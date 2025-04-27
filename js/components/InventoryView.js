@@ -581,6 +581,7 @@ const renderPagination = () => {
                 itemsPerPage: itemsPerPage, // Pass the prop
                 
                 // Callbacks
+                onAddComponent: onAddComponent,
                 onCategoriesChange: setSelectedCategories,
                 onTypesChange: setSelectedTypes,
                 onMarksChange: setSelectedMarks,

@@ -386,11 +386,17 @@ const renderPageSizeSelector = () => {
             // Add Component Button
             React.createElement('div', null,
                 React.createElement('button', {
-                    onClick: onAddComponent,
+                    onClick: () => {
+                        console.log("Add Component button clicked"); // Debug output
+                        if (typeof onAddComponent === 'function') {
+                            onAddComponent();
+                        } else {
+                            console.error("onAddComponent is not a function or undefined");
+                        }
+                    },
                     className: UI.buttons.success + " w-full"
                 }, "+ Add Component")
             ),
-
             // Category Filter
             React.createElement('div', null,
                 React.createElement('label', {
