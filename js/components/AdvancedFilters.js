@@ -69,7 +69,7 @@ window.App.components.AdvancedFilters = ({
     const [quantityStats, setQuantityStats] = useState({ min: 0, max: 100 });
 
     // Items per page options
-    const pageOptions = [10, 25, 50, 75, 100, 'all'];
+    const pageOptions = [5 ,10, 25, 50, 100, 'all'];
 
     // Calculate price and quantity stats on component changes
     useEffect(() => {

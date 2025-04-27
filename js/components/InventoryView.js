@@ -336,7 +336,7 @@ const renderPagination = () => {
                     onClick: () => handlePageChange(currentPage - 1),
                     disabled: currentPage === 1,
                     className: `px-3 py-1 border-r ${currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`
-                }, "Previous"),
+                }, "<"),
 
                 // Page numbers - limit visible pages for readability
                 (() => {
@@ -399,7 +399,7 @@ const renderPagination = () => {
                     onClick: () => handlePageChange(currentPage + 1),
                     disabled: currentPage === totalPages,
                     className: `px-3 py-1 ${currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`
-                }, "Next")
+                }, ">")
             )
         ),
         
