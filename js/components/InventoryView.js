@@ -592,6 +592,7 @@ const renderPagination = () => {
                 onItemsPerPageChange: onItemsPerPageChange, // Pass the callback
                 onClearFilters: handleClearAdvancedFilters,
                 onChangeViewMode: handleViewChange,
+                onChangeCategoryFilter:handleCategoryChange,
                 
                 // UI state
                 isExpanded: advancedFiltersExpanded,
@@ -612,7 +613,7 @@ const renderPagination = () => {
                         title: selectedComponents.length === filteredComponents.length ? "Deselect All Visible" : "Select All Visible",
                         disabled: filteredComponents.length === 0
                     }),
-                    React.createElement('label', { htmlFor: "select-all-filtered-bulk", className: "text-sm text-blue-800" }, ` ${selectedComponents.length} component(s) selected `)
+                    React.createElement('label', { htmlFor: "select-all-filtered-bulk", className: UI.forms.label }, ` ${selectedComponents.length} component(s) selected `)
                 ),
                 // Bulk Action Buttons
                 React.createElement('div', { className: "flex gap-2" },

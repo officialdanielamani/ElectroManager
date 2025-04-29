@@ -466,7 +466,7 @@ window.App.components.BulkEditForm = ({
 
                         // --- Favorite, Bookmark, Star Options ---
                         React.createElement('div', { className: "border-t border-gray-200 pt-4 mt-4" },
-                            React.createElement('h3', { className: "font-medium mb-3 text-gray-700" }, "Mark Components As:"),
+                            React.createElement('div', { className: UI.typography.sectionTitle }, "Mark Components As:"),
                             React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-3 gap-4" },
                                 // Favorite Option
                                 React.createElement('div', null,
