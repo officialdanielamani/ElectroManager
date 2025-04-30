@@ -195,10 +195,9 @@ window.App.utils.storage = {
 
             // Load theme setting
             const savedTheme = localStorage.getItem('electronicsTheme');
-            if (savedTheme && UI.themes[savedTheme]) {
+            if (savedTheme) {
                 defaultConfig.theme = savedTheme;
             }
-
             console.log('Loaded config from localStorage');
             return defaultConfig;
         } catch (e) {

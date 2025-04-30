@@ -56,6 +56,12 @@ window.App.utils.UI = {
                 textPrimary: 'white',
                 textSecondary: 'gray-300',
                 textMuted: 'gray-500'
+            },
+            overrides: {
+                body: 'bg-gray-900 text-white',
+                card: 'bg-gray-800 border-gray-700',
+                input: 'bg-gray-700 border-gray-600 text-white',
+                button: 'bg-blue-500 text-white hover:bg-blue-600'
             }
         },
         

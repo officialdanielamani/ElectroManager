@@ -46,9 +46,28 @@ window.App.components.SettingsView = ({
     onRestoreDefaultFootprints, // Function: Called to restore default footprints
     onChangeTheme, // Function(theme): Called when theme is changed
 }) => {
-    const { UI } = window.App.utils;
+  
+        // Ensure we have the UI object
+        const { UI } = window.App.utils;
+    // Fallback typography if UI is not loaded properly
+    const typography = UI?.typography || {
+        heading: { h2: "text-2xl font-semibold text-gray-800" },
+        sectionTitle: "font-medium text-gray-700",
+        body: "text-sm text-gray-600",
+        small: "text-xs text-gray-500"
+    };
     const { useState } = React;
-    const { FootprintManager, ThemeSwitcher } = window.App.components;
+    const { FootprintManager } = window.App.components;
+    
+    // Use typography with a fallback
+    const useTypography = (key) => {
+        try {
+            return UI.typography[key];
+        } catch (e) {
+            console.warn("UI typography not available, using fallback");
+            return typography[key] || "";
+        }
+    };
 
     // Internal state for settings form controls
     const [editingCategory, setEditingCategory] = useState(null); // Category being edited
@@ -548,6 +567,14 @@ window.App.components.SettingsView = ({
                                         }),
                                         React.createElement('p', { className: UI.forms.hint }, "Select a theme for the application interface.")
                                     ),
+                                    React.createElement('button', {
+                                        onClick: () => {
+                                            // Force theme application
+                                            onChangeTheme(theme);
+                                            setExportMessage('Theme updated and applied.');
+                                        },
+                                        className: UI.buttons.secondary + " mt-2"
+                                    }, "Apply Theme"),
                                     // End Display Settings Section
                   
             // --- Local Storage Management Section ---
