@@ -224,9 +224,8 @@ window.App.components.InventoryView = ({
                     // Favorite Icon/Button
                     React.createElement('button', {
                         onClick: () => onToggleFavorite(component.id, 'favorite'),
-                        className: `p-1 rounded-full ${component.favorite ? 'text-red-500 hover:text-red-600' : 'text-gray-300 hover:text-red-500'}`,
-                        title: component.favorite ? "Remove from favorites" : "Add to favorites"
-                    },
+                        className: `p-1 rounded-full ${component.favorite ? UI.colors.danger.text + ' ' + UI.colors.danger.hover.replace('bg-', 'hover:text-') : 'text-gray-300 hover:text-red-500'}`,
+                        title: component.favorite ? "Remove from favorites" : "Add to favorites"},
                         React.createElement('svg', {
                             xmlns: "http://www.w3.org/2000/svg",
                             className: "h-5 w-5",
@@ -244,9 +243,9 @@ window.App.components.InventoryView = ({
                     // Bookmark Icon/Button
                     React.createElement('button', {
                         onClick: () => onToggleFavorite(component.id, 'bookmark'),
-                        className: `p-1 rounded-full ${component.bookmark ? 'text-blue-500 hover:text-blue-600' : 'text-gray-300 hover:text-blue-500'}`,
+                        className: `p-1 rounded-full ${component.bookmark ? UI.colors.info.text + ' hover:' + UI.colors.info.text.replace('text', 'text') : 'text-gray-300 hover:text-blue-500'}`,
                         title: component.bookmark ? "Remove bookmark" : "Add bookmark"
-                    },
+                         },
                         React.createElement('svg', {
                             xmlns: "http://www.w3.org/2000/svg",
                             className: "h-5 w-5",
@@ -262,9 +261,9 @@ window.App.components.InventoryView = ({
                     // Star Icon/Button
                     React.createElement('button', {
                         onClick: () => onToggleFavorite(component.id, 'star'),
-                        className: `p-1 rounded-full ${component.star ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-300 hover:text-yellow-500'}`,
+                        className: `p-1 rounded-full ${component.star ? UI.colors.warning.text + ' hover:' + UI.colors.warning.text.replace('text', 'text') : 'text-gray-300 hover:text-yellow-500'}`,
                         title: component.star ? "Remove star" : "Add star"
-                    },
+                        },
                         React.createElement('svg', {
                             xmlns: "http://www.w3.org/2000/svg",
                             className: "h-5 w-5",
@@ -289,7 +288,7 @@ window.App.components.InventoryView = ({
                         title: "Decrease Quantity"
                     }, "-"),
                     React.createElement('span', {
-                        className: `text-sm font-semibold ${lowStock ? 'text-red-600' : 'text-gray-900'}`
+                        className: `text-sm font-semibold ${lowStock ? UI.colors.danger.text.replace('500', '600') : 'text-gray-900'}`
                     }, component.quantity || 0),
                     React.createElement('button', {
                         onClick: () => onUpdateQuantity(component.id, 1),
@@ -307,12 +306,12 @@ window.App.components.InventoryView = ({
             React.createElement('td', { className: UI.tables.body.cellAction },
                 React.createElement('button', {
                     onClick: () => onEditComponent(component),
-                    className: "text-indigo-600 hover:text-indigo-900 mr-3",
+                    className: UI.colors.info.text.replace('500', '600') + " hover:text-indigo-900 mr-3",
                     title: "Edit Component"
                 }, "Edit"),
                 React.createElement('button', {
                     onClick: () => onDeleteComponent(component.id),
-                    className: "text-red-600 hover:text-red-900",
+                    className: UI.colors.danger.text.replace('500', '600') + " hover:text-red-900",
                     title: "Delete Component"
                 }, "Delete")
             )
@@ -371,7 +370,7 @@ const renderPagination = () => {
                         pages.push(React.createElement('button', {
                             key: i,
                             onClick: () => handlePageChange(i),
-                            className: `px-3 py-1 border-r ${i === currentPage ? 'bg-blue-500 text-white' : 'hover:bg-gray-50'}`
+                            className: `px-3 py-1 border-r ${i === currentPage ? UI.colors.primary.default + ' text-white' : 'hover:bg-gray-50'}`
                         }, i.toString()));
                     }
 
@@ -420,7 +419,7 @@ const renderPagination = () => {
 
         return React.createElement('div', {
             key: component.id,
-            className: `${UI.cards.container} ${isSelected ? 'ring-2 ring-offset-1 ring-blue-500' : ''} ${lowStock ? 'border-l-4 border-red-400' : ''}`
+            className: `${UI.cards.container} ${isSelected ? 'ring-2 ring-offset-1 ' + UI.colors.primary.border : ''} ${lowStock ? 'border-l-4 ' + UI.colors.danger.border.replace('500', '400') : ''}`
         },
             // Select Checkbox
             React.createElement('div', { className: "absolute top-2 left-2 z-10" },
@@ -524,12 +523,12 @@ const renderPagination = () => {
                     // Total Components Stat
                     React.createElement('div', { className: "p-3 bg-white rounded-lg border" },
                         React.createElement('h3', { className: UI.typography.small + " font-medium text-gray-500" }, "Components"),
-                        React.createElement('p', { className: "text-2xl font-semibold text-blue-600" }, totalComponents)
+                        React.createElement('p', { className: "text-2xl font-semibold " + UI.colors.primary.text.replace('500', '600') }, totalComponents)
                     ),
                     // Total Items Stat
                     React.createElement('div', { className: "p-3 bg-white rounded-lg border" },
                         React.createElement('h3', { className: UI.typography.small + " font-medium text-gray-500" }, "Total Items"),
-                        React.createElement('p', { className: "text-2xl font-semibold text-green-600" }, totalItems)
+                        React.createElement('p', { className: "text-2xl font-semibold " + UI.colors.success.text.replace('500', '600') }, totalItems)
                     ),
                     // Total Value Stat (Conditional)
                     showTotalValue && React.createElement('div', { className: "p-3 bg-white rounded-lg border" },

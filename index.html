@@ -32,6 +32,8 @@
     <script src="js/components/DrawerManager.js"></script>
     <script src="js/components/DrawerView.js"></script>
     <script src="js/components/DrawerPage.js"></script>
+    <script src="js/components/ThemeSwitcher.js"></script>
+
 
 </head>
 
@@ -76,6 +78,7 @@
             const [cells, setCells] = useState([]);
             const [viewingDrawerId, setViewingDrawerId] = useState(null);
             const [itemsPerPage, setItemsPerPage] = useState('all');
+            const [appTheme, setAppTheme] = useState(window.App.utils.UI.currentTheme);
 
             //const [showAddDrawerForm, setShowAddDrawerForm] = useState(false);
 
@@ -155,28 +158,28 @@
 
             // Save configuration changes to localStorage
             useEffect(() => {
-    storage.saveConfig({
-        categories,
-        viewMode,
-        lowStockConfig,
-        currencySymbol,
-        showTotalValue,
-        footprints,
-        itemsPerPage // Add this line
-    });
-}, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage]);
+                storage.saveConfig({
+                    categories,
+                    viewMode,
+                    lowStockConfig,
+                    currencySymbol,
+                    showTotalValue,
+                    footprints,
+                    itemsPerPage // Add this line
+                });
+            }, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage]);
 
-const saveConfigCallback = useCallback(() => {
-    storage.saveConfig({
-        categories,
-        viewMode,
-        lowStockConfig,
-        currencySymbol,
-        showTotalValue,
-        footprints,
-        itemsPerPage // Add this property
-    });
-}, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage]); // Add itemsPerPage to dependency array
+            const saveConfigCallback = useCallback(() => {
+                storage.saveConfig({
+                    categories,
+                    viewMode,
+                    lowStockConfig,
+                    currencySymbol,
+                    showTotalValue,
+                    footprints,
+                    itemsPerPage // Add this property
+                });
+            }, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage]); // Add itemsPerPage to dependency array
 
             // --- Helper Functions / Callbacks for Child Components ---
 
@@ -769,6 +772,26 @@ const saveConfigCallback = useCallback(() => {
                 // You need to expose this state variable to the DrawerPage
                 setViewingDrawerId(drawerId);
             };
+
+            //-- Theme Management--
+
+            // Set up global theme change handler
+            window.App.onThemeChange = (newTheme) => {
+                setAppTheme(newTheme);
+            };
+
+            useEffect(() => {
+                // Get updated styles based on current theme
+                window.App.utils.UI.buttons = window.App.utils.UI.getThemeStyles().buttons;
+                window.App.utils.UI.cards = window.App.utils.UI.getThemeStyles().cards;
+                window.App.utils.UI.typography = window.App.utils.UI.getThemeStyles().typography;
+                // Update other style categories similarly
+
+                // Apply theme class to body if needed
+                document.body.className = `bg-${window.App.utils.UI.themes[appTheme].colors.background}`;
+            }, [appTheme]);
+
+
 
             //-- Footprint Management---
             const handleAddFootprint = (newFootprint) => {
@@ -1379,8 +1402,8 @@ const saveConfigCallback = useCallback(() => {
                         selectedComponents: selectedComponents,
                         locations: locations,
                         selectedLocation: selectedLocation,
-                        itemsPerPage: itemsPerPage, 
-                        
+                        itemsPerPage: itemsPerPage,
+
                         // Pass callbacks
                         onAddComponent: handleAddComponent,
                         onEditComponent: handleEditComponent,
