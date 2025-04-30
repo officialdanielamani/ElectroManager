@@ -17,6 +17,7 @@ window.App.components.SettingsView = ({
     importError, // String: Error or success message after import
     exportMessage, // String: Message after export/save attempt
     localStorageStatus, // Object: Status of localStorage items { key: boolean }
+    theme, // String: Current UI theme
     locations,
     components,
     // Callbacks
@@ -43,10 +44,11 @@ window.App.components.SettingsView = ({
     onExportLocations, // Function: Called when Export Locations button is clicked
     onImportLocationsFile, // Function(event): Called when locations file is selected for import
     onRestoreDefaultFootprints, // Function: Called to restore default footprints
+    onChangeTheme, // Function(theme): Called when theme is changed
 }) => {
     const { UI } = window.App.utils;
     const { useState } = React;
-    const { FootprintManager } = window.App.components;
+    const { FootprintManager, ThemeSwitcher } = window.App.components;
 
     // Internal state for settings form controls
     const [editingCategory, setEditingCategory] = useState(null); // Category being edited
@@ -537,6 +539,17 @@ window.App.components.SettingsView = ({
                 )
             ), // End Display Settings Section
 
+                                    // Theme Switcher Section
+                                    React.createElement('div', { className: "col-span-2 mt-4 pt-4 border-t border-gray-200" },
+                                        React.createElement('h4', { className: UI.typography.sectionTitle + " mb-3" }, "Application Theme"),
+                                        React.createElement(ThemeSwitcher, {
+                                            currentTheme: theme,
+                                            onThemeChange: onChangeTheme
+                                        }),
+                                        React.createElement('p', { className: UI.forms.hint }, "Select a theme for the application interface.")
+                                    ),
+                                    // End Display Settings Section
+                  
             // --- Local Storage Management Section ---
             React.createElement('div', { className: UI.cards.container },
                 React.createElement('h2', { className: `${UI.typography.heading.h2} ${UI.cards.header}` }, "Local Storage Management"),

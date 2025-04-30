@@ -30,12 +30,12 @@ window.App.utils.storage = {
                         bookmark: comp.bookmark || false,
                         star: comp.star || false
                     };
-    
+
                     // Ensure locationInfo is properly formatted
                     if (!comp.locationInfo || typeof comp.locationInfo === 'string' || comp.locationInfo === '[object Object]') {
                         updatedComp.locationInfo = { locationId: '', details: '' };
                     }
-    
+
                     // Ensure storageInfo is properly formatted
                     if (!comp.storageInfo || typeof comp.storageInfo === 'string' || comp.storageInfo === '[object Object]') {
                         updatedComp.storageInfo = { locationId: '', drawerId: '', cells: [] };
@@ -46,17 +46,17 @@ window.App.utils.storage = {
                             drawerId: comp.storageInfo.drawerId || '',
                             cells: Array.isArray(comp.storageInfo.cells) ? comp.storageInfo.cells : []
                         };
-                        
+
                         // Handle backward compatibility - if cellId exists but cells array doesn't include it
-                        if (comp.storageInfo.cellId && 
+                        if (comp.storageInfo.cellId &&
                             !updatedComp.storageInfo.cells.includes(comp.storageInfo.cellId)) {
                             updatedComp.storageInfo.cells.push(comp.storageInfo.cellId);
                         }
                     }
-    
+
                     return updatedComp;
                 });
-                
+
                 console.log('Loaded components from localStorage:', componentsWithValidValues.length);
                 return componentsWithValidValues;
             }
@@ -141,7 +141,8 @@ window.App.utils.storage = {
             currencySymbol: 'RM',
             showTotalValue: false,
             footprints: [],
-            itemsPerPage: 'all' 
+            itemsPerPage: 'all',
+            theme: 'dark' // Add default theme setting
         };
 
         try {
@@ -192,6 +193,12 @@ window.App.utils.storage = {
             // Check for 'true' string as localStorage stores strings
             defaultConfig.showTotalValue = savedShowTotalValue === 'true';
 
+            // Load theme setting
+            const savedTheme = localStorage.getItem('electronicsTheme');
+            if (savedTheme && UI.themes[savedTheme]) {
+                defaultConfig.theme = savedTheme;
+            }
+
             console.log('Loaded config from localStorage');
             return defaultConfig;
         } catch (e) {
@@ -232,6 +239,11 @@ window.App.utils.storage = {
                 if (typeof config.showTotalValue === 'boolean') {
                     // Store boolean as string 'true' or 'false'
                     localStorage.setItem('electronicsShowTotalValue', config.showTotalValue.toString());
+                }
+
+                // Save theme setting
+                if (config.theme && typeof config.theme === 'string') {
+                    localStorage.setItem('electronicsTheme', config.theme);
                 }
 
                 // Save footprints

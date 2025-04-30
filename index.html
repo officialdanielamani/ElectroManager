@@ -59,6 +59,7 @@
             const [categories, setCategories] = useState([]);
             const [currentPage, setCurrentPage] = useState('inventory'); // 'inventory', 'locations', 'data', or 'drawers'
             const [viewMode, setViewMode] = useState('table'); // 'table' or 'card'
+            const [theme, setTheme] = useState('dark');
             const [selectedCategory, setSelectedCategory] = useState('all');
             const [searchTerm, setSearchTerm] = useState('');
             const [showForm, setShowForm] = useState(false); // For add/edit component modal
@@ -97,6 +98,8 @@
                 setFootprints(config.footprints || []);
                 setLocations(storage.loadLocations() || []);
                 setItemsPerPage(config.itemsPerPage || 'all');
+                setTheme(config.theme || 'dark');
+                window.App.utils.UI.setTheme(config.theme || 'dark');
 
                 // Load drawers from localStorage
                 setDrawers(storage.loadDrawers() || []);
@@ -158,16 +161,17 @@
 
             // Save configuration changes to localStorage
             useEffect(() => {
-                storage.saveConfig({
-                    categories,
-                    viewMode,
-                    lowStockConfig,
-                    currencySymbol,
-                    showTotalValue,
-                    footprints,
-                    itemsPerPage // Add this line
-                });
-            }, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage]);
+    storage.saveConfig({
+        categories,
+        viewMode,
+        lowStockConfig,
+        currencySymbol,
+        showTotalValue,
+        footprints,
+        itemsPerPage,
+        theme // Add theme to saved config
+    });
+}, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]);
 
             const saveConfigCallback = useCallback(() => {
                 storage.saveConfig({
@@ -177,9 +181,10 @@
                     currencySymbol,
                     showTotalValue,
                     footprints,
-                    itemsPerPage // Add this property
+                    itemsPerPage,
+                    theme // Add theme property
                 });
-            }, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage]); // Add itemsPerPage to dependency array
+            }, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]); // Add theme to dependency array
 
             // --- Helper Functions / Callbacks for Child Components ---
 
@@ -774,6 +779,12 @@
             };
 
             //-- Theme Management--
+            const handleThemeChange = (newTheme) => {
+                if (window.App.utils.UI.themes[newTheme]) {
+                    setTheme(newTheme);
+                    window.App.utils.UI.setTheme(newTheme);
+                }
+            };
 
             // Set up global theme change handler
             window.App.onThemeChange = (newTheme) => {
@@ -1434,6 +1445,7 @@
                         footprints: footprints,
                         locations: locations,
                         components: components,
+                        theme: theme, // Pass theme state
                         onAddLocation: handleAddLocation,
                         onEditLocation: handleEditLocation,
                         onDeleteLocation: handleDeleteLocation,
@@ -1462,6 +1474,7 @@
                         onDeleteFootprint: handleDeleteFootprint,
                         onEditComponent: handleEditComponent,
                         onRestoreDefaultFootprints: handleRestoreDefaultFootprints,
+                        onChangeTheme: handleThemeChange, // Add theme change handler
                     }),
 
                     currentPage === 'locations' && React.createElement(LocationPage, {
