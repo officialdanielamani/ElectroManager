@@ -830,11 +830,33 @@
 
             //-- Theme Management--
             const handleThemeChange = (newTheme) => {
-                if (window.App.utils.UI.themes[newTheme]) {
-                    setTheme(newTheme);
-                    window.App.utils.UI.setTheme(newTheme);
-                }
-            };
+    if (window.App.utils.UI.themes[newTheme]) {
+        // Update state
+        setTheme(newTheme);
+        
+        // Update UI constants
+        window.App.utils.UI.currentTheme = newTheme;
+        
+        // Apply theme to body element
+        if (newTheme === 'dark') {
+            document.body.classList.add('dark-mode');
+            document.body.classList.remove('bg-gray-100');
+            document.body.classList.add('bg-gray-900', 'text-white');
+        } else if (newTheme === 'keqing') {
+            document.body.classList.remove('dark-mode');
+            document.body.classList.remove('bg-gray-100', 'bg-gray-900', 'text-white');
+            document.body.classList.add('bg-purple-900', 'text-yellow-300');
+        } else {
+            // Light theme
+            document.body.classList.remove('dark-mode');
+            document.body.classList.remove('bg-gray-900', 'text-white', 'bg-purple-900', 'text-yellow-300');
+            document.body.classList.add('bg-gray-100');
+        }
+        
+        // Force re-render
+        setAppTheme(newTheme);
+    }
+};
 
             // Set up global theme change handler
             window.App.onThemeChange = (newTheme) => {
