@@ -46,9 +46,9 @@ window.App.components.SettingsView = ({
     onRestoreDefaultFootprints, // Function: Called to restore default footprints
     onChangeTheme, // Function(theme): Called when theme is changed
 }) => {
-  
-        // Ensure we have the UI object
-        const { UI } = window.App.utils;
+
+    // Ensure we have the UI object
+    const { UI } = window.App.utils;
     // Fallback typography if UI is not loaded properly
     const typography = UI?.typography || {
         heading: { h2: "text-2xl font-semibold text-gray-800" },
@@ -58,7 +58,7 @@ window.App.components.SettingsView = ({
     };
     const { useState } = React;
     const { FootprintManager } = window.App.components;
-    
+
     // Use typography with a fallback
     const useTypography = (key) => {
         try {
@@ -157,7 +157,7 @@ window.App.components.SettingsView = ({
                     ),
                     // Update date
                     "Updated: 26 April 2025",
-                    
+
                     // Changes in this version 
                     React.createElement('div', { className: "mb-4 mt-4" },
                         React.createElement('h4', { className: UI.typography.sectionTitle }, "Changes in this version:"),
@@ -322,6 +322,25 @@ window.App.components.SettingsView = ({
                     )
                 )
             ), // End Import/Export Section
+
+            // Theme Configuration Section
+            React.createElement('div', { className: UI.cards.container },
+                React.createElement('h2', {
+                    className: `${UI.typography.heading.h2} ${UI.cards.header}`
+                },
+                    "Theme Configuration"
+                ),
+                React.createElement('div', { className: UI.cards.body },
+                    // This is your ThemeSwitcher component
+                    React.createElement(
+                        window.App.components.ThemeSwitcher,
+                        {
+                            currentTheme: theme,
+                            onThemeChange: onChangeTheme
+                        }
+                    )
+                )
+            ),
 
             // --- Category Management Section ---
             React.createElement('div', { className: UI.cards.container },
@@ -558,25 +577,6 @@ window.App.components.SettingsView = ({
                 )
             ), // End Display Settings Section
 
-                                    // Theme Switcher Section
-                                    React.createElement('div', { className: "col-span-2 mt-4 pt-4 border-t border-gray-200" },
-                                        React.createElement('h4', { className: UI.typography.sectionTitle + " mb-3" }, "Application Theme"),
-                                        React.createElement(ThemeSwitcher, {
-                                            currentTheme: theme,
-                                            onThemeChange: onChangeTheme
-                                        }),
-                                        React.createElement('p', { className: UI.forms.hint }, "Select a theme for the application interface.")
-                                    ),
-                                    React.createElement('button', {
-                                        onClick: () => {
-                                            // Force theme application
-                                            onChangeTheme(theme);
-                                            setExportMessage('Theme updated and applied.');
-                                        },
-                                        className: UI.buttons.secondary + " mt-2"
-                                    }, "Apply Theme"),
-                                    // End Display Settings Section
-                  
             // --- Local Storage Management Section ---
             React.createElement('div', { className: UI.cards.container },
                 React.createElement('h2', { className: `${UI.typography.heading.h2} ${UI.cards.header}` }, "Local Storage Management"),
@@ -663,7 +663,7 @@ window.App.components.SettingsView = ({
                                     )
                                 )
                             ),
-  
+
                         )
                     ),
 
@@ -711,7 +711,7 @@ window.App.components.SettingsView = ({
                                 React.createElement('p', { className: "text-xs text-red-600 mt-1" }, "I am aware what I am doing when clicking the button above"),
 
                             ),
-                        
+
                         )
                     )
                 )

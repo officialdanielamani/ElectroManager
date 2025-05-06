@@ -9,93 +9,101 @@ window.App.utils = window.App.utils || {};
  * Provides consistent styling across all components.
  */
 window.App.utils.UI = {
-    // Themes system
-    themes: {
-        light: {
-            name: 'Light',
-            colors: {
-                primary: 'blue-500',
-                primaryHover: 'blue-600',
-                secondary: 'gray-300',
-                secondaryHover: 'gray-400',
-                danger: 'red-500',
-                dangerHover: 'red-600',
-                success: 'green-500',
-                successHover: 'green-600',
-                warning: 'yellow-500',
-                warningHover: 'yellow-600',
-                info: 'indigo-500',
-                infoHover: 'indigo-600',
-                background: 'gray-100',
-                cardBackground: 'white',
-                border: 'gray-200',
-                textPrimary: 'gray-800',
-                textSecondary: 'gray-600',
-                textMuted: 'gray-400'
-            }
-        },
-        
-        dark: {
-            name: 'Dark',
-            colors: {
-                primary: 'blue-400',
-                primaryHover: 'blue-300',
-                secondary: 'gray-600',
-                secondaryHover: 'gray-500',
-                danger: 'red-400',
-                dangerHover: 'red-300',
-                success: 'green-400',
-                successHover: 'green-300',
-                warning: 'yellow-400',
-                warningHover: 'yellow-300',
-                info: 'indigo-400',
-                infoHover: 'indigo-300',
-                background: 'gray-900',
-                cardBackground: 'gray-800',
-                border: 'gray-700',
-                textPrimary: 'white',
-                textSecondary: 'gray-300',
-                textMuted: 'gray-500'
-            },
-            overrides: {
-                body: 'bg-gray-900 text-white',
-                card: 'bg-gray-800 border-gray-700',
-                input: 'bg-gray-700 border-gray-600 text-white',
-                button: 'bg-blue-500 text-white hover:bg-blue-600'
-            }
-        },
-        
-        keqing: {
-            name: 'Purple-Gold',
-            colors: {
-                primary: 'purple-600',
-                primaryHover: 'purple-700',
-                secondary: 'yellow-500',
-                secondaryHover: 'yellow-600',
-                danger: 'red-500',
-                dangerHover: 'red-600',
-                success: 'purple-400',
-                successHover: 'purple-500',
-                warning: 'yellow-400',
-                warningHover: 'yellow-500',
-                info: 'indigo-400',
-                infoHover: 'indigo-500',
-                background: 'purple-50',
-                cardBackground: 'white',
-                border: 'purple-200',
-                textPrimary: 'purple-900',
-                textSecondary: 'purple-700',
-                textMuted: 'purple-300'
-            },
-            gradients: {
-                primary: 'bg-gradient-to-r from-purple-500 to-purple-700',
-                accent: 'bg-gradient-to-r from-yellow-400 to-yellow-600'
-            },
-            specialButtons: {
-                electro: 'px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg shadow-md hover:shadow-lg transform hover:-translate-y-1 transition-all duration-200'
-            }
+
+        themes: {
+      // ─── LIGHT MODE ────────────────────────────────────────────────
+      light: {
+        name: 'Light',
+        colors: {
+          // brand colors (unchanged)
+          primary:        'blue-500',
+          primaryHover:   'blue-600',
+          secondary:      'gray-300',
+          secondaryHover: 'gray-400',
+          danger:         'red-500',
+          dangerHover:    'red-600',
+          success:        'green-500',
+          successHover:   'green-600',
+          warning:        'yellow-500',
+          warningHover:   'yellow-600',
+          info:           'indigo-500',
+          infoHover:      'indigo-600',
+          // background & surfaces
+          background:     'white',      // page background
+          cardBackground: 'gray-100',   // cards and panels
+          border:         'gray-200',   // card/input borders
+          // text
+          textPrimary:    'black',      // headings, body text
+          textSecondary:  'gray-700',   // secondary labels
+          textMuted:      'gray-500'    // small/disabled text
         }
+      },
+
+      // ─── DARK MODE ─────────────────────────────────────────────────
+      dark: {
+        name: 'Dark',
+        colors: {
+          // brand colors (you can tweak if you like)
+          primary:        'blue-400',
+          primaryHover:   'blue-300',
+          secondary:      'gray-600',
+          secondaryHover: 'gray-500',
+          danger:         'red-400',
+          dangerHover:    'red-300',
+          success:        'green-400',
+          successHover:   'green-300',
+          warning:        'yellow-400',
+          warningHover:   'yellow-300',
+          info:           'indigo-400',
+          infoHover:      'indigo-300',
+          // background & surfaces
+          background:     'black',      // page background
+          cardBackground: 'gray-900',   // cards and panels
+          border:         'gray-800',   // card/input borders
+          // text
+          textPrimary:    'white',      // headings, body text
+          textSecondary:  'gray-300',   // secondary labels
+          textMuted:      'gray-500'    // small/disabled text
+        },
+        // keep any overrides you already have here…
+        overrides: { /* … */ }
+      },
+
+      // ─── KEQING (PURPLE & GOLD) ────────────────────────────────────
+      keqing: {
+        name: 'Keqing',
+        colors: {
+          // brand colors
+          primary:        'purple-700',
+          primaryHover:   'purple-800',
+          secondary:      'yellow-500',
+          secondaryHover: 'yellow-600',
+          danger:         'red-500',
+          dangerHover:    'red-600',
+          success:        'green-500',
+          successHover:   'green-600',
+          warning:        'yellow-400',
+          warningHover:   'yellow-500',
+          info:           'indigo-500',
+          infoHover:      'indigo-600',
+          // background & surfaces
+          background:     'purple-900',  // page background
+          cardBackground: 'purple-800',  // cards and panels
+          border:         'purple-700',  // card/input borders
+          // text
+          textPrimary:    'yellow-400',  // gold text
+          textSecondary:  'yellow-300',  // lighter gold
+          textMuted:      'yellow-200'   // subtle gold
+        },
+        gradients: {
+          primary: 'bg-gradient-to-r from-purple-700 to-purple-900',
+          accent:  'bg-gradient-to-r from-yellow-500 to-yellow-600'
+        },
+        // any special buttons or overrides you want…
+        specialButtons: { /* … */ }
+      }
     },
+
 
     // Current theme (default to light)
     currentTheme: 'light',
@@ -436,12 +444,13 @@ window.App.utils.UI = {
             // Cards, typography, forms, etc. follow the same pattern
             cards: {
                 container: `bg-${theme.colors.cardBackground} rounded-lg shadow border border-${theme.colors.border} hover:shadow-md transition-shadow duration-150`,
-                header: `p-4 border-b border-${theme.colors.border}`,
-                body: `p-4`,
-                footer: `p-4 border-t border-${theme.colors.border} bg-${theme.colors.background}`
+                header:    `p-4 border-b border-${theme.colors.border}`,
+                body:      `p-4`,
+                footer:    `p-4 border-t border-${theme.colors.border} bg-${theme.colors.background}`
             },
             
             typography: {
+                weight: this.typography.weight,
                 title: `text-xl font-semibold text-${theme.colors.textPrimary}`,
                 subtitle: `text-lg font-medium text-${theme.colors.textSecondary}`,
                 body: `text-sm text-${theme.colors.textSecondary}`,
@@ -454,6 +463,12 @@ window.App.utils.UI = {
                     h5: `text-base font-medium text-${theme.colors.textSecondary}`,
                     h6: `text-sm font-medium text-${theme.colors.textSecondary}`
                 }
+            },
+
+            colors: {
+                bg: `bg-${theme.colors.default}`,
+                textPrimary: `text-${theme.colors.textPrimary}`,
+                textSecondary: `text-${theme.colors.textSecondary}`
             },
             
             // Additional themed components...
