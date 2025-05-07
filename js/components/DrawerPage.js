@@ -102,7 +102,7 @@ window.App.components.DrawerPage = ({
     return React.createElement('div', { className: "space-y-6" },
         React.createElement('h2', { className: UI.typography.heading.h2 }, "Drawer Management"),
         React.createElement('p', { className: UI.typography.body },
-            "Imagine you have rack, drawer or cabinate. This way you can visualise the location of the component more accurate"
+            "Manage drawer organization and cell assignments for your electronic components."
         ),
 
         viewingDrawerId && currentDrawer
@@ -133,4 +133,4 @@ window.App.components.DrawerPage = ({
     );
 };
 
-console.log("DrawerPage component loaded."); // For debugging
+console.log("DrawerPage component loaded with theme-aware styling."); // For debugging
