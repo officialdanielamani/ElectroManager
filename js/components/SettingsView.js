@@ -378,7 +378,7 @@ window.App.components.SettingsView = ({
                                                         autoFocus: true,
                                                         onKeyDown: (e) => e.key === 'Enter' && handleSaveCategory()
                                                     }) :
-                                                    React.createElement('span', { className: "text-sm text-gray-900" }, category)
+                                                    React.createElement('span',  { className: UI.tables.body.cell }, category)
                                             ),
                                             // Component Count
                                             React.createElement('td', { className: `${UI.tables.body.cell} text-center` },
@@ -573,7 +573,7 @@ window.App.components.SettingsView = ({
                                     onChange: onChangeShowTotalValue,
                                     className: UI.forms.checkbox
                                 }),
-                                React.createElement('span', null, "Show Total Inventory Value in Summary")
+                                React.createElement('span', { className: UI.typography.body }, "Show Total Inventory Value in Summary")
                             ),
                             React.createElement('p', { className: UI.forms.hint }, "Calculates and displays the sum of (price * quantity) for all components.")
                         )

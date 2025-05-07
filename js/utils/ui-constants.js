@@ -85,45 +85,8 @@ window.App.utils.UI = {
                 textMuted: 'gray-400',
                 textLight: 'gray-100'
             }
-        },
-
-        // ─── KEQING (PURPLE & GOLD) ────────────────────────────────────
-        keqing: {
-            name: 'Keqing',
-            colors: {
-                // Core theme colors
-                primary: 'purple-500',
-                primaryHover: 'purple-600',
-                secondary: 'yellow-400',
-                secondaryHover: 'yellow-500',
-                danger: 'red-400',
-                dangerHover: 'red-500',
-                success: 'green-400',
-                successHover: 'green-500',
-                warning: 'yellow-400',
-                warningHover: 'yellow-500',
-                info: 'indigo-400',
-                infoHover: 'indigo-500',
-                accent: 'yellow-400',
-                accentHover: 'yellow-500',
-                
-                // Page & component backgrounds
-                background: 'purple-900',
-                cardBackground: 'purple-800',
-                headerBackground: 'purple-800',
-                
-                // Borders
-                border: 'purple-700',
-                borderLight: 'purple-600',
-                borderDark: 'purple-700',
-                
-                // Text colors
-                textPrimary: 'yellow-300',
-                textSecondary: 'yellow-200',
-                textMuted: 'purple-300',
-                textLight: 'yellow-300'
-            }
         }
+
     },
 
     // Current theme (default to light)
