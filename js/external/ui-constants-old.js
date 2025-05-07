@@ -129,96 +129,19 @@ window.App.utils.UI = {
     // Current theme (default to light)
     currentTheme: 'light',
 
-    // NEW HELPER: Get a style with fallback
-    getStyle: function(path, defaultValue = '') {
-        // Handle direct paths like 'typography.small'
-        if (typeof path === 'string') {
-            const parts = path.split('.');
-            let result = this;
-            
-            for (const part of parts) {
-                if (result && result[part] !== undefined) {
-                    result = result[part];
-                } else {
-                    return defaultValue;
-                }
-            }
-            
-            return result;
-        }
-        
-        // Handle already resolved values
-        return path !== undefined ? path : defaultValue;
-    },
-
     // Function to set theme
     setTheme: function(themeName) {
         if (this.themes[themeName]) {
             this.currentTheme = themeName;
             
             // Update all the theme-based styles
-            const styles = this.getThemeStyles();
-            
-            // Update all UI components
-            this.buttons = styles.buttons;
-            this.cards = styles.cards;
-            this.typography = styles.typography;
-            this.forms = styles.forms;
-            this.tables = styles.tables;
-            this.status = styles.status;
-            this.tags = styles.tags;
-            this.modals = styles.modals;
-            this.layout = styles.layout;
-            
-            // Add colors direct access (for components that need direct color values)
-            this.colors = {
-                primary: {
-                    text: `text-${this.getThemeColors().primary}`,
-                    bg: `bg-${this.getThemeColors().primary}`,
-                    border: `border-${this.getThemeColors().primary}`,
-                    hover: `hover:bg-${this.getThemeColors().primaryHover}`
-                },
-                secondary: {
-                    text: `text-${this.getThemeColors().secondary}`,
-                    bg: `bg-${this.getThemeColors().secondary}`,
-                    border: `border-${this.getThemeColors().secondary}`,
-                    hover: `hover:bg-${this.getThemeColors().secondaryHover}`
-                },
-                danger: {
-                    text: `text-${this.getThemeColors().danger}`,
-                    bg: `bg-${this.getThemeColors().danger}`,
-                    border: `border-${this.getThemeColors().danger}`,
-                    hover: `hover:bg-${this.getThemeColors().dangerHover}`
-                },
-                success: {
-                    text: `text-${this.getThemeColors().success}`,
-                    bg: `bg-${this.getThemeColors().success}`,
-                    border: `border-${this.getThemeColors().success}`,
-                    hover: `hover:bg-${this.getThemeColors().successHover}`
-                },
-                warning: {
-                    text: `text-${this.getThemeColors().warning}`,
-                    bg: `bg-${this.getThemeColors().warning}`,
-                    border: `border-${this.getThemeColors().warning}`,
-                    hover: `hover:bg-${this.getThemeColors().warningHover}`
-                },
-                info: {
-                    text: `text-${this.getThemeColors().info}`,
-                    bg: `bg-${this.getThemeColors().info}`,
-                    border: `border-${this.getThemeColors().info}`,
-                    hover: `hover:bg-${this.getThemeColors().infoHover}`
-                },
-                accent: {
-                    text: `text-${this.getThemeColors().accent}`,
-                    bg: `bg-${this.getThemeColors().accent}`,
-                    border: `border-${this.getThemeColors().accent}`,
-                    hover: `hover:bg-${this.getThemeColors().accentHover}`
-                },
-                background: {
-                    default: `bg-${this.getThemeColors().background}`,
-                    alt: `bg-${this.getThemeColors().background.replace('900', '800').replace('100', '50')}`
-                }
-            };
+            this.buttons = this.getThemeStyles().buttons;
+            this.cards = this.getThemeStyles().cards;
+            this.typography = this.getThemeStyles().typography;
+            this.forms = this.getThemeStyles().forms;
+            this.tables = this.getThemeStyles().tables;
+            this.status = this.getThemeStyles().status;
+            this.tags = this.getThemeStyles().tags;
             
             console.log(`Theme switched to ${this.themes[themeName].name}`);
             return true;
@@ -258,9 +181,9 @@ window.App.utils.UI = {
                 
                 // Icon buttons
                 icon: {
-                    primary: `w-8 h-8 flex items-center justify-center text-${colors.primary} hover:bg-${colors.primary.replace('500', '100').replace('400', '900')} rounded-full`,
-                    danger: `w-8 h-8 flex items-center justify-center text-${colors.danger} hover:bg-${colors.danger.replace('500', '100').replace('400', '900')} rounded-full`,
-                    success: `w-8 h-8 flex items-center justify-center text-${colors.success} hover:bg-${colors.success.replace('500', '100').replace('400', '900')} rounded-full`
+                    primary: `w-8 h-8 flex items-center justify-center text-${colors.primary} hover:bg-${colors.primary.replace('500', '100')} rounded-full`,
+                    danger: `w-8 h-8 flex items-center justify-center text-${colors.danger} hover:bg-${colors.danger.replace('500', '100')} rounded-full`,
+                    success: `w-8 h-8 flex items-center justify-center text-${colors.success} hover:bg-${colors.success.replace('500', '100')} rounded-full`
                 }
             },
             
@@ -359,19 +282,9 @@ window.App.utils.UI = {
 
     // Initialize default styles based on initial theme
     initialize: function() {
-        // Set default theme
-        this.currentTheme = this.currentTheme || 'light';
-        
-        // Ensure theme exists
-        if (!this.themes[this.currentTheme]) {
-            console.warn(`Theme "${this.currentTheme}" not found, falling back to light theme`);
-            this.currentTheme = 'light';
-        }
-        
-        // Get theme styles based on current theme
         const styles = this.getThemeStyles();
         
-        // Initialize all UI component styles
+        // Assign initial styles
         this.buttons = styles.buttons;
         this.cards = styles.cards;
         this.typography = styles.typography;
@@ -381,57 +294,6 @@ window.App.utils.UI = {
         this.tags = styles.tags;
         this.modals = styles.modals;
         this.layout = styles.layout;
-        
-        // Add colors direct access
-        const colors = this.getThemeColors();
-        this.colors = {
-            primary: {
-                text: `text-${colors.primary}`,
-                bg: `bg-${colors.primary}`,
-                border: `border-${colors.primary}`,
-                hover: `hover:bg-${colors.primaryHover}`
-            },
-            secondary: {
-                text: `text-${colors.secondary}`,
-                bg: `bg-${colors.secondary}`,
-                border: `border-${colors.secondary}`,
-                hover: `hover:bg-${colors.secondaryHover}`
-            },
-            danger: {
-                text: `text-${colors.danger}`,
-                bg: `bg-${colors.danger}`,
-                border: `border-${colors.danger}`,
-                hover: `hover:bg-${colors.dangerHover}`
-            },
-            success: {
-                text: `text-${colors.success}`,
-                bg: `bg-${colors.success}`,
-                border: `border-${colors.success}`,
-                hover: `hover:bg-${colors.successHover}`
-            },
-            warning: {
-                text: `text-${colors.warning}`,
-                bg: `bg-${colors.warning}`,
-                border: `border-${colors.warning}`,
-                hover: `hover:bg-${colors.warningHover}`
-            },
-            info: {
-                text: `text-${colors.info}`,
-                bg: `bg-${colors.info}`,
-                border: `border-${colors.info}`,
-                hover: `hover:bg-${colors.infoHover}`
-            },
-            accent: {
-                text: `text-${colors.accent}`,
-                bg: `bg-${colors.accent}`,
-                border: `border-${colors.accent}`,
-                hover: `hover:bg-${colors.accentHover}`
-            },
-            background: {
-                default: `bg-${colors.background}`,
-                alt: `bg-${colors.background.replace('900', '800').replace('100', '50')}`
-            }
-        };
         
         // Standard utility helpers that don't change with theme
         this.utils = {
@@ -446,13 +308,120 @@ window.App.utils.UI = {
             borderTop: 'border-t',
             borderBottom: 'border-b'
         };
-        
-        console.log(`UI initialized with ${this.currentTheme} theme`);
-        return this;
     }
 };
+
+(function() {
+    const UI = window.App.utils.UI;
+    
+    // Ensure buttons exists
+    UI.buttons = UI.buttons || {};
+    
+    // Ensure buttons.small exists
+    UI.buttons.small = UI.buttons.small || {};
+    
+    // Add all required button properties if missing
+    if (!UI.buttons.small.primary) UI.buttons.small.primary = 'px-2 py-1 bg-blue-500 text-white text-xs rounded shadow hover:bg-blue-600';
+    if (!UI.buttons.small.secondary) UI.buttons.small.secondary = 'px-2 py-1 bg-gray-300 text-gray-700 text-xs rounded shadow hover:bg-gray-400';
+    if (!UI.buttons.small.danger) UI.buttons.small.danger = 'px-2 py-1 bg-red-500 text-white text-xs rounded shadow hover:bg-red-600';
+    if (!UI.buttons.small.success) UI.buttons.small.success = 'px-2 py-1 bg-green-500 text-white text-xs rounded shadow hover:bg-green-600';
+    if (!UI.buttons.small.info) UI.buttons.small.info = 'px-2 py-1 bg-indigo-500 text-white text-xs rounded shadow hover:bg-indigo-600';
+    if (!UI.buttons.small.warning) UI.buttons.small.warning = 'px-2 py-1 bg-yellow-500 text-white text-xs rounded shadow hover:bg-yellow-600';
+    
+    // Ensure colors object exists
+    UI.colors = UI.colors || {};
+    
+    // Add color properties if they're missing
+    UI.colors.primary = UI.colors.primary || {
+      text: 'text-blue-500',
+      default: 'bg-blue-500',
+      hover: 'hover:bg-blue-600'
+    };
+    
+    UI.colors.danger = UI.colors.danger || {
+      text: 'text-red-500',
+      default: 'bg-red-500',
+      hover: 'hover:bg-red-600'
+    };
+    
+    UI.colors.success = UI.colors.success || {
+      text: 'text-green-500',
+      default: 'bg-green-500',
+      hover: 'hover:bg-green-600'
+    };
+    
+    UI.colors.warning = UI.colors.warning || {
+      text: 'text-yellow-500',
+      default: 'bg-yellow-500',
+      hover: 'hover:bg-yellow-600'
+    };
+    
+    UI.colors.info = UI.colors.info || {
+      text: 'text-indigo-500',
+      default: 'bg-indigo-500',
+      hover: 'hover:bg-indigo-600'
+    };
+    
+    // Ensure card styles exist
+    UI.cards = UI.cards || {};
+    UI.cards.container = UI.cards.container || 'bg-white rounded-lg shadow border border-gray-200 hover:shadow-md transition-shadow duration-150';
+    UI.cards.header = UI.cards.header || 'p-4 border-b border-gray-200';
+    UI.cards.body = UI.cards.body || 'p-4';
+    
+    // Ensure tables styles exist
+    UI.tables = UI.tables || {};
+    UI.tables.header = UI.tables.header || {};
+    UI.tables.body = UI.tables.body || {};
+    UI.tables.header.cell = UI.tables.header.cell || 'py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+    UI.tables.body.cell = UI.tables.body.cell || 'px-4 py-2 whitespace-nowrap text-gray-500';
+    UI.tables.body.cellAction = UI.tables.body.cellAction || 'px-4 py-2 whitespace-nowrap text-center text-sm font-medium';
+    
+    // Ensure typography styles exist
+    UI.typography = UI.typography || {};
+    UI.typography.heading = UI.typography.heading || {};
+    UI.typography.heading.h2 = UI.typography.heading.h2 || 'text-2xl font-semibold text-gray-800';
+    UI.typography.heading.h3 = UI.typography.heading.h3 || 'text-xl font-semibold text-gray-700';
+    UI.typography.sectionTitle = UI.typography.sectionTitle || 'font-medium text-gray-700';
+    UI.typography.body = UI.typography.body || 'text-sm text-gray-600';
+    
+    // Ensure form styles exist
+    UI.forms = UI.forms || {};
+    UI.forms.input = UI.forms.input || 'w-full p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500';
+    UI.forms.select = UI.forms.select || 'w-full p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500';
+    UI.forms.label = UI.forms.label || 'block mb-1 text-sm font-medium text-gray-700';
+    UI.forms.hint = UI.forms.hint || 'text-xs text-gray-500 mt-1';
+    
+    console.log("UI fallback properties added to prevent errors");
+  })();
+
+  (function fixBackgroundColors() {
+    // Ensure UI object exists
+    if (!window.App) window.App = {};
+    if (!window.App.utils) window.App.utils = {};
+    if (!window.App.utils.UI) window.App.utils.UI = {};
+    
+    const UI = window.App.utils.UI;
+    
+    // Make sure colors object exists
+    UI.colors = UI.colors || {};
+    
+    // Add background color object if missing
+    UI.colors.background = UI.colors.background || {};
+    
+    // Add the missing 'alt' property
+    if (!UI.colors.background.alt) {
+      UI.colors.background.alt = 'bg-gray-50';
+    }
+    
+    // Also ensure 'default' exists
+    if (!UI.colors.background.default) {
+      UI.colors.background.default = 'bg-gray-100';
+    }
+    
+    console.log("Background colors fixed to prevent alt property error");
+  })();
 
 // Initialize UI with default theme
 window.App.utils.UI.initialize();
 
-console.log("UI constants loaded with improved theme support.");
+console.log("UI constants loaded with theme support.");
