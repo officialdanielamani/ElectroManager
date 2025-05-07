@@ -315,10 +315,11 @@ window.App.utils.UI = {
                     cell: `py-3 px-4 text-left text-xs font-medium text-${colors.textMuted} uppercase tracking-wider`
                 },
                 body: {
-                    row: `hover:bg-${colors.background} border-b border-${colors.borderLight}`,
+                    // Updated row styling with proper theme background colors
+                    row: `hover:bg-${colors.background} border-b border-${colors.borderLight} bg-${colors.cardBackground}`,
                     cell: `px-4 py-2 whitespace-nowrap text-${colors.textSecondary}`,
                     cellAction: `px-4 py-2 whitespace-nowrap text-center text-sm font-medium`
-                }
+                },
             },
             
             // Status indicators

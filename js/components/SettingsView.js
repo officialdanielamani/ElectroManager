@@ -1,3 +1,5 @@
+// js/components/SettingsView.js
+
 // Ensure the global namespace exists
 window.App = window.App || {};
 window.App.components = window.App.components || {};
@@ -153,7 +155,7 @@ window.App.components.SettingsView = ({
                     React.createElement('h3', { className: UI.typography.heading.h3 }, "Electro Manager"),
                     React.createElement('div', { className: "flex items-center mb-3" },
                         React.createElement('span', { className: `${UI.typography.weight.semibold} ${UI.colors.primary.text}` }, "Version 0.1.7beta"),
-                        React.createElement('span', { className: `ml-2 px-2 py-1 ${UI.colors.success.light} text-white-800 text-xs rounded-full` }, "Latest Update")
+                        React.createElement('span', { className: `ml-2 px-2 py-1 ${UI.colors.success.bg} text-white text-xs rounded-full` }, "Latest Update")
                     ),
                     // Update date
                     "Updated: 26 April 2025",
@@ -161,7 +163,7 @@ window.App.components.SettingsView = ({
                     // Changes in this version 
                     React.createElement('div', { className: "mb-4 mt-4" },
                         React.createElement('h4', { className: UI.typography.sectionTitle }, "Changes in this version:"),
-                        React.createElement('ul', { className: "list-disc list-inside text-sm text-gray-700 space-y-1 ml-2" },
+                        React.createElement('ul', { className: "list-disc list-inside text-sm space-y-1 ml-2" },
                             React.createElement('li', null, "Adding advanced filtering option for better search"),
                             React.createElement('li', null, "Remap some UI for more consistancy"),
                             React.createElement('li', null, "Add function to assign component Location and Drawers"),
@@ -176,7 +178,7 @@ window.App.components.SettingsView = ({
 
                     React.createElement('div', { className: `mb-4 pt-4 ${UI.utils.borderTop}` },
                         React.createElement('h4', { className: UI.typography.sectionTitle }, "Info:"),
-                        React.createElement('ul', { className: "list-disc list-inside text-sm text-red-700 space-y-1 ml-2" },
+                        React.createElement('ul', { className: "list-disc list-inside text-sm text-red-500 space-y-1 ml-2" },
                             React.createElement('li', null, "All data is store on your browser session, not save in cloud or 3rd party"),
                             React.createElement('li', null, "Clear data, change browser profile or incognito will effect your file"),
                             React.createElement('li', null, "Please export the JSON data of Component and Location for your own backup"),
@@ -270,7 +272,7 @@ window.App.components.SettingsView = ({
                             }),
                             React.createElement('label', {
                                 htmlFor: "import-locations-file",
-                                className: "cursor-pointer px-4 py-2 bg-amber-500 text-white text-sm rounded shadow hover:bg-amber-600 transition duration-150"
+                                className: UI.buttons.warning
                             }, "Import Locations & Drawers")
                         ),
                         React.createElement('p', { className: UI.forms.hint }, "Export/import locations, drawers and cells.")
@@ -302,17 +304,17 @@ window.App.components.SettingsView = ({
                         React.createElement('textarea', {
                             id: "json-data-area",
                             readOnly: true,
-                            className: "w-full p-2 border border-gray-300 rounded h-40 font-mono text-xs bg-gray-50",
+                            className: `w-full p-2 border border-${UI.getThemeColors().border} rounded h-40 font-mono text-xs bg-${UI.getThemeColors().background.replace('gray-900', 'gray-800').replace('gray-100', 'gray-50')}`,
                             value: jsonData
                         }),
                         React.createElement('div', { className: "flex flex-wrap gap-2 mt-2" },
                             React.createElement('button', {
                                 onClick: onDownloadJson,
-                                className: "px-4 py-2 bg-teal-500 text-white text-sm rounded shadow hover:bg-teal-600 transition duration-150"
+                                className: UI.buttons.accent
                             }, "Download JSON"),
                             React.createElement('button', {
                                 onClick: onCopyJson,
-                                className: "px-4 py-2 bg-gray-500 text-white text-sm rounded shadow hover:bg-gray-600 transition duration-150"
+                                className: UI.buttons.secondary
                             }, "Copy JSON"),
                             React.createElement('button', {
                                 onClick: onClearJsonArea,
@@ -421,7 +423,7 @@ window.App.components.SettingsView = ({
                     React.createElement('div', { className: "mt-4" },
                         React.createElement('button', {
                             onClick: onAddDefaultCategory,
-                            className: "px-4 py-2 bg-gray-500 text-white text-sm rounded shadow hover:bg-gray-600 transition duration-150",
+                            className: UI.buttons.secondary,
                             disabled: categories.includes('Default')
                         }, 'Ensure "Default" Category Exists')
                     )
@@ -494,7 +496,7 @@ window.App.components.SettingsView = ({
                                     React.createElement('button', {
                                         onClick: handleAddLowStock,
                                         disabled: !newLowStockCategory,
-                                        className: `w-full px-4 py-2 rounded shadow transition duration-150 ${!newLowStockCategory ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : UI.buttons.primary}`
+                                        className: !newLowStockCategory ? `${UI.buttons.secondary} cursor-not-allowed` : UI.buttons.primary
                                     }, lowStockConfig[newLowStockCategory] ? 'Update Threshold' : 'Add Threshold')
                                 )
                             )
@@ -504,7 +506,7 @@ window.App.components.SettingsView = ({
                             React.createElement('h4', { className: UI.typography.sectionTitle }, "Current Thresholds"),
                             Object.keys(lowStockConfig).length === 0 ?
                                 React.createElement('p', { className: "text-gray-500 italic text-sm" }, "No thresholds configured.") :
-                                React.createElement('div', { className: "border rounded max-h-60 overflow-y-auto" },
+                                React.createElement('div', { className: `border ${UI.utils.rounded} max-h-60 overflow-y-auto` },
                                     React.createElement('table', { className: UI.tables.container },
                                         React.createElement('thead', { className: `${UI.tables.header.row} sticky top-0` },
                                             React.createElement('tr', null,
@@ -513,7 +515,9 @@ window.App.components.SettingsView = ({
                                                 React.createElement('th', { className: UI.tables.header.cell }, "Action")
                                             )
                                         ),
-                                        React.createElement('tbody', { className: "bg-white divide-y divide-gray-200" },
+                                        React.createElement('tbody', { 
+                                            className: `divide-y divide-${UI.getThemeColors().border} bg-${UI.getThemeColors().cardBackground}` 
+                                        },
                                             Object.entries(lowStockConfig).sort(([catA], [catB]) => catA.localeCompare(catB)).map(([category, threshold]) =>
                                                 React.createElement('tr', { key: category, className: UI.tables.body.row },
                                                     React.createElement('td', { className: UI.tables.body.cell }, category),
@@ -587,52 +591,52 @@ window.App.components.SettingsView = ({
                         React.createElement('ul', { className: "list-disc list-inside text-sm text-gray-700 space-y-1" },
                             React.createElement('li', null, "Components: ",
                                 React.createElement('span', {
-                                    className: `font-semibold ${localStorageStatus.components ? 'text-green-600' : 'text-red-600'}`
+                                    className: `font-semibold ${localStorageStatus.components ? UI.colors.success.text : UI.colors.danger.text}`
                                 }, localStorageStatus.components ? 'Yes' : 'No')
                             ),
                             React.createElement('li', null, "Categories: ",
                                 React.createElement('span', {
-                                    className: `font-semibold ${localStorageStatus.categories ? 'text-green-600' : 'text-red-600'}`
+                                    className: `font-semibold ${localStorageStatus.categories ? UI.colors.success.text : UI.colors.danger.text}`
                                 }, localStorageStatus.categories ? 'Yes' : 'No')
                             ),
                             React.createElement('li', null, "View Mode: ",
                                 React.createElement('span', {
-                                    className: `font-semibold ${localStorageStatus.viewMode ? 'text-green-600' : 'text-red-600'}`
+                                    className: `font-semibold ${localStorageStatus.viewMode ? UI.colors.success.text : UI.colors.danger.text}`
                                 }, localStorageStatus.viewMode ? 'Yes' : 'No')
                             ),
                             React.createElement('li', null, "Low Stock Config: ",
                                 React.createElement('span', {
-                                    className: `font-semibold ${localStorageStatus.lowStockConfig ? 'text-green-600' : 'text-red-600'}`
+                                    className: `font-semibold ${localStorageStatus.lowStockConfig ? UI.colors.success.text : UI.colors.danger.text}`
                                 }, localStorageStatus.lowStockConfig ? 'Yes' : 'No')
                             ),
                             React.createElement('li', null, "Currency Symbol: ",
                                 React.createElement('span', {
-                                    className: `font-semibold ${localStorageStatus.currencySymbol ? 'text-green-600' : 'text-red-600'}`
+                                    className: `font-semibold ${localStorageStatus.currencySymbol ? UI.colors.success.text : UI.colors.danger.text}`
                                 }, localStorageStatus.currencySymbol ? 'Yes' : 'No')
                             ),
                             React.createElement('li', null, "Show Total Value: ",
                                 React.createElement('span', {
-                                    className: `font-semibold ${localStorageStatus.showTotalValue ? 'text-green-600' : 'text-red-600'}`
+                                    className: `font-semibold ${localStorageStatus.showTotalValue ? UI.colors.success.text : UI.colors.danger.text}`
                                 }, localStorageStatus.showTotalValue ? 'Yes' : 'No')
                             ),
                             React.createElement('li', null, "Footprints: ",
                                 React.createElement('span', {
-                                    className: `font-semibold ${footprints && footprints.length > 0 ? 'text-green-600' : 'text-red-600'}`
+                                    className: `font-semibold ${footprints && footprints.length > 0 ? UI.colors.success.text : UI.colors.danger.text}`
                                 }, footprints && footprints.length > 0 ? 'Yes' : 'No')
                             ),
                             React.createElement('li', null, "Locations: ",
                                 React.createElement('span', {
-                                    className: `font-semibold ${locations && locations.length > 0 ? 'text-green-600' : 'text-red-600'}`
+                                    className: `font-semibold ${locations && locations.length > 0 ? UI.colors.success.text : UI.colors.danger.text}`
                                 }, locations && locations.length > 0 ? 'Yes' : 'No')
                             ),
                             React.createElement('li', null, "Drawers: ",
                                 React.createElement('span', {
-                                    className: `font-semibold ${'electronicsDrawers' in localStorage ? 'text-green-600' : 'text-red-600'}`
+                                    className: `font-semibold ${'electronicsDrawers' in localStorage ? UI.colors.success.text : UI.colors.danger.text}`
                                 }, 'electronicsDrawers' in localStorage ? 'Yes' : 'No')
                             ),
                             React.createElement('li', null, "Cells: ",
                                 React.createElement('span', {
-                                    className: `font-semibold ${'electronicsCells' in localStorage ? 'text-green-600' : 'text-red-600'}`
+                                    className: `font-semibold ${'electronicsCells' in localStorage ? UI.colors.success.text : UI.colors.danger.text}`
                                 }, 'electronicsCells' in localStorage ? 'Yes' : 'No')
                             )
                         )
@@ -647,23 +651,22 @@ window.App.components.SettingsView = ({
                                 React.createElement('ul', { className: "space-y-1 text-sm" },
                                     React.createElement('li', { className: "flex justify-between" },
                                         React.createElement('span', null, "Components:"),
-                                        React.createElement('span', { className: "font-semibold" }, components ? components.length : 0)
+                                        React.createElement('span', { className: `font-semibold ${UI.typography.weight.semibold}` }, components ? components.length : 0)
                                     ),
                                     React.createElement('li', { className: "flex justify-between" },
                                         React.createElement('span', null, "Categories:"),
-                                        React.createElement('span', { className: "font-semibold" }, categories ? categories.length : 0)
+                                        React.createElement('span', { className: `font-semibold ${UI.typography.weight.semibold}` }, categories ? categories.length : 0)
                                     ),
                                     React.createElement('li', { className: "flex justify-between" },
                                         React.createElement('span', null, "Footprints:"),
-                                        React.createElement('span', { className: "font-semibold" }, footprints ? footprints.length : 0)
+                                        React.createElement('span', { className: `font-semibold ${UI.typography.weight.semibold}` }, footprints ? footprints.length : 0)
                                     ),
                                     React.createElement('li', { className: "flex justify-between" },
                                         React.createElement('span', null, "Locations:"),
-                                        React.createElement('span', { className: "font-semibold" }, locations ? locations.length : 0)
+                                        React.createElement('span', { className: `font-semibold ${UI.typography.weight.semibold}` }, locations ? locations.length : 0)
                                     )
                                 )
-                            ),
-
+                            )
                         )
                     ),
 
@@ -683,7 +686,7 @@ window.App.components.SettingsView = ({
 
                     // Backup Recommendations
                     React.createElement('div', { className: `mb-4 p-3 ${UI.colors.background.alt} ${UI.utils.rounded} ${UI.utils.border}` },
-                        React.createElement('h5', { className: "font-medium mb-2" }, "Backup Recommendations"),
+                        React.createElement('h5', { className: `${UI.typography.weight.medium} mb-2` }, "Backup Recommendations"),
                         React.createElement('p', { className: "text-sm mb-2" },
                             "Regular backups help prevent data loss. We recommend:"
                         ),
@@ -695,7 +698,7 @@ window.App.components.SettingsView = ({
                         )
                     ),
 
-                    // Danger Zone
+                    // Danger Zone - Using light theme styling consistently even in dark mode
                     React.createElement('div', { className: `mt-6 pt-4 ${UI.utils.borderTop}` },
                         React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-4 mb-4" },
                             // Clear All Data
@@ -706,12 +709,10 @@ window.App.components.SettingsView = ({
                                 ),
                                 React.createElement('button', {
                                     onClick: onClearLS,
-                                    className: "px-4 py-2 bg-red-600 text-white text-sm rounded shadow hover:bg-red-700 transition duration-150"
+                                    className: UI.buttons.danger
                                 }, "Clear All Local Storage Data"),
                                 React.createElement('p', { className: "text-xs text-red-600 mt-1" }, "I am aware what I am doing when clicking the button above"),
-
                             ),
-
                         )
                     )
                 )
@@ -719,4 +720,3 @@ window.App.components.SettingsView = ({
         )
     )
 }
-console.log("SettingsView component loaded.");
