@@ -311,6 +311,116 @@ window.App.utils.UI = {
     }
 };
 
+(function() {
+    const UI = window.App.utils.UI;
+    
+    // Ensure buttons exists
+    UI.buttons = UI.buttons || {};
+    
+    // Ensure buttons.small exists
+    UI.buttons.small = UI.buttons.small || {};
+    
+    // Add all required button properties if missing
+    if (!UI.buttons.small.primary) UI.buttons.small.primary = 'px-2 py-1 bg-blue-500 text-white text-xs rounded shadow hover:bg-blue-600';
+    if (!UI.buttons.small.secondary) UI.buttons.small.secondary = 'px-2 py-1 bg-gray-300 text-gray-700 text-xs rounded shadow hover:bg-gray-400';
+    if (!UI.buttons.small.danger) UI.buttons.small.danger = 'px-2 py-1 bg-red-500 text-white text-xs rounded shadow hover:bg-red-600';
+    if (!UI.buttons.small.success) UI.buttons.small.success = 'px-2 py-1 bg-green-500 text-white text-xs rounded shadow hover:bg-green-600';
+    if (!UI.buttons.small.info) UI.buttons.small.info = 'px-2 py-1 bg-indigo-500 text-white text-xs rounded shadow hover:bg-indigo-600';
+    if (!UI.buttons.small.warning) UI.buttons.small.warning = 'px-2 py-1 bg-yellow-500 text-white text-xs rounded shadow hover:bg-yellow-600';
+    
+    // Ensure colors object exists
+    UI.colors = UI.colors || {};
+    
+    // Add color properties if they're missing
+    UI.colors.primary = UI.colors.primary || {
+      text: 'text-blue-500',
+      default: 'bg-blue-500',
+      hover: 'hover:bg-blue-600'
+    };
+    
+    UI.colors.danger = UI.colors.danger || {
+      text: 'text-red-500',
+      default: 'bg-red-500',
+      hover: 'hover:bg-red-600'
+    };
+    
+    UI.colors.success = UI.colors.success || {
+      text: 'text-green-500',
+      default: 'bg-green-500',
+      hover: 'hover:bg-green-600'
+    };
+    
+    UI.colors.warning = UI.colors.warning || {
+      text: 'text-yellow-500',
+      default: 'bg-yellow-500',
+      hover: 'hover:bg-yellow-600'
+    };
+    
+    UI.colors.info = UI.colors.info || {
+      text: 'text-indigo-500',
+      default: 'bg-indigo-500',
+      hover: 'hover:bg-indigo-600'
+    };
+    
+    // Ensure card styles exist
+    UI.cards = UI.cards || {};
+    UI.cards.container = UI.cards.container || 'bg-white rounded-lg shadow border border-gray-200 hover:shadow-md transition-shadow duration-150';
+    UI.cards.header = UI.cards.header || 'p-4 border-b border-gray-200';
+    UI.cards.body = UI.cards.body || 'p-4';
+    
+    // Ensure tables styles exist
+    UI.tables = UI.tables || {};
+    UI.tables.header = UI.tables.header || {};
+    UI.tables.body = UI.tables.body || {};
+    UI.tables.header.cell = UI.tables.header.cell || 'py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+    UI.tables.body.cell = UI.tables.body.cell || 'px-4 py-2 whitespace-nowrap text-gray-500';
+    UI.tables.body.cellAction = UI.tables.body.cellAction || 'px-4 py-2 whitespace-nowrap text-center text-sm font-medium';
+    
+    // Ensure typography styles exist
+    UI.typography = UI.typography || {};
+    UI.typography.heading = UI.typography.heading || {};
+    UI.typography.heading.h2 = UI.typography.heading.h2 || 'text-2xl font-semibold text-gray-800';
+    UI.typography.heading.h3 = UI.typography.heading.h3 || 'text-xl font-semibold text-gray-700';
+    UI.typography.sectionTitle = UI.typography.sectionTitle || 'font-medium text-gray-700';
+    UI.typography.body = UI.typography.body || 'text-sm text-gray-600';
+    
+    // Ensure form styles exist
+    UI.forms = UI.forms || {};
+    UI.forms.input = UI.forms.input || 'w-full p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500';
+    UI.forms.select = UI.forms.select || 'w-full p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500';
+    UI.forms.label = UI.forms.label || 'block mb-1 text-sm font-medium text-gray-700';
+    UI.forms.hint = UI.forms.hint || 'text-xs text-gray-500 mt-1';
+    
+    console.log("UI fallback properties added to prevent errors");
+  })();
+
+  (function fixBackgroundColors() {
+    // Ensure UI object exists
+    if (!window.App) window.App = {};
+    if (!window.App.utils) window.App.utils = {};
+    if (!window.App.utils.UI) window.App.utils.UI = {};
+    
+    const UI = window.App.utils.UI;
+    
+    // Make sure colors object exists
+    UI.colors = UI.colors || {};
+    
+    // Add background color object if missing
+    UI.colors.background = UI.colors.background || {};
+    
+    // Add the missing 'alt' property
+    if (!UI.colors.background.alt) {
+      UI.colors.background.alt = 'bg-gray-50';
+    }
+    
+    // Also ensure 'default' exists
+    if (!UI.colors.background.default) {
+      UI.colors.background.default = 'bg-gray-100';
+    }
+    
+    console.log("Background colors fixed to prevent alt property error");
+  })();
+
 // Initialize UI with default theme
 window.App.utils.UI.initialize();
 

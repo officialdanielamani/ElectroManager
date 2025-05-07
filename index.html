@@ -12,7 +12,7 @@
             --text-secondary: #4b5563;
             --border-color: #e5e7eb;
         }
-        
+
         /* Dark Theme Override */
         .dark-mode {
             --bg-primary: #111827;
@@ -21,17 +21,17 @@
             --text-secondary: #d1d5db;
             --border-color: #374151;
         }
-        
+
         /* Apply theme variables */
         .theme-aware-bg {
             background-color: var(--bg-primary);
         }
-        
+
         .theme-aware-card {
             background-color: var(--bg-card);
             border-color: var(--border-color);
         }
-        
+
         .theme-aware-text {
             color: var(--text-primary);
         }
@@ -44,7 +44,7 @@
     <script src="js/external/react18.development.js"></script>
     <script src="js/external/react-dom18.development.js"></script>
     <script src="js/external/babel.min.js"></script>
-    
+
     <!--
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -195,17 +195,17 @@
 
             // Save configuration changes to localStorage
             useEffect(() => {
-    storage.saveConfig({
-        categories,
-        viewMode,
-        lowStockConfig,
-        currencySymbol,
-        showTotalValue,
-        footprints,
-        itemsPerPage,
-        theme // Add theme to saved config
-    });
-}, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]);
+                storage.saveConfig({
+                    categories,
+                    viewMode,
+                    lowStockConfig,
+                    currencySymbol,
+                    showTotalValue,
+                    footprints,
+                    itemsPerPage,
+                    theme // Add theme to saved config
+                });
+            }, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]);
 
             const saveConfigCallback = useCallback(() => {
                 storage.saveConfig({
@@ -220,21 +220,16 @@
                 });
             }, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]); // Add theme to dependency array
 
-
             useEffect(() => {
-    if (theme === 'dark') {
-        document.body.classList.remove('bg-gray-100');
-        document.body.classList.add('bg-gray-900', 'text-white');
-        
-        // You can add more document-level dark mode classes here
-        // For example changing the base text color
-        document.documentElement.classList.add('dark-mode');
-    } else {
-        document.body.classList.remove('bg-gray-900', 'text-white');
-        document.body.classList.add('bg-gray-100');
-        document.documentElement.classList.remove('dark-mode');
-    }
-}, [theme]);
+                // Apply theme through the UI system
+                window.App.utils.UI.setTheme(theme);
+
+                // Update the document's root class based on theme
+                const themeColors = window.App.utils.UI.getThemeColors();
+                document.body.className = `bg-${themeColors.background} text-${themeColors.textPrimary}`;
+            }, [theme]);
+
+
 
             // --- Helper Functions / Callbacks for Child Components ---
 
@@ -830,33 +825,21 @@
 
             //-- Theme Management--
             const handleThemeChange = (newTheme) => {
-    if (window.App.utils.UI.themes[newTheme]) {
-        // Update state
-        setTheme(newTheme);
-        
-        // Update UI constants
-        window.App.utils.UI.currentTheme = newTheme;
-        
-        // Apply theme to body element
-        if (newTheme === 'dark') {
-            document.body.classList.add('dark-mode');
-            document.body.classList.remove('bg-gray-100');
-            document.body.classList.add('bg-gray-900', 'text-white');
-        } else if (newTheme === 'keqing') {
-            document.body.classList.remove('dark-mode');
-            document.body.classList.remove('bg-gray-100', 'bg-gray-900', 'text-white');
-            document.body.classList.add('bg-purple-900', 'text-yellow-300');
-        } else {
-            // Light theme
-            document.body.classList.remove('dark-mode');
-            document.body.classList.remove('bg-gray-900', 'text-white', 'bg-purple-900', 'text-yellow-300');
-            document.body.classList.add('bg-gray-100');
-        }
-        
-        // Force re-render
-        setAppTheme(newTheme);
-    }
-};
+                if (window.App.utils.UI.themes[newTheme]) {
+                    // Update state
+                    setTheme(newTheme);
+
+                    // Update UI system
+                    window.App.utils.UI.setTheme(newTheme);
+
+                    // Save theme preference
+                    saveConfigCallback();
+
+                    // Force re-render to update components
+                    setAppTheme(newTheme);
+                }
+            };
+
 
             // Set up global theme change handler
             window.App.onThemeChange = (newTheme) => {

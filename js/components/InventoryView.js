@@ -224,8 +224,9 @@ window.App.components.InventoryView = ({
                     // Favorite Icon/Button
                     React.createElement('button', {
                         onClick: () => onToggleFavorite(component.id, 'favorite'),
-                        className: `p-1 rounded-full ${component.favorite ? UI.colors.danger.text + ' ' + UI.colors.danger.hover.replace('bg-', 'hover:text-') : 'text-gray-300 hover:text-red-500'}`,
-                        title: component.favorite ? "Remove from favorites" : "Add to favorites"},
+                        className: `p-1 rounded-full ${component.favorite ? "text-red-500 hover:text-red-600" : 'text-gray-300 hover:text-red-500'}`,
+                        title: component.favorite ? "Remove from favorites" : "Add to favorites"
+                    },
                         React.createElement('svg', {
                             xmlns: "http://www.w3.org/2000/svg",
                             className: "h-5 w-5",
@@ -243,9 +244,9 @@ window.App.components.InventoryView = ({
                     // Bookmark Icon/Button
                     React.createElement('button', {
                         onClick: () => onToggleFavorite(component.id, 'bookmark'),
-                        className: `p-1 rounded-full ${component.bookmark ? UI.colors.info.text + ' hover:' + UI.colors.info.text.replace('text', 'text') : 'text-gray-300 hover:text-blue-500'}`,
+                        className: `p-1 rounded-full ${component.bookmark ? "text-blue-500 hover:text-blue-600" : 'text-gray-300 hover:text-blue-500'}`,
                         title: component.bookmark ? "Remove bookmark" : "Add bookmark"
-                         },
+                    },
                         React.createElement('svg', {
                             xmlns: "http://www.w3.org/2000/svg",
                             className: "h-5 w-5",
@@ -261,9 +262,9 @@ window.App.components.InventoryView = ({
                     // Star Icon/Button
                     React.createElement('button', {
                         onClick: () => onToggleFavorite(component.id, 'star'),
-                        className: `p-1 rounded-full ${component.star ? UI.colors.warning.text + ' hover:' + UI.colors.warning.text.replace('text', 'text') : 'text-gray-300 hover:text-yellow-500'}`,
+                        className: `p-1 rounded-full ${component.star ? "text-yellow-500 hover:text-yellow-600" : 'text-gray-300 hover:text-yellow-500'}`,
                         title: component.star ? "Remove star" : "Add star"
-                        },
+                    },
                         React.createElement('svg', {
                             xmlns: "http://www.w3.org/2000/svg",
                             className: "h-5 w-5",
@@ -288,7 +289,7 @@ window.App.components.InventoryView = ({
                         title: "Decrease Quantity"
                     }, "-"),
                     React.createElement('span', {
-                        className: `text-sm font-semibold ${lowStock ? UI.colors.danger.text.replace('500', '600') : 'text-gray-900'}`
+                        className: `text-sm font-semibold ${lowStock ? 'text-red-600' : 'text-gray-900'}`
                     }, component.quantity || 0),
                     React.createElement('button', {
                         onClick: () => onUpdateQuantity(component.id, 1),
@@ -306,108 +307,106 @@ window.App.components.InventoryView = ({
             React.createElement('td', { className: UI.tables.body.cellAction },
                 React.createElement('button', {
                     onClick: () => onEditComponent(component),
-                    className: UI.colors.info.text.replace('500', '600') + " hover:text-indigo-900 mr-3",
+                    className: "text-indigo-600 hover:text-indigo-900 mr-3",
                     title: "Edit Component"
                 }, "Edit"),
                 React.createElement('button', {
                     onClick: () => onDeleteComponent(component.id),
-                    className: UI.colors.danger.text.replace('500', '600') + " hover:text-red-900",
+                    className: "text-red-600 hover:text-red-900",
                     title: "Delete Component"
                 }, "Delete")
             )
         );
     };
 
-    // In InventoryView.js
-
-// Add this function inside your component before the main return
-const renderPagination = () => {
-    if (itemsPerPage === 'all' || totalPages <= 1) {
-        return null; // Don't render pagination if showing all or only one page
-    }
-    
-    return React.createElement('div', { className: "flex flex-col items-center mb-4" },
-        // Pagination controls
-        React.createElement('div', { className: "flex justify-center" },
-            React.createElement('div', { className: "bg-white shadow-sm rounded border inline-flex" },
-                // Previous button
-                React.createElement('button', {
-                    onClick: () => handlePageChange(currentPage - 1),
-                    disabled: currentPage === 1,
-                    className: `px-3 py-1 border-r ${currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`
-                }, "<"),
-
-                // Page numbers - limit visible pages for readability
-                (() => {
-                    const pages = [];
-                    const maxVisiblePages = 5; // Show max 5 page numbers at once
-                    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-                    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-
-                    // Adjust if we're near the end
-                    if (endPage - startPage + 1 < maxVisiblePages) {
-                        startPage = Math.max(1, endPage - maxVisiblePages + 1);
-                    }
-
-                    // Add first page if not in range
-                    if (startPage > 1) {
-                        pages.push(React.createElement('button', {
-                            key: 1,
-                            onClick: () => handlePageChange(1),
-                            className: `px-3 py-1 border-r ${1 === currentPage ? 'bg-blue-500 text-white' : 'hover:bg-gray-50'}`
-                        }, "1"));
-
-                        if (startPage > 2) {
-                            pages.push(React.createElement('span', {
-                                key: 'start-ellipsis',
-                                className: "px-2 py-1 border-r text-gray-500"
-                            }, "..."));
-                        }
-                    }
-
-                    // Add visible page numbers
-                    for (let i = startPage; i <= endPage; i++) {
-                        pages.push(React.createElement('button', {
-                            key: i,
-                            onClick: () => handlePageChange(i),
-                            className: `px-3 py-1 border-r ${i === currentPage ? UI.colors.primary.default + ' text-white' : 'hover:bg-gray-50'}`
-                        }, i.toString()));
-                    }
-
-                    // Add last page if not in range
-                    if (endPage < totalPages) {
-                        if (endPage < totalPages - 1) {
-                            pages.push(React.createElement('span', {
-                                key: 'end-ellipsis',
-                                className: "px-2 py-1 border-r text-gray-500"
-                            }, "..."));
-                        }
-
-                        pages.push(React.createElement('button', {
-                            key: totalPages,
-                            onClick: () => handlePageChange(totalPages),
-                            className: `px-3 py-1 border-r ${totalPages === currentPage ? 'bg-blue-500 text-white' : 'hover:bg-gray-50'}`
-                        }, totalPages.toString()));
-                    }
-
-                    return pages;
-                })(),
-
-                // Next button
-                React.createElement('button', {
-                    onClick: () => handlePageChange(currentPage + 1),
-                    disabled: currentPage === totalPages,
-                    className: `px-3 py-1 ${currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`
-                }, ">")
-            )
-        ),
+    // Pagination component
+    const renderPagination = () => {
+        if (itemsPerPage === 'all' || totalPages <= 1) {
+            return null; // Don't render pagination if showing all or only one page
+        }
         
-        // Pagination status text
-        filteredComponents.length > 0 && React.createElement('div', { className: "text-center text-sm text-gray-600 mt-2" },
-            `Showing ${(currentPage - 1) * itemsPerPage + 1}-${Math.min(currentPage * itemsPerPage, filteredComponents.length)} of ${filteredComponents.length} items`
-        )
-    );
-};
+        return React.createElement('div', { className: "flex flex-col items-center mb-4" },
+            // Pagination controls
+            React.createElement('div', { className: "flex justify-center" },
+                React.createElement('div', { className: "bg-white shadow-sm rounded border inline-flex" },
+                    // Previous button
+                    React.createElement('button', {
+                        onClick: () => handlePageChange(currentPage - 1),
+                        disabled: currentPage === 1,
+                        className: `px-3 py-1 border-r ${currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`
+                    }, "<"),
+
+                    // Page numbers - limit visible pages for readability
+                    (() => {
+                        const pages = [];
+                        const maxVisiblePages = 5; // Show max 5 page numbers at once
+                        let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+                        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+                        // Adjust if we're near the end
+                        if (endPage - startPage + 1 < maxVisiblePages) {
+                            startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                        }
+
+                        // Add first page if not in range
+                        if (startPage > 1) {
+                            pages.push(React.createElement('button', {
+                                key: 1,
+                                onClick: () => handlePageChange(1),
+                                className: `px-3 py-1 border-r ${1 === currentPage ? 'bg-blue-500 text-white' : 'hover:bg-gray-50'}`
+                            }, "1"));
+
+                            if (startPage > 2) {
+                                pages.push(React.createElement('span', {
+                                    key: 'start-ellipsis',
+                                    className: "px-2 py-1 border-r text-gray-500"
+                                }, "..."));
+                            }
+                        }
+
+                        // Add visible page numbers
+                        for (let i = startPage; i <= endPage; i++) {
+                            pages.push(React.createElement('button', {
+                                key: i,
+                                onClick: () => handlePageChange(i),
+                                className: `px-3 py-1 border-r ${i === currentPage ? 'bg-blue-500 text-white' : 'hover:bg-gray-50'}`
+                            }, i.toString()));
+                        }
+
+                        // Add last page if not in range
+                        if (endPage < totalPages) {
+                            if (endPage < totalPages - 1) {
+                                pages.push(React.createElement('span', {
+                                    key: 'end-ellipsis',
+                                    className: "px-2 py-1 border-r text-gray-500"
+                                }, "..."));
+                            }
+
+                            pages.push(React.createElement('button', {
+                                key: totalPages,
+                                onClick: () => handlePageChange(totalPages),
+                                className: `px-3 py-1 border-r ${totalPages === currentPage ? 'bg-blue-500 text-white' : 'hover:bg-gray-50'}`
+                            }, totalPages.toString()));
+                        }
+
+                        return pages;
+                    })(),
+
+                    // Next button
+                    React.createElement('button', {
+                        onClick: () => handlePageChange(currentPage + 1),
+                        disabled: currentPage === totalPages,
+                        className: `px-3 py-1 ${currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-gray-50'}`
+                    }, ">")
+                )
+            ),
+            
+            // Pagination status text
+            filteredComponents.length > 0 && React.createElement('div', { className: "text-center text-sm text-gray-600 mt-2" },
+                `Showing ${(currentPage - 1) * itemsPerPage + 1}-${Math.min(currentPage * itemsPerPage, filteredComponents.length)} of ${filteredComponents.length} items`
+            )
+        );
+    };
 
     // Renders a single card in the card view
     const renderCard = (component) => {
@@ -415,11 +414,10 @@ const renderPagination = () => {
         const lowStock = helpers.isLowStock(component, lowStockConfig);
         const formattedPrice = helpers.formatCurrency(component.price, currencySymbol);
         const datasheetLinks = helpers.formatDatasheets(component.datasheets);
-        const imageUrl = component.image || `https://placehold.co/200x150/e2e8f0/94a3b8?text=No+Image`; // Placeholder
 
         return React.createElement('div', {
             key: component.id,
-            className: `${UI.cards.container} ${isSelected ? 'ring-2 ring-offset-1 ' + UI.colors.primary.border : ''} ${lowStock ? 'border-l-4 ' + UI.colors.danger.border.replace('500', '400') : ''}`
+            className: `${UI.cards.container} ${isSelected ? 'ring-2 ring-offset-1 ring-blue-500' : ''} ${lowStock ? 'border-l-4 border-red-400' : ''}`
         },
             // Select Checkbox
             React.createElement('div', { className: "absolute top-2 left-2 z-10" },
@@ -434,30 +432,41 @@ const renderPagination = () => {
             // Image Area
             React.createElement('div', { className: "relative h-40 bg-gray-100 rounded-t-lg flex items-center justify-center overflow-hidden" },
                 React.createElement('img', {
-                    src: component.image || '', // Use component image if available
+                    src: component.image || '',
                     alt: component.name || 'Component Image',
                     className: "w-full h-full object-contain p-2",
                     // Fallback placeholder if image fails to load
                     onError: (e) => { e.target.onerror = null; e.target.src = `https://placehold.co/200x150/e2e8f0/94a3b8?text=No+Image`; }
                 }),
-                lowStock && React.createElement('span', { className: UI.tags.red + " absolute bottom-1 right-1" }, "LOW")
+                lowStock && React.createElement('span', { 
+                    className: UI.tags.red + " absolute bottom-1 right-1" 
+                }, "LOW")
             ),
             // Card Content
             React.createElement('div', { className: UI.cards.body },
                 // Name & Type
                 React.createElement('div', { className: "flex justify-between items-start mb-2" },
-                    React.createElement('h3', { className: UI.typography.heading.h4 + " truncate mr-2", title: component.name }, component.name),
-                    component.type && React.createElement('span', { className: UI.tags.gray }, component.type)
+                    React.createElement('h3', { 
+                        className: UI.typography.heading.h4 + " truncate mr-2", 
+                        title: component.name 
+                    }, component.name),
+                    component.type && React.createElement('span', { 
+                        className: UI.tags.gray
+                    }, component.type)
                 ),
                 // Footprint
                 React.createElement('div', { className: "text-sm text-gray-600 mb-1 flex justify-between" },
                     React.createElement('span', { className: "font-medium" }, "Footprint:"),
                     component.footprint ?
-                        React.createElement('span', { className: UI.tags.gray }, component.footprint)
+                        React.createElement('span', { 
+                            className: UI.tags.gray
+                        }, component.footprint)
                         : React.createElement('span', { className: "text-gray-400" }, "-")
                 ),
                 // Category
-                React.createElement('div', { className: UI.typography.small + " mb-1" }, component.category),
+                React.createElement('div', { 
+                    className: UI.typography.small + " mb-1" 
+                }, component.category),
                 // Price
                 React.createElement('div', { className: "text-md font-semibold text-green-700 mb-3" }, formattedPrice),
                 // Quantity Controls
@@ -481,7 +490,10 @@ const renderPagination = () => {
                             React.createElement('path', { fillRule: "evenodd", d: "M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z", clipRule: "evenodd" })))
                 ),
                 // Info
-                component.info && React.createElement('p', { className: UI.typography.small + " mb-2 truncate", title: component.info },
+                component.info && React.createElement('p', { 
+                    className: UI.typography.small + " mb-2 truncate", 
+                    title: component.info 
+                },
                     React.createElement('span', { className: "font-medium" }, "Uses: "), component.info),
                 // Datasheets
                 React.createElement('div', { className: "mb-3" },
@@ -523,12 +535,12 @@ const renderPagination = () => {
                     // Total Components Stat
                     React.createElement('div', { className: "p-3 bg-white rounded-lg border" },
                         React.createElement('h3', { className: UI.typography.small + " font-medium text-gray-500" }, "Components"),
-                        React.createElement('p', { className: "text-2xl font-semibold " + UI.colors.primary.text.replace('500', '600') }, totalComponents)
+                        React.createElement('p', { className: "text-2xl font-semibold text-blue-600" }, totalComponents)
                     ),
                     // Total Items Stat
                     React.createElement('div', { className: "p-3 bg-white rounded-lg border" },
                         React.createElement('h3', { className: UI.typography.small + " font-medium text-gray-500" }, "Total Items"),
-                        React.createElement('p', { className: "text-2xl font-semibold " + UI.colors.success.text.replace('500', '600') }, totalItems)
+                        React.createElement('p', { className: "text-2xl font-semibold text-green-600" }, totalItems)
                     ),
                     // Total Value Stat (Conditional)
                     showTotalValue && React.createElement('div', { className: "p-3 bg-white rounded-lg border" },
@@ -546,7 +558,7 @@ const renderPagination = () => {
                         React.createElement('p', { className: `text-2xl font-semibold ${lowStockCount > 0 ? 'text-red-600' : 'text-gray-600'}` }, lowStockCount)
                     ),
                 ),
-                // Category Counts Section
+                // Category Counts Section (continued)
                 totalComponents > 0 && React.createElement('div', { className: UI.utils.borderTop + " pt-3 mt-3" },
                     React.createElement('h3', { className: UI.typography.subtitle + " mb-2" }, "Item Counts by Category"),
                     React.createElement('div', { className: "flex flex-wrap gap-3" },
@@ -591,13 +603,12 @@ const renderPagination = () => {
                 onItemsPerPageChange: onItemsPerPageChange, // Pass the callback
                 onClearFilters: handleClearAdvancedFilters,
                 onChangeViewMode: handleViewChange,
-                onChangeCategoryFilter:handleCategoryChange,
+                onChangeCategoryFilter: handleCategoryChange,
                 
                 // UI state
                 isExpanded: advancedFiltersExpanded,
                 onToggleExpand: () => setAdvancedFiltersExpanded(!advancedFiltersExpanded)
             }),
-
 
             // --- Bulk Action Bar (Conditional) ---
             selectedComponents.length > 0 && React.createElement('div', { className: UI.status.info + " mb-4 flex flex-wrap justify-between items-center gap-2" },
@@ -616,8 +627,14 @@ const renderPagination = () => {
                 ),
                 // Bulk Action Buttons
                 React.createElement('div', { className: "flex gap-2" },
-                    React.createElement('button', { onClick: onBulkEdit, className: UI.buttons.small.primary }, "Edit Selected"),
-                    React.createElement('button', { onClick: onBulkDelete, className: UI.buttons.small.danger }, "Delete Selected")
+                    React.createElement('button', { 
+                        onClick: onBulkEdit, 
+                        className: UI.buttons.small.primary 
+                    }, "Edit Selected"),
+                    React.createElement('button', { 
+                        onClick: onBulkDelete, 
+                        className: UI.buttons.small.danger 
+                    }, "Delete Selected")
                 )
             ), // End Bulk Action Bar
             renderPagination(),
@@ -694,4 +711,4 @@ const renderPagination = () => {
     );
 };
 
-console.log("InventoryView component loaded with UI constants."); // For debugging
+console.log("InventoryView component loaded with clean direct UI references."); // For debugging
