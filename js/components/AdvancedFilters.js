@@ -1,4 +1,4 @@
-// js/components/AdvancedFilters.js
+// js/components/AdvancedFilters.js - Updated for better dark mode support
 
 // Ensure the global namespace exists
 window.App = window.App || {};
@@ -69,36 +69,36 @@ window.App.components.AdvancedFilters = ({
     const [quantityStats, setQuantityStats] = useState({ min: 0, max: 100 });
 
     // Items per page options
-    const pageOptions = [5 ,10, 25, 50, 100, 'all'];
+    const pageOptions = [5, 10, 25, 50, 100, 'all'];
 
     // Calculate price and quantity stats on component changes
     useEffect(() => {
         // Check if components exists and has items
         if (components && components.length > 0) {
-            const prices = components.map(c => Number(c.price) || 0); //
-            const quantities = components.map(c => Number(c.quantity) || 0); //
+            const prices = components.map(c => Number(c.price) || 0);
+            const quantities = components.map(c => Number(c.quantity) || 0);
 
             // Ensure calculated min is at least 0
-            const calculatedPriceMin = Math.min(...prices); //
-            const calculatedQuantityMin = Math.min(...quantities); //
+            const calculatedPriceMin = Math.min(...prices);
+            const calculatedQuantityMin = Math.min(...quantities);
 
             // Set stats, ensuring min is never below 0
             setPriceStats({
-                min: Math.max(0, calculatedPriceMin), //
+                min: Math.max(0, calculatedPriceMin),
                 // Use a sensible default max for the slider UI if actual max is 0 or less than min
-                max: Math.max(Math.max(0, calculatedPriceMin), Math.max(...prices) || 0) || 100 //
+                max: Math.max(Math.max(0, calculatedPriceMin), Math.max(...prices) || 0) || 100
             });
 
             setQuantityStats({
-                min: Math.max(0, calculatedQuantityMin), //
-                max: Math.max(Math.max(0, calculatedQuantityMin), Math.max(...quantities) || 0) || 100 //
+                min: Math.max(0, calculatedQuantityMin),
+                max: Math.max(Math.max(0, calculatedQuantityMin), Math.max(...quantities) || 0) || 100
             });
         } else {
             // Default stats if no components
-            setPriceStats({ min: 0, max: 100 }); //
-            setQuantityStats({ min: 0, max: 100 }); //
+            setPriceStats({ min: 0, max: 100 });
+            setQuantityStats({ min: 0, max: 100 });
         }
-    }, [components]); //
+    }, [components]);
 
     // Handler for checkbox group changes
     const handleCheckboxGroup = (currentSelected, item, onChange) => {
@@ -137,9 +137,9 @@ window.App.components.AdvancedFilters = ({
                 React.createElement('h4', { className: UI.typography.sectionTitle }, title),
                 // Select all checkbox
                 itemCount === 0
-                    ? React.createElement('p', { /* ... */ }, "No items available")
+                    ? React.createElement('p', { className: `text-${UI.getThemeColors().textMuted}` }, "No items available")
                     :
-                    React.createElement('label', { className: "flex items-center text-xs cursor-pointer" },
+                    React.createElement('label', { className: `flex items-center text-xs cursor-pointer text-${UI.getThemeColors().textSecondary}` },
                         React.createElement('input', {
                             type: "checkbox",
                             className: UI.forms.checkbox + " mr-1",
@@ -150,14 +150,14 @@ window.App.components.AdvancedFilters = ({
                     )
             ),
             // Checkbox list
-            React.createElement('div', { className: "max-h-36 overflow-y-auto px-1 border border-gray-200 rounded bg-white" },
+            React.createElement('div', { className: `max-h-36 overflow-y-auto px-1 border border-${UI.getThemeColors().border} rounded bg-${UI.getThemeColors().cardBackground}` },
                 items.length === 0
-                    ? React.createElement('p', { className: "text-sm text-gray-500 p-2 italic" }, "No items available")
+                    ? React.createElement('p', { className: `text-sm text-${UI.getThemeColors().textMuted} p-2 italic` }, "No items available")
                     : React.createElement('div', { className: "grid grid-cols-2 gap-1 py-1" },
                         items.map(item =>
                             React.createElement('label', {
                                 key: item,
-                                className: "flex items-center text-sm px-1 py-0.5 hover:bg-gray-50 rounded cursor-pointer"
+                                className: `flex items-center text-sm px-1 py-0.5 hover:bg-${UI.getThemeColors().background} rounded cursor-pointer text-${UI.getThemeColors().textSecondary}`
                             },
                                 React.createElement('input', {
                                     type: "checkbox",
@@ -172,7 +172,6 @@ window.App.components.AdvancedFilters = ({
             )
         );
     };
-    // RenderRangeSlider
 
     const [exactMatchModes, setExactMatchModes] = useState({
         quantity: false,
@@ -231,11 +230,11 @@ window.App.components.AdvancedFilters = ({
 
             // Filter mode indicator
             React.createElement('div', { className: "flex justify-between items-center mb-2" },
-                React.createElement('span', { className: "text-xs font-medium text-blue-600" },
+                React.createElement('span', { className: `text-xs font-medium text-${UI.colors.primary.text}` },
                     exactMatchMode ? "Finding exact value" : "Finding in range"
                 ),
                 // Exact match toggle
-                React.createElement('label', { className: "flex items-center text-xs cursor-pointer" },
+                React.createElement('label', { className: `flex items-center text-xs cursor-pointer text-${UI.getThemeColors().textSecondary}` },
                     React.createElement('input', {
                         type: "checkbox",
                         className: UI.forms.checkbox + " mr-1",
@@ -250,7 +249,7 @@ window.App.components.AdvancedFilters = ({
             React.createElement('div', { className: "grid grid-cols-2 gap-2" },
                 // Min Input
                 React.createElement('div', null,
-                    React.createElement('label', { className: "text-xs block mb-0.5" },
+                    React.createElement('label', { className: `text-xs block mb-0.5 text-${UI.getThemeColors().textSecondary}` },
                         exactMatchMode ? "Value" : "Minimum"
                     ),
                     React.createElement('input', {
@@ -259,7 +258,7 @@ window.App.components.AdvancedFilters = ({
                         step: title.toLowerCase().includes('price') ? "0.01" : "1",
                         value: currentMin,
                         onChange: (e) => handleMinChange(e.target.value),
-                        className: "w-full text-sm p-1 border rounded"
+                        className: UI.forms.input
                     })
                 ),
 
@@ -267,20 +266,19 @@ window.App.components.AdvancedFilters = ({
                 React.createElement('div', {
                     style: { visibility: exactMatchMode ? 'hidden' : 'visible' }
                 },
-                    React.createElement('label', { className: "text-xs block mb-0.5" }, "Maximum"),
+                    React.createElement('label', { className: `text-xs block mb-0.5 text-${UI.getThemeColors().textSecondary}` }, "Maximum"),
                     React.createElement('input', {
                         type: "number",
                         min: 0,
                         step: title.toLowerCase().includes('price') ? "0.01" : "1",
                         value: currentMax,
                         onChange: (e) => handleMaxChange(e.target.value),
-                        className: "w-full text-sm p-1 border rounded"
+                        className: UI.forms.input
                     })
                 )
             )
         );
     };
-
 
     // Special render method for marks (with icons)
     const renderMarksCheckboxes = () => {
@@ -319,7 +317,7 @@ window.App.components.AdvancedFilters = ({
 
                     return React.createElement('label', {
                         key: mark.id,
-                        className: "flex items-center bg-white px-2 py-1 border rounded hover:bg-gray-50 cursor-pointer"
+                        className: `flex items-center bg-${UI.getThemeColors().cardBackground} px-2 py-1 border border-${UI.getThemeColors().border} rounded hover:bg-${UI.getThemeColors().background} cursor-pointer text-${UI.getThemeColors().textSecondary}`
                     },
                         React.createElement('input', {
                             type: "checkbox",
@@ -336,20 +334,23 @@ window.App.components.AdvancedFilters = ({
     };
 
     // Render page size selector
-const renderPageSizeSelector = () => {
-    return React.createElement('div', { className: "mb-4" },
-        React.createElement('h4', { className: UI.typography.sectionTitle + " mb-2" }, "Items per Page"),
-        React.createElement('div', { className: "flex space-x-2" },
-            pageOptions.map(option => 
-                React.createElement('button', {
-                    key: option,
-                    onClick: () => onItemsPerPageChange(option), // This should be correctly calling the prop
-                    className: `px-3 py-1.5 text-sm border rounded ${itemsPerPage === option ? 'bg-blue-500 text-white' : 'bg-white hover:bg-gray-50'}`
-                }, option === 'all' ? 'All' : option)
+    const renderPageSizeSelector = () => {
+        return React.createElement('div', { className: "mb-4" },
+            React.createElement('h4', { className: UI.typography.sectionTitle + " mb-2" }, "Items per Page"),
+            React.createElement('div', { className: "flex space-x-2" },
+                pageOptions.map(option => 
+                    React.createElement('button', {
+                        key: option,
+                        onClick: () => onItemsPerPageChange(option),
+                        className: `px-3 py-1.5 text-sm border border-${UI.getThemeColors().border} rounded 
+                            ${itemsPerPage === option ? 
+                                `bg-${UI.getThemeColors().primary} text-white` : 
+                                `bg-${UI.getThemeColors().cardBackground} text-${UI.getThemeColors().textSecondary} hover:bg-${UI.getThemeColors().background}`}`
+                    }, option === 'all' ? 'All' : option)
+                )
             )
-        )
-    );
-};
+        );
+    };
 
     // Count active filters
     const getActiveFilterCount = () => {
@@ -381,7 +382,7 @@ const renderPageSizeSelector = () => {
 
         // Header with Basic Controls (moved from InventoryView)
         React.createElement('div', {
-            className: "p-4 border-b border-gray-200 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end",
+            className: `p-4 border-b border-${UI.getThemeColors().border} grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end`,
         },
             // Add Component Button
             React.createElement('div', null,
@@ -433,10 +434,12 @@ const renderPageSizeSelector = () => {
             // View Mode Toggle
             React.createElement('div', null,
                 React.createElement('label', { className: UI.forms.label }, "View Mode"),
-                React.createElement('div', { className: "flex rounded shadow-sm border border-gray-300" },
+                React.createElement('div', { className: `flex rounded shadow-sm border border-${UI.getThemeColors().border}` },
                     React.createElement('button', {
                         title: "Table View",
-                        className: `flex-1 p-2 text-sm rounded-l ${viewMode === 'table' ? 'bg-blue-500 text-white' : 'bg-white hover:bg-gray-100 text-gray-700'}`,
+                        className: `flex-1 p-2 text-sm rounded-l ${viewMode === 'table' ? 
+                            `bg-${UI.getThemeColors().primary} text-white` : 
+                            `bg-${UI.getThemeColors().cardBackground} text-${UI.getThemeColors().textSecondary} hover:bg-${UI.getThemeColors().background}`}`,
                         onClick: () => onChangeViewMode('table')
                     },
                         React.createElement('svg', {
@@ -455,7 +458,9 @@ const renderPageSizeSelector = () => {
                     ),
                     React.createElement('button', {
                         title: "Card View",
-                        className: `flex-1 p-2 text-sm rounded-r ${viewMode === 'card' ? 'bg-blue-500 text-white' : 'bg-white hover:bg-gray-100 text-gray-700'}`,
+                        className: `flex-1 p-2 text-sm rounded-r ${viewMode === 'card' ? 
+                            `bg-${UI.getThemeColors().primary} text-white` : 
+                            `bg-${UI.getThemeColors().cardBackground} text-${UI.getThemeColors().textSecondary} hover:bg-${UI.getThemeColors().background}`}`,
                         onClick: () => onChangeViewMode('card')
                     },
                         React.createElement('svg', {
@@ -473,7 +478,7 @@ const renderPageSizeSelector = () => {
         ),
 
         React.createElement('div', {
-            className: "flex justify-between items-center p-4 border-b border-gray-200 cursor-pointer",
+            className: `flex justify-between items-center p-4 border-b border-${UI.getThemeColors().border} cursor-pointer`,
             onClick: onToggleExpand
         },
             React.createElement('div', { className: "flex items-center" },
@@ -560,4 +565,4 @@ const renderPageSizeSelector = () => {
     );
 };
 
-console.log("AdvancedFilters component loaded."); // For debugging
+console.log("AdvancedFilters component loaded with improved dark mode support.");

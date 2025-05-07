@@ -65,4 +65,4 @@ window.App.components.LocationPage = ({
     );
 };
 
-console.log("LocationPage component loaded."); // For debugging
+console.log("LocationPage component loaded with theme-aware styling."); // For debugging

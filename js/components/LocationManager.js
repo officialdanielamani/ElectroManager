@@ -122,17 +122,17 @@ window.App.components.LocationManager = ({
 
     return React.createElement('div', { className: "space-y-6" },
         // Add new location form
-        React.createElement('div', { className: "mb-6 bg-white p-4 rounded-lg shadow border border-gray-200" },
+        React.createElement('div', { className: `mb-6 ${UI.cards.container}` },
             // Clickable header with toggle arrow
             React.createElement('div', { 
-                className: "flex justify-between items-center cursor-pointer",
+                className: `flex justify-between items-center cursor-pointer ${UI.cards.header}`,
                 onClick: () => {
                     console.log("Toggle location form visibility", !showAddLocationForm);
                     setShowAddLocationForm(!showAddLocationForm);
                 }
             },
-                React.createElement('h4', { className: "font-medium text-gray-700" }, "Add New Location"),
-                React.createElement('span', { className: "text-gray-500" },
+                React.createElement('h4', { className: `font-medium text-${UI.getThemeColors().textSecondary}` }, "Add New Location"),
+                React.createElement('span', { className: `text-${UI.getThemeColors().textMuted}` },
                     React.createElement('svg', {
                         xmlns: "http://www.w3.org/2000/svg",
                         className: `h-5 w-5 transition-transform ${showAddLocationForm ? 'transform rotate-180' : ''}`,
@@ -151,13 +151,13 @@ window.App.components.LocationManager = ({
             ),
             
             // Form (conditionally rendered based on state)
-            showAddLocationForm && React.createElement('div', { className: "mt-3" },
+            showAddLocationForm && React.createElement('div', { className: UI.cards.body },
                 React.createElement('form', { onSubmit: handleAddSubmit, className: "space-y-3" },
                     // Name input
                     React.createElement('div', null,
                         React.createElement('label', { 
                             htmlFor: "new-location-name", 
-                            className: "block mb-1 text-sm font-medium text-gray-700" 
+                            className: UI.forms.label 
                         }, "Location Name"),
                         React.createElement('input', {
                             id: "new-location-name",
@@ -165,14 +165,14 @@ window.App.components.LocationManager = ({
                             value: newLocationName,
                             onChange: (e) => setNewLocationName(e.target.value),
                             placeholder: "e.g., Lab Room 101",
-                            className: "w-full p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            className: UI.forms.input
                         })
                     ),
                     // Description input
                     React.createElement('div', null,
                         React.createElement('label', { 
                             htmlFor: "new-location-description", 
-                            className: "block mb-1 text-sm font-medium text-gray-700" 
+                            className: UI.forms.label
                         }, "Description (Optional)"),
                         React.createElement('input', {
                             id: "new-location-description",
@@ -180,14 +180,14 @@ window.App.components.LocationManager = ({
                             value: newLocationDescription,
                             onChange: (e) => setNewLocationDescription(e.target.value),
                             placeholder: "e.g., Main electronics workbench",
-                            className: "w-full p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            className: UI.forms.input
                         })
                     ),
                     // Submit button
                     React.createElement('div', null,
                         React.createElement('button', {
                             type: "submit",
-                            className: "px-4 py-2 bg-blue-500 text-white rounded shadow hover:bg-blue-600 transition duration-150 ease-in-out"
+                            className: UI.buttons.primary
                         }, "Add Location")
                     )
                 )
@@ -195,163 +195,165 @@ window.App.components.LocationManager = ({
         ),
         
         // Locations list
-        React.createElement('div', { className: "bg-white p-4 rounded-lg shadow border border-gray-200" },
-            React.createElement('h4', { className: UI.typography.sectionTitle }, "Location List"),
+        React.createElement('div', { className: UI.cards.container },
+            React.createElement('h4', { className: `${UI.typography.sectionTitle} ${UI.cards.header}` }, "Location List"),
             
-            locations.length === 0 ?
-                React.createElement('p', { className: "text-gray-500 italic" }, "No locations defined yet.") :
-                
-                // Locations accordion list
-                React.createElement('div', { className: "divide-y divide-gray-200" },
-                    locations.map(location => {
-                        const isEditing = editingLocationId === location.id;
-                        const isExpanded = expandedLocations[location.id];
-                        const locationComponents = getComponentsForLocation(location.id);
-                        const locationDrawers = getDrawersForLocation(location.id);
-                        
-                        return React.createElement('div', { 
-                            key: location.id, 
-                            className: "py-2"
-                        },
-                            // Location header (name, description, actions)
-                            React.createElement('div', { className: "flex items-center justify-between" },
-                                // Expand/collapse button and name
-                                React.createElement('div', { 
-                                    className: "flex items-center cursor-pointer",
-                                    onClick: () => !isEditing && toggleLocationExpanded(location.id)
-                                },
-                                    React.createElement('button', { 
-                                        className: "mr-2 text-gray-500 hover:text-gray-700",
-                                        title: isExpanded ? "Collapse" : "Expand"
-                                    },
-                                        React.createElement('svg', {
-                                            xmlns: "http://www.w3.org/2000/svg",
-                                            className: `h-5 w-5 transition-transform ${isExpanded ? 'transform rotate-90' : ''}`,
-                                            fill: "none",
-                                            viewBox: "0 0 24 24",
-                                            stroke: "currentColor"
-                                        },
-                                            React.createElement('path', {
-                                                strokeLinecap: "round",
-                                                strokeLinejoin: "round",
-                                                strokeWidth: 2,
-                                                d: "M9 5l7 7-7 7"
-                                            })
-                                        )
-                                    ),
-                                    !isEditing ?
-                                        React.createElement('div', null,
-                                            React.createElement('span', { className: "font-medium text-gray-800" }, location.name),
-                                            location.description && React.createElement('span', { className: "ml-2 text-sm text-gray-500" }, `(${location.description})`)
-                                        ) :
-                                        // Edit form inline
-                                        React.createElement('div', { className: "flex-1 flex space-x-2" },
-                                            React.createElement('input', {
-                                                type: "text",
-                                                value: editLocationName,
-                                                onChange: (e) => setEditLocationName(e.target.value),
-                                                className: "p-1 border border-gray-300 rounded text-sm w-full max-w-xs",
-                                                placeholder: "Location name"
-                                            }),
-                                            React.createElement('input', {
-                                                type: "text",
-                                                value: editLocationDescription,
-                                                onChange: (e) => setEditLocationDescription(e.target.value),
-                                                className: "p-1 border border-gray-300 rounded text-sm w-full",
-                                                placeholder: "Description (optional)"
-                                            })
-                                        )
-                                ),
-                                
-                                // Action buttons
-                                React.createElement('div', { className: "flex space-x-2" },
-                                    !isEditing ?
-                                        React.createElement(React.Fragment, null,
-                                            React.createElement('button', {
-                                                onClick: () => handleStartEdit(location),
-                                                className: UI.buttons.small.primary,
-                                                title: "Edit Location"
-                                            }, "Edit"),
-                                            React.createElement('button', {
-                                                onClick: () => onDeleteLocation(location.id),
-                                                className: UI.buttons.small.danger,
-                                                title: "Delete Location"
-                                            }, "Delete")
-                                        ) :
-                                        React.createElement(React.Fragment, null,
-                                            React.createElement('button', {
-                                                onClick: handleSaveEdit,
-                                                className: "px-2 py-1 bg-green-500 text-white text-xs rounded shadow hover:bg-green-600",
-                                                title: "Save Changes"
-                                            }, "Save"),
-                                            React.createElement('button', {
-                                                onClick: handleCancelEdit,
-                                                className: "px-2 py-1 bg-gray-300 text-gray-700 text-xs rounded shadow hover:bg-gray-400",
-                                                title: "Cancel Editing"
-                                            }, "Cancel")
-                                        )
-                                )
-                            ),
+            React.createElement('div', { className: UI.cards.body },
+                locations.length === 0 ?
+                    React.createElement('p', { className: `text-${UI.getThemeColors().textMuted} italic` }, "No locations defined yet.") :
+                    
+                    // Locations accordion list
+                    React.createElement('div', { className: `divide-y divide-${UI.getThemeColors().border}` },
+                        locations.map(location => {
+                            const isEditing = editingLocationId === location.id;
+                            const isExpanded = expandedLocations[location.id];
+                            const locationComponents = getComponentsForLocation(location.id);
+                            const locationDrawers = getDrawersForLocation(location.id);
                             
-                            // Components and drawers in this location (collapsible)
-                            isExpanded && !isEditing && React.createElement('div', { 
-                                className: "mt-2 ml-7 pl-2 border-l-2 border-gray-200"
+                            return React.createElement('div', { 
+                                key: location.id, 
+                                className: "py-2"
                             },
-                                // Components Section
-                                React.createElement('h5', { className: "text-sm font-medium text-gray-700 mb-1" }, 
-                                    `Components in this location (${locationComponents.length})`
-                                ),
-                                locationComponents.length === 0 ?
-                                    React.createElement('p', { className: "text-sm text-gray-500 italic mb-3" }, 
-                                        "No components assigned to this location."
-                                    ) :
-                                    React.createElement('ul', { className: "space-y-1 mb-3" },
-                                        locationComponents.slice(0, 5).map(comp => 
-                                            React.createElement('li', { key: comp.id, className: "flex justify-between items-center" },
-                                                React.createElement('span', { className: "text-sm" }, comp.name),
-                                                React.createElement('button', {
-                                                    onClick: () => onEditComponent(comp),
-                                                    className: "text-xs text-blue-500 hover:text-blue-700",
-                                                    title: "Edit Component"
-                                                }, "Edit")
+                                // Location header (name, description, actions)
+                                React.createElement('div', { className: "flex items-center justify-between" },
+                                    // Expand/collapse button and name
+                                    React.createElement('div', { 
+                                        className: "flex items-center cursor-pointer",
+                                        onClick: () => !isEditing && toggleLocationExpanded(location.id)
+                                    },
+                                        React.createElement('button', { 
+                                            className: `mr-2 text-${UI.getThemeColors().textMuted} hover:text-${UI.getThemeColors().textSecondary}`,
+                                            title: isExpanded ? "Collapse" : "Expand"
+                                        },
+                                            React.createElement('svg', {
+                                                xmlns: "http://www.w3.org/2000/svg",
+                                                className: `h-5 w-5 transition-transform ${isExpanded ? 'transform rotate-90' : ''}`,
+                                                fill: "none",
+                                                viewBox: "0 0 24 24",
+                                                stroke: "currentColor"
+                                            },
+                                                React.createElement('path', {
+                                                    strokeLinecap: "round",
+                                                    strokeLinejoin: "round",
+                                                    strokeWidth: 2,
+                                                    d: "M9 5l7 7-7 7"
+                                                })
                                             )
                                         ),
-                                        locationComponents.length > 5 && React.createElement('li', { className: "text-xs text-gray-500 italic" },
-                                            `... and ${locationComponents.length - 5} more component(s)`
-                                        )
+                                        !isEditing ?
+                                            React.createElement('div', null,
+                                                React.createElement('span', { className: `font-medium text-${UI.getThemeColors().textPrimary}` }, location.name),
+                                                location.description && React.createElement('span', { className: `ml-2 text-sm text-${UI.getThemeColors().textMuted}` }, `(${location.description})`)
+                                            ) :
+                                            // Edit form inline
+                                            React.createElement('div', { className: "flex-1 flex space-x-2" },
+                                                React.createElement('input', {
+                                                    type: "text",
+                                                    value: editLocationName,
+                                                    onChange: (e) => setEditLocationName(e.target.value),
+                                                    className: "p-1 border border-gray-300 rounded text-sm w-full max-w-xs",
+                                                    placeholder: "Location name"
+                                                }),
+                                                React.createElement('input', {
+                                                    type: "text",
+                                                    value: editLocationDescription,
+                                                    onChange: (e) => setEditLocationDescription(e.target.value),
+                                                    className: "p-1 border border-gray-300 rounded text-sm w-full",
+                                                    placeholder: "Description (optional)"
+                                                })
+                                            )
                                     ),
-                                
-                                // Drawers Section
-                                React.createElement('h5', { className: "text-sm font-medium text-gray-700 mb-1 mt-3" }, 
-                                    `Drawers in this location (${locationDrawers.length})`
-                                ),
-                                locationDrawers.length === 0 ?
-                                    React.createElement('p', { className: "text-sm text-gray-500 italic" }, 
-                                        "No drawers defined for this location."
-                                    ) :
-                                    React.createElement('ul', { className: "space-y-1" },
-                                        locationDrawers.map(drawer => 
-                                            React.createElement('li', { key: drawer.id, className: "flex justify-between items-center" },
-                                                React.createElement('div', { className: "flex items-center" },
-                                                    React.createElement('span', { className: "text-sm" }, drawer.name),
-                                                    drawer.description && React.createElement('span', { className: "text-xs text-gray-500 ml-2" }, 
-                                                        `(${drawer.description})`
-                                                    )
-                                                ),
+                                    
+                                    // Action buttons
+                                    React.createElement('div', { className: "flex space-x-2" },
+                                        !isEditing ?
+                                            React.createElement(React.Fragment, null,
                                                 React.createElement('button', {
-                                                    onClick: () => onNavigateToDrawer(drawer.id),
-                                                    className: "px-2 py-1 bg-green-500 text-white text-xs rounded shadow hover:bg-green-600",
-                                                    title: "View Drawer"
-                                                }, "View")
+                                                    onClick: () => handleStartEdit(location),
+                                                    className: UI.buttons.small.primary,
+                                                    title: "Edit Location"
+                                                }, "Edit"),
+                                                React.createElement('button', {
+                                                    onClick: () => onDeleteLocation(location.id),
+                                                    className: UI.buttons.small.danger,
+                                                    title: "Delete Location"
+                                                }, "Delete")
+                                            ) :
+                                            React.createElement(React.Fragment, null,
+                                                React.createElement('button', {
+                                                    onClick: handleSaveEdit,
+                                                    className: UI.buttons.small.success,
+                                                    title: "Save Changes"
+                                                }, "Save"),
+                                                React.createElement('button', {
+                                                    onClick: handleCancelEdit,
+                                                    className: UI.buttons.small.secondary,
+                                                    title: "Cancel Editing"
+                                                }, "Cancel")
+                                            )
+                                    )
+                                ),
+                                
+                                // Components and drawers in this location (collapsible)
+                                isExpanded && !isEditing && React.createElement('div', { 
+                                    className: `mt-2 ml-7 pl-2 border-l-2 border-${UI.getThemeColors().borderLight}`
+                                },
+                                    // Components Section
+                                    React.createElement('h5', { className: `text-sm font-medium text-${UI.getThemeColors().textSecondary} mb-1` }, 
+                                        `Components in this location (${locationComponents.length})`
+                                    ),
+                                    locationComponents.length === 0 ?
+                                        React.createElement('p', { className: `text-sm text-${UI.getThemeColors().textMuted} italic mb-3` }, 
+                                            "No components assigned to this location."
+                                        ) :
+                                        React.createElement('ul', { className: "space-y-1 mb-3" },
+                                            locationComponents.slice(0, 5).map(comp => 
+                                                React.createElement('li', { key: comp.id, className: "flex justify-between items-center" },
+                                                    React.createElement('span', { className: "text-sm" }, comp.name),
+                                                    React.createElement('button', {
+                                                        onClick: () => onEditComponent(comp),
+                                                        className: `text-xs ${UI.colors.info.text} hover:${UI.colors.info.hover}`,
+                                                        title: "Edit Component"
+                                                    }, "Edit")
+                                                )
+                                            ),
+                                            locationComponents.length > 5 && React.createElement('li', { className: `text-xs text-${UI.getThemeColors().textMuted} italic` },
+                                                `... and ${locationComponents.length - 5} more component(s)`
+                                            )
+                                        ),
+                                    
+                                    // Drawers Section
+                                    React.createElement('h5', { className: `text-sm font-medium text-${UI.getThemeColors().textSecondary} mb-1 mt-3` }, 
+                                        `Drawers in this location (${locationDrawers.length})`
+                                    ),
+                                    locationDrawers.length === 0 ?
+                                        React.createElement('p', { className: `text-sm text-${UI.getThemeColors().textMuted} italic` }, 
+                                            "No drawers defined for this location."
+                                        ) :
+                                        React.createElement('ul', { className: "space-y-1" },
+                                            locationDrawers.map(drawer => 
+                                                React.createElement('li', { key: drawer.id, className: "flex justify-between items-center" },
+                                                    React.createElement('div', { className: "flex items-center" },
+                                                        React.createElement('span', { className: "text-sm" }, drawer.name),
+                                                        drawer.description && React.createElement('span', { className: `text-xs text-${UI.getThemeColors().textMuted} ml-2` }, 
+                                                            `(${drawer.description})`
+                                                        )
+                                                    ),
+                                                    React.createElement('button', {
+                                                        onClick: () => onNavigateToDrawer(drawer.id),
+                                                        className: UI.buttons.small.success,
+                                                        title: "View Drawer"
+                                                    }, "View")
+                                                )
                                             )
                                         )
-                                    )
-                            )
-                        );
-                    })
-                )
+                                )
+                            );
+                        })
+                    )
+            )
         )
     );
 };
 
-console.log("LocationManager component loaded."); // For debugging
+console.log("LocationManager component loaded with theme-aware styling."); // For debugging
