@@ -166,33 +166,31 @@ window.App.components.DrawerManager = ({
         React.createElement('div', { className: "mb-4" },
             React.createElement('label', {
                 htmlFor: "location-select",
-                className: "block mb-1 text-sm font-medium text-gray-700"
+                className: UI.forms.label
             }, "Filter by Location"),
             React.createElement('select', {
                 id: "location-select",
+                className: UI.forms.select,
                 value: selectedLocationId,
-                onChange: (e) => setSelectedLocationId(e.target.value),
-                className: "w-full p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                onChange: (e) => setSelectedLocationId(e.target.value)
             },
                 React.createElement('option', { value: "" }, "-- All Locations --"),
-                locations.map(location =>
-                    React.createElement('option', { key: location.id, value: location.id }, location.name)
-                )
+                locations.map(location => React.createElement('option', { key: location.id, value: location.id }, location.name))
             )
         ),
 
-        // Then replace the entire "Add new drawer form" section with this
-        React.createElement('div', { className: "mb-6 bg-white p-4 rounded-lg shadow border border-gray-200" },
+        // Add new drawer form 
+        React.createElement('div', { className: UI.cards.container + " mb-6" },
             // Clickable header with toggle arrow
             React.createElement('div', {
-                className: "flex justify-between items-center cursor-pointer",
+                className: `flex justify-between items-center cursor-pointer ${UI.cards.header}`,
                 onClick: () => {
                     console.log("Toggle form visibility", !showAddDrawerForm);
                     setShowAddDrawerForm(!showAddDrawerForm);
                 }
             },
-                React.createElement('h4', { className: "font-medium text-gray-700" }, "Add New Drawer"),
-                React.createElement('span', { className: "text-gray-500" },
+                React.createElement('h4', { className: `font-medium text-${UI.getThemeColors().textSecondary}` }, "Add New Drawer"),
+                React.createElement('span', { className: `text-${UI.getThemeColors().textMuted}` },
                     React.createElement('svg', {
                         xmlns: "http://www.w3.org/2000/svg",
                         className: `h-5 w-5 transition-transform ${showAddDrawerForm ? 'transform rotate-180' : ''}`,
@@ -211,19 +209,19 @@ window.App.components.DrawerManager = ({
             ),
 
             // Form (conditionally rendered based on state)
-            showAddDrawerForm && React.createElement('div', { className: "mt-3" },
+            showAddDrawerForm && React.createElement('div', { className: UI.cards.body },
                 React.createElement('form', { onSubmit: handleAddSubmit, className: "space-y-3" },
                     // Location selection for new drawer
                     React.createElement('div', null,
                         React.createElement('label', {
                             htmlFor: "new-drawer-location",
-                            className: "block mb-1 text-sm font-medium text-gray-700"
+                            className: UI.forms.label
                         }, "Location"),
                         React.createElement('select', {
                             id: "new-drawer-location",
                             value: selectedLocationId,
                             onChange: (e) => setSelectedLocationId(e.target.value),
-                            className: "w-full p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500",
+                            className: UI.forms.select,
                             required: true
                         },
                             React.createElement('option', { value: "" }, "-- Select Location --"),
@@ -232,13 +230,11 @@ window.App.components.DrawerManager = ({
                             )
                         )
                     ),
-                    // Rest of the form elements...
-                    // (Include the rest of your form here)
                     // Name input
                     React.createElement('div', null,
                         React.createElement('label', {
                             htmlFor: "new-drawer-name",
-                            className: "block mb-1 text-sm font-medium text-gray-700"
+                            className: UI.forms.label
                         }, "Drawer Name"),
                         React.createElement('input', {
                             id: "new-drawer-name",
@@ -246,7 +242,7 @@ window.App.components.DrawerManager = ({
                             value: newDrawerName,
                             onChange: (e) => setNewDrawerName(e.target.value),
                             placeholder: "e.g., Drawer A2",
-                            className: "w-full p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500",
+                            className: UI.forms.input,
                             required: true
                         })
                     ),
@@ -254,7 +250,7 @@ window.App.components.DrawerManager = ({
                     React.createElement('div', null,
                         React.createElement('label', {
                             htmlFor: "new-drawer-description",
-                            className: "block mb-1 text-sm font-medium text-gray-700"
+                            className: UI.forms.label
                         }, "Description (Optional)"),
                         React.createElement('input', {
                             id: "new-drawer-description",
@@ -262,7 +258,7 @@ window.App.components.DrawerManager = ({
                             value: newDrawerDescription,
                             onChange: (e) => setNewDrawerDescription(e.target.value),
                             placeholder: "e.g., Top Left",
-                            className: "w-full p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            className: UI.forms.input
                         })
                     ),
                     // Grid size inputs
@@ -270,7 +266,7 @@ window.App.components.DrawerManager = ({
                         React.createElement('div', null,
                             React.createElement('label', {
                                 htmlFor: "new-drawer-rows",
-                                className: "block mb-1 text-sm font-medium text-gray-700"
+                                className: UI.forms.label
                             }, "Number of Rows"),
                             React.createElement('input', {
                                 id: "new-drawer-rows",
@@ -279,13 +275,13 @@ window.App.components.DrawerManager = ({
                                 max: "16",
                                 value: newDrawerRows,
                                 onChange: (e) => setNewDrawerRows(e.target.value),
-                                className: "w-full p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                className: UI.forms.input
                             })
                         ),
                         React.createElement('div', null,
                             React.createElement('label', {
                                 htmlFor: "new-drawer-cols",
-                                className: "block mb-1 text-sm font-medium text-gray-700"
+                                className: UI.forms.label
                             }, "Number of Columns"),
                             React.createElement('input', {
                                 id: "new-drawer-cols",
@@ -294,7 +290,7 @@ window.App.components.DrawerManager = ({
                                 max: "16",
                                 value: newDrawerCols,
                                 onChange: (e) => setNewDrawerCols(e.target.value),
-                                className: "w-full p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                className: UI.forms.input
                             })
                         )
                     ),
@@ -302,7 +298,7 @@ window.App.components.DrawerManager = ({
                     React.createElement('div', null,
                         React.createElement('button', {
                             type: "submit",
-                            className: "px-4 py-2 bg-blue-500 text-white rounded shadow hover:bg-blue-600 transition duration-150 ease-in-out",
+                            className: UI.buttons.primary,
                             disabled: !selectedLocationId
                         }, "Add Drawer")
                     )
@@ -311,181 +307,183 @@ window.App.components.DrawerManager = ({
         ),
 
         // Drawers list
-        React.createElement('div', { className: "bg-white p-4 rounded-lg shadow border border-gray-200" },
-            React.createElement('h4', { className: UI.typography.sectionTitle },
+        React.createElement('div', { className: UI.cards.container },
+            React.createElement('h4', { className: `${UI.typography.sectionTitle} ${UI.cards.header}` },
                 selectedLocationId
                     ? `Drawers in ${getLocationName(selectedLocationId)}`
                     : "All Drawers"
             ),
 
-            filteredDrawers.length === 0 ?
-                React.createElement('p', { className: "text-gray-500 italic" },
-                    selectedLocationId
-                        ? "No drawers defined for this location yet."
-                        : "No drawers defined yet."
-                ) :
+            React.createElement('div', { className: UI.cards.body },
+                filteredDrawers.length === 0 ?
+                    React.createElement('p', { className: `text-${UI.getThemeColors().textMuted} italic` },
+                        selectedLocationId
+                            ? "No drawers defined for this location yet."
+                            : "No drawers defined yet."
+                    ) :
 
-                // Drawers accordion list
-                React.createElement('div', { className: "divide-y divide-gray-200" },
-                    filteredDrawers.map(drawer => {
-                        const isEditing = editingDrawerId === drawer.id;
-                        const isExpanded = expandedDrawers[drawer.id];
-                        const drawerComponents = getComponentsForDrawer(drawer.id);
+                    // Drawers accordion list
+                    React.createElement('div', { className: `divide-y divide-${UI.getThemeColors().border}` },
+                        filteredDrawers.map(drawer => {
+                            const isEditing = editingDrawerId === drawer.id;
+                            const isExpanded = expandedDrawers[drawer.id];
+                            const drawerComponents = getComponentsForDrawer(drawer.id);
 
-                        return React.createElement('div', {
-                            key: drawer.id,
-                            className: "py-2"
-                        },
-                            // Drawer header (name, description, actions)
-                            React.createElement('div', { className: "flex items-center justify-between" },
-                                // Expand/collapse button and name
-                                React.createElement('div', {
-                                    className: "flex items-center cursor-pointer",
-                                    onClick: () => !isEditing && toggleDrawerExpanded(drawer.id)
-                                },
-                                    React.createElement('button', {
-                                        className: "mr-2 text-gray-500 hover:text-gray-700",
-                                        title: isExpanded ? "Collapse" : "Expand"
-                                    },
-                                        React.createElement('svg', {
-                                            xmlns: "http://www.w3.org/2000/svg",
-                                            className: `h-5 w-5 transition-transform ${isExpanded ? 'transform rotate-90' : ''}`,
-                                            fill: "none",
-                                            viewBox: "0 0 24 24",
-                                            stroke: "currentColor"
-                                        },
-                                            React.createElement('path', {
-                                                strokeLinecap: "round",
-                                                strokeLinejoin: "round",
-                                                strokeWidth: 2,
-                                                d: "M9 5l7 7-7 7"
-                                            })
-                                        )
-                                    ),
-                                    !isEditing ?
-                                        React.createElement('div', null,
-                                            React.createElement('span', { className: "font-medium text-gray-800" }, drawer.name),
-                                            drawer.description && React.createElement('span', { className: "ml-2 text-sm text-gray-500" }, `(${drawer.description})`),
-                                            !selectedLocationId && React.createElement('span', { className: "ml-2 text-xs bg-gray-100 px-2 py-0.5 rounded" }, getLocationName(drawer.locationId))
-                                        ) :
-                                        // Edit form inline
-                                        React.createElement('div', { className: "flex-1 space-y-2" },
-                                            React.createElement('div', { className: "flex space-x-2" },
-                                                React.createElement('input', {
-                                                    type: "text",
-                                                    value: editDrawerName,
-                                                    onChange: (e) => setEditDrawerName(e.target.value),
-                                                    className: "p-1 border border-gray-300 rounded text-sm w-full max-w-xs",
-                                                    placeholder: "Drawer name"
-                                                }),
-                                                React.createElement('input', {
-                                                    type: "text",
-                                                    value: editDrawerDescription,
-                                                    onChange: (e) => setEditDrawerDescription(e.target.value),
-                                                    className: "p-1 border border-gray-300 rounded text-sm w-full",
-                                                    placeholder: "Description (optional)"
-                                                })
-                                            ),
-                                            React.createElement('div', { className: "flex space-x-2" },
-                                                React.createElement('div', { className: "flex items-center" },
-                                                    React.createElement('span', { className: "text-xs mr-1" }, "Rows:"),
-                                                    React.createElement('input', {
-                                                        type: "number",
-                                                        min: "1",
-                                                        max: "16",
-                                                        value: editDrawerRows,
-                                                        onChange: (e) => setEditDrawerRows(e.target.value),
-                                                        className: "p-1 border border-gray-300 rounded text-sm w-16"
-                                                    })
-                                                ),
-                                                React.createElement('div', { className: "flex items-center" },
-                                                    React.createElement('span', { className: "text-xs mr-1" }, "Columns:"),
-                                                    React.createElement('input', {
-                                                        type: "number",
-                                                        min: "1",
-                                                        max: "16",
-                                                        value: editDrawerCols,
-                                                        onChange: (e) => setEditDrawerCols(e.target.value),
-                                                        className: "p-1 border border-gray-300 rounded text-sm w-16"
-                                                    })
-                                                )
-                                            )
-                                        )
-                                ),
-
-                                // Action buttons
-                                React.createElement('div', { className: "flex space-x-2" },
-                                    !isEditing ?
-                                        React.createElement(React.Fragment, null,
-                                            React.createElement('button', {
-                                                onClick: () => onViewDrawer(drawer.id),
-                                                className: "px-2 py-1 bg-green-500 text-white text-xs rounded shadow hover:bg-green-600",
-                                                title: "View Drawer Contents"
-                                            }, "View"),
-                                            React.createElement('button', {
-                                                onClick: () => handleStartEdit(drawer),
-                                                className: UI.buttons.small.primary,
-                                                title: "Edit Drawer"
-                                            }, "Edit"),
-                                            React.createElement('button', {
-                                                onClick: () => onDeleteDrawer(drawer.id),
-                                                className: UI.buttons.small.danger,
-                                                title: "Delete Drawer"
-                                            }, "Delete")
-                                        ) :
-                                        React.createElement(React.Fragment, null,
-                                            React.createElement('button', {
-                                                onClick: handleSaveEdit,
-                                                className: "px-2 py-1 bg-green-500 text-white text-xs rounded shadow hover:bg-green-600",
-                                                title: "Save Changes"
-                                            }, "Save"),
-                                            React.createElement('button', {
-                                                onClick: handleCancelEdit,
-                                                className: "px-2 py-1 bg-gray-300 text-gray-700 text-xs rounded shadow hover:bg-gray-400",
-                                                title: "Cancel Editing"
-                                            }, "Cancel")
-                                        )
-                                )
-                            ),
-
-                            // Components in this drawer (collapsible)
-                            isExpanded && !isEditing && React.createElement('div', {
-                                className: "mt-2 ml-7 pl-2 border-l-2 border-gray-200"
+                            return React.createElement('div', {
+                                key: drawer.id,
+                                className: "py-2"
                             },
-                                React.createElement('h5', { className: "text-sm font-medium text-gray-700 mb-1" },
-                                    `${drawer.grid?.rows || 3}×${drawer.grid?.cols || 3} grid with ${drawerComponents.length} component(s)`
-                                ),
-                                React.createElement('div', { className: "flex space-x-2 mt-2" },
-                                    React.createElement('button', {
-                                        onClick: () => onViewDrawer(drawer.id),
-                                        className: "px-3 py-1 bg-indigo-500 text-white text-xs rounded shadow hover:bg-indigo-600",
-                                        title: "View Drawer Contents"
-                                    }, "View Drawer Contents")
-                                ),
-                                drawerComponents.length > 0 && React.createElement('div', { className: "mt-2" },
-                                    React.createElement('h6', { className: "text-xs font-medium text-gray-600 mb-1" }, "Components in this drawer:"),
-                                    React.createElement('ul', { className: "space-y-1 max-h-40 overflow-y-auto" },
-                                        drawerComponents.slice(0, 5).map(comp =>
-                                            React.createElement('li', { key: comp.id, className: "flex justify-between items-center" },
-                                                React.createElement('span', { className: "text-sm" }, comp.name),
-                                                React.createElement('button', {
-                                                    onClick: () => onEditComponent(comp),
-                                                    className: "text-xs text-blue-500 hover:text-blue-700",
-                                                    title: "Edit Component"
-                                                }, "Edit")
+                                // Drawer header (name, description, actions)
+                                React.createElement('div', { className: "flex items-center justify-between" },
+                                    // Expand/collapse button and name
+                                    React.createElement('div', {
+                                        className: "flex items-center cursor-pointer",
+                                        onClick: () => !isEditing && toggleDrawerExpanded(drawer.id)
+                                    },
+                                        React.createElement('button', {
+                                            className: `mr-2 text-${UI.getThemeColors().textMuted} hover:text-${UI.getThemeColors().textSecondary}`,
+                                            title: isExpanded ? "Collapse" : "Expand"
+                                        },
+                                            React.createElement('svg', {
+                                                xmlns: "http://www.w3.org/2000/svg",
+                                                className: `h-5 w-5 transition-transform ${isExpanded ? 'transform rotate-90' : ''}`,
+                                                fill: "none",
+                                                viewBox: "0 0 24 24",
+                                                stroke: "currentColor"
+                                            },
+                                                React.createElement('path', {
+                                                    strokeLinecap: "round",
+                                                    strokeLinejoin: "round",
+                                                    strokeWidth: 2,
+                                                    d: "M9 5l7 7-7 7"
+                                                })
                                             )
                                         ),
-                                        drawerComponents.length > 5 && React.createElement('li', { className: "text-xs text-gray-500 italic" },
-                                            `... and ${drawerComponents.length - 5} more component(s)`
+                                        !isEditing ?
+                                            React.createElement('div', null,
+                                                React.createElement('span', { className: `font-medium text-${UI.getThemeColors().textPrimary}` }, drawer.name),
+                                                drawer.description && React.createElement('span', { className: `ml-2 text-sm text-${UI.getThemeColors().textMuted}` }, `(${drawer.description})`),
+                                                !selectedLocationId && React.createElement('span', { className: `ml-2 text-xs bg-${UI.getThemeColors().background} px-2 py-0.5 rounded` }, getLocationName(drawer.locationId))
+                                            ) :
+                                            // Edit form inline
+                                            React.createElement('div', { className: "flex-1 space-y-2" },
+                                                React.createElement('div', { className: "flex space-x-2" },
+                                                    React.createElement('input', {
+                                                        type: "text",
+                                                        value: editDrawerName,
+                                                        onChange: (e) => setEditDrawerName(e.target.value),
+                                                        className: UI.forms.input + " max-w-xs",
+                                                        placeholder: "Drawer name"
+                                                    }),
+                                                    React.createElement('input', {
+                                                        type: "text",
+                                                        value: editDrawerDescription,
+                                                        onChange: (e) => setEditDrawerDescription(e.target.value),
+                                                        className: UI.forms.input + " w-full",
+                                                        placeholder: "Description (optional)"
+                                                    })
+                                                ),
+                                                React.createElement('div', { className: "flex space-x-2" },
+                                                    React.createElement('div', { className: "flex items-center" },
+                                                        React.createElement('span', { className: `text-xs mr-1 text-${UI.getThemeColors().textSecondary}` }, "Rows:"),
+                                                        React.createElement('input', {
+                                                            type: "number",
+                                                            min: "1",
+                                                            max: "16",
+                                                            value: editDrawerRows,
+                                                            onChange: (e) => setEditDrawerRows(e.target.value),
+                                                            className: UI.forms.input + " w-16"
+                                                        })
+                                                    ),
+                                                    React.createElement('div', { className: "flex items-center" },
+                                                        React.createElement('span', { className: `text-xs mr-1 text-${UI.getThemeColors().textSecondary}` }, "Columns:"),
+                                                        React.createElement('input', {
+                                                            type: "number",
+                                                            min: "1",
+                                                            max: "16",
+                                                            value: editDrawerCols,
+                                                            onChange: (e) => setEditDrawerCols(e.target.value),
+                                                            className: UI.forms.input + " w-16"
+                                                        })
+                                                    )
+                                                )
+                                            )
+                                    ),
+
+                                    // Action buttons
+                                    React.createElement('div', { className: "flex space-x-2" },
+                                        !isEditing ?
+                                            React.createElement(React.Fragment, null,
+                                                React.createElement('button', {
+                                                    onClick: () => onViewDrawer(drawer.id),
+                                                    className: UI.buttons.small.success,
+                                                    title: "View Drawer Contents"
+                                                }, "View"),
+                                                React.createElement('button', {
+                                                    onClick: () => handleStartEdit(drawer),
+                                                    className: UI.buttons.small.primary,
+                                                    title: "Edit Drawer"
+                                                }, "Edit"),
+                                                React.createElement('button', {
+                                                    onClick: () => onDeleteDrawer(drawer.id),
+                                                    className: UI.buttons.small.danger,
+                                                    title: "Delete Drawer"
+                                                }, "Delete")
+                                            ) :
+                                            React.createElement(React.Fragment, null,
+                                                React.createElement('button', {
+                                                    onClick: handleSaveEdit,
+                                                    className: UI.buttons.small.success,
+                                                    title: "Save Changes"
+                                                }, "Save"),
+                                                React.createElement('button', {
+                                                    onClick: handleCancelEdit,
+                                                    className: UI.buttons.small.secondary,
+                                                    title: "Cancel Editing"
+                                                }, "Cancel")
+                                            )
+                                    )
+                                ),
+
+                                // Components in this drawer (collapsible)
+                                isExpanded && !isEditing && React.createElement('div', {
+                                    className: `mt-2 ml-7 pl-2 border-l-2 border-${UI.getThemeColors().borderLight}`
+                                },
+                                    React.createElement('h5', { className: `text-sm font-medium text-${UI.getThemeColors().textSecondary} mb-1` },
+                                        `${drawer.grid?.rows || 3}×${drawer.grid?.cols || 3} grid with ${drawerComponents.length} component(s)`
+                                    ),
+                                    React.createElement('div', { className: "flex space-x-2 mt-2" },
+                                        React.createElement('button', {
+                                            onClick: () => onViewDrawer(drawer.id),
+                                            className: UI.buttons.small.info,
+                                            title: "View Drawer Contents"
+                                        }, "View Drawer Contents")
+                                    ),
+                                    drawerComponents.length > 0 && React.createElement('div', { className: "mt-2" },
+                                        React.createElement('h6', { className: `text-xs font-medium text-${UI.getThemeColors().textSecondary} mb-1` }, "Components in this drawer:"),
+                                        React.createElement('ul', { className: "space-y-1 max-h-40 overflow-y-auto" },
+                                            drawerComponents.slice(0, 5).map(comp =>
+                                                React.createElement('li', { key: comp.id, className: "flex justify-between items-center" },
+                                                    React.createElement('span', { className: `text-sm text-${UI.getThemeColors().textSecondary}` }, comp.name),
+                                                    React.createElement('button', {
+                                                        onClick: () => onEditComponent(comp),
+                                                        className: `text-xs ${UI.colors.info.text} hover:${UI.colors.info.hover}`,
+                                                        title: "Edit Component"
+                                                    }, "Edit")
+                                                )
+                                            ),
+                                            drawerComponents.length > 5 && React.createElement('li', { className: `text-xs text-${UI.getThemeColors().textMuted} italic` },
+                                                `... and ${drawerComponents.length - 5} more component(s)`
+                                            )
                                         )
                                     )
                                 )
-                            )
-                        );
-                    })
-                )
+                            );
+                        })
+                    )
+            )
         )
     );
 };
 
-console.log("DrawerManager component loaded."); // For debugging
+console.log("DrawerManager component loaded with theme-aware styling."); // For debugging
