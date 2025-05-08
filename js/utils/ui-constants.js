@@ -275,11 +275,12 @@ window.App.utils.UI = {
                 container: `min-w-full bg-${colors.cardBackground} divide-y divide-${colors.border} rounded-lg shadow`,
                 header: {
                     row: `bg-${colors.headerBackground}`,
-                    cell: `py-3 px-4 text-left text-xs font-medium text-${colors.textMuted} uppercase tracking-wider`
+                    cell: `py-3 px-4 text-center text-xs font-medium text-${colors.textMuted} uppercase tracking-wider`
                 },
                 body: {
-                    // Updated row styling with proper theme background colors
+                    // Updated row styling with proper theme background colors and selection highlighting
                     row: `hover:bg-${colors.background} border-b border-${colors.borderLight} bg-${colors.cardBackground}`,
+                    rowSelected: `bg-${colors.primary.replace('500', '50').replace('400', '950')} hover:bg-${colors.primary.replace('500', '100').replace('400', '900')} border-b border-${colors.borderLight}`,
                     cell: `px-4 py-2 whitespace-nowrap text-${colors.textSecondary}`,
                     cellAction: `px-4 py-2 whitespace-nowrap text-center text-sm font-medium`
                 },
@@ -298,7 +299,7 @@ window.App.utils.UI = {
                 base: 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
                 primary: `bg-${colors.primary.replace('500', '100').replace('400', '900')} text-${colors.primary.replace('500', '800').replace('400', '300')}`,
                 gray: `bg-${colors.secondary.replace('300', '100').replace('600', '900')} text-${colors.textSecondary}`,
-                red: `bg-${colors.danger.replace('500', '100').replace('400', '900')} text-${colors.danger.replace('500', '800').replace('400', '300')}`,
+                red: `bg-${colors.danger.replace('500', '100').replace('400', '900')} text-white`,  // Improved contrast for "Low Stock"
                 green: `bg-${colors.success.replace('500', '100').replace('400', '900')} text-${colors.success.replace('500', '800').replace('400', '300')}`,
                 yellow: `bg-${colors.warning.replace('500', '100').replace('400', '900')} text-${colors.warning.replace('500', '800').replace('400', '300')}`,
                 indigo: `bg-${colors.info.replace('500', '100').replace('400', '900')} text-${colors.info.replace('500', '800').replace('400', '300')}`

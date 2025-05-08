@@ -188,7 +188,7 @@ window.App.components.InventoryView = ({
 
         return React.createElement('tr', {
             key: component.id,
-            className: `${UI.tables.body.row} ${isSelected ? 'bg-blue-50' : ''} ${lowStock ? 'bg-red-50 hover:bg-red-100' : ''}`
+            className: `${isSelected ? UI.tables.body.rowSelected : UI.tables.body.row} ${lowStock ? `bg-${UI.getThemeColors().danger.replace('500', '50').replace('400', '950')} hover:bg-${UI.getThemeColors().danger.replace('500', '100').replace('400', '900')}` : ''}`
         },
             // Checkbox
             React.createElement('td', { className: "px-3 py-2 text-center" },
@@ -288,16 +288,16 @@ window.App.components.InventoryView = ({
                         className: UI.buttons.icon.danger,
                         title: "Decrease Quantity"
                     }, "-"),
-                    React.createElement('span', {
-                        className: `text-sm font-semibold ${lowStock ? 'text-red-600' : 'text-gray-900'}`
-                    }, component.quantity || 0),
+                    React.createElement('span',{ className: UI.tables.body.cell}, component.quantity || 0),
                     React.createElement('button', {
                         onClick: () => onUpdateQuantity(component.id, 1),
                         className: UI.buttons.icon.success,
                         title: "Increase Quantity"
                     }, "+")
                 ),
-                lowStock && React.createElement('div', { className: UI.tags.red }, "Low Stock")
+                lowStock && React.createElement('div', { 
+                    className: UI.tags.red,
+                }, "Low Stock")
             ),
             // Price
             React.createElement('td', { className: UI.tables.body.cell + " text-right" }, formattedPrice),
