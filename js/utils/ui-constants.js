@@ -325,7 +325,11 @@ window.App.utils.UI = {
     // Initialize default styles based on initial theme
     initialize: function() {
         // Set default theme
-        this.currentTheme = this.currentTheme || 'light';
+        this.currentTheme = (
+            (typeof storage !== 'undefined' && storage.loadConfig().theme) 
+              || this.currentTheme 
+              || 'light'
+          );
         
         // Ensure theme exists
         if (!this.themes[this.currentTheme]) {
@@ -411,6 +415,22 @@ window.App.utils.UI = {
             borderTop: 'border-t',
             borderBottom: 'border-b'
         };
+
+                // Add direct body class update here
+                const bodyElement = document.body || document.querySelector('body');
+if (!bodyElement) {
+  console.warn('UI.initialize: <body> element not yet available, skipping class update');
+  return this;
+}
+                const themeColors = this.getThemeColors();
+                
+                // Clear existing theme classes
+                bodyElement.classList.remove('bg-gray-100', 'bg-gray-900');
+                bodyElement.classList.remove('text-gray-100', 'text-gray-900');
+                
+                // Add new theme classes
+                bodyElement.classList.add(`bg-${themeColors.background}`);
+                bodyElement.classList.add(`text-${themeColors.textPrimary}`);
         
         console.log(`UI initialized with ${this.currentTheme} theme`);
         return this;
@@ -418,6 +438,12 @@ window.App.utils.UI = {
 };
 
 // Initialize UI with default theme
-window.App.utils.UI.initialize();
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      window.App.utils.UI.initialize();
+    });
+  } else {
+    window.App.utils.UI.initialize();
+}
 
 console.log("UI constants loaded with improved theme support.");

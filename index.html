@@ -34,8 +34,6 @@
     <script src="js/components/DrawerView.js"></script>
     <script src="js/components/DrawerPage.js"></script>
     <script src="js/components/ThemeSwitcher.js"></script>
-
-
 </head>
 
 <body>
@@ -61,7 +59,6 @@
             const [categories, setCategories] = useState([]);
             const [currentPage, setCurrentPage] = useState('inventory'); // 'inventory', 'locations', 'data', or 'drawers'
             const [viewMode, setViewMode] = useState('table'); // 'table' or 'card'
-            const [theme, setTheme] = useState('dark');
             const [selectedCategory, setSelectedCategory] = useState('all');
             const [searchTerm, setSearchTerm] = useState('');
             const [showForm, setShowForm] = useState(false); // For add/edit component modal
@@ -82,6 +79,11 @@
             const [viewingDrawerId, setViewingDrawerId] = useState(null);
             const [itemsPerPage, setItemsPerPage] = useState('all');
             const [appTheme, setAppTheme] = useState(window.App.utils.UI.currentTheme);
+            const [theme, setTheme] = useState(
+                () => storage.loadConfig().theme
+                    || window.App.utils.UI.currentTheme
+                    || 'light'
+            );
 
             //const [showAddDrawerForm, setShowAddDrawerForm] = useState(false);
 
@@ -100,8 +102,10 @@
                 setFootprints(config.footprints || []);
                 setLocations(storage.loadLocations() || []);
                 setItemsPerPage(config.itemsPerPage || 'all');
-                setTheme(config.theme || 'dark');
-                window.App.utils.UI.setTheme(config.theme || 'dark');
+                if ((config.theme || 'dark') !== theme) {
+                    setTheme(config.theme);
+                }
+                window.App.utils.UI.setTheme(config.theme || theme);
 
                 // Load drawers from localStorage
                 setDrawers(storage.loadDrawers() || []);
@@ -188,17 +192,24 @@
                 });
             }, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]); // Add theme to dependency array
 
+            // Combined useEffect for theme handling
             useEffect(() => {
                 // Apply theme through the UI system
                 window.App.utils.UI.setTheme(theme);
 
-                // Update the document's root class based on theme
+                // Get current theme colors
                 const themeColors = window.App.utils.UI.getThemeColors();
+
+                // Clear existing background classes
+                document.body.classList.remove('bg-gray-100', 'bg-gray-900');
+                document.body.classList.remove('text-gray-100', 'text-gray-900');
+
+                // Set the body class directly
                 document.body.className = `bg-${themeColors.background} text-${themeColors.textPrimary}`;
+
+                // Log theme change for debugging
+                console.log(`Theme applied: ${theme}, background: bg-${themeColors.background}`);
             }, [theme]);
-
-
-
             // --- Helper Functions / Callbacks for Child Components ---
 
             // Clear status messages (import/export)
@@ -793,31 +804,40 @@
 
             //-- Theme Management--
             const handleThemeChange = (newTheme) => {
-    if (window.App.utils.UI.themes[newTheme]) {
-        // Update state
-        setTheme(newTheme);
+                if (window.App.utils.UI.themes[newTheme]) {
+                    // Update state
+                    setTheme(newTheme);
 
-        // Update UI system
-        window.App.utils.UI.setTheme(newTheme);
+                    // Get the body element
+                    const bodyElement = document.body;
 
-        // Save theme preference
-        saveConfigCallback();
+                    // Get theme colors
+                    const themeColors = window.App.utils.UI.getThemeColors();
 
-        // Force re-render to update components
-        setAppTheme(newTheme);
-        
-        // Force immediate style recalculation in problematic components
-        const tables = document.querySelectorAll('table');
-        tables.forEach(table => {
-            // This triggers a style recalculation
-            table.style.display = 'none';
-            // Force layout recalculation
-            table.offsetHeight; 
-            // Restore display
-            table.style.display = '';
-        });
-    }
-};
+                    // Remove all existing theme-related classes from body
+                    bodyElement.classList.remove('bg-gray-100', 'bg-gray-900');
+                    bodyElement.classList.remove('text-gray-100', 'text-gray-900');
+
+                    // Add the correct background class based on theme
+                    if (newTheme === 'dark') {
+                        bodyElement.classList.add(`bg-${themeColors.background}`);
+                        bodyElement.classList.add(`text-${themeColors.textPrimary}`);
+                    } else {
+                        bodyElement.classList.add(`bg-${themeColors.background}`);
+                        bodyElement.classList.add(`text-${themeColors.textPrimary}`);
+                    }
+
+                    // Update UI system
+                    window.App.utils.UI.setTheme(newTheme);
+
+                    // Save theme preference
+                    saveConfigCallback();
+
+                    // Force re-render to update components
+                    setAppTheme(newTheme);
+                }
+            };
+
             // Set up global theme change handler
             window.App.onThemeChange = (newTheme) => {
                 setAppTheme(newTheme);
@@ -833,8 +853,6 @@
                 // Apply theme class to body if needed
                 document.body.className = `bg-${window.App.utils.UI.themes[appTheme].colors.background}`;
             }, [appTheme]);
-
-
 
             //-- Footprint Management---
             const handleAddFootprint = (newFootprint) => {
@@ -1579,7 +1597,6 @@
         }
 
     </script>
-
 </body>
 
 </html>
