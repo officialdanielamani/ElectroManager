@@ -35,8 +35,6 @@ window.App.components.InventoryView = ({
     onBulkEdit, // Function: Called when 'Edit Selected' button clicked
     onBulkDelete, // Function: Called when 'Delete Selected' button clicked
     onChangeViewMode, // Function(mode): Called to change view mode ('table'/'card')
-    onChangeCategoryFilter, // Function(category): Called when category filter changes
-    onChangeSearchTerm, // Function(term): Called when search input changes
     onToggleFavorite, // Function(id, property): Called when favorite/bookmark/star is toggled
 }) => {
     // Get UI constants and helper functions
@@ -81,71 +79,75 @@ window.App.components.InventoryView = ({
         setCurrentPage(1);
     }, []);
 
-    // --- Filtering Logic ---
-    // Filter components based on search term, selected category, and advanced filters
-    const filteredComponents = components.filter(component => {
-        // Basic filters (search and category dropdown)
-        const matchesCategory = selectedCategory === 'all' || component.category === selectedCategory;
-        const lowerSearchTerm = searchTerm.toLowerCase();
-        const matchesSearch = !searchTerm ||
-            (component.name && component.name.toLowerCase().includes(lowerSearchTerm)) ||
-            (component.type && component.type.toLowerCase().includes(lowerSearchTerm)) ||
-            (component.category && component.category.toLowerCase().includes(lowerSearchTerm)) ||
-            (component.info && component.info.toLowerCase().includes(lowerSearchTerm));
+   // --- Filtering Logic ---
+// Filter components based on search term, selected category, and advanced filters
+const filteredComponents = components.filter(component => {
+    // Basic filters (search and category dropdown)
+    const matchesCategory = selectedCategory === 'all' || component.category === selectedCategory;
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm ||
+        (component.name && component.name.toLowerCase().includes(lowerSearchTerm)) ||
+        (component.type && component.type.toLowerCase().includes(lowerSearchTerm)) ||
+        (component.category && component.category.toLowerCase().includes(lowerSearchTerm)) ||
+        (component.info && component.info.toLowerCase().includes(lowerSearchTerm));
 
-        // Advanced filters
-        // Category filter
-        const matchesAdvancedCategory = selectedCategories.length === 0 ||
-            selectedCategories.includes(component.category);
+    // Advanced filters
+    // Category filter
+    const matchesAdvancedCategory = selectedCategories.length === 0 ||
+        selectedCategories.includes(component.category);
 
-        // Type filter
-        const matchesType = selectedTypes.length === 0 ||
-            (component.type && selectedTypes.includes(component.type));
+    // Type filter
+    const matchesType = selectedTypes.length === 0 ||
+        (component.type && selectedTypes.includes(component.type));
 
-        // Marks filter (favorite, bookmark, star)
-        const matchesMarks = selectedMarks.length === 0 ||
-            selectedMarks.some(mark => component[mark]);
+    // Marks filter (favorite, bookmark, star)
+    const matchesMarks = selectedMarks.length === 0 ||
+        selectedMarks.some(mark => component[mark]);
 
-        // Location filter
-        const matchesLocation = selectedLocations.length === 0 ||
-            (component.locationInfo && component.locationInfo.locationId &&
-                locations.some(loc =>
-                    selectedLocations.includes(loc.name) &&
-                    loc.id === component.locationInfo.locationId
-                ));
+    // Location filter
+    const matchesLocation = selectedLocations.length === 0 ||
+        (component.locationInfo && component.locationInfo.locationId &&
+            locations.some(loc =>
+                selectedLocations.includes(loc.name) &&
+                loc.id === component.locationInfo.locationId
+            ));
 
-        // Footprint filter
-        const matchesFootprint = selectedFootprints.length === 0 ||
-            (component.footprint && selectedFootprints.includes(component.footprint));
+    // Footprint filter
+    const matchesFootprint = selectedFootprints.length === 0 ||
+        (component.footprint && selectedFootprints.includes(component.footprint));
 
-        // Quantity range filter
-        const componentQuantity = component.quantity || 0;
-        const matchesQuantity = !quantityRange || (
-            // If min and max are defined and equal, filter for exact match
-            (quantityRange.min !== null && quantityRange.max !== null && quantityRange.min === quantityRange.max)
-                ? (componentQuantity === quantityRange.min)
-                // Otherwise, filter only by minimum value (max is ignored unless used for exact match)
-                // Ensure component quantity is greater than or equal to the minimum filter value
-                : (quantityRange.min === null || componentQuantity >= quantityRange.min)
-        );
+    // Quantity range filter - FIXED LOGIC
+    const componentQuantity = component.quantity || 0;
+    const matchesQuantity = !quantityRange || (
+        // If min and max are defined and equal, filter for exact match
+        (quantityRange.min !== null && quantityRange.max !== null && quantityRange.min === quantityRange.max)
+            ? (componentQuantity === quantityRange.min)
+            // Otherwise, use proper range filtering with both min and max boundaries
+            : (
+                (quantityRange.min === null || componentQuantity >= quantityRange.min) &&
+                (quantityRange.max === null || componentQuantity <= quantityRange.max)
+            )
+    );
 
-        // Component range filter
-        const componentPrice = component.price || 0;
-        const matchesPrice = !priceRange || (
-            // If min and max are defined and equal, filter for exact match
-            (priceRange.min !== null && priceRange.max !== null && priceRange.min === priceRange.max)
-                ? (componentPrice === priceRange.min)
-                // Otherwise, filter only by minimum value (max is ignored unless used for exact match)
-                // Ensure component price is greater than or equal to the minimum filter value
-                : (priceRange.min === null || componentPrice >= priceRange.min)
-        );
+    // Price range filter - FIXED LOGIC
+    const componentPrice = component.price || 0;
+    const matchesPrice = !priceRange || (
+        // If min and max are defined and equal, filter for exact match
+        (priceRange.min !== null && priceRange.max !== null && priceRange.min === priceRange.max)
+            ? (componentPrice === priceRange.min)
+            // Otherwise, use proper range filtering with both min and max boundaries
+            : (
+                (priceRange.min === null || componentPrice >= priceRange.min) &&
+                (priceRange.max === null || componentPrice <= priceRange.max)
+            )
+    );
 
-        // Combine all filters
-        return matchesCategory && matchesSearch &&
-            matchesAdvancedCategory && matchesType &&
-            matchesMarks && matchesLocation &&
-            matchesFootprint && matchesQuantity && matchesPrice;
-    });
+    // Combine all filters
+    return matchesCategory && matchesSearch &&
+        matchesAdvancedCategory && matchesType &&
+        matchesMarks && matchesLocation &&
+        matchesFootprint && matchesQuantity && matchesPrice;
+});
 
     // --- Pagination Logic ---
     const paginatedComponents = itemsPerPage === 'all'
@@ -173,9 +175,17 @@ window.App.components.InventoryView = ({
     const categoryCounts = helpers.calculateCategoryCounts(components);
 
     // --- Event Handlers ---
-    const handleCategoryChange = (e) => onChangeCategoryFilter(e.target.value);
-    const handleSearchChange = (e) => onChangeSearchTerm(e.target.value);
-    const handleViewChange = (mode) => onChangeViewMode(mode);
+
+    //const handleSearchChange = (e) => onChangeSearchTerm(e.target.value);
+    const handleViewChange = (mode) => {
+        // Just pass the mode directly - this is expected to be a string value
+        if (mode === 'table' || mode === 'card') {
+            onChangeViewMode(mode);
+        } else {
+            console.warn("handleViewChange called with invalid mode", mode);
+            onChangeViewMode('table'); // Default to table view
+        }
+    };
 
     // --- Render Functions for Table and Card Views ---
 
@@ -436,7 +446,7 @@ window.App.components.InventoryView = ({
                     alt: component.name || 'Component Image',
                     className: "w-full h-full object-contain p-2",
                     // Fallback placeholder if image fails to load
-                    onError: (e) => { e.target.onerror = null; e.target.src = `https://placehold.co/200x150/e2e8f0/94a3b8?text=No+Image`; }
+                    //onError: (e) => { e.target.onerror = null; e.target.src = `https://placehold.co/200x150/e2e8f0/94a3b8?text=No+Image`; }
                 }),
                 lowStock && React.createElement('span', { 
                     className: UI.tags.red + " absolute bottom-1 right-1" 
@@ -607,7 +617,6 @@ React.createElement('div', { className: UI.layout.sectionAlt },
                 onItemsPerPageChange: onItemsPerPageChange, // Pass the callback
                 onClearFilters: handleClearAdvancedFilters,
                 onChangeViewMode: handleViewChange,
-                onChangeCategoryFilter: handleCategoryChange,
                 
                 // UI state
                 isExpanded: advancedFiltersExpanded,
