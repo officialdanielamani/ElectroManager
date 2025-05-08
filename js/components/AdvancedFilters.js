@@ -575,8 +575,15 @@ window.App.components.AdvancedFilters = ({
                         type: "text",
                         placeholder: "Search by name, type, category, info...",
                         className: UI.forms.input + " flex-grow",
-                        value: searchTerm,
-                        onChange: (e) => onChangeSearchTerm(e.target.value),
+                        value: searchTerm || '',
+                        onChange: (e) => {
+                            // Call the function that was passed as a prop
+                            if (typeof onChangeSearchTerm === 'function') {
+                                onChangeSearchTerm(e); // Pass the entire event object
+                            } else {
+                                console.warn("onChangeSearchTerm is not a function");
+                            }
+                        }
                     }),
                     // Optional: Add a search icon or clear button
                     searchTerm && React.createElement('button', {

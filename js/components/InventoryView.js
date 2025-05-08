@@ -36,6 +36,7 @@ window.App.components.InventoryView = ({
     onBulkDelete, // Function: Called when 'Delete Selected' button clicked
     onChangeViewMode, // Function(mode): Called to change view mode ('table'/'card')
     onToggleFavorite, // Function(id, property): Called when favorite/bookmark/star is toggled
+
 }) => {
     // Get UI constants and helper functions
     const { helpers, UI } = window.App.utils;
@@ -176,7 +177,20 @@ const filteredComponents = components.filter(component => {
 
     // --- Event Handlers ---
 
-    //const handleSearchChange = (e) => onChangeSearchTerm(e.target.value);
+    const handleSearchChange = (e) => {
+        // Handle both event objects and direct string values
+        if (e && e.target && e.target.value !== undefined) {
+            // Normal event object from input element
+            onChangeSearchTerm(e.target.value);
+        } else if (typeof e === 'string') {
+            // Direct string value
+            onChangeSearchTerm(e);
+        } else {
+            // Fallback
+            console.warn("handleSearchChange called with invalid argument", e);
+            onChangeSearchTerm(''); // Default to empty search
+        }
+    };
     const handleViewChange = (mode) => {
         // Just pass the mode directly - this is expected to be a string value
         if (mode === 'table' || mode === 'card') {
@@ -617,6 +631,7 @@ React.createElement('div', { className: UI.layout.sectionAlt },
                 onItemsPerPageChange: onItemsPerPageChange, // Pass the callback
                 onClearFilters: handleClearAdvancedFilters,
                 onChangeViewMode: handleViewChange,
+                onChangeSearchTerm: handleSearchChange,
                 
                 // UI state
                 isExpanded: advancedFiltersExpanded,
