@@ -30,17 +30,17 @@ window.App.utils.UI = {
                 infoHover: 'indigo-600',
                 accent: 'purple-500',
                 accentHover: 'purple-600',
-                
+
                 // Page & component backgrounds
                 background: 'gray-100',
                 cardBackground: 'white',
                 headerBackground: 'white',
-                
+
                 // Borders
                 border: 'gray-200',
                 borderLight: 'gray-100',
                 borderDark: 'gray-300',
-                
+
                 // Text colors
                 textPrimary: 'gray-900',
                 textSecondary: 'gray-700',
@@ -68,17 +68,17 @@ window.App.utils.UI = {
                 infoHover: 'indigo-300',
                 accent: 'purple-400',
                 accentHover: 'purple-300',
-                
+
                 // Page & component backgrounds
                 background: 'gray-900',
                 cardBackground: 'gray-800',
                 headerBackground: 'gray-800',
-                
+
                 // Borders
                 border: 'gray-700',
                 borderLight: 'gray-600',
                 borderDark: 'gray-600',
-                
+
                 // Text colors
                 textPrimary: 'gray-100',
                 textSecondary: 'gray-300',
@@ -93,12 +93,12 @@ window.App.utils.UI = {
     currentTheme: 'light',
 
     // NEW HELPER: Get a style with fallback
-    getStyle: function(path, defaultValue = '') {
+    getStyle: function (path, defaultValue = '') {
         // Handle direct paths like 'typography.small'
         if (typeof path === 'string') {
             const parts = path.split('.');
             let result = this;
-            
+
             for (const part of parts) {
                 if (result && result[part] !== undefined) {
                     result = result[part];
@@ -106,27 +106,29 @@ window.App.utils.UI = {
                     return defaultValue;
                 }
             }
-            
+
             return result;
         }
-        
+
         // Handle already resolved values
         return path !== undefined ? path : defaultValue;
     },
 
     // Function to set theme
-    setTheme: function(themeName) {
+    setTheme: function (themeName) {
         if (this.themes[themeName]) {
             this.currentTheme = themeName;
-            
+
+            // Get theme colors FIRST
+            const themeColors = this.getThemeColors();
+
             // Update all the theme-based styles
             const styles = this.getThemeStyles();
-            
+
             // Update all UI components
             this.buttons = styles.buttons;
             this.cards = styles.cards;
             this.typography = styles.typography;
-            this.forms = styles.forms;
             this.tables = styles.tables;
             this.status = styles.status;
             this.tags = styles.tags;
@@ -135,10 +137,10 @@ window.App.utils.UI = {
             // Add colors direct access (for components that need direct color values)
             this.colors = {
                 primary: {
-                    text: `text-${this.getThemeColors().primary}`,
-                    bg: `bg-${this.getThemeColors().primary}`,
-                    border: `border-${this.getThemeColors().primary}`,
-                    hover: `hover:bg-${this.getThemeColors().primaryHover}`
+                    text: `text-${themeColors.primary}`,
+                    bg: `bg-${themeColors.primary}`,
+                    border: `border-${themeColors.primary}`,
+                    hover: `hover:bg-${themeColors.primaryHover}`
                 },
                 secondary: {
                     text: `text-${this.getThemeColors().secondary}`,
@@ -181,23 +183,40 @@ window.App.utils.UI = {
                     alt: `bg-${this.getThemeColors().background.replace('900', '800').replace('100', '50')}`
                 }
             };
-            
-            
+            if (typeof document !== 'undefined') {
+                // Get the body element
+                const bodyElement = document.body;
+                if (bodyElement) {
+                    bodyElement.classList.remove('bg-gray-100', 'bg-gray-900');
+                    bodyElement.classList.add(`bg-${themeColors.background}`);
+                    bodyElement.classList.add(`text-${themeColors.textPrimary}`);
+                }
+
+                try {
+                    if (typeof localStorage !== 'undefined') {
+                        localStorage.setItem('electronicsTheme', themeName);
+                    }
+                } catch (e) {
+                    console.warn('Failed to save theme preference:', e);
+                }
+            }
+
             console.log(`Theme switched to ${this.themes[themeName].name}`);
             return true;
         }
         return false;
     },
 
+
     // Get current theme colors
-    getThemeColors: function() {
+    getThemeColors: function () {
         return this.themes[this.currentTheme].colors;
     },
 
     // Function to generate dynamic styles based on current theme
-    getThemeStyles: function() {
+    getThemeStyles: function () {
         const colors = this.getThemeColors();
-        
+
         return {
             buttons: {
                 // Standard buttons
@@ -208,7 +227,7 @@ window.App.utils.UI = {
                 info: `px-4 py-2 bg-${colors.info} text-${colors.textLight} rounded shadow hover:bg-${colors.infoHover} transition duration-150 ease-in-out`,
                 warning: `px-4 py-2 bg-${colors.warning} text-${colors.textLight} rounded shadow hover:bg-${colors.warningHover} transition duration-150 ease-in-out`,
                 accent: `px-4 py-2 bg-${colors.accent} text-${colors.textLight} rounded shadow hover:bg-${colors.accentHover} transition duration-150 ease-in-out`,
-                
+
                 // Small buttons
                 small: {
                     primary: `px-2 py-1 bg-${colors.primary} text-${colors.textLight} text-xs rounded shadow hover:bg-${colors.primaryHover}`,
@@ -218,7 +237,7 @@ window.App.utils.UI = {
                     info: `px-2 py-1 bg-${colors.info} text-${colors.textLight} text-xs rounded shadow hover:bg-${colors.infoHover}`,
                     warning: `px-2 py-1 bg-${colors.warning} text-${colors.textLight} text-xs rounded shadow hover:bg-${colors.warningHover}`
                 },
-                
+
                 // Icon buttons
                 icon: {
                     primary: `w-8 h-8 flex items-center justify-center text-${colors.primary} hover:bg-${colors.primary.replace('500', '100').replace('400', '900')} rounded-full`,
@@ -226,7 +245,7 @@ window.App.utils.UI = {
                     success: `w-8 h-8 flex items-center justify-center text-${colors.success} hover:bg-${colors.success.replace('500', '100').replace('400', '900')} rounded-full`
                 }
             },
-            
+
             // Cards styling
             cards: {
                 container: `bg-${colors.cardBackground} rounded-lg shadow border border-${colors.border} hover:shadow-md transition-shadow duration-150`,
@@ -234,7 +253,7 @@ window.App.utils.UI = {
                 body: `p-4 text-${colors.textSecondary}`,
                 footer: `p-4 border-t border-${colors.border} bg-${colors.cardBackground.replace('white', 'gray-50').replace('gray-800', 'gray-700')} text-${colors.textSecondary}`
             },
-            
+
             // Typography styling
             typography: {
                 weight: {
@@ -257,7 +276,7 @@ window.App.utils.UI = {
                     h6: `text-sm font-medium text-${colors.textSecondary}`
                 }
             },
-            
+
             // Form styling
             forms: {
                 input: `w-full p-2 border border-${colors.border} rounded shadow-sm bg-${colors.cardBackground} text-${colors.textPrimary} focus:ring-${colors.primary} focus:border-${colors.primary}`,
@@ -269,7 +288,7 @@ window.App.utils.UI = {
                 error: `text-${colors.danger} text-xs mt-1`,
                 hint: `text-xs text-${colors.textMuted} mt-1`
             },
-            
+
             // Table styling
             tables: {
                 container: `min-w-full bg-${colors.cardBackground} divide-y divide-${colors.border} rounded-lg shadow`,
@@ -285,7 +304,7 @@ window.App.utils.UI = {
                     cellAction: `px-4 py-2 whitespace-nowrap text-center text-sm font-medium`
                 },
             },
-            
+
             // Status indicators
             status: {
                 success: `bg-${colors.success.replace('500', '100').replace('400', '900')} text-${colors.success.replace('500', '800').replace('400', '300')} border border-${colors.success.replace('500', '200').replace('400', '800')} p-3 rounded`,
@@ -293,7 +312,7 @@ window.App.utils.UI = {
                 warning: `bg-${colors.warning.replace('500', '100').replace('400', '900')} text-${colors.warning.replace('500', '800').replace('400', '300')} border border-${colors.warning.replace('500', '200').replace('400', '800')} p-3 rounded`,
                 info: `bg-${colors.info.replace('500', '100').replace('400', '900')} text-${colors.info.replace('500', '800').replace('400', '300')} border border-${colors.info.replace('500', '200').replace('400', '800')} p-3 rounded`
             },
-            
+
             // Tags
             tags: {
                 base: 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
@@ -304,13 +323,13 @@ window.App.utils.UI = {
                 yellow: `bg-${colors.warning.replace('500', '100').replace('400', '900')} text-${colors.warning.replace('500', '800').replace('400', '300')}`,
                 indigo: `bg-${colors.info.replace('500', '100').replace('400', '900')} text-${colors.info.replace('500', '800').replace('400', '300')}`
             },
-            
+
             // Layout related
             layout: {
                 section: 'mb-6',
                 sectionAlt: `mb-6 bg-${colors.background} p-4 rounded-lg border border-${colors.border}`
             },
-            
+
             // Modal styling
             modals: {
                 backdrop: 'fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-30',
@@ -323,23 +342,34 @@ window.App.utils.UI = {
     },
 
     // Initialize default styles based on initial theme
-    initialize: function() {
-        // Set default theme
-        this.currentTheme = (
-            (typeof storage !== 'undefined' && storage.loadConfig().theme) 
-              || this.currentTheme 
-              || 'light'
-          );
-        
+    initialize: function () {
+        // Set default theme first
+        this.currentTheme = 'light';
+
+        // Try to load from localStorage if available
+        try {
+            if (typeof localStorage !== 'undefined') {
+                const savedTheme = localStorage.getItem('electronicsTheme');
+                if (savedTheme && this.themes[savedTheme]) {
+                    this.currentTheme = savedTheme;
+                }
+            }
+        } catch (e) {
+            console.warn('Error loading theme from localStorage:', e);
+        }
+
         // Ensure theme exists
         if (!this.themes[this.currentTheme]) {
             console.warn(`Theme "${this.currentTheme}" not found, falling back to light theme`);
             this.currentTheme = 'light';
         }
-        
+
+        // Get theme colors BEFORE getting styles
+        const themeColors = this.getThemeColors();
+
         // Get theme styles based on current theme
         const styles = this.getThemeStyles();
-        
+
         // Initialize all UI component styles
         this.buttons = styles.buttons;
         this.cards = styles.cards;
@@ -350,13 +380,13 @@ window.App.utils.UI = {
         this.tags = styles.tags;
         this.modals = styles.modals;
         this.layout = styles.layout;
-        
+
         // Add colors direct access
         const colors = this.getThemeColors();
         this.colors = {
             primary: {
-                text: `text-${colors.primary}`,
-                bg: `bg-${colors.primary}`,
+                text: `text-${themeColors.primary}`,
+                bg: `bg-${themeColors.primary}`,
                 border: `border-${colors.primary}`,
                 hover: `hover:bg-${colors.primaryHover}`
             },
@@ -401,7 +431,7 @@ window.App.utils.UI = {
                 alt: `bg-${colors.background.replace('900', '800').replace('100', '50')}`
             }
         };
-        
+
         // Standard utility helpers that don't change with theme
         this.utils = {
             divider: 'border-t my-4',
@@ -415,34 +445,49 @@ window.App.utils.UI = {
             borderTop: 'border-t',
             borderBottom: 'border-b'
         };
+        // Update body class with themeColors
+        const bodyElement = document.body;
+        if (bodyElement) {
+            bodyElement.classList.remove('bg-gray-100', 'bg-gray-900');
+            bodyElement.classList.add(`bg-${themeColors.background}`);
+            bodyElement.classList.add(`text-${themeColors.textPrimary}`);
+        }
 
-                // Add direct body class update here
-                const bodyElement = document.body || document.querySelector('body');
-if (!bodyElement) {
-  console.warn('UI.initialize: <body> element not yet available, skipping class update');
-  return this;
-}
-                const themeColors = this.getThemeColors();
-                
-                // Clear existing theme classes
-                bodyElement.classList.remove('bg-gray-100', 'bg-gray-900');
-                bodyElement.classList.remove('text-gray-100', 'text-gray-900');
-                
-                // Add new theme classes
-                bodyElement.classList.add(`bg-${themeColors.background}`);
-                bodyElement.classList.add(`text-${themeColors.textPrimary}`);
-        
+        console.log(`UI initialized with ${this.currentTheme} theme`);
+
         console.log(`UI initialized with ${this.currentTheme} theme`);
         return this;
-    }
+    },
+
+    // Save current theme to localStorage
+    saveThemePreference: function () {
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('electronicsTheme', this.currentTheme);
+            return true;
+        }
+        return false;
+    },
+
+    // Load theme preference from localStorage
+    loadThemePreference: function () {
+        if (typeof localStorage !== 'undefined') {
+            const savedTheme = localStorage.getItem('electronicsTheme');
+            if (savedTheme && this.themes[savedTheme]) {
+                this.currentTheme = savedTheme;
+                return savedTheme;
+            }
+        }
+        return null;
+    },
 };
 
 // Initialize UI with default theme
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-      window.App.utils.UI.initialize();
+        window.App.utils.UI.initialize();
     });
-  } else {
+} else {
+    // If document is already loaded, initialize immediately
     window.App.utils.UI.initialize();
 }
 

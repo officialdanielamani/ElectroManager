@@ -49,7 +49,7 @@
         const { useState, useEffect, useCallback } = React;
         const { helpers } = window.App.utils;
         const { storage } = window.App.utils;
-        const { UI } = window.App.utils;
+        const { UI } = window.App.utils || {};
         const { ComponentForm, BulkEditForm, InventoryView, SettingsView, DrawerPage, LocationPage } = window.App.components;
 
         // --- Main Application Component ---
@@ -192,25 +192,37 @@
                 });
             }, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]); // Add theme to dependency array
 
-            // Combined useEffect for theme handling
             useEffect(() => {
                 // Apply theme through the UI system
                 window.App.utils.UI.setTheme(theme);
 
-                // Get current theme colors
-                const themeColors = window.App.utils.UI.getThemeColors();
-
-                // Clear existing background classes
-                document.body.classList.remove('bg-gray-100', 'bg-gray-900');
-                document.body.classList.remove('text-gray-100', 'text-gray-900');
-
-                // Set the body class directly
-                document.body.className = `bg-${themeColors.background} text-${themeColors.textPrimary}`;
+                // Save theme preference (handled inside setTheme too, but for extra safety)
+                localStorage.setItem('electronicsTheme', theme);
 
                 // Log theme change for debugging
-                console.log(`Theme applied: ${theme}, background: bg-${themeColors.background}`);
+                console.log(`Theme applied: ${theme}`);
             }, [theme]);
             // --- Helper Functions / Callbacks for Child Components ---
+
+            // Get Theme
+            const getThemeColors = () => {
+                // Check if UI and getThemeColors exist
+                if (UI && typeof UI.getThemeColors === 'function') {
+                    return UI.getThemeColors();
+                }
+                // Fallback if UI is not available
+                return {
+                    textPrimary: 'gray-900',
+                    textSecondary: 'gray-700',
+                    textMuted: 'gray-500',
+                    primary: 'blue-500',
+                    border: 'gray-300',
+                    background: 'gray-100'
+                };
+            };
+
+            // Get the theme colors
+            const themeColors = getThemeColors();
 
             // Clear status messages (import/export)
             const clearStatusMessages = () => {
@@ -1416,39 +1428,65 @@
             // --- Render ---
             return (
                 React.createElement('div', { className: "container mx-auto p-4 font-sans" },
-                    React.createElement('h1', { className: "text-3xl font-bold mb-6 text-center text-gray-700" }, "Electro Manager"),
-                    React.createElement('h4', { className: "text font mb-6 text-center text-gray-700" }, "an Electronics Inventory System | DANP-EDNA V0.1.7beta"),
-                    // --- Navigation Tabs ---
-                    React.createElement('div', { className: "flex justify-center mb-6 border-b border-gray-300 overflow-x-auto" },
+                    React.createElement('h1', {
+                        className: `text-3xl font-bold mb-6 text-center text-${themeColors.textPrimary}`
+                    }, "Electro Manager"),
+                    React.createElement('h4', {
+                        className: `text font mb-6 text-center text-${themeColors.textSecondary}`
+                    }, "an Electronics Inventory System | DANP-EDNA V0.1.7beta"),
+                    // Navigation Tabs
+                    React.createElement('div', {
+                        className: `flex justify-center mb-6 border-b border-${themeColors.border} overflow-x-auto`
+                    },
+                        // Inventory Tab
                         React.createElement('button', {
                             onClick: () => {
                                 setCurrentPage('inventory');
-                                setViewingDrawerId(null); // Reset drawer view when changing page
+                                setViewingDrawerId(null);
                             },
-                            className: `py-2 px-4 text-lg whitespace-nowrap ${currentPage === 'inventory' ? 'border-b-2 border-blue-500 text-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'}`
+                            className: `py-2 px-4 text-lg whitespace-nowrap ${currentPage === 'inventory'
+                                ? `border-b-2 border-${themeColors.primary} text-${themeColors.primary} font-semibold`
+                                : `text-${themeColors.textMuted} hover:text-${themeColors.textSecondary}`
+                                }`
                         }, "Inventory List"),
+
+                        // Locations Tab
                         React.createElement('button', {
                             onClick: () => {
                                 setCurrentPage('locations');
-                                setViewingDrawerId(null); // Reset drawer view when changing page
+                                setViewingDrawerId(null);
                             },
-                            className: `py-2 px-4 text-lg whitespace-nowrap ${currentPage === 'locations' ? 'border-b-2 border-blue-500 text-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'}`
+                            className: `py-2 px-4 text-lg whitespace-nowrap ${currentPage === 'locations'
+                                ? `border-b-2 border-${themeColors.primary} text-${themeColors.primary} font-semibold`
+                                : `text-${themeColors.textMuted} hover:text-${themeColors.textSecondary}`
+                                }`
                         }, "Locations"),
+
+                        // Drawers Tab
                         React.createElement('button', {
                             onClick: () => {
                                 setCurrentPage('drawers');
-                                setViewingDrawerId(null); // Reset drawer view when changing page
+                                setViewingDrawerId(null);
                             },
-                            className: `py-2 px-4 text-lg whitespace-nowrap ${currentPage === 'drawers' ? 'border-b-2 border-blue-500 text-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'}`
+                            className: `py-2 px-4 text-lg whitespace-nowrap ${currentPage === 'drawers'
+                                ? `border-b-2 border-${themeColors.primary} text-${themeColors.primary} font-semibold`
+                                : `text-${themeColors.textMuted} hover:text-${themeColors.textSecondary}`
+                                }`
                         }, "Drawers"),
+
+                        // Settings Tab
                         React.createElement('button', {
                             onClick: () => {
                                 setCurrentPage('data');
-                                setViewingDrawerId(null); // Reset drawer view when changing page
+                                setViewingDrawerId(null);
                             },
-                            className: `py-2 px-4 text-lg whitespace-nowrap ${currentPage === 'data' ? 'border-b-2 border-blue-500 text-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'}`
-                        }, "Settings"),
+                            className: `py-2 px-4 text-lg whitespace-nowrap ${currentPage === 'data'
+                                ? `border-b-2 border-${themeColors.primary} text-${themeColors.primary} font-semibold`
+                                : `text-${themeColors.textMuted} hover:text-${themeColors.textSecondary}`
+                                }`
+                        }, "Settings")
                     ),
+
                     // --- Conditional Page Rendering ---
                     currentPage === 'inventory' && React.createElement(InventoryView, {
                         // Pass state

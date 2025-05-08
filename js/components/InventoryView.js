@@ -558,7 +558,7 @@ window.App.components.InventoryView = ({
                         React.createElement('p', { className: `text-2xl font-semibold ${lowStockCount > 0 ? 'text-red-600' : 'text-gray-600'}` }, lowStockCount)
                     ),
                 ),
-                // Category Counts Section (continued)
+                // Category Counts
                 totalComponents > 0 && React.createElement('div', { className: UI.utils.borderTop + " pt-3 mt-3" },
                     React.createElement('h3', { className: UI.typography.subtitle + " mb-2" }, "Item Counts by Category"),
                     React.createElement('div', { className: "flex flex-wrap gap-3" },
