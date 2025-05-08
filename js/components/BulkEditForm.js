@@ -409,14 +409,14 @@ window.App.components.BulkEditForm = ({
                         ),
 
                         // --- Storage Location Section ---
-                        React.createElement('div', { className: `bg-${UI.getThemeColors().background} p-4 rounded border border-${UI.getThemeColors().border} mt-6` },
+                        React.createElement('div', { className: `md:col-span-2 border-t pt-4 mt-2 border-${themeColors.border}` },
                             React.createElement('div', { className: "flex justify-between items-center" },
-                                React.createElement('h3', { className: `text-md font-medium mb-1 text-${UI.getThemeColors().textSecondary}` }, "Storage Location"),
+                                React.createElement('h3', { className: `text-md font-medium mb-3 text-${themeColors.textSecondary}` }, "Storage Location"),
                                 React.createElement('button', {
                                     type: "button",
-                                    className: `text-${UI.getThemeColors().primary.text} text-sm`,
-                                    onClick: () => setShowDrawerSelector(!showDrawerSelector)
-                                }, showDrawerSelector ? "Hide Drawer Selector" : "Show Drawer Selector")
+                                    className: UI.colors.primary.text + " text-sm",
+                                    onClick: () => setShowStorageSelector(!showStorageSelector)
+                                }, showStorageSelector ? "Hide Drawer Selector" : "Show Drawer Selector")
                             ),
 
                             // Location Action

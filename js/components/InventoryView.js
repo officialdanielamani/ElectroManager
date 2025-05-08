@@ -529,49 +529,53 @@ window.App.components.InventoryView = ({
         React.createElement('div', null,
 
             // --- Inventory Summary Stats ---
-            React.createElement('div', { className: UI.layout.sectionAlt + " mb-6" },
-                React.createElement('h2', { className: UI.typography.subtitle + " mb-3" }, "Inventory Summary"),
-                React.createElement('div', { className: "grid grid-cols-2 md:grid-cols-5 gap-4 text-center mb-4" }, // 5 cols for potential total value
-                    // Total Components Stat
-                    React.createElement('div', { className: "p-3 bg-white rounded-lg border" },
-                        React.createElement('h3', { className: UI.typography.small + " font-medium text-gray-500" }, "Components"),
-                        React.createElement('p', { className: "text-2xl font-semibold text-blue-600" }, totalComponents)
-                    ),
-                    // Total Items Stat
-                    React.createElement('div', { className: "p-3 bg-white rounded-lg border" },
-                        React.createElement('h3', { className: UI.typography.small + " font-medium text-gray-500" }, "Total Items"),
-                        React.createElement('p', { className: "text-2xl font-semibold text-green-600" }, totalItems)
-                    ),
-                    // Total Value Stat (Conditional)
-                    showTotalValue && React.createElement('div', { className: "p-3 bg-white rounded-lg border" },
-                        React.createElement('h3', { className: UI.typography.small + " font-medium text-gray-500" }, "Total Value"),
-                        React.createElement('p', { className: "text-2xl font-semibold text-purple-600" }, helpers.formatCurrency(totalValue, currencySymbol))
-                    ),
-                    // Categories Stat
-                    React.createElement('div', { className: "p-3 bg-white rounded-lg border" },
-                        React.createElement('h3', { className: UI.typography.small + " font-medium text-gray-500" }, "Categories"),
-                        React.createElement('p', { className: "text-2xl font-semibold text-indigo-600" }, (categories || []).length)
-                    ),
-                    // Low Stock Stat
-                    React.createElement('div', { className: "p-3 bg-white rounded-lg border" },
-                        React.createElement('h3', { className: UI.typography.small + " font-medium text-gray-500" }, "Low Stock"),
-                        React.createElement('p', { className: `text-2xl font-semibold ${lowStockCount > 0 ? 'text-red-600' : 'text-gray-600'}` }, lowStockCount)
-                    ),
-                ),
-                // Category Counts
-                totalComponents > 0 && React.createElement('div', { className: UI.utils.borderTop + " pt-3 mt-3" },
-                    React.createElement('h3', { className: UI.typography.subtitle + " mb-2" }, "Item Counts by Category"),
-                    React.createElement('div', { className: "flex flex-wrap gap-3" },
-                        categoryCounts.length > 0 ? categoryCounts.map(([category, count]) =>
-                            React.createElement('div', { key: category, className: "bg-white border border-gray-200 rounded-md px-3 py-1 shadow-sm" },
-                                React.createElement('span', { className: "text-sm font-medium text-gray-700" }, category, ":"),
-                                React.createElement('span', { className: "text-sm font-semibold text-blue-700 ml-1" }, count)
-                            )
-                        ) : React.createElement('p', { className: UI.typography.small + " italic" }, "No items with categories found.")
-                    )
+            // --- Inventory Summary Stats ---
+React.createElement('div', { className: UI.layout.sectionAlt },
+    React.createElement('h2', { className: UI.typography.subtitle + " mb-3" }, "Inventory Summary"),
+    React.createElement('div', { className: "grid grid-cols-2 md:grid-cols-5 gap-4 text-center mb-4" },
+        // Total Components Stat
+        React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
+            React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Components"),
+            React.createElement('p', { className: `text-2xl font-semibold text-${UI.colors.primary.text.replace('text-', '')}` }, totalComponents)
+        ),
+        // Total Items Stat
+        React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
+            React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Total Items"),
+            React.createElement('p', { className: `text-2xl font-semibold text-${UI.colors.success.text.replace('text-', '')}` }, totalItems)
+        ),
+        // Total Value Stat (Conditional)
+        showTotalValue && React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
+            React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Total Value"),
+            React.createElement('p', { className: `text-2xl font-semibold text-${UI.colors.accent.text.replace('text-', '')}` }, helpers.formatCurrency(totalValue, currencySymbol))
+        ),
+        // Categories Stat
+        React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
+            React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Categories"),
+            React.createElement('p', { className: `text-2xl font-semibold text-${UI.colors.info.text.replace('text-', '')}` }, (categories || []).length)
+        ),
+        // Low Stock Stat
+        React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
+            React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Low Stock"),
+            React.createElement('p', { className: `text-2xl font-semibold ${lowStockCount > 0 ? UI.colors.danger.text : `text-${UI.getThemeColors().textMuted}`}` }, lowStockCount)
+        ),
+    ),
+    // Category Counts
+    totalComponents > 0 && React.createElement('div', { className: `${UI.utils.borderTop} pt-3 mt-3 border-${UI.getThemeColors().border}` },
+        React.createElement('h3', { className: UI.typography.subtitle + " mb-2" }, "Item Counts by Category"),
+        React.createElement('div', { className: "flex flex-wrap gap-3" },
+            categoryCounts.length > 0 ? categoryCounts.map(([category, count]) =>
+                React.createElement('div', { 
+                    key: category, 
+                    className: `bg-${UI.getThemeColors().cardBackground} border border-${UI.getThemeColors().border} rounded-md px-3 py-1 shadow-sm` 
+                },
+                    React.createElement('span', { className: `text-sm font-medium text-${UI.getThemeColors().textSecondary}` }, category, ":"),
+                    React.createElement('span', { className: `text-sm font-semibold ${UI.colors.primary.text} ml-1` }, count)
                 )
-            ), // End Summary Stats
-
+            ) : React.createElement('p', { className: `${UI.typography.small} italic text-${UI.getThemeColors().textMuted}` }, "No items with categories found.")
+        )
+    )
+),
+            
             // --- Advanced Filters Card ---
             React.createElement(window.App.components.AdvancedFilters, {
                 // Props
