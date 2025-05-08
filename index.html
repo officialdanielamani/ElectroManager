@@ -3,39 +3,6 @@
 
 <head>
 
-    <style>
-        /* Base Light Theme (default) */
-        :root {
-            --bg-primary: #f3f4f6;
-            --bg-card: #ffffff;
-            --text-primary: #1f2937;
-            --text-secondary: #4b5563;
-            --border-color: #e5e7eb;
-        }
-
-        /* Dark Theme Override */
-        .dark-mode {
-            --bg-primary: #111827;
-            --bg-card: #1f2937;
-            --text-primary: #f9fafb;
-            --text-secondary: #d1d5db;
-            --border-color: #374151;
-        }
-
-        /* Apply theme variables */
-        .theme-aware-bg {
-            background-color: var(--bg-primary);
-        }
-
-        .theme-aware-card {
-            background-color: var(--bg-card);
-            border-color: var(--border-color);
-        }
-
-        .theme-aware-text {
-            color: var(--text-primary);
-        }
-    </style>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Electronics Inventory (Modular)</title>
@@ -71,7 +38,7 @@
 
 </head>
 
-<body class="bg-gray-100">
+<body>
     <div id="root"></div>
 
     <script type="text/babel">
@@ -826,22 +793,31 @@
 
             //-- Theme Management--
             const handleThemeChange = (newTheme) => {
-                if (window.App.utils.UI.themes[newTheme]) {
-                    // Update state
-                    setTheme(newTheme);
+    if (window.App.utils.UI.themes[newTheme]) {
+        // Update state
+        setTheme(newTheme);
 
-                    // Update UI system
-                    window.App.utils.UI.setTheme(newTheme);
+        // Update UI system
+        window.App.utils.UI.setTheme(newTheme);
 
-                    // Save theme preference
-                    saveConfigCallback();
+        // Save theme preference
+        saveConfigCallback();
 
-                    // Force re-render to update components
-                    setAppTheme(newTheme);
-                }
-            };
-
-
+        // Force re-render to update components
+        setAppTheme(newTheme);
+        
+        // Force immediate style recalculation in problematic components
+        const tables = document.querySelectorAll('table');
+        tables.forEach(table => {
+            // This triggers a style recalculation
+            table.style.display = 'none';
+            // Force layout recalculation
+            table.offsetHeight; 
+            // Restore display
+            table.style.display = '';
+        });
+    }
+};
             // Set up global theme change handler
             window.App.onThemeChange = (newTheme) => {
                 setAppTheme(newTheme);

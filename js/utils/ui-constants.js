@@ -132,7 +132,6 @@ window.App.utils.UI = {
             this.tags = styles.tags;
             this.modals = styles.modals;
             this.layout = styles.layout;
-            
             // Add colors direct access (for components that need direct color values)
             this.colors = {
                 primary: {
@@ -182,6 +181,7 @@ window.App.utils.UI = {
                     alt: `bg-${this.getThemeColors().background.replace('900', '800').replace('100', '50')}`
                 }
             };
+            
             
             console.log(`Theme switched to ${this.themes[themeName].name}`);
             return true;
