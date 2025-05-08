@@ -180,73 +180,74 @@ window.App.components.BulkEditForm = ({
     };
 
     // Generate grid elements for drawer cells
-    const generateCellGrid = () => {
-        if (!selectedDrawer) return null;
+    // Generate grid elements for drawer cells
+const generateCellGrid = () => {
+    if (!selectedDrawer) return null;
 
-        const rows = selectedDrawer.grid?.rows || 3;
-        const cols = selectedDrawer.grid?.cols || 3;
+    const rows = selectedDrawer.grid?.rows || 3;
+    const cols = selectedDrawer.grid?.cols || 3;
 
-        const gridElements = [];
+    const gridElements = [];
 
-        // Generate column headers (A, B, C, ...)
-        const headerRow = [React.createElement('div', {
-            key: 'corner',
-            className: `w-8 h-8 bg-${UI.getThemeColors().background} text-center font-medium`
-        })];
+    // Generate column headers (A, B, C, ...)
+    const headerRow = [React.createElement('div', {
+        key: 'corner',
+        className: `w-8 h-8 bg-${UI.getThemeColors().background} text-center font-medium`
+    })];
 
+    for (let c = 0; c < cols; c++) {
+        const colLabel = String.fromCharCode(65 + c); // A=65 in ASCII
+        headerRow.push(
+            React.createElement('div', {
+                key: `col-${c}`,
+                className: `w-8 h-8 bg-${UI.getThemeColors().background} text-center font-medium`
+            }, colLabel)
+        );
+    }
+
+    gridElements.push(React.createElement('div', { key: 'header-row', className: "flex" }, headerRow));
+
+    // Generate rows with cells
+    for (let r = 0; r < rows; r++) {
+        const rowElements = [
+            // Row header (1, 2, 3, ...)
+            React.createElement('div', {
+                key: `row-${r}`,
+                className: `w-8 h-8 bg-${UI.getThemeColors().background} text-center font-medium flex items-center justify-center`
+            }, r + 1)
+        ];
+
+        // Generate cells for this row
         for (let c = 0; c < cols; c++) {
-            const colLabel = String.fromCharCode(65 + c); // A=65 in ASCII
-            headerRow.push(
+            const coordinate = `${String.fromCharCode(65 + c)}${r + 1}`; // e.g., "A1", "B2"
+            const cell = filteredCells.find(cell => cell.coordinate === coordinate);
+
+            // Cell might not exist in the database yet
+            const cellId = cell ? cell.id : null;
+            const isSelected = cellId && bulkData.selectedCells.includes(cellId);
+
+            // Safely check available property with a default to true
+            const isAvailable = cell ? (cell.available !== false) : true;
+
+            rowElements.push(
                 React.createElement('div', {
-                    key: `col-${c}`,
-                    className: `w-8 h-8 bg-${UI.getThemeColors().background} text-center font-medium`
-                }, colLabel)
+                    key: `cell-${r}-${c}`,
+                    className: `w-8 h-8 border flex items-center justify-center 
+                        ${isSelected ? `bg-${UI.getThemeColors().primary.replace('500', '100').replace('400', '900')} border-${UI.getThemeColors().primary}` : `bg-${UI.getThemeColors().cardBackground} hover:bg-${UI.getThemeColors().background}`} 
+                        ${!isAvailable ? `bg-${UI.getThemeColors().secondary} opacity-70 cursor-not-allowed` : 'cursor-pointer'}`,
+                    onClick: () => cellId && isAvailable && handleCellToggle(cellId),
+                    title: cell ? (cell.nickname || coordinate) + (isAvailable ? '' : ' (Unavailable)') : coordinate
+                },
+                    isSelected ? '✓' : ''
+                )
             );
         }
 
-        gridElements.push(React.createElement('div', { key: 'header-row', className: "flex" }, headerRow));
+        gridElements.push(React.createElement('div', { key: `row-${r}`, className: "flex" }, rowElements));
+    }
 
-        // Generate rows with cells
-        for (let r = 0; r < rows; r++) {
-            const rowElements = [
-                // Row header (1, 2, 3, ...)
-                React.createElement('div', {
-                    key: `row-${r}`,
-                    className: `w-8 h-8 bg-${UI.getThemeColors().background} text-center font-medium flex items-center justify-center`
-                }, r + 1)
-            ];
-
-            // Generate cells for this row
-            for (let c = 0; c < cols; c++) {
-                const coordinate = `${String.fromCharCode(65 + c)}${r + 1}`; // e.g., "A1", "B2"
-                const cell = filteredCells.find(cell => cell.coordinate === coordinate);
-
-                // Cell might not exist in the database yet
-                const cellId = cell ? cell.id : null;
-                const isSelected = cellId && bulkData.selectedCells.includes(cellId);
-
-                // Safely check available property with a default to true
-                const isAvailable = cell ? (cell.available !== false) : true;
-
-                rowElements.push(
-                    React.createElement('div', {
-                        key: `cell-${r}-${c}`,
-                        className: `w-8 h-8 border flex items-center justify-center 
-                            ${isSelected ? `bg-${UI.getThemeColors().primary.replace('500', '100').replace('400', '900')} border-${UI.getThemeColors().primary}` : `bg-${UI.getThemeColors().cardBackground} hover:bg-${UI.getThemeColors().background}`} 
-                            ${!isAvailable ? `bg-${UI.getThemeColors().secondary} opacity-70 cursor-not-allowed` : 'cursor-pointer'}`,
-                        onClick: () => cellId && isAvailable && handleCellToggle(cellId),
-                        title: cell ? (cell.nickname || coordinate) + (isAvailable ? '' : ' (Unavailable)') : coordinate
-                    },
-                        isSelected ? '✓' : ''
-                    )
-                );
-            }
-
-            gridElements.push(React.createElement('div', { key: `row-${r}`, className: "flex" }, rowElements));
-        }
-
-        return gridElements;
-    };
+    return gridElements;
+};
 
     // Get selected cells information
     const getSelectedCellsInfo = () => {
@@ -409,14 +410,14 @@ window.App.components.BulkEditForm = ({
                         ),
 
                         // --- Storage Location Section ---
-                        React.createElement('div', { className: `md:col-span-2 border-t pt-4 mt-2 border-${themeColors.border}` },
+                        React.createElement('div', { className: `bg-${UI.getThemeColors().background} p-4 rounded border border-${UI.getThemeColors().border} mt-6` },
                             React.createElement('div', { className: "flex justify-between items-center" },
-                                React.createElement('h3', { className: `text-md font-medium mb-3 text-${themeColors.textSecondary}` }, "Storage Location"),
+                                React.createElement('h3', { className: `text-md font-medium mb-1 text-${UI.getThemeColors().textSecondary}` }, "Storage Location"),
                                 React.createElement('button', {
                                     type: "button",
-                                    className: UI.colors.primary.text + " text-sm",
-                                    onClick: () => setShowStorageSelector(!showStorageSelector)
-                                }, showStorageSelector ? "Hide Drawer Selector" : "Show Drawer Selector")
+                                    className: `${UI.colors.primary.text} text-sm`,
+                                    onClick: () => setShowDrawerSelector(!showDrawerSelector)
+                                }, showDrawerSelector ? "Hide Drawer Selector" : "Show Drawer Selector")
                             ),
 
                             // Location Action
@@ -464,8 +465,12 @@ window.App.components.BulkEditForm = ({
                             ),
 
                             // Drawer Storage Section (expandable)
-                            showDrawerSelector && React.createElement('div', { className: `mt-4 border-t border-${UI.getThemeColors().borderLight} pt-4` },
-                                React.createElement('h4', { className: `font-medium mb-2 text-${UI.getThemeColors().textSecondary}` }, "Drawer Storage Assignment"),
+                            showDrawerSelector && React.createElement('div', {
+                                className: `mt-4 border-t border-${UI.getThemeColors().borderLight} pt-4`
+                            },
+                                React.createElement('h4', {
+                                    className: `font-medium mb-2 text-${UI.getThemeColors().textSecondary}`
+                                }, "Drawer Storage Assignment"),
 
                                 // Storage Action
                                 React.createElement('div', { className: "mb-3" },
@@ -503,7 +508,9 @@ window.App.components.BulkEditForm = ({
                                     bulkData.storageLocationId && React.createElement('div', { className: "mb-3" },
                                         React.createElement('label', { htmlFor: "storage-drawer", className: UI.forms.label }, "Select Drawer"),
                                         filteredDrawers.length === 0 ?
-                                            React.createElement('p', { className: `text-sm text-${UI.getThemeColors().textMuted} italic` }, "No drawers found for this location.") :
+                                            React.createElement('p', {
+                                                className: `text-sm text-${UI.getThemeColors().textMuted} italic`
+                                            }, "No drawers found for this location.") :
                                             React.createElement('select', {
                                                 id: "storage-drawer",
                                                 name: "drawerId",
@@ -519,20 +526,30 @@ window.App.components.BulkEditForm = ({
                                     // Cell grid for selection (when drawer is selected)
                                     bulkData.drawerId && React.createElement('div', { className: "mb-3" },
                                         React.createElement('label', { className: UI.forms.label }, "Select Cell(s)"),
-                                        React.createElement('p', { className: `text-xs text-${UI.getThemeColors().textSecondary} mb-2` }, "Click on cells to select/deselect. Multiple cells can be selected."),
+                                        React.createElement('p', {
+                                            className: `text-xs text-${UI.getThemeColors().textSecondary} mb-2`
+                                        }, "Click on cells to select/deselect. Multiple cells can be selected."),
                                         filteredCells.length === 0 ?
-                                            React.createElement('p', { className: `text-sm text-${UI.getThemeColors().textMuted} italic` }, "No cells defined for this drawer yet.") :
+                                            React.createElement('p', {
+                                                className: `text-sm text-${UI.getThemeColors().textMuted} italic`
+                                            }, "No cells defined for this drawer yet.") :
                                             React.createElement('div', null,
                                                 // Display the grid
-                                                React.createElement('div', { className: `inline-block border border-${UI.getThemeColors().border} bg-${UI.getThemeColors().cardBackground} p-1` },
+                                                React.createElement('div', {
+                                                    className: `inline-block border border-${UI.getThemeColors().border} bg-${UI.getThemeColors().cardBackground} p-1`
+                                                },
                                                     generateCellGrid()
                                                 ),
 
                                                 // Selected cells display
                                                 React.createElement('div', { className: "mt-2" },
-                                                    React.createElement('p', { className: `text-xs text-${UI.getThemeColors().textSecondary}` }, "Selected Cells: ",
+                                                    React.createElement('p', {
+                                                        className: `text-xs text-${UI.getThemeColors().textSecondary}`
+                                                    }, "Selected Cells: ",
                                                         bulkData.selectedCells.length === 0
-                                                            ? React.createElement('span', { className: `italic text-${UI.getThemeColors().textMuted}` }, "None")
+                                                            ? React.createElement('span', {
+                                                                className: `italic text-${UI.getThemeColors().textMuted}`
+                                                            }, "None")
                                                             : getSelectedCellsInfo()
                                                     )
                                                 )
@@ -540,7 +557,7 @@ window.App.components.BulkEditForm = ({
                                     )
                                 )
                             ) // End drawer selector
-                        ), // End Storage Location section
+                        ),
 
                         // --- Favorite, Bookmark, Star Options ---
                         React.createElement('div', { className: `border-t border-${UI.getThemeColors().border} pt-4 mt-4` },
