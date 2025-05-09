@@ -53,6 +53,7 @@ window.App.components.BulkEditForm = ({
     const [filteredDrawers, setFilteredDrawers] = useState([]);
     const [filteredCells, setFilteredCells] = useState([]);
     const [selectedDrawer, setSelectedDrawer] = useState(null);
+    const [loading, setLoading] = useState(false);
 
     // Update filtered drawers when storage location changes
     useEffect(() => {
@@ -176,78 +177,82 @@ window.App.components.BulkEditForm = ({
 
     // Handle applying the changes
     const handleApply = () => {
-        onApply(bulkData); // Pass the current bulk edit state to the parent handler
+        setLoading(true);
+
+        setTimeout(() => {
+            onApply(bulkData); // Pass the current bulk edit state to the parent handler
+            setLoading(false);
+        }, 300);
     };
 
     // Generate grid elements for drawer cells
-    // Generate grid elements for drawer cells
-const generateCellGrid = () => {
-    if (!selectedDrawer) return null;
+    const generateCellGrid = () => {
+        if (!selectedDrawer) return null;
 
-    const rows = selectedDrawer.grid?.rows || 3;
-    const cols = selectedDrawer.grid?.cols || 3;
+        const rows = selectedDrawer.grid?.rows || 3;
+        const cols = selectedDrawer.grid?.cols || 3;
 
-    const gridElements = [];
+        const gridElements = [];
 
-    // Generate column headers (A, B, C, ...)
-    const headerRow = [React.createElement('div', {
-        key: 'corner',
-        className: `w-8 h-8 bg-${UI.getThemeColors().background} text-center font-medium`
-    })];
+        // Generate column headers (A, B, C, ...)
+        const headerRow = [React.createElement('div', {
+            key: 'corner',
+            className: `w-8 h-8 bg-${UI.getThemeColors().background} text-center font-medium`
+        })];
 
-    for (let c = 0; c < cols; c++) {
-        const colLabel = String.fromCharCode(65 + c); // A=65 in ASCII
-        headerRow.push(
-            React.createElement('div', {
-                key: `col-${c}`,
-                className: `w-8 h-8 bg-${UI.getThemeColors().background} text-center font-medium`
-            }, colLabel)
-        );
-    }
-
-    gridElements.push(React.createElement('div', { key: 'header-row', className: "flex" }, headerRow));
-
-    // Generate rows with cells
-    for (let r = 0; r < rows; r++) {
-        const rowElements = [
-            // Row header (1, 2, 3, ...)
-            React.createElement('div', {
-                key: `row-${r}`,
-                className: `w-8 h-8 bg-${UI.getThemeColors().background} text-center font-medium flex items-center justify-center`
-            }, r + 1)
-        ];
-
-        // Generate cells for this row
         for (let c = 0; c < cols; c++) {
-            const coordinate = `${String.fromCharCode(65 + c)}${r + 1}`; // e.g., "A1", "B2"
-            const cell = filteredCells.find(cell => cell.coordinate === coordinate);
-
-            // Cell might not exist in the database yet
-            const cellId = cell ? cell.id : null;
-            const isSelected = cellId && bulkData.selectedCells.includes(cellId);
-
-            // Safely check available property with a default to true
-            const isAvailable = cell ? (cell.available !== false) : true;
-
-            rowElements.push(
+            const colLabel = String.fromCharCode(65 + c); // A=65 in ASCII
+            headerRow.push(
                 React.createElement('div', {
-                    key: `cell-${r}-${c}`,
-                    className: `w-8 h-8 border flex items-center justify-center 
-                        ${isSelected ? `bg-${UI.getThemeColors().primary.replace('500', '100').replace('400', '900')} border-${UI.getThemeColors().primary}` : `bg-${UI.getThemeColors().cardBackground} hover:bg-${UI.getThemeColors().background}`} 
-                        ${!isAvailable ? `bg-${UI.getThemeColors().secondary} opacity-70 cursor-not-allowed` : 'cursor-pointer'}`,
-                    onClick: () => cellId && isAvailable && handleCellToggle(cellId),
-                    title: cell ? (cell.nickname || coordinate) + (isAvailable ? '' : ' (Unavailable)') : coordinate
-                },
-                    isSelected ? '✓' : ''
-                )
+                    key: `col-${c}`,
+                    className: `w-8 h-8 bg-${UI.getThemeColors().background} text-center font-medium`
+                }, colLabel)
             );
         }
 
-        gridElements.push(React.createElement('div', { key: `row-${r}`, className: "flex" }, rowElements));
-    }
+        gridElements.push(React.createElement('div', { key: 'header-row', className: "flex" }, headerRow));
 
-    return gridElements;
-};
+        // Generate rows with cells
+        for (let r = 0; r < rows; r++) {
+            const rowElements = [
+                // Row header (1, 2, 3, ...)
+                React.createElement('div', {
+                    key: `row-${r}`,
+                    className: `w-8 h-8 bg-${UI.getThemeColors().background} text-center font-medium flex items-center justify-center`
+                }, r + 1)
+            ];
+
+            // Generate cells for this row
+            for (let c = 0; c < cols; c++) {
+                const coordinate = `${String.fromCharCode(65 + c)}${r + 1}`; // e.g., "A1", "B2"
+                const cell = filteredCells.find(cell => cell.coordinate === coordinate);
+
+                // Cell might not exist in the database yet
+                const cellId = cell ? cell.id : null;
+                const isSelected = cellId && bulkData.selectedCells.includes(cellId);
+
+                // Safely check available property with a default to true
+                const isAvailable = cell ? (cell.available !== false) : true;
+
+                rowElements.push(
+                    React.createElement('div', {
+                        key: `cell-${r}-${c}`,
+                        className: `w-8 h-8 border flex items-center justify-center 
+                        ${isSelected ? `bg-${UI.getThemeColors().primary.replace('500', '100').replace('400', '900')} border-${UI.getThemeColors().primary}` : `bg-${UI.getThemeColors().cardBackground} hover:bg-${UI.getThemeColors().background}`} 
+                        ${!isAvailable ? `bg-${UI.getThemeColors().secondary} opacity-70 cursor-not-allowed` : 'cursor-pointer'}`,
+                        onClick: () => cellId && isAvailable && handleCellToggle(cellId),
+                        title: cell ? (cell.nickname || coordinate) + (isAvailable ? '' : ' (Unavailable)') : coordinate
+                    },
+                        isSelected ? '✓' : ''
+                    )
+                );
+            }
+
+            gridElements.push(React.createElement('div', { key: `row-${r}`, className: "flex" }, rowElements));
+        }
+
+        return gridElements;
+    };
 
     // Get selected cells information
     const getSelectedCellsInfo = () => {
@@ -265,6 +270,19 @@ const generateCellGrid = () => {
 
     // --- Main Render ---
     return (
+
+        loading && React.createElement('div', {
+            className: "fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50"
+        },
+            React.createElement('div', {
+                className: "bg-white p-4 rounded-lg shadow-xl"
+            },
+                React.createElement('div', {
+                    className: "w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"
+                })
+            )
+        ),
+
         React.createElement('div', { className: `fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-30` },
             React.createElement('div', { className: `bg-${UI.getThemeColors().cardBackground} rounded-lg shadow-xl max-w-xl w-full max-h-[90vh] flex flex-col` },
                 // Header (Fixed at top)
@@ -306,7 +324,8 @@ const generateCellGrid = () => {
                                 name: "category",
                                 className: UI.forms.select,
                                 value: bulkData.category,
-                                onChange: handleCategoryChange
+                                onChange: handleCategoryChange,
+                                disabled: loading
                             },
                                 React.createElement('option', { value: "" }, "-- Keep existing category --"),
                                 (categories || []).sort().map(cat => React.createElement('option', { key: cat, value: cat }, cat)),
@@ -318,7 +337,8 @@ const generateCellGrid = () => {
                                 placeholder: "Enter new category name",
                                 className: UI.forms.input,
                                 value: bulkData.customCategory || '',
-                                onChange: handleChange
+                                onChange: handleChange,
+                                disabled: loading
                             })
                         ),
                         // Type
@@ -330,7 +350,8 @@ const generateCellGrid = () => {
                                 placeholder: "Leave blank to keep existing type",
                                 className: UI.forms.input,
                                 value: bulkData.type,
-                                onChange: handleChange
+                                onChange: handleChange,
+                                disabled: loading
                             })
                         ),
                         // Quantity Adjustment
@@ -341,7 +362,8 @@ const generateCellGrid = () => {
                                     name: "quantityAction",
                                     className: UI.forms.select,
                                     value: bulkData.quantityAction,
-                                    onChange: handleChange
+                                    onChange: handleChange,
+                                    disabled: loading
                                 },
                                     React.createElement('option', { value: "set" }, "Set quantity to"),
                                     React.createElement('option', { value: "increment" }, "Add quantity"),
@@ -354,7 +376,8 @@ const generateCellGrid = () => {
                                     placeholder: "Value",
                                     className: UI.forms.input,
                                     value: bulkData.quantity,
-                                    onChange: handleChange
+                                    onChange: handleChange,
+                                    disabled: loading
                                 })
                             ),
                             React.createElement('p', { className: UI.forms.hint }, "Leave value blank for no quantity change.")
@@ -367,7 +390,8 @@ const generateCellGrid = () => {
                                     name: "priceAction",
                                     className: UI.forms.select,
                                     value: bulkData.priceAction,
-                                    onChange: handleChange
+                                    onChange: handleChange,
+                                    disabled: loading
                                 },
                                     React.createElement('option', { value: "set" }, "Set price to"),
                                     React.createElement('option', { value: "increase" }, "Increase price by"),
@@ -381,7 +405,8 @@ const generateCellGrid = () => {
                                     placeholder: "Value",
                                     className: UI.forms.input,
                                     value: bulkData.price,
-                                    onChange: handleChange
+                                    onChange: handleChange,
+                                    disabled: loading
                                 })
                             ),
                             React.createElement('p', { className: UI.forms.hint }, "Leave value blank for no price change.")
@@ -393,7 +418,8 @@ const generateCellGrid = () => {
                                 name: "footprint",
                                 className: UI.forms.select,
                                 value: bulkData.footprint,
-                                onChange: handleFootprintChange
+                                onChange: handleFootprintChange,
+                                disabled: loading
                             },
                                 React.createElement('option', { value: "" }, "-- Keep existing footprint --"),
                                 React.createElement('option', { value: "__custom__" }, "Custom footprint..."),
@@ -405,7 +431,8 @@ const generateCellGrid = () => {
                                 placeholder: "Enter custom footprint",
                                 className: UI.forms.input,
                                 value: bulkData.customFootprint || '',
-                                onChange: handleChange
+                                onChange: handleChange,
+                                disabled: loading
                             })
                         ),
 
@@ -427,7 +454,8 @@ const generateCellGrid = () => {
                                     name: "locationAction",
                                     className: UI.forms.select,
                                     value: bulkData.locationAction,
-                                    onChange: handleChange
+                                    onChange: handleChange,
+                                    disabled: loading
                                 },
                                     React.createElement('option', { value: "keep" }, "Keep existing location"),
                                     React.createElement('option', { value: "set" }, "Set new location"),
@@ -444,7 +472,8 @@ const generateCellGrid = () => {
                                         name: "locationId",
                                         className: UI.forms.select,
                                         value: bulkData.locationId,
-                                        onChange: handleChange
+                                        onChange: handleChange,
+                                        disabled: loading
                                     },
                                         React.createElement('option', { value: "" }, "-- Select location --"),
                                         (locations || []).map(loc => React.createElement('option', { key: loc.id, value: loc.id }, loc.name))
@@ -459,7 +488,8 @@ const generateCellGrid = () => {
                                         placeholder: "e.g., Shelf 3, Box A",
                                         className: UI.forms.input,
                                         value: bulkData.locationDetails,
-                                        onChange: handleChange
+                                        onChange: handleChange,
+                                        disabled: loading
                                     })
                                 )
                             ),
@@ -479,7 +509,8 @@ const generateCellGrid = () => {
                                         name: "storageAction",
                                         className: UI.forms.select,
                                         value: bulkData.storageAction,
-                                        onChange: handleChange
+                                        onChange: handleChange,
+                                        disabled: loading
                                     },
                                         React.createElement('option', { value: "keep" }, "Keep existing drawer"),
                                         React.createElement('option', { value: "set" }, "Set new drawer"),
@@ -497,7 +528,8 @@ const generateCellGrid = () => {
                                             name: "storageLocationId",
                                             className: UI.forms.select,
                                             value: bulkData.storageLocationId,
-                                            onChange: handleChange
+                                            onChange: handleChange,
+                                            disabled: loading
                                         },
                                             React.createElement('option', { value: "" }, "-- Select location --"),
                                             locations.map(loc => React.createElement('option', { key: loc.id, value: loc.id }, loc.name))
@@ -516,7 +548,8 @@ const generateCellGrid = () => {
                                                 name: "drawerId",
                                                 className: UI.forms.select,
                                                 value: bulkData.drawerId,
-                                                onChange: handleChange
+                                                onChange: handleChange,
+                                                disabled: loading
                                             },
                                                 React.createElement('option', { value: "" }, "-- Select drawer --"),
                                                 filteredDrawers.map(drawer => React.createElement('option', { key: drawer.id, value: drawer.id }, drawer.name))
@@ -583,6 +616,7 @@ const generateCellGrid = () => {
                                     React.createElement('select', {
                                         name: "favorite",
                                         className: UI.forms.select,
+                                        disabled: loading,
                                         value: bulkData.favorite === null ? '' : bulkData.favorite.toString(),
                                         onChange: (e) => {
                                             const value = e.target.value;
@@ -616,6 +650,7 @@ const generateCellGrid = () => {
                                     React.createElement('select', {
                                         name: "bookmark",
                                         className: UI.forms.select,
+                                        disabled: loading,
                                         value: bulkData.bookmark === null ? '' : bulkData.bookmark.toString(),
                                         onChange: (e) => {
                                             const value = e.target.value;
@@ -649,6 +684,7 @@ const generateCellGrid = () => {
                                     React.createElement('select', {
                                         name: "star",
                                         className: UI.forms.select,
+                                        disabled: loading,
                                         value: bulkData.star === null ? '' : bulkData.star.toString(),
                                         onChange: (e) => {
                                             const value = e.target.value;
@@ -674,12 +710,14 @@ const generateCellGrid = () => {
                 },
                     React.createElement('button', {
                         className: UI.buttons.secondary,
-                        onClick: onCancel
+                        onClick: onCancel,
+                        disabled: loading
                     }, "Cancel"),
                     React.createElement('button', {
                         className: UI.buttons.primary,
-                        onClick: handleApply
-                    }, "Apply Changes")
+                        onClick: handleApply,
+                        disabled: loading
+                    }, loading ? "Applying..." : "Apply Changes")
                 )
             ) // End Modal Content
         ) // End Modal Backdrop

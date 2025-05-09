@@ -6,6 +6,7 @@ window.App.components = window.App.components || {};
 
 /**
  * React Component for managing drawers within locations.
+ * Updated for IndexedDB compatibility.
  */
 window.App.components.DrawerManager = ({
     // Props
@@ -35,20 +36,27 @@ window.App.components.DrawerManager = ({
     const [editDrawerCols, setEditDrawerCols] = useState(3);
     const [expandedDrawers, setExpandedDrawers] = useState({});
     const [showAddDrawerForm, setShowAddDrawerForm] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     // Handle adding a new drawer
     function handleAddSubmit(e) {
         e.preventDefault();
+        
+        // Set loading state
+        setLoading(true);
+        
         const trimmedName = newDrawerName.trim();
         const trimmedDescription = newDrawerDescription.trim();
 
         if (!selectedLocationId) {
             alert("Please select a location for this drawer.");
+            setLoading(false);
             return;
         }
 
         if (!trimmedName) {
             alert("Drawer name cannot be empty.");
+            setLoading(false);
             return;
         }
 
@@ -57,12 +65,13 @@ window.App.components.DrawerManager = ({
             drawer.name.toLowerCase() === trimmedName.toLowerCase()
         )) {
             alert(`Drawer "${trimmedName}" already exists in this location.`);
+            setLoading(false);
             return;
         }
 
-        // Fix: Use parseInt with base 10 instead of base 16
+        // Create new drawer with a unique ID
         const newDrawer = {
-            id: `drawer-${Date.now()}`,
+            id: `drawer-${Date.now()}-${Math.random().toString(16).slice(2)}`,
             locationId: selectedLocationId,
             name: trimmedName,
             description: trimmedDescription,
@@ -72,13 +81,21 @@ window.App.components.DrawerManager = ({
             }
         };
 
-        onAddDrawer(newDrawer);
+        // Normalize drawer data if helper is available
+        if (window.App.utils.helpers && typeof window.App.utils.helpers.normalizeDrawer === 'function') {
+            newDrawer = window.App.utils.helpers.normalizeDrawer(newDrawer);
+        }
 
-        // Reset form
-        setNewDrawerName('');
-        setNewDrawerDescription('');
-        setNewDrawerRows(3);
-        setNewDrawerCols(3);
+        setTimeout(() => {
+            onAddDrawer(newDrawer);
+
+            // Reset form
+            setNewDrawerName('');
+            setNewDrawerDescription('');
+            setNewDrawerRows(3);
+            setNewDrawerCols(3);
+            setLoading(false);
+        }, 300);
     }
 
     // Start editing a drawer
@@ -92,17 +109,24 @@ window.App.components.DrawerManager = ({
 
     // Save the edited drawer
     const handleSaveEdit = () => {
+        // Set loading state
+        setLoading(true);
+        
         const trimmedName = editDrawerName.trim();
         const trimmedDescription = editDrawerDescription.trim();
 
         if (!trimmedName) {
             alert("Drawer name cannot be empty.");
+            setLoading(false);
             return;
         }
 
         // Get the current drawer to check location
         const currentDrawer = drawers.find(d => d.id === editingDrawerId);
-        if (!currentDrawer) return;
+        if (!currentDrawer) {
+            setLoading(false);
+            return;
+        }
 
         // Check for duplicate names in the same location, excluding the current drawer
         if (drawers.some(drawer =>
@@ -111,10 +135,11 @@ window.App.components.DrawerManager = ({
             drawer.name.toLowerCase() === trimmedName.toLowerCase()
         )) {
             alert(`Drawer "${trimmedName}" already exists in this location.`);
+            setLoading(false);
             return;
         }
 
-        // Fix: Use parseInt with base 10 instead of base 16
+        // Prepare the updated drawer object
         const updatedDrawer = {
             ...currentDrawer,
             name: trimmedName,
@@ -125,8 +150,19 @@ window.App.components.DrawerManager = ({
             }
         };
 
-        onEditDrawer(editingDrawerId, updatedDrawer);
-        setEditingDrawerId(null);
+        // Normalize drawer data if helper is available
+        if (window.App.utils.helpers && typeof window.App.utils.helpers.normalizeDrawer === 'function') {
+            let normalizedDrawer = window.App.utils.helpers.normalizeDrawer(updatedDrawer);
+            // Preserve ID
+            normalizedDrawer.id = editingDrawerId;
+            updatedDrawer = normalizedDrawer;
+        }
+
+        setTimeout(() => {
+            onEditDrawer(editingDrawerId, updatedDrawer);
+            setEditingDrawerId(null);
+            setLoading(false);
+        }, 300);
     };
 
     // Cancel editing
@@ -162,6 +198,19 @@ window.App.components.DrawerManager = ({
     };
 
     return React.createElement('div', { className: "space-y-6" },
+        // Loading overlay
+        loading && React.createElement('div', { 
+            className: "fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50" 
+        },
+            React.createElement('div', { 
+                className: "bg-white p-4 rounded-lg shadow-xl" 
+            },
+                React.createElement('div', { 
+                    className: "w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" 
+                })
+            )
+        ),
+    
         // Location selection dropdown 
         React.createElement('div', { className: "mb-4" },
             React.createElement('label', {
@@ -222,7 +271,8 @@ window.App.components.DrawerManager = ({
                             value: selectedLocationId,
                             onChange: (e) => setSelectedLocationId(e.target.value),
                             className: UI.forms.select,
-                            required: true
+                            required: true,
+                            disabled: loading
                         },
                             React.createElement('option', { value: "" }, "-- Select Location --"),
                             locations.map(location =>
@@ -243,7 +293,8 @@ window.App.components.DrawerManager = ({
                             onChange: (e) => setNewDrawerName(e.target.value),
                             placeholder: "e.g., Drawer A2",
                             className: UI.forms.input,
-                            required: true
+                            required: true,
+                            disabled: loading
                         })
                     ),
                     // Description input
@@ -258,7 +309,8 @@ window.App.components.DrawerManager = ({
                             value: newDrawerDescription,
                             onChange: (e) => setNewDrawerDescription(e.target.value),
                             placeholder: "e.g., Top Left",
-                            className: UI.forms.input
+                            className: UI.forms.input,
+                            disabled: loading
                         })
                     ),
                     // Grid size inputs
@@ -275,7 +327,8 @@ window.App.components.DrawerManager = ({
                                 max: "16",
                                 value: newDrawerRows,
                                 onChange: (e) => setNewDrawerRows(e.target.value),
-                                className: UI.forms.input
+                                className: UI.forms.input,
+                                disabled: loading
                             })
                         ),
                         React.createElement('div', null,
@@ -290,7 +343,8 @@ window.App.components.DrawerManager = ({
                                 max: "16",
                                 value: newDrawerCols,
                                 onChange: (e) => setNewDrawerCols(e.target.value),
-                                className: UI.forms.input
+                                className: UI.forms.input,
+                                disabled: loading
                             })
                         )
                     ),
@@ -299,8 +353,8 @@ window.App.components.DrawerManager = ({
                         React.createElement('button', {
                             type: "submit",
                             className: UI.buttons.primary,
-                            disabled: !selectedLocationId
-                        }, "Add Drawer")
+                            disabled: !selectedLocationId || loading
+                        }, loading ? "Adding..." : "Add Drawer")
                     )
                 )
             )
@@ -342,7 +396,8 @@ window.App.components.DrawerManager = ({
                                     },
                                         React.createElement('button', {
                                             className: `mr-2 text-${UI.getThemeColors().textMuted} hover:text-${UI.getThemeColors().textSecondary}`,
-                                            title: isExpanded ? "Collapse" : "Expand"
+                                            title: isExpanded ? "Collapse" : "Expand",
+                                            disabled: loading
                                         },
                                             React.createElement('svg', {
                                                 xmlns: "http://www.w3.org/2000/svg",
@@ -373,14 +428,16 @@ window.App.components.DrawerManager = ({
                                                         value: editDrawerName,
                                                         onChange: (e) => setEditDrawerName(e.target.value),
                                                         className: UI.forms.input + " max-w-xs",
-                                                        placeholder: "Drawer name"
+                                                        placeholder: "Drawer name",
+                                                        disabled: loading
                                                     }),
                                                     React.createElement('input', {
                                                         type: "text",
                                                         value: editDrawerDescription,
                                                         onChange: (e) => setEditDrawerDescription(e.target.value),
                                                         className: UI.forms.input + " w-full",
-                                                        placeholder: "Description (optional)"
+                                                        placeholder: "Description (optional)",
+                                                        disabled: loading
                                                     })
                                                 ),
                                                 React.createElement('div', { className: "flex space-x-2" },
@@ -392,7 +449,8 @@ window.App.components.DrawerManager = ({
                                                             max: "16",
                                                             value: editDrawerRows,
                                                             onChange: (e) => setEditDrawerRows(e.target.value),
-                                                            className: UI.forms.input + " w-16"
+                                                            className: UI.forms.input + " w-16",
+                                                            disabled: loading
                                                         })
                                                     ),
                                                     React.createElement('div', { className: "flex items-center" },
@@ -403,7 +461,8 @@ window.App.components.DrawerManager = ({
                                                             max: "16",
                                                             value: editDrawerCols,
                                                             onChange: (e) => setEditDrawerCols(e.target.value),
-                                                            className: UI.forms.input + " w-16"
+                                                            className: UI.forms.input + " w-16",
+                                                            disabled: loading
                                                         })
                                                     )
                                                 )
@@ -417,29 +476,34 @@ window.App.components.DrawerManager = ({
                                                 React.createElement('button', {
                                                     onClick: () => onViewDrawer(drawer.id),
                                                     className: UI.buttons.small.success,
-                                                    title: "View Drawer Contents"
+                                                    title: "View Drawer Contents",
+                                                    disabled: loading
                                                 }, "View"),
                                                 React.createElement('button', {
                                                     onClick: () => handleStartEdit(drawer),
                                                     className: UI.buttons.small.primary,
-                                                    title: "Edit Drawer"
+                                                    title: "Edit Drawer",
+                                                    disabled: loading
                                                 }, "Edit"),
                                                 React.createElement('button', {
                                                     onClick: () => onDeleteDrawer(drawer.id),
                                                     className: UI.buttons.small.danger,
-                                                    title: "Delete Drawer"
+                                                    title: "Delete Drawer",
+                                                    disabled: loading
                                                 }, "Delete")
                                             ) :
                                             React.createElement(React.Fragment, null,
                                                 React.createElement('button', {
                                                     onClick: handleSaveEdit,
                                                     className: UI.buttons.small.success,
-                                                    title: "Save Changes"
-                                                }, "Save"),
+                                                    title: "Save Changes",
+                                                    disabled: loading
+                                                }, loading ? "Saving..." : "Save"),
                                                 React.createElement('button', {
                                                     onClick: handleCancelEdit,
                                                     className: UI.buttons.small.secondary,
-                                                    title: "Cancel Editing"
+                                                    title: "Cancel Editing",
+                                                    disabled: loading
                                                 }, "Cancel")
                                             )
                                     )
@@ -456,7 +520,8 @@ window.App.components.DrawerManager = ({
                                         React.createElement('button', {
                                             onClick: () => onViewDrawer(drawer.id),
                                             className: UI.buttons.small.info,
-                                            title: "View Drawer Contents"
+                                            title: "View Drawer Contents",
+                                            disabled: loading
                                         }, "View Drawer Contents")
                                     ),
                                     drawerComponents.length > 0 && React.createElement('div', { className: "mt-2" },
@@ -468,7 +533,8 @@ window.App.components.DrawerManager = ({
                                                     React.createElement('button', {
                                                         onClick: () => onEditComponent(comp),
                                                         className: `text-xs ${UI.colors.info.text} hover:${UI.colors.info.hover}`,
-                                                        title: "Edit Component"
+                                                        title: "Edit Component",
+                                                        disabled: loading
                                                     }, "Edit")
                                                 )
                                             ),
@@ -486,4 +552,4 @@ window.App.components.DrawerManager = ({
     );
 };
 
-console.log("DrawerManager component loaded with theme-aware styling."); // For debugging
+console.log("DrawerManager component loaded with IndexedDB compatibility.");

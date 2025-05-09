@@ -7,6 +7,7 @@ window.App.components = window.App.components || {};
 /**
  * React Component for the Drawer Management Page.
  * This page handles both the list of drawers and viewing individual drawers.
+ * Updated to support IndexedDB operations.
  */
 window.App.components.DrawerPage = ({
     // Props
@@ -30,6 +31,7 @@ window.App.components.DrawerPage = ({
 
     // Internal state
     const [viewingDrawerId, setViewingDrawerId] = useState(initialDrawerId || null);
+    const [loading, setLoading] = useState(false);
     
     // Find the current drawer and its location if viewing a drawer
     const currentDrawer = drawers.find(drawer => drawer.id === viewingDrawerId);
@@ -39,7 +41,11 @@ window.App.components.DrawerPage = ({
 
     // Handler for viewing a drawer
     const handleViewDrawer = (drawerId) => {
-        setViewingDrawerId(drawerId);
+        setLoading(true);
+        setTimeout(() => {
+            setViewingDrawerId(drawerId);
+            setLoading(false);
+        }, 300);
     };
 
     // Handler for deleting a drawer with confirmation
@@ -55,10 +61,17 @@ window.App.components.DrawerPage = ({
             : 'Are you sure you want to delete this drawer?';
 
         if (window.confirm(message)) {
+            setLoading(true);
+            
             if (viewingDrawerId === drawerId) {
                 setViewingDrawerId(null); // Navigate back to drawer list if deleting current drawer
             }
-            onDeleteDrawer(drawerId);
+            
+            // Use short timeout to show loading state
+            setTimeout(() => {
+                onDeleteDrawer(drawerId);
+                setLoading(false);
+            }, 300);
         }
     };
 
@@ -66,7 +79,10 @@ window.App.components.DrawerPage = ({
     const handleDeleteCell = (cellId) => {
         // Check if any components are assigned to this cell
         const assignedComponents = components.filter(comp => 
-            comp.storageInfo && comp.storageInfo.cellId === cellId
+            comp.storageInfo && 
+            (comp.storageInfo.cellId === cellId || 
+             (comp.storageInfo.cells && Array.isArray(comp.storageInfo.cells) && 
+              comp.storageInfo.cells.includes(cellId)))
         );
 
         // Confirm deletion with warning if components are assigned
@@ -75,8 +91,80 @@ window.App.components.DrawerPage = ({
             : 'Are you sure you want to delete this cell?';
 
         if (window.confirm(message)) {
-            onDeleteCell(cellId);
+            setLoading(true);
+            
+            // Use short timeout to show loading state
+            setTimeout(() => {
+                onDeleteCell(cellId);
+                setLoading(false);
+            }, 300);
         }
+    };
+    
+    // Updated handlers for drawer operations
+    const handleAddDrawer = (newDrawer) => {
+        setLoading(true);
+        
+        // Normalize drawer data if helper is available
+        if (window.App.utils.helpers && typeof window.App.utils.helpers.normalizeDrawer === 'function') {
+            newDrawer = window.App.utils.helpers.normalizeDrawer(newDrawer);
+        }
+        
+        // Add the drawer with a short delay to show loading state
+        setTimeout(() => {
+            onAddDrawer(newDrawer);
+            setLoading(false);
+        }, 300);
+    };
+    
+    const handleEditDrawer = (drawerId, updatedDrawer) => {
+        setLoading(true);
+        
+        // Normalize drawer data if helper is available
+        if (window.App.utils.helpers && typeof window.App.utils.helpers.normalizeDrawer === 'function') {
+            updatedDrawer = window.App.utils.helpers.normalizeDrawer(updatedDrawer);
+            // Preserve the original ID
+            updatedDrawer.id = drawerId;
+        }
+        
+        // Edit the drawer with a short delay to show loading state
+        setTimeout(() => {
+            onEditDrawer(drawerId, updatedDrawer);
+            setLoading(false);
+        }, 300);
+    };
+    
+    // Updated handlers for cell operations
+    const handleAddCell = (newCell) => {
+        setLoading(true);
+        
+        // Normalize cell data if helper is available
+        if (window.App.utils.helpers && typeof window.App.utils.helpers.normalizeCell === 'function') {
+            newCell = window.App.utils.helpers.normalizeCell(newCell);
+        }
+        
+        // Add the cell with a short delay to show loading state
+        setTimeout(() => {
+            onAddCell(newCell);
+            setLoading(false);
+        }, 300);
+    };
+    
+    const handleEditCell = (cellId, updatedCell) => {
+        setLoading(true);
+        
+        // Normalize cell data if helper is available
+        if (window.App.utils.helpers && typeof window.App.utils.helpers.normalizeCell === 'function') {
+            updatedCell = window.App.utils.helpers.normalizeCell(updatedCell);
+            // Preserve the original ID
+            updatedCell.id = cellId;
+        }
+        
+        // Edit the cell with a short delay to show loading state
+        setTimeout(() => {
+            onEditCell(cellId, updatedCell);
+            setLoading(false);
+        }, 300);
     };
     
     // Reset the viewing drawer when initialDrawerId changes or when navigating to the page
@@ -100,6 +188,19 @@ window.App.components.DrawerPage = ({
 
     // Render
     return React.createElement('div', { className: "space-y-6" },
+        // Loading overlay
+        loading && React.createElement('div', { 
+            className: "fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50" 
+        },
+            React.createElement('div', { 
+                className: "bg-white p-4 rounded-lg shadow-xl" 
+            },
+                React.createElement('div', { 
+                    className: "w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" 
+                })
+            )
+        ),
+        
         React.createElement('h2', { className: UI.typography.heading.h2 }, "Drawer Management"),
         React.createElement('p', { className: UI.typography.body },
             "Manage drawer organization and cell assignments for your electronic components."
@@ -112,8 +213,8 @@ window.App.components.DrawerPage = ({
                 cells: cells,
                 components: components,
                 location: currentLocation,
-                onAddCell: onAddCell,
-                onEditCell: onEditCell,
+                onAddCell: handleAddCell,
+                onEditCell: handleEditCell,
                 onDeleteCell: handleDeleteCell,
                 onEditComponent: onEditComponent,
                 onBackToDrawers: () => setViewingDrawerId(null)
@@ -123,8 +224,8 @@ window.App.components.DrawerPage = ({
                 locations: locations,
                 drawers: drawers,
                 components: components,
-                onAddDrawer: onAddDrawer,
-                onEditDrawer: onEditDrawer,
+                onAddDrawer: handleAddDrawer,
+                onEditDrawer: handleEditDrawer,
                 onDeleteDrawer: handleDeleteDrawer,
                 onViewDrawer: handleViewDrawer,
                 onEditComponent: onEditComponent,
@@ -133,4 +234,4 @@ window.App.components.DrawerPage = ({
     );
 };
 
-console.log("DrawerPage component loaded with theme-aware styling."); // For debugging
+console.log("DrawerPage component loaded with IndexedDB compatibility.");
