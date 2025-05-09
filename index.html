@@ -78,6 +78,8 @@
             const [cells, setCells] = useState([]);
             const [viewingDrawerId, setViewingDrawerId] = useState(null);
             const [itemsPerPage, setItemsPerPage] = useState('all');
+            const [dbInitialized, setDbInitialized] = useState(false);
+            const [appReady, setAppReady] = useState(false);
             const [appTheme, setAppTheme] = useState(window.App.utils.UI.currentTheme);
             const [theme, setTheme] = useState(
                 () => storage.loadConfig().theme
@@ -89,65 +91,84 @@
                 console.log("Initial load effect running...");
 
                 const loadAllData = async () => {
-                    try {
-                        // Set loading state if needed
-                        // setLoading(true);
-
-                        // Load components
-                        const componentsData = await storage.loadComponents();
-                        setComponents(componentsData);
-
-                        // Load config
-                        const config = await storage.loadConfig();
-                        setCategories(config.categories);
-                        setViewMode(config.viewMode);
-                        setLowStockConfig(config.lowStockConfig);
-                        setCurrencySymbol(config.currencySymbol);
-                        setShowTotalValue(config.showTotalValue);
-                        setFootprints(config.footprints || []);
-                        setItemsPerPage(config.itemsPerPage || 'all');
-
-                        // Apply theme
-                        if ((config.theme || 'dark') !== theme) {
-                            setTheme(config.theme);
-                        }
-                        window.App.utils.UI.setTheme(config.theme || theme);
-
-                        // Load locations, drawers, and cells
-                        const locationsData = await storage.loadLocations();
-                        setLocations(locationsData || []);
-
-                        const drawersData = await storage.loadDrawers();
-                        setDrawers(drawersData || []);
-
-                        const cellsData = await storage.loadCells();
-                        setCells(cellsData || []);
-
-                        // Handle derived categories same as before
-                        if (config.categories.length === 0) {
-                            if (componentsData.length > 0) {
-                                const derivedCategories = [...new Set(componentsData.map(item => item.category).filter(Boolean))];
-                                if (derivedCategories.length > 0) {
-                                    setCategories(derivedCategories);
-                                    console.log("Derived categories from existing components.");
-                                }
-                            }
-                        }
-
-                        console.log("Initial load complete.");
-                        // Clear loading state if needed
-                        // setLoading(false);
-                    } catch (error) {
-                        console.error("Error loading initial data:", error);
-                        // Handle error state if needed
-                        // setLoading(false);
-                        // setError(error.message);
-                    }
-                };
-
+        try {
+            // Load components
+            const componentsData = await storage.loadComponents();
+            setComponents(componentsData);
+            
+            // Load config
+            const config = await storage.loadConfig();
+            setCategories(config.categories);
+            setViewMode(config.viewMode);
+            setLowStockConfig(config.lowStockConfig);
+            setCurrencySymbol(config.currencySymbol);
+            setShowTotalValue(config.showTotalValue);
+            setFootprints(config.footprints || []);
+            setItemsPerPage(config.itemsPerPage || 'all');
+            
+            // Apply theme
+            const themeToUse = config.theme || 'light';
+            setTheme(themeToUse);
+            window.App.utils.UI.setTheme(themeToUse);
+            
+            // Load locations, drawers, and cells
+            const locationsData = await storage.loadLocations();
+            setLocations(locationsData || []);
+            
+            const drawersData = await storage.loadDrawers();
+            setDrawers(drawersData || []);
+            
+            const cellsData = await storage.loadCells();
+            setCells(cellsData || []);
+            
+            // Handle derived categories if needed
+            if (config.categories.length === 0 && componentsData.length > 0) {
+                const derivedCategories = [...new Set(componentsData.map(item => item.category).filter(Boolean))];
+                if (derivedCategories.length > 0) {
+                    setCategories(derivedCategories);
+                    console.log("Derived categories from existing components.");
+                }
+            }
+            
+            console.log("All data loaded successfully");
+        } catch (error) {
+            console.error("Error loading application data:", error);
+            // Handle error appropriately
+        }
+    };
                 // Call the async function
                 loadAllData();
             }, []); // Runs only once on mount
+
+            useEffect(() => {
+        const initializeApp = async () => {
+            console.log("Initializing application...");
+            try {
+                // First, initialize the database system
+                const dbSuccess = await storage.init();
+                if (!dbSuccess) {
+                    console.error("Failed to initialize database");
+                    // You could show an error message to the user here
+                    return;
+                }
+                
+                setDbInitialized(true);
+                console.log("Database initialized successfully");
+                
+                // Now load all application data
+                await loadAllData();
+                
+                // Mark the app as fully ready
+                setAppReady(true);
+                console.log("Application ready");
+            } catch (error) {
+                console.error("Error initializing application:", error);
+                // Show error message to user
+            }
+        };
+        
+        initializeApp();
+    }, []);
 
             useEffect(() => {
     const loadCellsData = async () => {
@@ -162,6 +183,14 @@
     
     loadCellsData();
 }, []);
+
+const componentCheck = () => {
+    return window.App.components && 
+           window.App.components.InventoryView &&
+           window.App.components.ComponentForm &&
+           window.App.utils &&
+           window.App.utils.UI;
+};
 
 useEffect(() => {
     if (drawers.length > 0) {

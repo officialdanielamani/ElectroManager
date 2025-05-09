@@ -90,10 +90,9 @@ window.App.utils.UI = {
 
     },
 
-    // Current theme (default to light)
     currentTheme: 'light',
 
-    // NEW HELPER: Get a style with fallback
+    // Get a style with fallback
     getStyle: function (path, defaultValue = '') {
         // Handle direct paths like 'typography.small'
         if (typeof path === 'string') {
@@ -115,7 +114,7 @@ window.App.utils.UI = {
         return path !== undefined ? path : defaultValue;
     },
 
-    // Function to set theme with IndexedDB support
+    // Function to set theme with IndexedDB support only
     setTheme: function (themeName) {
         if (this.themes[themeName]) {
             this.currentTheme = themeName;
@@ -195,25 +194,12 @@ window.App.utils.UI = {
                     bodyElement.classList.add(`text-${themeColors.textPrimary}`);
                 }
 
-                // Save theme preference to IndexedDB if storage is available
+                // Save theme preference to IndexedDB
                 if (window.App.utils.storage && typeof window.App.utils.storage.saveConfig === 'function') {
                     window.App.utils.storage.saveConfig({ theme: themeName })
                         .catch(error => {
                             console.warn('Failed to save theme preference to IndexedDB:', error);
-                            // Fall back to localStorage if IndexedDB fails
-                            try {
-                                localStorage.setItem('electronicsTheme', themeName);
-                            } catch (e) {
-                                console.warn('Failed to save theme preference to localStorage:', e);
-                            }
                         });
-                } else {
-                    // Fall back to localStorage if IndexedDB is not available
-                    try {
-                        localStorage.setItem('electronicsTheme', themeName);
-                    } catch (e) {
-                        console.warn('Failed to save theme preference to localStorage:', e);
-                    }
                 }
             }
 
@@ -356,60 +342,38 @@ window.App.utils.UI = {
         };
     },
 
-    // Initialize default styles based on initial theme
-    initialize: function () {
-        // Default theme
-        let initialTheme = 'light';
-        
-        // First, try to get theme from IndexedDB
-        if (window.App.utils.storage && typeof window.App.utils.storage.loadConfig === 'function') {
-            // Set a temporary theme while we wait for IndexedDB
-            this.currentTheme = initialTheme;
-            
-            // Load theme from IndexedDB asynchronously
-            window.App.utils.storage.loadConfig()
-                .then(config => {
-                    if (config && config.theme && this.themes[config.theme]) {
-                        // Set the theme from config
-                        this.setTheme(config.theme);
-                    } else {
-                        // Fall back to localStorage or default theme
-                        this.loadThemePreferenceFromLocalStorage();
-                    }
-                })
-                .catch(error => {
-                    console.warn('Error loading theme from IndexedDB:', error);
-                    // Fall back to localStorage or default theme
-                    this.loadThemePreferenceFromLocalStorage();
-                });
-        } else {
-            // If IndexedDB is not available, try localStorage
-            this.loadThemePreferenceFromLocalStorage();
-        }
-        
-        // Initialize UI with the temporary theme (will be updated once async operations complete)
-        this.setTheme(this.currentTheme);
-        
-        return this;
-    },
     
-    // Helper to load theme from localStorage when IndexedDB is not available
-    loadThemePreferenceFromLocalStorage: function() {
-        try {
-            if (typeof localStorage !== 'undefined') {
-                const savedTheme = localStorage.getItem('electronicsTheme');
-                if (savedTheme && this.themes[savedTheme]) {
-                    this.setTheme(savedTheme);
-                    return savedTheme;
-                }
+    // Initialize the UI system
+    initialize: function () {
+        // Use a promise-based initialization
+        return new Promise((resolve) => {
+            // Default theme
+            let initialTheme = 'light';
+            
+            // Set a temporary default theme
+            this.currentTheme = initialTheme;
+            this.setTheme(initialTheme);
+            
+            // Try to get theme from IndexedDB if available
+            if (window.App.utils.storage && typeof window.App.utils.storage.loadConfig === 'function') {
+                window.App.utils.storage.loadConfig()
+                    .then(config => {
+                        if (config && config.theme && this.themes[config.theme]) {
+                            // Apply theme from config
+                            this.setTheme(config.theme);
+                        }
+                        resolve(this);
+                    })
+                    .catch(error => {
+                        console.warn('Error loading theme from IndexedDB:', error);
+                        resolve(this);
+                    });
+            } else {
+                // Storage not available, stick with default
+                console.warn('IndexedDB storage not available, using default theme');
+                resolve(this);
             }
-        } catch (e) {
-            console.warn('Error loading theme from localStorage:', e);
-        }
-        
-        // Default to light theme if all else fails
-        this.setTheme('light');
-        return 'light';
+        });
     },
 
     // Standard utility helpers that don't change with theme
@@ -430,11 +394,21 @@ window.App.utils.UI = {
 // Initialize UI when document is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        window.App.utils.UI.initialize();
+        window.App.utils.UI.initialize()
+            .then(() => {
+                console.log("UI system initialized with theme:", window.App.utils.UI.currentTheme);
+                // Dispatch an event that other components can listen for
+                document.dispatchEvent(new CustomEvent('ui-initialized'));
+            });
     });
 } else {
     // If document is already loaded, initialize immediately
-    window.App.utils.UI.initialize();
+    window.App.utils.UI.initialize()
+        .then(() => {
+            console.log("UI system initialized with theme:", window.App.utils.UI.currentTheme);
+            // Dispatch an event that other components can listen for
+            document.dispatchEvent(new CustomEvent('ui-initialized'));
+        });
 }
 
-console.log("UI constants loaded with IndexedDB theme persistence.");
+console.log("UI constants loaded with IndexedDB-only theme persistence.");
