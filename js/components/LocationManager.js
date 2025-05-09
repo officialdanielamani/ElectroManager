@@ -1,4 +1,4 @@
-// js/components/LocationManager.js
+// js/components/LocationManager.js - Updated for IndexedDB compatibility
 
 // Ensure the global namespace exists
 window.App = window.App || {};
@@ -30,33 +30,43 @@ window.App.components.LocationManager = ({
     const [editLocationDescription, setEditLocationDescription] = useState('');
     const [expandedLocations, setExpandedLocations] = useState({});
     const [showAddLocationForm, setShowAddLocationForm] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     // Handle adding a new location
     const handleAddSubmit = (e) => {
         e.preventDefault();
+        setLoading(true);
+        
         const trimmedName = newLocationName.trim();
         const trimmedDescription = newLocationDescription.trim();
         
         if (!trimmedName) {
             alert("Location name cannot be empty.");
+            setLoading(false);
             return;
         }
         
         // Check for duplicate location names
         if (locations.some(loc => loc.name.toLowerCase() === trimmedName.toLowerCase())) {
             alert(`Location "${trimmedName}" already exists.`);
+            setLoading(false);
             return;
         }
         
+        // Create a new location with a unique ID
         const newLocation = {
-            id: `loc-${Date.now()}`,
+            id: `loc-${Date.now()}-${Math.random().toString(16).slice(2)}`,
             name: trimmedName,
             description: trimmedDescription
         };
         
+        // Add the location
         onAddLocation(newLocation);
+        
+        // Reset form
         setNewLocationName('');
         setNewLocationDescription('');
+        setLoading(false);
     };
 
     // Start editing a location
@@ -68,11 +78,14 @@ window.App.components.LocationManager = ({
 
     // Save the edited location
     const handleSaveEdit = () => {
+        setLoading(true);
+        
         const trimmedName = editLocationName.trim();
         const trimmedDescription = editLocationDescription.trim();
         
         if (!trimmedName) {
             alert("Location name cannot be empty.");
+            setLoading(false);
             return;
         }
         
@@ -82,17 +95,21 @@ window.App.components.LocationManager = ({
             loc.name.toLowerCase() === trimmedName.toLowerCase()
         )) {
             alert(`Location "${trimmedName}" already exists.`);
+            setLoading(false);
             return;
         }
         
+        // Create updated location object
         const updatedLocation = {
             id: editingLocationId,
             name: trimmedName,
             description: trimmedDescription
         };
         
+        // Save changes
         onEditLocation(editingLocationId, updatedLocation);
         setEditingLocationId(null);
+        setLoading(false);
     };
 
     // Cancel editing
@@ -127,7 +144,6 @@ window.App.components.LocationManager = ({
             React.createElement('div', { 
                 className: `flex justify-between items-center cursor-pointer ${UI.cards.header}`,
                 onClick: () => {
-                    console.log("Toggle location form visibility", !showAddLocationForm);
                     setShowAddLocationForm(!showAddLocationForm);
                 }
             },
@@ -152,45 +168,54 @@ window.App.components.LocationManager = ({
             
             // Form (conditionally rendered based on state)
             showAddLocationForm && React.createElement('div', { className: UI.cards.body },
-                React.createElement('form', { onSubmit: handleAddSubmit, className: "space-y-3" },
-                    // Name input
-                    React.createElement('div', null,
-                        React.createElement('label', { 
-                            htmlFor: "new-location-name", 
-                            className: UI.forms.label 
-                        }, "Location Name"),
-                        React.createElement('input', {
-                            id: "new-location-name",
-                            type: "text",
-                            value: newLocationName,
-                            onChange: (e) => setNewLocationName(e.target.value),
-                            placeholder: "e.g., Lab Room 101",
-                            className: UI.forms.input
-                        })
-                    ),
-                    // Description input
-                    React.createElement('div', null,
-                        React.createElement('label', { 
-                            htmlFor: "new-location-description", 
-                            className: UI.forms.label
-                        }, "Description (Optional)"),
-                        React.createElement('input', {
-                            id: "new-location-description",
-                            type: "text",
-                            value: newLocationDescription,
-                            onChange: (e) => setNewLocationDescription(e.target.value),
-                            placeholder: "e.g., Main electronics workbench",
-                            className: UI.forms.input
-                        })
-                    ),
-                    // Submit button
-                    React.createElement('div', null,
-                        React.createElement('button', {
-                            type: "submit",
-                            className: UI.buttons.primary
-                        }, "Add Location")
+                loading ? 
+                    // Loading spinner
+                    React.createElement('div', { className: "text-center py-4" },
+                        React.createElement('div', { 
+                            className: "w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" 
+                        }),
+                        React.createElement('p', { className: "text-sm text-gray-500" }, "Processing...")
+                    ) :
+                    // Form content
+                    React.createElement('form', { onSubmit: handleAddSubmit, className: "space-y-3" },
+                        // Name input
+                        React.createElement('div', null,
+                            React.createElement('label', { 
+                                htmlFor: "new-location-name", 
+                                className: UI.forms.label 
+                            }, "Location Name"),
+                            React.createElement('input', {
+                                id: "new-location-name",
+                                type: "text",
+                                value: newLocationName,
+                                onChange: (e) => setNewLocationName(e.target.value),
+                                placeholder: "e.g., Lab Room 101",
+                                className: UI.forms.input
+                            })
+                        ),
+                        // Description input
+                        React.createElement('div', null,
+                            React.createElement('label', { 
+                                htmlFor: "new-location-description", 
+                                className: UI.forms.label
+                            }, "Description (Optional)"),
+                            React.createElement('input', {
+                                id: "new-location-description",
+                                type: "text",
+                                value: newLocationDescription,
+                                onChange: (e) => setNewLocationDescription(e.target.value),
+                                placeholder: "e.g., Main electronics workbench",
+                                className: UI.forms.input
+                            })
+                        ),
+                        // Submit button
+                        React.createElement('div', null,
+                            React.createElement('button', {
+                                type: "submit",
+                                className: UI.buttons.primary
+                            }, "Add Location")
+                        )
                     )
-                )
             )
         ),
         
@@ -266,31 +291,37 @@ window.App.components.LocationManager = ({
                                     
                                     // Action buttons
                                     React.createElement('div', { className: "flex space-x-2" },
-                                        !isEditing ?
-                                            React.createElement(React.Fragment, null,
-                                                React.createElement('button', {
-                                                    onClick: () => handleStartEdit(location),
-                                                    className: UI.buttons.small.primary,
-                                                    title: "Edit Location"
-                                                }, "Edit"),
-                                                React.createElement('button', {
-                                                    onClick: () => onDeleteLocation(location.id),
-                                                    className: UI.buttons.small.danger,
-                                                    title: "Delete Location"
-                                                }, "Delete")
-                                            ) :
-                                            React.createElement(React.Fragment, null,
-                                                React.createElement('button', {
-                                                    onClick: handleSaveEdit,
-                                                    className: UI.buttons.small.success,
-                                                    title: "Save Changes"
-                                                }, "Save"),
-                                                React.createElement('button', {
-                                                    onClick: handleCancelEdit,
-                                                    className: UI.buttons.small.secondary,
-                                                    title: "Cancel Editing"
-                                                }, "Cancel")
-                                            )
+                                        loading ? 
+                                            // Loading indicator during operations
+                                            React.createElement('div', { 
+                                                className: "w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
+                                            }) :
+                                            // Normal action buttons when not loading
+                                            !isEditing ?
+                                                React.createElement(React.Fragment, null,
+                                                    React.createElement('button', {
+                                                        onClick: () => handleStartEdit(location),
+                                                        className: UI.buttons.small.primary,
+                                                        title: "Edit Location"
+                                                    }, "Edit"),
+                                                    React.createElement('button', {
+                                                        onClick: () => onDeleteLocation(location.id),
+                                                        className: UI.buttons.small.danger,
+                                                        title: "Delete Location"
+                                                    }, "Delete")
+                                                ) :
+                                                React.createElement(React.Fragment, null,
+                                                    React.createElement('button', {
+                                                        onClick: handleSaveEdit,
+                                                        className: UI.buttons.small.success,
+                                                        title: "Save Changes"
+                                                    }, "Save"),
+                                                    React.createElement('button', {
+                                                        onClick: handleCancelEdit,
+                                                        className: UI.buttons.small.secondary,
+                                                        title: "Cancel Editing"
+                                                    }, "Cancel")
+                                                )
                                     )
                                 ),
                                 
@@ -356,4 +387,4 @@ window.App.components.LocationManager = ({
     );
 };
 
-console.log("LocationManager component loaded with theme-aware styling."); // For debugging
+console.log("LocationManager component loaded with IndexedDB compatibility.");

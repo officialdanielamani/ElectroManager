@@ -1,4 +1,4 @@
-// js/components/InventoryView.js
+// js/components/InventoryView.js - Updated for IndexedDB compatibility
 
 // Ensure the global namespace exists
 window.App = window.App || {};
@@ -8,6 +8,7 @@ window.App.utils = window.App.utils || {}; // Ensure utils namespace exists
 /**
  * React Component for the Inventory Page View.
  * Displays filters, summary, bulk actions, and the component list (table or cards).
+ * Modified to work with IndexedDB.
  */
 window.App.components.InventoryView = ({
     // Props
@@ -33,10 +34,8 @@ window.App.components.InventoryView = ({
     onToggleSelectAll, // Function: Called when the select-all checkbox is toggled
     onBulkEdit, // Function: Called when 'Edit Selected' button clicked
     onBulkDelete, // Function: Called when 'Delete Selected' button clicked
-    //onChangeSearchTerm, // Function: Called when search input changes
     onChangeViewMode, // Function: Called to change view mode ('table'/'card')
     onToggleFavorite, // Function(id, property): Called when favorite/bookmark/star is toggled
-
 }) => {
     // Get UI constants and helper functions
     const { helpers, UI } = window.App.utils;
@@ -53,6 +52,7 @@ window.App.components.InventoryView = ({
     const [priceRange, setPriceRange] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
+    const [loading, setLoading] = useState(false);
 
     // Clear advanced filters if simple category/search filters change
     useEffect(() => {
@@ -81,75 +81,75 @@ window.App.components.InventoryView = ({
         setCurrentPage(1);
     }, []);
 
-   // --- Filtering Logic ---
-// Filter components based on search term, selected category, and advanced filters
-const filteredComponents = components.filter(component => {
-    // Basic filters (search and category dropdown)
-    const matchesCategory = selectedCategory === 'all' || component.category === selectedCategory;
-    const lowerSearchTerm = searchTerm.toLowerCase();
-    const matchesSearch = !searchTerm ||
-        (component.name && component.name.toLowerCase().includes(lowerSearchTerm)) ||
-        (component.type && component.type.toLowerCase().includes(lowerSearchTerm)) ||
-        (component.category && component.category.toLowerCase().includes(lowerSearchTerm)) ||
-        (component.info && component.info.toLowerCase().includes(lowerSearchTerm));
+    // --- Filtering Logic ---
+    // Filter components based on search term, selected category, and advanced filters
+    const filteredComponents = components.filter(component => {
+        // Basic filters (search and category dropdown)
+        const matchesCategory = selectedCategory === 'all' || component.category === selectedCategory;
+        const lowerSearchTerm = searchTerm.toLowerCase();
+        const matchesSearch = !searchTerm ||
+            (component.name && component.name.toLowerCase().includes(lowerSearchTerm)) ||
+            (component.type && component.type.toLowerCase().includes(lowerSearchTerm)) ||
+            (component.category && component.category.toLowerCase().includes(lowerSearchTerm)) ||
+            (component.info && component.info.toLowerCase().includes(lowerSearchTerm));
 
-    // Advanced filters
-    // Category filter
-    const matchesAdvancedCategory = selectedCategories.length === 0 ||
-        selectedCategories.includes(component.category);
+        // Advanced filters
+        // Category filter
+        const matchesAdvancedCategory = selectedCategories.length === 0 ||
+            selectedCategories.includes(component.category);
 
-    // Type filter
-    const matchesType = selectedTypes.length === 0 ||
-        (component.type && selectedTypes.includes(component.type));
+        // Type filter
+        const matchesType = selectedTypes.length === 0 ||
+            (component.type && selectedTypes.includes(component.type));
 
-    // Marks filter (favorite, bookmark, star)
-    const matchesMarks = selectedMarks.length === 0 ||
-        selectedMarks.some(mark => component[mark]);
+        // Marks filter (favorite, bookmark, star)
+        const matchesMarks = selectedMarks.length === 0 ||
+            selectedMarks.some(mark => component[mark]);
 
-    // Location filter
-    const matchesLocation = selectedLocations.length === 0 ||
-        (component.locationInfo && component.locationInfo.locationId &&
-            locations.some(loc =>
-                selectedLocations.includes(loc.name) &&
-                loc.id === component.locationInfo.locationId
-            ));
+        // Location filter
+        const matchesLocation = selectedLocations.length === 0 ||
+            (component.locationInfo && component.locationInfo.locationId &&
+                locations.some(loc =>
+                    selectedLocations.includes(loc.name) &&
+                    loc.id === component.locationInfo.locationId
+                ));
 
-    // Footprint filter
-    const matchesFootprint = selectedFootprints.length === 0 ||
-        (component.footprint && selectedFootprints.includes(component.footprint));
+        // Footprint filter
+        const matchesFootprint = selectedFootprints.length === 0 ||
+            (component.footprint && selectedFootprints.includes(component.footprint));
 
-    // Quantity range filter - FIXED LOGIC
-    const componentQuantity = component.quantity || 0;
-    const matchesQuantity = !quantityRange || (
-        // If min and max are defined and equal, filter for exact match
-        (quantityRange.min !== null && quantityRange.max !== null && quantityRange.min === quantityRange.max)
-            ? (componentQuantity === quantityRange.min)
-            // Otherwise, use proper range filtering with both min and max boundaries
-            : (
-                (quantityRange.min === null || componentQuantity >= quantityRange.min) &&
-                (quantityRange.max === null || componentQuantity <= quantityRange.max)
-            )
-    );
+        // Quantity range filter
+        const componentQuantity = component.quantity || 0;
+        const matchesQuantity = !quantityRange || (
+            // If min and max are defined and equal, filter for exact match
+            (quantityRange.min !== null && quantityRange.max !== null && quantityRange.min === quantityRange.max)
+                ? (componentQuantity === quantityRange.min)
+                // Otherwise, use proper range filtering with both min and max boundaries
+                : (
+                    (quantityRange.min === null || componentQuantity >= quantityRange.min) &&
+                    (quantityRange.max === null || componentQuantity <= quantityRange.max)
+                )
+        );
 
-    // Price range filter - FIXED LOGIC
-    const componentPrice = component.price || 0;
-    const matchesPrice = !priceRange || (
-        // If min and max are defined and equal, filter for exact match
-        (priceRange.min !== null && priceRange.max !== null && priceRange.min === priceRange.max)
-            ? (componentPrice === priceRange.min)
-            // Otherwise, use proper range filtering with both min and max boundaries
-            : (
-                (priceRange.min === null || componentPrice >= priceRange.min) &&
-                (priceRange.max === null || componentPrice <= priceRange.max)
-            )
-    );
+        // Price range filter
+        const componentPrice = component.price || 0;
+        const matchesPrice = !priceRange || (
+            // If min and max are defined and equal, filter for exact match
+            (priceRange.min !== null && priceRange.max !== null && priceRange.min === priceRange.max)
+                ? (componentPrice === pricePrice.min)
+                // Otherwise, use proper range filtering with both min and max boundaries
+                : (
+                    (priceRange.min === null || componentPrice >= priceRange.min) &&
+                    (priceRange.max === null || componentPrice <= priceRange.max)
+                )
+        );
 
-    // Combine all filters
-    return matchesCategory && matchesSearch &&
-        matchesAdvancedCategory && matchesType &&
-        matchesMarks && matchesLocation &&
-        matchesFootprint && matchesQuantity && matchesPrice;
-});
+        // Combine all filters
+        return matchesCategory && matchesSearch &&
+            matchesAdvancedCategory && matchesType &&
+            matchesMarks && matchesLocation &&
+            matchesFootprint && matchesQuantity && matchesPrice;
+    });
 
     // --- Pagination Logic ---
     const paginatedComponents = itemsPerPage === 'all'
@@ -200,11 +200,73 @@ const filteredComponents = components.filter(component => {
     const handleViewChange = (mode) => {
         // Just pass the mode directly - this is expected to be a string value
         if (mode === 'table' || mode === 'card') {
+            // Set loading state for UI feedback
+            setLoading(true);
+            
+            // Call the parent handler to change the view mode
             onChangeViewMode(mode);
+            
+            // Clear loading state after a short delay to allow UI to update
+            setTimeout(() => setLoading(false), 300);
         } else {
             console.warn("handleViewChange called with invalid mode", mode);
             onChangeViewMode('table'); // Default to table view
         }
+    };
+
+    // Handler functions for component operations
+    const handleComponentAction = (actionType, component, ...args) => {
+        // Show loading indicator
+        setLoading(true);
+        
+        // Perform the action with a small delay to show loading state
+        setTimeout(() => {
+            switch (actionType) {
+                case 'edit':
+                    onEditComponent(component);
+                    break;
+                case 'delete':
+                    onDeleteComponent(component.id);
+                    break;
+                case 'updateQuantity':
+                    onUpdateQuantity(component.id, args[0]); // args[0] = delta
+                    break;
+                case 'toggleFavorite':
+                    onToggleFavorite(component.id, args[0]); // args[0] = property (favorite, bookmark, star)
+                    break;
+                default:
+                    console.warn('Unknown component action:', actionType);
+            }
+            
+            // Clear loading state
+            setLoading(false);
+        }, 100); // Short delay for UI feedback
+    };
+    
+    // Bulk operation handlers with loading state
+    const handleBulkAction = (actionType) => {
+        // Show loading indicator
+        setLoading(true);
+        
+        // Perform the action with a small delay to show loading state
+        setTimeout(() => {
+            switch (actionType) {
+                case 'edit':
+                    onBulkEdit();
+                    break;
+                case 'delete':
+                    onBulkDelete();
+                    break;
+                case 'toggleSelect':
+                    onToggleSelectAll();
+                    break;
+                default:
+                    console.warn('Unknown bulk action:', actionType);
+            }
+            
+            // Clear loading state
+            setLoading(false);
+        }, 100); // Short delay for UI feedback
     };
 
     // --- Render Functions for Table and Card Views ---
@@ -253,7 +315,7 @@ const filteredComponents = components.filter(component => {
                 React.createElement('div', { className: "flex items-center space-x-1" },
                     // Favorite Icon/Button
                     React.createElement('button', {
-                        onClick: () => onToggleFavorite(component.id, 'favorite'),
+                        onClick: () => handleComponentAction('toggleFavorite', component, 'favorite'),
                         className: `p-1 rounded-full ${component.favorite ? "text-red-500 hover:text-red-600" : 'text-gray-300 hover:text-red-500'}`,
                         title: component.favorite ? "Remove from favorites" : "Add to favorites"
                     },
@@ -273,7 +335,7 @@ const filteredComponents = components.filter(component => {
 
                     // Bookmark Icon/Button
                     React.createElement('button', {
-                        onClick: () => onToggleFavorite(component.id, 'bookmark'),
+                        onClick: () => handleComponentAction('toggleFavorite', component, 'bookmark'),
                         className: `p-1 rounded-full ${component.bookmark ? "text-blue-500 hover:text-blue-600" : 'text-gray-300 hover:text-blue-500'}`,
                         title: component.bookmark ? "Remove bookmark" : "Add bookmark"
                     },
@@ -291,7 +353,7 @@ const filteredComponents = components.filter(component => {
 
                     // Star Icon/Button
                     React.createElement('button', {
-                        onClick: () => onToggleFavorite(component.id, 'star'),
+                        onClick: () => handleComponentAction('toggleFavorite', component, 'star'),
                         className: `p-1 rounded-full ${component.star ? "text-yellow-500 hover:text-yellow-600" : 'text-gray-300 hover:text-yellow-500'}`,
                         title: component.star ? "Remove star" : "Add star"
                     },
@@ -314,13 +376,13 @@ const filteredComponents = components.filter(component => {
             React.createElement('td', { className: "px-4 py-2 whitespace-nowrap text-center" },
                 React.createElement('div', { className: "flex items-center justify-center space-x-1" },
                     React.createElement('button', {
-                        onClick: () => onUpdateQuantity(component.id, -1),
+                        onClick: () => handleComponentAction('updateQuantity', component, -1),
                         className: UI.buttons.icon.danger,
                         title: "Decrease Quantity"
                     }, "-"),
                     React.createElement('span',{ className: UI.tables.body.cell}, component.quantity || 0),
                     React.createElement('button', {
-                        onClick: () => onUpdateQuantity(component.id, 1),
+                        onClick: () => handleComponentAction('updateQuantity', component, 1),
                         className: UI.buttons.icon.success,
                         title: "Increase Quantity"
                     }, "+")
@@ -336,12 +398,12 @@ const filteredComponents = components.filter(component => {
             // Actions
             React.createElement('td', { className: UI.tables.body.cellAction },
                 React.createElement('button', {
-                    onClick: () => onEditComponent(component),
+                    onClick: () => handleComponentAction('edit', component),
                     className: "text-indigo-600 hover:text-indigo-900 mr-3",
                     title: "Edit Component"
                 }, "Edit"),
                 React.createElement('button', {
-                    onClick: () => onDeleteComponent(component.id),
+                    onClick: () => handleComponentAction('delete', component),
                     className: "text-red-600 hover:text-red-900",
                     title: "Delete Component"
                 }, "Delete")
@@ -466,7 +528,10 @@ const filteredComponents = components.filter(component => {
                     alt: component.name || 'Component Image',
                     className: "w-full h-full object-contain p-2",
                     // Fallback placeholder if image fails to load
-                    //onError: (e) => { e.target.onerror = null; e.target.src = `https://placehold.co/200x150/e2e8f0/94a3b8?text=No+Image`; }
+                    onError: (e) => { 
+                        e.target.onerror = null; 
+                        e.target.src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150" viewBox="0 0 200 150"><rect width="200" height="150" fill="%23f0f0f0"/><text x="50%" y="50%" font-family="sans-serif" font-size="14" text-anchor="middle" fill="%23999">No Image</text></svg>`; 
+                    }
                 }),
                 lowStock && React.createElement('span', { 
                     className: UI.tags.red + " absolute bottom-1 right-1" 
@@ -502,7 +567,7 @@ const filteredComponents = components.filter(component => {
                 // Quantity Controls
                 React.createElement('div', { className: "flex items-center justify-center space-x-2 mb-3 border-t border-b py-2 border-gray-100" },
                     React.createElement('button', {
-                        onClick: () => onUpdateQuantity(component.id, -1),
+                        onClick: () => handleComponentAction('updateQuantity', component, -1),
                         className: UI.buttons.icon.danger,
                         title: "Decrease Quantity"
                     },
@@ -512,7 +577,7 @@ const filteredComponents = components.filter(component => {
                     React.createElement('span', { className: `text-lg font-semibold ${lowStock ? 'text-red-600' : 'text-gray-900'}` }, component.quantity || 0),
 
                     React.createElement('button', {
-                        onClick: () => onUpdateQuantity(component.id, 1),
+                        onClick: () => handleComponentAction('updateQuantity', component, 1),
                         className: UI.buttons.icon.success,
                         title: "Increase Quantity"
                     },
@@ -540,12 +605,12 @@ const filteredComponents = components.filter(component => {
                 // Action Buttons
                 React.createElement('div', { className: "flex justify-end space-x-2 border-t border-gray-100 pt-3" },
                     React.createElement('button', {
-                        onClick: () => onEditComponent(component),
+                        onClick: () => handleComponentAction('edit', component),
                         className: UI.buttons.small.info,
                         title: "Edit Component"
                     }, "Edit"),
                     React.createElement('button', {
-                        onClick: () => onDeleteComponent(component.id),
+                        onClick: () => handleComponentAction('delete', component),
                         className: UI.buttons.small.danger,
                         title: "Delete Component"
                     }, "Delete")
@@ -557,54 +622,65 @@ const filteredComponents = components.filter(component => {
     // --- Main Render ---
     return (
         React.createElement('div', null,
+            // Loading overlay
+            loading && React.createElement('div', { 
+                className: "fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50" 
+            },
+                React.createElement('div', { 
+                    className: "bg-white p-4 rounded-lg shadow-xl" 
+                },
+                    React.createElement('div', { 
+                        className: "w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" 
+                    })
+                )
+            ),
 
             // --- Inventory Summary Stats ---
-            // --- Inventory Summary Stats ---
-React.createElement('div', { className: UI.layout.sectionAlt },
-    React.createElement('h2', { className: UI.typography.subtitle + " mb-3" }, "Inventory Summary"),
-    React.createElement('div', { className: "grid grid-cols-2 md:grid-cols-5 gap-4 text-center mb-4" },
-        // Total Components Stat
-        React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
-            React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Components"),
-            React.createElement('p', { className: `text-2xl font-semibold text-${UI.colors.primary.text.replace('text-', '')}` }, totalComponents)
-        ),
-        // Total Items Stat
-        React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
-            React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Total Items"),
-            React.createElement('p', { className: `text-2xl font-semibold text-${UI.colors.success.text.replace('text-', '')}` }, totalItems)
-        ),
-        // Total Value Stat (Conditional)
-        showTotalValue && React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
-            React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Total Value"),
-            React.createElement('p', { className: `text-2xl font-semibold text-${UI.colors.accent.text.replace('text-', '')}` }, helpers.formatCurrency(totalValue, currencySymbol))
-        ),
-        // Categories Stat
-        React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
-            React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Categories"),
-            React.createElement('p', { className: `text-2xl font-semibold text-${UI.colors.info.text.replace('text-', '')}` }, (categories || []).length)
-        ),
-        // Low Stock Stat
-        React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
-            React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Low Stock"),
-            React.createElement('p', { className: `text-2xl font-semibold ${lowStockCount > 0 ? UI.colors.danger.text : `text-${UI.getThemeColors().textMuted}`}` }, lowStockCount)
-        ),
-    ),
-    // Category Counts
-    totalComponents > 0 && React.createElement('div', { className: `${UI.utils.borderTop} pt-3 mt-3 border-${UI.getThemeColors().border}` },
-        React.createElement('h3', { className: UI.typography.subtitle + " mb-2" }, "Item Counts by Category"),
-        React.createElement('div', { className: "flex flex-wrap gap-3" },
-            categoryCounts.length > 0 ? categoryCounts.map(([category, count]) =>
-                React.createElement('div', { 
-                    key: category, 
-                    className: `bg-${UI.getThemeColors().cardBackground} border border-${UI.getThemeColors().border} rounded-md px-3 py-1 shadow-sm` 
-                },
-                    React.createElement('span', { className: `text-sm font-medium text-${UI.getThemeColors().textSecondary}` }, category, ":"),
-                    React.createElement('span', { className: `text-sm font-semibold ${UI.colors.primary.text} ml-1` }, count)
+            React.createElement('div', { className: UI.layout.sectionAlt },
+                React.createElement('h2', { className: UI.typography.subtitle + " mb-3" }, "Inventory Summary"),
+                React.createElement('div', { className: "grid grid-cols-2 md:grid-cols-5 gap-4 text-center mb-4" },
+                    // Total Components Stat
+                    React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
+                        React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Components"),
+                        React.createElement('p', { className: `text-2xl font-semibold text-${UI.colors.primary.text.replace('text-', '')}` }, totalComponents)
+                    ),
+                    // Total Items Stat
+                    React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
+                        React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Total Items"),
+                        React.createElement('p', { className: `text-2xl font-semibold text-${UI.colors.success.text.replace('text-', '')}` }, totalItems)
+                    ),
+                    // Total Value Stat (Conditional)
+                    showTotalValue && React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
+                        React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Total Value"),
+                        React.createElement('p', { className: `text-2xl font-semibold text-${UI.colors.accent.text.replace('text-', '')}` }, helpers.formatCurrency(totalValue, currencySymbol))
+                    ),
+                    // Categories Stat
+                    React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
+                        React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Categories"),
+                        React.createElement('p', { className: `text-2xl font-semibold text-${UI.colors.info.text.replace('text-', '')}` }, (categories || []).length)
+                    ),
+                    // Low Stock Stat
+                    React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
+                        React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Low Stock"),
+                        React.createElement('p', { className: `text-2xl font-semibold ${lowStockCount > 0 ? UI.colors.danger.text : `text-${UI.getThemeColors().textMuted}`}` }, lowStockCount)
+                    ),
+                ),
+                // Category Counts
+                totalComponents > 0 && React.createElement('div', { className: `${UI.utils.borderTop} pt-3 mt-3 border-${UI.getThemeColors().border}` },
+                    React.createElement('h3', { className: UI.typography.subtitle + " mb-2" }, "Item Counts by Category"),
+                    React.createElement('div', { className: "flex flex-wrap gap-3" },
+                        categoryCounts.length > 0 ? categoryCounts.map(([category, count]) =>
+                            React.createElement('div', { 
+                                key: category, 
+                                className: `bg-${UI.getThemeColors().cardBackground} border border-${UI.getThemeColors().border} rounded-md px-3 py-1 shadow-sm` 
+                            },
+                                React.createElement('span', { className: `text-sm font-medium text-${UI.getThemeColors().textSecondary}` }, category, ":"),
+                                React.createElement('span', { className: `text-sm font-semibold ${UI.colors.primary.text} ml-1` }, count)
+                            )
+                        ) : React.createElement('p', { className: `${UI.typography.small} italic text-${UI.getThemeColors().textMuted}` }, "No items with categories found.")
+                    )
                 )
-            ) : React.createElement('p', { className: `${UI.typography.small} italic text-${UI.getThemeColors().textMuted}` }, "No items with categories found.")
-        )
-    )
-),
+            ),
             
             // --- Advanced Filters Card ---
             React.createElement(window.App.components.AdvancedFilters, {
@@ -654,7 +730,7 @@ React.createElement('div', { className: UI.layout.sectionAlt },
                         id: "select-all-filtered-bulk",
                         className: UI.forms.checkbox + " mr-2",
                         checked: selectedComponents.length === filteredComponents.length && filteredComponents.length > 0,
-                        onChange: onToggleSelectAll,
+                        onChange: () => handleBulkAction('toggleSelect'),
                         title: selectedComponents.length === filteredComponents.length ? "Deselect All Visible" : "Select All Visible",
                         disabled: filteredComponents.length === 0
                     }),
@@ -663,11 +739,11 @@ React.createElement('div', { className: UI.layout.sectionAlt },
                 // Bulk Action Buttons
                 React.createElement('div', { className: "flex gap-2" },
                     React.createElement('button', { 
-                        onClick: onBulkEdit, 
+                        onClick: () => handleBulkAction('edit'), 
                         className: UI.buttons.small.primary 
                     }, "Edit Selected"),
                     React.createElement('button', { 
-                        onClick: onBulkDelete, 
+                        onClick: () => handleBulkAction('delete'), 
                         className: UI.buttons.small.danger 
                     }, "Delete Selected")
                 )
@@ -688,7 +764,7 @@ React.createElement('div', { className: UI.layout.sectionAlt },
                                             type: "checkbox",
                                             className: UI.forms.checkbox,
                                             checked: selectedComponents.length === filteredComponents.length && filteredComponents.length > 0,
-                                            onChange: onToggleSelectAll,
+                                            onChange: () => handleBulkAction('toggleSelect'),
                                             disabled: filteredComponents.length === 0,
                                             title: selectedComponents.length === filteredComponents.length ? "Deselect All Visible" : "Select All Visible"
                                         })
@@ -746,4 +822,4 @@ React.createElement('div', { className: UI.layout.sectionAlt },
     );
 };
 
-console.log("InventoryView component loaded with clean direct UI references."); // For debugging
+console.log("InventoryView component loaded with IndexedDB compatibility.");

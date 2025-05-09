@@ -1,15 +1,20 @@
-// ThemeSwitcher.js
+// ThemeSwitcher.js - Updated for IndexedDB compatibility
 window.App.components.ThemeSwitcher = ({ currentTheme, onThemeChange }) => {
   const { UI } = window.App.utils;
   
   // Get available themes
   const themeNames = Object.keys(UI.themes);
   
-  // Handle theme change
+  // Handle theme change with IndexedDB support
   const handleThemeChange = (themeName) => {
     // Call the parent component's handler
     if (onThemeChange && UI.themes[themeName]) {
       onThemeChange(themeName);
+      
+      // Apply theme immediately through the UI system
+      UI.setTheme(themeName);
+      
+      // Theme will be saved to IndexedDB by the UI.setTheme method
     }
   };
   
@@ -44,4 +49,5 @@ window.App.components.ThemeSwitcher = ({ currentTheme, onThemeChange }) => {
           theme.name
         )})
       )
-    )};
+    );
+};

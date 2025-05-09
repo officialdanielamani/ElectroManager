@@ -1,4 +1,4 @@
-// js/components/DrawerView.js
+// js/components/DrawerView.js - Updated for IndexedDB compatibility
 
 // Ensure the global namespace exists
 window.App = window.App || {};
@@ -7,6 +7,7 @@ window.App.components = window.App.components || {};
 /**
  * React Component for viewing and managing the contents of a drawer.
  * Displays a grid of cells with the ability to name cells and view/edit components in cells.
+ * Modified to support IndexedDB operations.
  */
 window.App.components.DrawerView = ({
     // Props
@@ -29,6 +30,7 @@ window.App.components.DrawerView = ({
     const [selectedCellId, setSelectedCellId] = useState(null);
     const [editingCellId, setEditingCellId] = useState(null);
     const [editCellNickname, setEditCellNickname] = useState('');
+    const [loading, setLoading] = useState(false);
 
     // Grid dimensions
     const rows = drawer?.grid?.rows || 3;
@@ -80,8 +82,13 @@ window.App.components.DrawerView = ({
 
     // Handle saving a cell nickname
     const handleSaveCellNickname = () => {
+        setLoading(true);
+        
         const cellToUpdate = drawerCells.find(cell => cell.id === editingCellId);
-        if (!cellToUpdate) return;
+        if (!cellToUpdate) {
+            setLoading(false);
+            return;
+        }
 
         const trimmedNickname = editCellNickname.trim();
 
@@ -94,6 +101,7 @@ window.App.components.DrawerView = ({
 
         if (isDuplicate && trimmedNickname) {
             alert(`Nickname "${trimmedNickname}" is already used in this drawer.`);
+            setLoading(false);
             return;
         }
 
@@ -104,16 +112,24 @@ window.App.components.DrawerView = ({
         };
 
         onEditCell(editingCellId, updatedCell);
-        setEditingCellId(null);
-        setEditCellNickname('');
+        
+        setTimeout(() => {
+            setEditingCellId(null);
+            setEditCellNickname('');
+            setLoading(false);
+        }, 300);
     };
 
     // Handle toggling cell availability
     const handleToggleAvailability = (cellId) => {
         if (!cellId) return;
+        setLoading(true);
         
         const cellToToggle = drawerCells.find(cell => cell.id === cellId);
-        if (!cellToToggle) return;
+        if (!cellToToggle) {
+            setLoading(false);
+            return;
+        }
 
         const updatedCell = {
             ...cellToToggle,
@@ -121,17 +137,23 @@ window.App.components.DrawerView = ({
         };
 
         onEditCell(cellId, updatedCell);
+        
+        setTimeout(() => {
+            setLoading(false);
+        }, 300);
     };
 
     // Handle emptying a cell by removing all component associations
     const handleEmptyCell = (cellId) => {
         if (!cellId) return;
+        setLoading(true);
         
         // Find components assigned to this cell
         const cellComponents = getComponentsForCell(cellId);
         
         if (cellComponents.length === 0) {
             alert("This cell is already empty.");
+            setLoading(false);
             return;
         }
 
@@ -140,7 +162,7 @@ window.App.components.DrawerView = ({
             let updatedComponents = [...components];
             
             // For each component in the cell, update its storage info
-            cellComponents.forEach(component => {
+            const updatePromises = cellComponents.map(component => {
                 // Find the component in our components array
                 const index = updatedComponents.findIndex(c => c.id === component.id);
                 if (index !== -1) {
@@ -164,18 +186,26 @@ window.App.components.DrawerView = ({
                     
                     // Update the component in our array
                     updatedComponents[index] = updatedComponent;
+                    
+                    // Call onEditComponent
+                    return onEditComponent(updatedComponent);
                 }
+                return Promise.resolve();
             });
             
-            // Call onEditComponent for each updated component
-            cellComponents.forEach(component => {
-                const updatedComponent = updatedComponents.find(c => c.id === component.id);
-                if (updatedComponent) {
-                    onEditComponent(updatedComponent);
-                }
-            });
-            
-            alert(`Successfully removed ${cellComponents.length} component(s) from this cell.`);
+            // Wait for all updates to complete
+            Promise.all(updatePromises)
+                .then(() => {
+                    setLoading(false);
+                    alert(`Successfully removed ${cellComponents.length} component(s) from this cell.`);
+                })
+                .catch(error => {
+                    console.error("Error emptying cell:", error);
+                    setLoading(false);
+                    alert("Error emptying cell. Please try again.");
+                });
+        } else {
+            setLoading(false);
         }
     };
     
@@ -193,16 +223,18 @@ window.App.components.DrawerView = ({
 
     // Handle creating a new cell
     const handleCreateCell = (rowIndex, colIndex) => {
+        setLoading(true);
         const coordinate = `${String.fromCharCode(65 + colIndex)}${rowIndex + 1}`;
 
         // Check if a cell already exists for this coordinate
         const existingCell = drawerCells.find(cell => cell.coordinate === coordinate);
         if (existingCell) {
             setSelectedCellId(existingCell.id);
+            setLoading(false);
             return;
         }
 
-        // Create a new cell
+        // Create a new cell with a unique ID
         const newCell = {
             id: `cell-${Date.now()}-${Math.random().toString(16).slice(2)}`,
             drawerId: drawer.id,
@@ -212,7 +244,26 @@ window.App.components.DrawerView = ({
         };
 
         onAddCell(newCell);
-        setSelectedCellId(newCell.id);
+        
+        setTimeout(() => {
+            setSelectedCellId(newCell.id);
+            setLoading(false);
+        }, 300);
+    };
+    
+    // Handle deleting a cell
+    const handleDeleteCell = (cellId) => {
+        if (!cellId) return;
+        setLoading(true);
+        
+        onDeleteCell(cellId);
+        
+        setTimeout(() => {
+            if (selectedCellId === cellId) {
+                setSelectedCellId(null);
+            }
+            setLoading(false);
+        }, 300);
     };
 
     // Generate grid elements
@@ -287,7 +338,8 @@ window.App.components.DrawerView = ({
                                 onBlur: handleSaveCellNickname,
                                 onKeyDown: (e) => e.key === 'Enter' && handleSaveCellNickname(),
                                 className: "w-full p-1 text-sm border border-gray-300 rounded",
-                                autoFocus: true
+                                autoFocus: true,
+                                disabled: loading
                             }) :
                             React.createElement('div', { className: "font-medium text-sm" },
                                 cell ? (cell.nickname || cell.coordinate) : coordinate, // Show coordinate if cell doesn't exist
@@ -320,6 +372,19 @@ window.App.components.DrawerView = ({
     const selectedCellComponents = selectedCell ? getComponentsForCell(selectedCell.id) : [];
 
     return React.createElement('div', { className: "space-y-4" },
+        // Loading overlay
+        loading && React.createElement('div', { 
+            className: "fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50" 
+        },
+            React.createElement('div', { 
+                className: "bg-white p-4 rounded-lg shadow-xl" 
+            },
+                React.createElement('div', { 
+                    className: "w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" 
+                })
+            )
+        ),
+        
         // Header with back button
         React.createElement('div', { className: "flex justify-between items-center mb-4" },
             React.createElement('h2', { className: UI.typography.heading.h2 },
@@ -328,7 +393,8 @@ window.App.components.DrawerView = ({
             ),
             React.createElement('button', {
                 onClick: onBackToDrawers,
-                className: `px-3 py-1 bg-${UI.getThemeColors().secondary} text-${UI.getThemeColors().textSecondary} rounded flex items-center hover:bg-${UI.getThemeColors().secondaryHover}`
+                className: `px-3 py-1 bg-${UI.getThemeColors().secondary} text-${UI.getThemeColors().textSecondary} rounded flex items-center hover:bg-${UI.getThemeColors().secondaryHover}`,
+                disabled: loading
             },
                 React.createElement('svg', {
                     xmlns: "http://www.w3.org/2000/svg",
@@ -392,22 +458,26 @@ window.App.components.DrawerView = ({
                 React.createElement('button', {
                     onClick: () => handleToggleAvailability(selectedCell.id),
                     className: `px-2 py-1 text-xs ${selectedCell.available !== false ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'} text-white rounded`,
-                    title: selectedCell.available !== false ? "Mark as Unavailable" : "Mark as Available"
+                    title: selectedCell.available !== false ? "Mark as Unavailable" : "Mark as Available",
+                    disabled: loading
                 }, selectedCell.available !== false ? "Mark Unavailable" : "Mark Available"),
 
                 React.createElement('button', {
                     onClick: () => handleEmptyCell(selectedCell.id),
-                    className: "px-2 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600"
+                    className: "px-2 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600",
+                    disabled: loading
                 }, "Empty Cell"),
 
                 React.createElement('button', {
                     onClick: () => handleEditCellNickname(selectedCell),
-                    className: UI.buttons.small.info
+                    className: UI.buttons.small.info,
+                    disabled: loading
                 }, "Rename Cell"),
 
                 React.createElement('button', {
-                    onClick: () => onDeleteCell(selectedCell.id),
-                    className: UI.buttons.small.danger
+                    onClick: () => handleDeleteCell(selectedCell.id),
+                    className: UI.buttons.small.danger,
+                    disabled: loading
                 }, "Delete Cell")
             ),
 
@@ -431,7 +501,8 @@ window.App.components.DrawerView = ({
                             ),
                             React.createElement('button', {
                                 onClick: () => onEditComponent(comp),
-                                className: UI.buttons.small.primary
+                                className: UI.buttons.small.primary,
+                                disabled: loading
                             }, "Edit")
                         )
                     )
@@ -440,4 +511,4 @@ window.App.components.DrawerView = ({
     );
 };
 
-console.log("DrawerView component loaded with theme-aware styling."); // For debugging
+console.log("DrawerView component loaded with IndexedDB compatibility.");
