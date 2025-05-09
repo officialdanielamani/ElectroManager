@@ -15,6 +15,7 @@ window.App.components.AdvancedFilters = ({
     locations = [], // Array: List of location objects
     footprints = [], // Array: List of footprint strings
     viewMode, // String: 'table' or 'card'
+    searchTerm = '',//String: Current search term
 
     // Filter states
     selectedCategories = [], // Array: Currently selected categories
@@ -25,7 +26,6 @@ window.App.components.AdvancedFilters = ({
     quantityRange, // Object: {min, max} for quantity filter
     priceRange, // Object: {min, max} for price filter
     itemsPerPage, // Number: Items to show per page
-    searchTerm, //String: Current search term
     onChangeViewMode, // Function(mode): Called to change view mode ('table'/'card')
 
     // Callbacks
@@ -38,7 +38,7 @@ window.App.components.AdvancedFilters = ({
     onPriceRangeChange, // Function(range): Update price range
     onItemsPerPageChange, // Function(count): Update items per page
     onClearFilters, // Function: Clear all filters
-    onChangeSearchTerm, // Function(term): Called when search input changes
+    onChangeSearchTerm = () => {}, 
     onAddComponent, // Function: Called when 'Add Component' button clicked
 
     // State
@@ -575,23 +575,27 @@ window.App.components.AdvancedFilters = ({
                         type: "text",
                         placeholder: "Search by name, type, category, info...",
                         className: UI.forms.input + " flex-grow",
-                        value: searchTerm || '',
+                        value: searchTerm || '',  // Important: bind to prop value
                         onChange: (e) => {
-                            // Call the function that was passed as a prop
+                            // Safely call the change handler
                             if (typeof onChangeSearchTerm === 'function') {
-                                onChangeSearchTerm(e); // Pass the entire event object
-                            } else {
-                                console.warn("onChangeSearchTerm is not a function");
+                                onChangeSearchTerm(e);  // Pass the entire event
                             }
                         }
                     }),
-                    // Optional: Add a search icon or clear button
+                    // Clear button (only shown when search has text)
                     searchTerm && React.createElement('button', {
                         className: `ml-2 px-2 text-${UI.getThemeColors().textMuted} hover:text-${UI.getThemeColors().textPrimary}`,
-                        onClick: () => onChangeSearchTerm(''),
+                        onClick: () => {
+                            if (typeof onChangeSearchTerm === 'function') {
+                                // Clear search by passing empty string or event-like object
+                                onChangeSearchTerm('');
+                            }
+                        },
                         title: "Clear search"
                     }, "✕")
                 )
+            
             ),
             
             // View Mode Toggle (column 3)

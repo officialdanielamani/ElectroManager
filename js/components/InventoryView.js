@@ -15,7 +15,6 @@ window.App.components.InventoryView = ({
     categories = [], // Array: List of category strings
     viewMode, // String: 'table' or 'card'
     selectedCategory, // String: Currently selected category filter
-    searchTerm, // String: Current search term
     lowStockConfig, // Object: Low stock thresholds { category: threshold }
     currencySymbol, // String: Currency symbol
     showTotalValue, // Boolean: Whether to show total value in summary
@@ -34,7 +33,8 @@ window.App.components.InventoryView = ({
     onToggleSelectAll, // Function: Called when the select-all checkbox is toggled
     onBulkEdit, // Function: Called when 'Edit Selected' button clicked
     onBulkDelete, // Function: Called when 'Delete Selected' button clicked
-    onChangeViewMode, // Function(mode): Called to change view mode ('table'/'card')
+    //onChangeSearchTerm, // Function: Called when search input changes
+    onChangeViewMode, // Function: Called to change view mode ('table'/'card')
     onToggleFavorite, // Function(id, property): Called when favorite/bookmark/star is toggled
 
 }) => {
@@ -52,6 +52,7 @@ window.App.components.InventoryView = ({
     const [quantityRange, setQuantityRange] = useState(null);
     const [priceRange, setPriceRange] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
+    const [searchTerm, setSearchTerm] = useState('');
 
     // Clear advanced filters if simple category/search filters change
     useEffect(() => {
@@ -178,19 +179,24 @@ const filteredComponents = components.filter(component => {
     // --- Event Handlers ---
 
     const handleSearchChange = (e) => {
-        // Handle both event objects and direct string values
+        // Extract the search value safely
+        let newSearchTerm = '';
+        
         if (e && e.target && e.target.value !== undefined) {
             // Normal event object from input element
-            onChangeSearchTerm(e.target.value);
+            newSearchTerm = e.target.value;
         } else if (typeof e === 'string') {
             // Direct string value
-            onChangeSearchTerm(e);
-        } else {
-            // Fallback
-            console.warn("handleSearchChange called with invalid argument", e);
-            onChangeSearchTerm(''); // Default to empty search
+            newSearchTerm = e;
         }
+        
+        // Update the search term state
+        setSearchTerm(newSearchTerm);
+        
+        // Reset to page 1 when search changes (if using pagination)
+        setCurrentPage(1);
     };
+
     const handleViewChange = (mode) => {
         // Just pass the mode directly - this is expected to be a string value
         if (mode === 'table' || mode === 'card') {
@@ -608,6 +614,7 @@ React.createElement('div', { className: UI.layout.sectionAlt },
                 locations: locations,
                 footprints: footprints,
                 viewMode: viewMode,
+                searchTerm: searchTerm,
                 
                 // Filter states
                 selectedCategories: selectedCategories,
