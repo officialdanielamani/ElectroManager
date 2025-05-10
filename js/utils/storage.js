@@ -1,140 +1,316 @@
-// js/utils/storage.js
+// js/utils/storage.js - Modified to work with ES5 for compatibility
+console.log("Loading storage.js...");
 
 // Create a global namespace if it doesn't exist
 window.App = window.App || {};
 window.App.utils = window.App.utils || {};
 
 /**
- * Storage utility functions for the Electronics Inventory App.
- * Handles saving and loading data from localStorage.
+ * Storage utilities with IndexedDB for core data and localStorage for settings
  */
 window.App.utils.storage = {
+    // Flag to track if IndexedDB is available
+    useIndexedDB: null,
+    
     /**
-     * Load components from localStorage.
-     * @returns {Array} Array of component objects or empty array if none found.
+     * Initialize storage and check IndexedDB availability
      */
-    loadComponents: () => {
-        try {
-            const savedComponents = localStorage.getItem('electronicsComponents');
-            if (savedComponents) {
-                const parsedComponents = JSON.parse(savedComponents);
-                // Ensure all objects have proper structure and types
-                const componentsWithValidValues = parsedComponents.map(comp => {
-                    // Create base component with standard fields
-                    const updatedComp = {
-                        ...comp,
-                        price: typeof comp.price === 'number' ? comp.price : Number(comp.price) || 0,
-                        quantity: typeof comp.quantity === 'number' ? comp.quantity : Number(comp.quantity) || 0,
-                        // Initialize flag fields if they don't exist
-                        favorite: comp.favorite || false,
-                        bookmark: comp.bookmark || false,
-                        star: comp.star || false
-                    };
-
-                    // Ensure locationInfo is properly formatted
-                    if (!comp.locationInfo || typeof comp.locationInfo === 'string' || comp.locationInfo === '[object Object]') {
-                        updatedComp.locationInfo = { locationId: '', details: '' };
-                    }
-
-                    // Ensure storageInfo is properly formatted
-                    if (!comp.storageInfo || typeof comp.storageInfo === 'string' || comp.storageInfo === '[object Object]') {
-                        updatedComp.storageInfo = { locationId: '', drawerId: '', cells: [] };
-                    } else {
-                        // Handle partial storageInfo object (may be missing 'cells' array)
-                        updatedComp.storageInfo = {
-                            locationId: comp.storageInfo.locationId || '',
-                            drawerId: comp.storageInfo.drawerId || '',
-                            cells: Array.isArray(comp.storageInfo.cells) ? comp.storageInfo.cells : []
-                        };
-
-                        // Handle backward compatibility - if cellId exists but cells array doesn't include it
-                        if (comp.storageInfo.cellId &&
-                            !updatedComp.storageInfo.cells.includes(comp.storageInfo.cellId)) {
-                            updatedComp.storageInfo.cells.push(comp.storageInfo.cellId);
-                        }
-                    }
-
-                    return updatedComp;
-                });
-
-                console.log('Loaded components from localStorage:', componentsWithValidValues.length);
-                return componentsWithValidValues;
-            }
-        } catch (e) {
-            console.error("Error parsing saved components:", e);
-            // Don't remove storage on error, just return empty array
+    init: function() {
+        var self = this;
+        
+        // Only run once
+        if (this.useIndexedDB !== null) {
+            return Promise.resolve(this.useIndexedDB);
         }
-        return []; // Default to empty array if nothing valid found
-    },
-
-    /**
-     * Save components to localStorage.
-     * @param {Array} components Array of component objects to save.
-     * @returns {boolean} True if saved successfully, false otherwise.
-     */
-    saveComponents: (components) => {
-        try {
-            if (Array.isArray(components)) {
-                // Make sure price and quantity are properly formatted before saving
-                const componentsToSave = components.map(comp => ({
-                    ...comp,
-                    price: Number(comp.price) || 0,
-                    quantity: Number(comp.quantity) || 0
-                }));
-
-                // Save to localStorage
-                localStorage.setItem('electronicsComponents', JSON.stringify(componentsToSave));
-                console.log('Saved components to localStorage:', componentsToSave.length);
-                return true;
-            }
-        } catch (e) {
-            console.error("Error saving components to localStorage:", e);
+        
+        // Check for idb object
+        var idb = window.App.utils.idb;
+        if (!idb || typeof idb.init !== 'function') {
+            console.log("IndexedDB utility not available, using localStorage for all data");
+            this.useIndexedDB = false;
+            return Promise.resolve(false);
         }
-        return false;
+        
+        // Try to initialize IndexedDB
+        return idb.init()
+            .then(function(initialized) {
+                self.useIndexedDB = initialized;
+                console.log("Storage initialized:", initialized ? "Using IndexedDB" : "Using localStorage");
+                return initialized;
+            })
+            .catch(function(err) {
+                console.error("Error initializing storage:", err);
+                self.useIndexedDB = false;
+                return false;
+            });
     },
-
-    /**
- * Load locations from localStorage.
- * @returns {Array} Array of location objects or empty array if none found.
- */
-    loadLocations: () => {
+    
+    /*** COMPONENTS ***/
+    
+    loadComponents: function() {
+        var self = this;
+        
+        return this.init()
+            .then(function(useIndexedDB) {
+                // Try IndexedDB first if available
+                if (useIndexedDB) {
+                    return window.App.utils.idb.loadComponents()
+                        .catch(function(err) {
+                            console.error("Error loading components from IndexedDB:", err);
+                            return self._loadComponentsFromLocalStorage();
+                        });
+                }
+                
+                // Otherwise use localStorage
+                return self._loadComponentsFromLocalStorage();
+            });
+    },
+    
+    _loadComponentsFromLocalStorage: function() {
         try {
-            const savedLocations = localStorage.getItem('electronicsLocations');
-            if (savedLocations) {
-                return JSON.parse(savedLocations);
-            }
-        } catch (e) {
-            console.error("Error parsing saved locations:", e);
+            var json = localStorage.getItem('electronicsComponents');
+            var components = json ? JSON.parse(json) : [];
+            console.log("Loaded", components.length, "components from localStorage");
+            return components;
+        } catch (err) {
+            console.error("Error loading components from localStorage:", err);
+            return [];
         }
-        return []; // Default to empty array if nothing valid found
     },
-
-    /**
-     * Save locations to localStorage.
-     * @param {Array} locations Array of location objects to save.
-     * @returns {boolean} True if saved successfully, false otherwise.
-     */
-    saveLocations: (locations) => {
+    
+    saveComponents: function(components) {
+        var self = this;
+        
+        return this.init()
+            .then(function(useIndexedDB) {
+                // Try IndexedDB first if available
+                if (useIndexedDB) {
+                    return window.App.utils.idb.saveComponents(components)
+                        .catch(function(err) {
+                            console.error("Error saving components to IndexedDB:", err);
+                            return self._saveComponentsToLocalStorage(components);
+                        });
+                }
+                
+                // Otherwise use localStorage
+                return self._saveComponentsToLocalStorage(components);
+            });
+    },
+    
+    _saveComponentsToLocalStorage: function(components) {
         try {
-            if (Array.isArray(locations)) {
-                localStorage.setItem('electronicsLocations', JSON.stringify(locations));
-                console.log('Saved locations to localStorage:', locations.length);
-                return true;
-            }
-        } catch (e) {
-            console.error("Error saving locations to localStorage:", e);
+            localStorage.setItem('electronicsComponents', JSON.stringify(components));
+            console.log("Saved", components.length, "components to localStorage");
+            return true;
+        } catch (err) {
+            console.error("Error saving components to localStorage:", err);
+            return false;
         }
-        return false;
     },
-
-
-    /**
-     * Load configuration (categories, view mode, etc.) from localStorage.
-     * @returns {Object} Configuration object with default values if none found.
-     */
-    loadConfig: () => {
+    
+    /*** LOCATIONS ***/
+    
+    loadLocations: function() {
+        var self = this;
+        
+        return this.init()
+            .then(function(useIndexedDB) {
+                // Try IndexedDB first if available
+                if (useIndexedDB) {
+                    return window.App.utils.idb.loadLocations()
+                        .catch(function(err) {
+                            console.error("Error loading locations from IndexedDB:", err);
+                            return self._loadLocationsFromLocalStorage();
+                        });
+                }
+                
+                // Otherwise use localStorage
+                return self._loadLocationsFromLocalStorage();
+            });
+    },
+    
+    _loadLocationsFromLocalStorage: function() {
+        try {
+            var json = localStorage.getItem('electronicsLocations');
+            var locations = json ? JSON.parse(json) : [];
+            console.log("Loaded", locations.length, "locations from localStorage");
+            return locations;
+        } catch (err) {
+            console.error("Error loading locations from localStorage:", err);
+            return [];
+        }
+    },
+    
+    saveLocations: function(locations) {
+        var self = this;
+        
+        return this.init()
+            .then(function(useIndexedDB) {
+                // Try IndexedDB first if available
+                if (useIndexedDB) {
+                    return window.App.utils.idb.saveLocations(locations)
+                        .catch(function(err) {
+                            console.error("Error saving locations to IndexedDB:", err);
+                            return self._saveLocationsToLocalStorage(locations);
+                        });
+                }
+                
+                // Otherwise use localStorage
+                return self._saveLocationsToLocalStorage(locations);
+            });
+    },
+    
+    _saveLocationsToLocalStorage: function(locations) {
+        try {
+            localStorage.setItem('electronicsLocations', JSON.stringify(locations));
+            console.log("Saved", locations.length, "locations to localStorage");
+            return true;
+        } catch (err) {
+            console.error("Error saving locations to localStorage:", err);
+            return false;
+        }
+    },
+    
+    /*** DRAWERS ***/
+    
+    loadDrawers: function() {
+        var self = this;
+        
+        return this.init()
+            .then(function(useIndexedDB) {
+                // Try IndexedDB first if available
+                if (useIndexedDB) {
+                    return window.App.utils.idb.loadDrawers()
+                        .catch(function(err) {
+                            console.error("Error loading drawers from IndexedDB:", err);
+                            return self._loadDrawersFromLocalStorage();
+                        });
+                }
+                
+                // Otherwise use localStorage
+                return self._loadDrawersFromLocalStorage();
+            });
+    },
+    
+    _loadDrawersFromLocalStorage: function() {
+        try {
+            var json = localStorage.getItem('electronicsDrawers');
+            var drawers = json ? JSON.parse(json) : [];
+            console.log("Loaded", drawers.length, "drawers from localStorage");
+            return drawers;
+        } catch (err) {
+            console.error("Error loading drawers from localStorage:", err);
+            return [];
+        }
+    },
+    
+    saveDrawers: function(drawers) {
+        var self = this;
+        
+        return this.init()
+            .then(function(useIndexedDB) {
+                // Try IndexedDB first if available
+                if (useIndexedDB) {
+                    return window.App.utils.idb.saveDrawers(drawers)
+                        .catch(function(err) {
+                            console.error("Error saving drawers to IndexedDB:", err);
+                            return self._saveDrawersToLocalStorage(drawers);
+                        });
+                }
+                
+                // Otherwise use localStorage
+                return self._saveDrawersToLocalStorage(drawers);
+            });
+    },
+    
+    _saveDrawersToLocalStorage: function(drawers) {
+        try {
+            localStorage.setItem('electronicsDrawers', JSON.stringify(drawers));
+            console.log("Saved", drawers.length, "drawers to localStorage");
+            return true;
+        } catch (err) {
+            console.error("Error saving drawers to localStorage:", err);
+            return false;
+        }
+    },
+    
+    /*** CELLS ***/
+    
+    loadCells: function() {
+        var self = this;
+        
+        return this.init()
+            .then(function(useIndexedDB) {
+                // Try IndexedDB first if available
+                if (useIndexedDB) {
+                    return window.App.utils.idb.loadCells()
+                        .catch(function(err) {
+                            console.error("Error loading cells from IndexedDB:", err);
+                            return self._loadCellsFromLocalStorage();
+                        });
+                }
+                
+                // Otherwise use localStorage
+                return self._loadCellsFromLocalStorage();
+            });
+    },
+    
+    _loadCellsFromLocalStorage: function() {
+        try {
+            var json = localStorage.getItem('electronicsCells');
+            var cells = json ? JSON.parse(json) : [];
+            
+            // Ensure all cells have the 'available' property
+            cells = cells.map(function(cell) {
+                return {
+                    available: true,  // Default value
+                    ...cell
+                };
+            });
+            
+            console.log("Loaded", cells.length, "cells from localStorage");
+            return cells;
+        } catch (err) {
+            console.error("Error loading cells from localStorage:", err);
+            return [];
+        }
+    },
+    
+    saveCells: function(cells) {
+        var self = this;
+        
+        return this.init()
+            .then(function(useIndexedDB) {
+                // Try IndexedDB first if available
+                if (useIndexedDB) {
+                    return window.App.utils.idb.saveCells(cells)
+                        .catch(function(err) {
+                            console.error("Error saving cells to IndexedDB:", err);
+                            return self._saveCellsToLocalStorage(cells);
+                        });
+                }
+                
+                // Otherwise use localStorage
+                return self._saveCellsToLocalStorage(cells);
+            });
+    },
+    
+    _saveCellsToLocalStorage: function(cells) {
+        try {
+            localStorage.setItem('electronicsCells', JSON.stringify(cells));
+            console.log("Saved", cells.length, "cells to localStorage");
+            return true;
+        } catch (err) {
+            console.error("Error saving cells to localStorage:", err);
+            return false;
+        }
+    },
+    
+    /*** CONFIG - Always use localStorage ***/
+    
+    loadConfig: function() {
         // Create default config object
-        const defaultConfig = {
+        var defaultConfig = {
             categories: [],
             viewMode: 'table',
             lowStockConfig: {},
@@ -142,76 +318,66 @@ window.App.utils.storage = {
             showTotalValue: false,
             footprints: [],
             itemsPerPage: 'all',
-            theme: 'dark' // Add default theme setting
+            theme: 'dark'
         };
 
         try {
             // Load categories
-            const savedCategories = localStorage.getItem('electronicsCategories');
+            var savedCategories = localStorage.getItem('electronicsCategories');
             if (savedCategories) {
                 defaultConfig.categories = JSON.parse(savedCategories);
             }
 
             // Load view mode
-            const savedViewMode = localStorage.getItem('electronicsViewMode');
+            var savedViewMode = localStorage.getItem('electronicsViewMode');
             if (savedViewMode && (savedViewMode === 'table' || savedViewMode === 'card')) {
                 defaultConfig.viewMode = savedViewMode;
             }
 
             // Load low stock configuration
-            const savedLowStockConfig = localStorage.getItem('electronicsLowStockConfig');
+            var savedLowStockConfig = localStorage.getItem('electronicsLowStockConfig');
             if (savedLowStockConfig) {
                 defaultConfig.lowStockConfig = JSON.parse(savedLowStockConfig);
             }
 
-            // Load locations
-            const savedLocations = localStorage.getItem('electronicsLocations');
-            if (savedLocations) {
-                defaultConfig.locations = JSON.parse(savedLocations);
-            }
-
             // Load currency symbol
-            const savedCurrency = localStorage.getItem('electronicsCurrencySymbol');
+            var savedCurrency = localStorage.getItem('electronicsCurrencySymbol');
             if (savedCurrency) {
                 defaultConfig.currencySymbol = savedCurrency;
             }
 
             // Load footprints
-            const savedFootprints = localStorage.getItem('electronicsFootprints');
+            var savedFootprints = localStorage.getItem('electronicsFootprints');
             if (savedFootprints) {
                 defaultConfig.footprints = JSON.parse(savedFootprints);
             }
 
             // Load items per page setting
-            const savedItemsPerPage = localStorage.getItem('electronicsItemsPerPage');
+            var savedItemsPerPage = localStorage.getItem('electronicsItemsPerPage');
             if (savedItemsPerPage) {
                 defaultConfig.itemsPerPage = JSON.parse(savedItemsPerPage);
             }
 
             // Load show total value setting
-            const savedShowTotalValue = localStorage.getItem('electronicsShowTotalValue');
+            var savedShowTotalValue = localStorage.getItem('electronicsShowTotalValue');
             // Check for 'true' string as localStorage stores strings
             defaultConfig.showTotalValue = savedShowTotalValue === 'true';
 
             // Load theme setting
-            const savedTheme = localStorage.getItem('electronicsTheme');
+            var savedTheme = localStorage.getItem('electronicsTheme');
             if (savedTheme) {
                 defaultConfig.theme = savedTheme;
             }
-            console.log('Loaded config from localStorage');
+            
+            console.log("Config loaded from localStorage");
             return defaultConfig;
-        } catch (e) {
-            console.error("Error loading config from localStorage:", e);
+        } catch (err) {
+            console.error("Error loading config from localStorage:", err);
             return defaultConfig;
         }
     },
-
-    /**
-     * Save configuration to localStorage.
-     * @param {Object} config Configuration object to save.
-     * @returns {boolean} True if saved successfully, false otherwise.
-     */
-    saveConfig: (config) => {
+    
+    saveConfig: function(config) {
         try {
             if (config && typeof config === 'object') {
                 // Save categories
@@ -255,115 +421,122 @@ window.App.utils.storage = {
                     localStorage.setItem('electronicsItemsPerPage', JSON.stringify(config.itemsPerPage));
                 }
 
-                console.log('Saved config to localStorage');
+                console.log("Config saved to localStorage");
                 return true;
             }
-        } catch (e) {
-            console.error("Error saving config to localStorage:", e);
+        } catch (err) {
+            console.error("Error saving config to localStorage:", err);
         }
         return false;
     },
-
-    // Add to window.App.utils.storage
-    loadDrawers: () => {
-        try {
-            const savedDrawers = localStorage.getItem('electronicsDrawers');
-            if (savedDrawers) {
-                return JSON.parse(savedDrawers);
-            }
-        } catch (e) {
-            console.error("Error parsing saved drawers:", e);
-        }
-        return []; // Default to empty array
+    
+    /*** UTILITY FUNCTIONS ***/
+    
+    clearStorage: function() {
+        var self = this;
+        
+        return this.init()
+            .then(function(useIndexedDB) {
+                var promises = [];
+                
+                // Clear IndexedDB if available
+                if (useIndexedDB) {
+                    promises.push(window.App.utils.idb.clearAll());
+                }
+                
+                // Always clear localStorage (synchronous)
+                try {
+                    localStorage.removeItem('electronicsComponents');
+                    localStorage.removeItem('electronicsCategories');
+                    localStorage.removeItem('electronicsViewMode');
+                    localStorage.removeItem('electronicsLowStockConfig');
+                    localStorage.removeItem('electronicsCurrencySymbol');
+                    localStorage.removeItem('electronicsShowTotalValue');
+                    localStorage.removeItem('electronicsFootprints');
+                    localStorage.removeItem('electronicsLocations');
+                    localStorage.removeItem('electronicsDrawers');
+                    localStorage.removeItem('electronicsCells');
+                    localStorage.removeItem('electronicsItemsPerPage');
+                    console.log("LocalStorage cleared");
+                } catch (err) {
+                    console.error("Error clearing localStorage:", err);
+                    return false;
+                }
+                
+                // Wait for all promises to resolve
+                return Promise.all(promises)
+                    .then(function() {
+                        console.log("All storage cleared");
+                        return true;
+                    })
+                    .catch(function(err) {
+                        console.error("Error clearing all storage:", err);
+                        return false;
+                    });
+            });
     },
-
-    saveDrawers: (drawers) => {
-        try {
-            if (Array.isArray(drawers)) {
-                localStorage.setItem('electronicsDrawers', JSON.stringify(drawers));
-                console.log('Saved drawers to localStorage:', drawers.length);
-                return true;
-            }
-        } catch (e) {
-            console.error("Error saving drawers to localStorage:", e);
-        }
-        return false;
-    },
-
-    loadCells: () => {
-        try {
-            const savedCells = localStorage.getItem('electronicsCells');
-            if (savedCells) {
-                const parsedCells = JSON.parse(savedCells);
-                // Set default availability for any cell that doesn't have it
-                return parsedCells.map(cell => ({
-                    ...cell,
-                    available: cell.available !== undefined ? cell.available : true
-                }));
-            }
-        } catch (e) {
-            console.error("Error parsing saved cells:", e);
-        }
-        return []; // Default to empty array
-    },
-
-    saveCells: (cells) => {
-        try {
-            if (Array.isArray(cells)) {
-                localStorage.setItem('electronicsCells', JSON.stringify(cells));
-                console.log('Saved cells to localStorage:', cells.length);
-                return true;
-            }
-        } catch (e) {
-            console.error("Error saving cells to localStorage:", e);
-        }
-        return false;
-    },
-
-    /**
-     * Clear all electronics inventory related data from localStorage.
-     * @returns {boolean} True if cleared successfully, false otherwise.
-     */
-    clearStorage: () => {
-        try {
-            // Clear all related items one by one
-            localStorage.removeItem('electronicsComponents');
-            localStorage.removeItem('electronicsCategories');
-            localStorage.removeItem('electronicsViewMode');
-            localStorage.removeItem('electronicsLowStockConfig');
-            localStorage.removeItem('electronicsCurrencySymbol');
-            localStorage.removeItem('electronicsShowTotalValue');
-            localStorage.removeItem('electronicsFootprints');
-            localStorage.removeItem('electronicsLocations');
-            localStorage.removeItem('electronicsDrawers');
-            localStorage.removeItem('electronicsCells');
-
-            console.log('All localStorage items cleared');
-            return true;
-        } catch (e) {
-            console.error("Error clearing localStorage:", e);
-            return false;
-        }
-    },
-
-    /**
-     * For debugging - dump all electronics-related localStorage contents to console
-     */
-    debugStorage: () => {
-        try {
-            console.log('==== Electronics Inventory localStorage Debug ====');
-            console.log('Components:', localStorage.getItem('electronicsComponents'));
-            console.log('Categories:', localStorage.getItem('electronicsCategories'));
-            console.log('View Mode:', localStorage.getItem('electronicsViewMode'));
-            console.log('Low Stock Config:', localStorage.getItem('electronicsLowStockConfig'));
-            console.log('Currency Symbol:', localStorage.getItem('electronicsCurrencySymbol'));
-            console.log('Show Total Value:', localStorage.getItem('electronicsShowTotalValue'));
-            console.log('Locations:', localStorage.getItem('electronicsLocations'));
-            console.log('=================================================');
-        } catch (e) {
-            console.error("Error debugging localStorage:", e);
-        }
+    
+    migrateToIndexedDB: function() {
+        var self = this;
+        
+        return this.init()
+            .then(function(useIndexedDB) {
+                if (!useIndexedDB) {
+                    console.log("IndexedDB not available for migration");
+                    return false;
+                }
+                
+                var promises = [];
+                var idb = window.App.utils.idb;
+                
+                // Migrate components
+                var components = self._loadComponentsFromLocalStorage();
+                if (components.length > 0) {
+                    promises.push(idb.saveComponents(components)
+                        .then(function(success) {
+                            return { type: 'components', count: components.length, success: success };
+                        }));
+                }
+                
+                // Migrate locations
+                var locations = self._loadLocationsFromLocalStorage();
+                if (locations.length > 0) {
+                    promises.push(idb.saveLocations(locations)
+                        .then(function(success) {
+                            return { type: 'locations', count: locations.length, success: success };
+                        }));
+                }
+                
+                // Migrate drawers
+                var drawers = self._loadDrawersFromLocalStorage();
+                if (drawers.length > 0) {
+                    promises.push(idb.saveDrawers(drawers)
+                        .then(function(success) {
+                            return { type: 'drawers', count: drawers.length, success: success };
+                        }));
+                }
+                
+                // Migrate cells
+                var cells = self._loadCellsFromLocalStorage();
+                if (cells.length > 0) {
+                    promises.push(idb.saveCells(cells)
+                        .then(function(success) {
+                            return { type: 'cells', count: cells.length, success: success };
+                        }));
+                }
+                
+                // Wait for all migrations to complete
+                return Promise.all(promises)
+                    .then(function(results) {
+                        console.log("Migration results:", results);
+                        return results.some(function(r) { return r.success; });
+                    })
+                    .catch(function(err) {
+                        console.error("Error during migration:", err);
+                        return false;
+                    });
+            });
     }
 };
 
-console.log("Storage utilities loaded."); // For debugging
+console.log("storage.js loaded successfully");

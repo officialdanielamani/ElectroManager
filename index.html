@@ -87,114 +87,213 @@
                     || 'light'
             );
 
-            //const [showAddDrawerForm, setShowAddDrawerForm] = useState(false);
-
             // --- Effects ---
-
-            // Load data from localStorage on initial render
-            // Load data from IndexedDB / localStorage on first render
             useEffect(() => {
-                (async () => {
-                    console.log("Initial load effect running.");
+                console.log("Initial load effect running with proper data ordering...");
 
-                    /*  Components & Locations come from IndexedDB */
-                    const loadedComponents = await storage.loadComponents();
-                    setComponents(loadedComponents);
+                // Initialize storage first
+                storage.init()
+                    .then(function () {
+                        console.log("Storage system initialized");
 
-                    const loadedLocations = await storage.loadLocations();
-                    setLocations(loadedLocations);
+                        // We want to load all data before setting state
+                        // This prevents partial state updates causing problems with references
+                        Promise.all([
+                            storage.loadComponents(),
+                            storage.loadLocations(),
+                            storage.loadDrawers(),
+                            storage.loadCells()
+                        ])
+                            .then(function (results) {
+                                // Destructure results
+                                var [loadedComponents, loadedLocations, loadedDrawers, loadedCells] = results;
 
-                    /*  Everything else is still sync/localStorage */
-                    const config = storage.loadConfig();
-                    setCategories(config.categories);
-                    setViewMode(config.viewMode);
-                    setLowStockConfig(config.lowStockConfig);
-                    setCurrencySymbol(config.currencySymbol);
-                    setShowTotalValue(config.showTotalValue);
-                    setFootprints(config.footprints || []);
-                    setItemsPerPage(config.itemsPerPage || 'all');
+                                console.log("Loaded all data:", {
+                                    components: loadedComponents.length,
+                                    locations: loadedLocations.length,
+                                    drawers: loadedDrawers.length,
+                                    cells: loadedCells.length
+                                });
 
-                    /* Theme handling unchanged */
-                    if ((config.theme || 'dark') !== theme) setTheme(config.theme);
-                    window.App.utils.UI.setTheme(config.theme || theme);
+                                // Now set all state at once to maintain consistency
+                                setComponents(loadedComponents);
+                                setLocations(loadedLocations);
+                                setDrawers(loadedDrawers);
+                                setCells(loadedCells);
 
-                    /* Drawers / cells still on localStorage */
-                    setDrawers(storage.loadDrawers() || []);
-                    setCells(storage.loadCells() || []);
+                                // Load config (synchronous)
+                                var config = storage.loadConfig();
+                                setCategories(config.categories || []);
+                                setViewMode(config.viewMode || 'table');
+                                setLowStockConfig(config.lowStockConfig || {});
+                                setCurrencySymbol(config.currencySymbol || 'RM');
+                                setShowTotalValue(config.showTotalValue || false);
+                                setFootprints(config.footprints || []);
+                                setItemsPerPage(config.itemsPerPage || 'all');
 
-                    /*  Category fallback re-uses loadedComponents */
-                    if (config.categories.length === 0 && loadedComponents.length > 0) {
-                        const derived = [...new Set(loadedComponents.map(c => c.category).filter(Boolean))];
-                        if (derived.length) setCategories(derived);
-                    }
+                                // Handle theme
+                                if ((config.theme || 'dark') !== theme) {
+                                    setTheme(config.theme || 'dark');
+                                }
 
-                    console.log("Initial load complete.");
-                })();
-            }, []);          // still “run once”
+                                window.App.utils.UI.setTheme(config.theme || theme || 'dark');
 
-// 2️⃣ initialise Cells (and add default availability flag)
-useEffect(() => {
-    (async () => {
-        let loadedCells = await storage.loadCells();   // ← await the Promise
+                                // Category fallback
+                                if ((!config.categories || config.categories.length === 0) && loadedComponents.length > 0) {
+                                    var derived = [...new Set(loadedComponents.map(function (c) {
+                                        return c.category;
+                                    }).filter(Boolean))];
 
-        // ensure every cell has `.available`
-        loadedCells = loadedCells.map(cell => ({
-            ...cell,
-            available: cell.available !== undefined ? cell.available : true
-        }));
+                                    if (derived.length) {
+                                        console.log("Derived categories:", derived.length);
+                                        setCategories(derived);
+                                    }
+                                }
 
-        setCells(loadedCells);
-    })();
-}, []);   // still runs once on mount
+                                console.log("Initial data load complete");
+                            });
+                    })
+                    .catch(function (err) {
+                        console.error("Error during initialization:", err);
+                    });
+            }, []); // Only run once
 
-useEffect(() => {
-    (async () => setDrawers(await storage.loadDrawers()))();
-}, []);
+            useEffect(() => { (async () => setDrawers(await storage.loadDrawers()))(); }, []);
+            useEffect(() => { (async () => await storage.saveCells(cells))(); }, [cells]);
+            useEffect(() => { (async () => await storage.saveDrawers(drawers))(); }, [drawers]);
 
-useEffect(() => { (async () => await storage.saveCells(cells))(); }, [cells]);
-useEffect(() => { (async () => await storage.saveDrawers(drawers))(); }, [drawers]);
-
-
-
+            // ---------- FOR COMPONENTS ----------
             useEffect(() => {
-                if (drawers.length) {
-                    storage.saveDrawers(drawers);          // still sync (localStorage)
-                }
-            }, [drawers]);
+                if (!components.length) return;
 
+                // We use a delay to avoid multiple rapid saves during initialization
+                var saveTimeout = setTimeout(function () {
+                    console.log("Saving components...", components.length);
+
+                    storage.saveComponents(components)
+                        .then(function (success) {
+                            if (success) {
+                                console.log("Components saved successfully");
+                            } else {
+                                console.warn("Failed to save components");
+                            }
+                        })
+                        .catch(function (err) {
+                            console.error("Error saving components:", err);
+                        });
+                }, 300); // Small delay to batch rapid changes
+
+                // Clear timeout on unmount
+                return function cleanup() {
+                    clearTimeout(saveTimeout);
+                };
+            }, [components]);
+
+            // ---------- FOR LOCATIONS ----------
             useEffect(() => {
-                if (cells.length) {
-                    storage.saveCells(cells);              // still sync
-                }
+                if (!locations.length) return;
+
+                // We use a delay to avoid multiple rapid saves during initialization
+                var saveTimeout = setTimeout(function () {
+                    console.log("Saving locations...", locations.length);
+
+                    storage.saveLocations(locations)
+                        .then(function (success) {
+                            if (success) {
+                                console.log("Locations saved successfully");
+
+                                // After locations are saved, make sure drawers are also saved
+                                // to ensure references are maintained
+                                if (drawers.length) {
+                                    return storage.saveDrawers(drawers);
+                                }
+                            } else {
+                                console.warn("Failed to save locations");
+                            }
+                        })
+                        .catch(function (err) {
+                            console.error("Error saving locations:", err);
+                        });
+                }, 300); // Small delay to batch rapid changes
+
+                // Clear timeout on unmount
+                return function cleanup() {
+                    clearTimeout(saveTimeout);
+                };
+            }, [locations]);
+
+            // ---------- FOR DRAWERS ----------
+            useEffect(() => {
+                if (!drawers.length) return;
+
+                // We use a delay to avoid multiple rapid saves during initialization
+                var saveTimeout = setTimeout(function () {
+                    console.log("Saving drawers...", drawers.length);
+
+                    storage.saveDrawers(drawers)
+                        .then(function (success) {
+                            if (success) {
+                                console.log("Drawers saved successfully");
+
+                                // After drawers are saved, make sure cells are also saved
+                                // to ensure references are maintained
+                                if (cells.length) {
+                                    return storage.saveCells(cells);
+                                }
+                            } else {
+                                console.warn("Failed to save drawers");
+                            }
+                        })
+                        .catch(function (err) {
+                            console.error("Error saving drawers:", err);
+                        });
+                }, 300); // Small delay to batch rapid changes
+
+                // Clear timeout on unmount
+                return function cleanup() {
+                    clearTimeout(saveTimeout);
+                };
+            }, [drawers, cells]);
+
+            // ---------- FOR CELLS ----------
+            useEffect(() => {
+                if (!cells.length) return;
+
+                // We use a delay to avoid multiple rapid saves during initialization
+                var saveTimeout = setTimeout(function () {
+                    console.log("Saving cells...", cells.length);
+
+                    storage.saveCells(cells)
+                        .then(function (success) {
+                            if (success) {
+                                console.log("Cells saved successfully");
+                            } else {
+                                console.warn("Failed to save cells");
+                            }
+                        })
+                        .catch(function (err) {
+                            console.error("Error saving cells:", err);
+                        });
+                }, 300); // Small delay to batch rapid changes
+
+                // Clear timeout on unmount
+                return function cleanup() {
+                    clearTimeout(saveTimeout);
+                };
             }, [cells]);
 
-            useEffect(() => {
-                (async () => {
-                    if (locations.length) {
-                        await storage.saveLocations(locations);  // async (IndexedDB)
-                    }
-                })();
-            }, [locations]);
+            const saveComponentsCallback = useCallback(() => {
+                storage.saveComponents(components);
+            }, [components]);
 
             const handleItemsPerPageChange = useCallback((value) => {
                 setItemsPerPage(value);
             }, []);
 
-            // Save components to localStorage whenever they change
-            // Use useCallback for stability if passed as dependency elsewhere, though not strictly needed here
-            const saveComponentsCallback = useCallback(() => {
-                storage.saveComponents(components);
-            }, [components]);
-
-
+            // Save configuration changes 
+            // For configuration (still synchronous)
             useEffect(() => {
-                // Save components whenever the list changes
-                saveComponentsCallback();
-            }, [components, saveComponentsCallback]);
-
-            // Save configuration changes to localStorage
-            useEffect(() => {
-                storage.saveConfig({
+                var config = {
                     categories,
                     viewMode,
                     lowStockConfig,
@@ -202,8 +301,15 @@ useEffect(() => { (async () => await storage.saveDrawers(drawers))(); }, [drawer
                     showTotalValue,
                     footprints,
                     itemsPerPage,
-                    theme // Add theme to saved config
-                });
+                    theme
+                };
+
+                var success = storage.saveConfig(config);
+                if (success) {
+                    console.log("Config saved to localStorage");
+                } else {
+                    console.warn("Failed to save config");
+                }
             }, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]);
 
             const saveConfigCallback = useCallback(() => {
@@ -1454,34 +1560,39 @@ useEffect(() => { (async () => await storage.saveDrawers(drawers))(); }, [drawer
                     setImportError("❌ Config save threw an error.");
                 }
             };
-            const handleClearLS = () => {
-                clearStatusMessages();
-                if (window.confirm('Are you sure you want to clear ALL inventory data and settings from local storage? This action cannot be undone.')) {
-                    if (storage.clearStorage()) {
-                        // Reset ALL state values to defaults
-                        setComponents([]);
-                        setCategories([]);
-                        setLowStockConfig({});
-                        setViewMode('table');
-                        setSelectedCategory('all');
-                        setSearchTerm('');
-                        setJsonData('');
-                        setImportError('');
-                        setCurrencySymbol('$');
-                        setShowTotalValue(false);
-                        setSelectedComponents([]);
 
-                        // Also reset locations, drawers, and cells
-                        setLocations([]);
-                        setDrawers([]);
-                        setCells([]);
+            const handleClearLS = async () => {
+                clearStatusMessages(); // Your existing function
 
-                        // Reset footprints
-                        setFootprints([]);
+                if (window.confirm('Are you sure you want to clear ALL inventory data and settings? This action cannot be undone.')) {
+                    try {
+                        const cleared = await storage.clearStorage();
 
-                        setExportMessage('Local storage cleared successfully! Application state reset.');
-                    } else {
-                        setImportError('An error occurred while trying to clear local storage.');
+                        if (cleared) {
+                            // Reset ALL state values to defaults
+                            setComponents([]);
+                            setCategories([]);
+                            setLowStockConfig({});
+                            setViewMode('table');
+                            setSelectedCategory('all');
+                            setSearchTerm('');
+                            setJsonData('');
+                            setImportError('');
+                            setCurrencySymbol('$');
+                            setShowTotalValue(false);
+                            setSelectedComponents([]);
+                            setLocations([]);
+                            setDrawers([]);
+                            setCells([]);
+                            setFootprints([]);
+
+                            setExportMessage('All storage cleared successfully! Application state reset.');
+                        } else {
+                            setImportError('An error occurred while trying to clear storage.');
+                        }
+                    } catch (err) {
+                        console.error("Error clearing storage:", err);
+                        setImportError(`Error clearing storage: ${err.message}`);
                     }
                 }
             };
@@ -1572,10 +1683,10 @@ useEffect(() => { (async () => await storage.saveDrawers(drawers))(); }, [drawer
                         currencySymbol: currencySymbol,
                         showTotalValue: showTotalValue,
                         selectedComponents: selectedComponents,
-                        drawers:    drawers,     
-                        cells:     cells,       
-                        locations:  locations,
-                        footprints: footprints,   
+                        drawers: drawers,
+                        cells: cells,
+                        locations: locations,
+                        footprints: footprints,
                         selectedLocation: selectedLocation,
                         itemsPerPage: itemsPerPage,
 
