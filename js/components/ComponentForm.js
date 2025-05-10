@@ -33,7 +33,6 @@ window.App.components.ComponentForm = ({
     const [showStorageSelector, setShowStorageSelector] = useState(false);
     const [selectedCells, setSelectedCells] = useState([]);
     const [selectedDrawerId, setSelectedDrawerId] = useState('');
-    const [loading, setLoading] = useState(false);
 
     // Update internal state if the componentData prop changes (e.g., when opening the modal)
     useEffect(() => {
@@ -270,15 +269,7 @@ window.App.components.ComponentForm = ({
     // Handle form submission
     const handleSubmit = (e) => {
         e.preventDefault(); // Prevent default form submission
-        
-        // Show loading state
-        setLoading(true);
-        
-        // Wrap in setTimeout to show loading state
-        setTimeout(() => {
-            onSave(formData); // Pass the current form data to the parent save handler
-            setLoading(false);
-        }, 300);
+        onSave(formData); // Pass the current form data to the parent save handler
     };
 
     // Generate grid elements for drawer cells
@@ -352,19 +343,6 @@ window.App.components.ComponentForm = ({
 
     // --- Render ---
     return (
-
-        loading && React.createElement('div', { 
-            className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40" 
-        },
-            React.createElement('div', { 
-                className: "bg-white p-4 rounded-lg shadow-xl" 
-            },
-                React.createElement('div', { 
-                    className: "w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" 
-                })
-            )
-        ),
-        
         React.createElement('div', { className: UI.modals.backdrop },
             React.createElement('div', { className: UI.modals.container },
                 // Header
@@ -405,8 +383,7 @@ window.App.components.ComponentForm = ({
                                 className: UI.forms.input,
                                 value: formData.name || '',
                                 onChange: handleChange,
-                                required: true,
-                                disabled: loading
+                                required: true
                             })
                         ),
                         // Category Select/Input
@@ -418,8 +395,7 @@ window.App.components.ComponentForm = ({
                                 className: UI.forms.select,
                                 value: formData.category || '',
                                 onChange: handleCategoryChange,
-                                required: true,
-                                disabled: loading
+                                required: true
                             },
                                 React.createElement('option', { value: "" }, "-- Select category --"),
                                 (categories || []).sort().map(cat => React.createElement('option', { key: cat, value: cat }, cat)),
@@ -432,8 +408,7 @@ window.App.components.ComponentForm = ({
                                 className: UI.forms.input,
                                 value: formData.customCategory || '',
                                 onChange: handleChange,
-                                required: true,
-                                disabled: loading
+                                required: true
                             })
                         ),
                         // Type Input
@@ -446,8 +421,7 @@ window.App.components.ComponentForm = ({
                                 className: UI.forms.input,
                                 value: formData.type || '',
                                 onChange: handleChange,
-                                placeholder: "e.g., Resistor, LM7805",
-                                disabled: loading
+                                placeholder: "e.g., Resistor, LM7805"
                             })
                         ),
                         // Quantity Input
@@ -460,8 +434,7 @@ window.App.components.ComponentForm = ({
                                 min: "0",
                                 className: UI.forms.input,
                                 value: formData.quantity || 0,
-                                onChange: handleChange,
-                                disabled: loading
+                                onChange: handleChange
                             })
                         ),
                         // Price Input
@@ -476,8 +449,7 @@ window.App.components.ComponentForm = ({
                                 className: UI.forms.input,
                                 value: formData.price || 0,
                                 onChange: handleChange,
-                                placeholder: "0.00",
-                                disabled: loading
+                                placeholder: "0.00"
                             })
                         ),
 
@@ -502,8 +474,7 @@ window.App.components.ComponentForm = ({
                                         name: "locationId",
                                         className: UI.forms.select,
                                         value: formData.locationInfo?.locationId || '',
-                                        onChange: handleLocationChange,
-                                        disabled: loading
+                                        onChange: handleLocationChange
                                     },
                                         React.createElement('option', { value: "" }, "-- No location assigned --"),
                                         locations.map(loc => React.createElement('option', { key: loc.id, value: loc.id }, loc.name))
@@ -519,8 +490,7 @@ window.App.components.ComponentForm = ({
                                         className: UI.forms.input,
                                         value: formData.locationInfo?.details || '',
                                         onChange: handleLocationChange,
-                                        placeholder: "e.g., Shelf 3, Box A",
-                                        disabled: loading
+                                        placeholder: "e.g., Shelf 3, Box A"
                                     })
                                 )
                             ),
@@ -541,8 +511,7 @@ window.App.components.ComponentForm = ({
                                         name: "locationId",
                                         className: UI.forms.select,
                                         value: formData.storageInfo?.locationId || '',
-                                        onChange: handleStorageLocationChange,
-                                        disabled: loading
+                                        onChange: handleStorageLocationChange
                                     },
                                         React.createElement('option', { value: "" }, "-- Select location --"),
                                         locations.map(loc => React.createElement('option', { key: loc.id, value: loc.id }, loc.name))
@@ -561,8 +530,7 @@ window.App.components.ComponentForm = ({
                                             name: "drawerId",
                                             className: UI.forms.select,
                                             value: selectedDrawerId,
-                                            onChange: handleDrawerChange,
-                                            disabled: loading
+                                            onChange: handleDrawerChange
                                         },
                                             React.createElement('option', { value: "" }, "-- Select drawer --"),
                                             filteredDrawers.map(drawer => React.createElement('option', { key: drawer.id, value: drawer.id }, drawer.name))
@@ -617,8 +585,7 @@ window.App.components.ComponentForm = ({
                                 name: "footprint",
                                 className: UI.forms.select,
                                 value: formData.footprint || '',
-                                onChange: handleFootprintChange,
-                                disabled: loading
+                                onChange: handleFootprintChange
                             },
                                 React.createElement('option', { value: "" }, "-- Select footprint --"),
                                 React.createElement('option', { value: "__custom__" }, "Custom footprint..."),
@@ -631,8 +598,7 @@ window.App.components.ComponentForm = ({
                                 className: UI.forms.input,
                                 value: formData.customFootprint || '',
                                 onChange: handleChange,
-                                required: true,
-                                disabled: loading
+                                required: true
                             })
                         ),
                         // Info Input
@@ -645,8 +611,7 @@ window.App.components.ComponentForm = ({
                                 className: UI.forms.input,
                                 value: formData.info || '',
                                 onChange: handleChange,
-                                placeholder: "e.g., Voltage regulation",
-                                disabled: loading
+                                placeholder: "e.g., Voltage regulation"
                             })
                         ),
                         // Datasheets Textarea
@@ -659,8 +624,7 @@ window.App.components.ComponentForm = ({
                                 rows: "3",
                                 value: formData.datasheets || '',
                                 onChange: handleChange,
-                                placeholder: "One URL per line or comma-separated...",
-                                disabled: loading
+                                placeholder: "One URL per line or comma-separated..."
                             }),
                             React.createElement('p', { className: UI.forms.hint }, "Enter full URLs (http:// or https://).")
                         ),
@@ -676,8 +640,7 @@ window.App.components.ComponentForm = ({
                                         className: UI.forms.input,
                                         value: formData.image || '',
                                         onChange: handleImageUrlChange,
-                                        placeholder: "https://example.com/image.jpg",
-                                        disabled: loading
+                                        placeholder: "https://example.com/image.jpg"
                                     }),
                                     React.createElement('p', { className: UI.forms.hint }, "Optional direct link to image.")
                                 ),
@@ -710,8 +673,7 @@ window.App.components.ComponentForm = ({
                                 rows: "5",
                                 value: formData.parameters || '',
                                 onChange: handleChange,
-                                placeholder: "One per line:\nVoltage: 5V\nTolerance: 5%",
-                                disabled: loading
+                                placeholder: "One per line:\nVoltage: 5V\nTolerance: 5%"
                             }),
                             React.createElement('p', { className: UI.forms.hint }, "Format: \"Name: Value\".")
                         ),
@@ -729,7 +691,6 @@ window.App.components.ComponentForm = ({
                                         name: "favorite",
                                         type: "checkbox",
                                         checked: formData.favorite || false,
-                                        disabled: loading,
                                         onChange: (e) => handleChange({
                                             target: { name: "favorite", value: e.target.checked }
                                         }),
@@ -761,7 +722,6 @@ window.App.components.ComponentForm = ({
                                         name: "bookmark",
                                         type: "checkbox",
                                         checked: formData.bookmark || false,
-                                        disabled: loading,
                                         onChange: (e) => handleChange({
                                             target: { name: "bookmark", value: e.target.checked }
                                         }),
@@ -791,7 +751,6 @@ window.App.components.ComponentForm = ({
                                         name: "star",
                                         type: "checkbox",
                                         checked: formData.star || false,
-                                        disabled: loading,
                                         onChange: (e) => handleChange({
                                             target: { name: "star", value: e.target.checked }
                                         }),
@@ -822,8 +781,7 @@ window.App.components.ComponentForm = ({
                     React.createElement('button', {
                         type: "button",
                         className: UI.buttons.secondary,
-                        onClick: onCancel,
-                        disabled: loading
+                        onClick: onCancel
                     }, "Cancel"),
 
                     // Use button type="submit" to trigger the form's onSubmit
@@ -831,9 +789,8 @@ window.App.components.ComponentForm = ({
                         type: "submit",
                         formNoValidate: true,
                         onClick: handleSubmit,
-                        className: UI.buttons.primary,
-                        disabled: loading
-                    }, loading ? (isEditMode ? 'Saving...' : 'Adding...') : (isEditMode ? 'Save Changes' : 'Add Component'))                    
+                        className: UI.buttons.primary
+                    }, isEditMode ? 'Save Changes' : 'Add Component')
                 ),
             ), // End Form Body
         ) // End Modal Backdrop

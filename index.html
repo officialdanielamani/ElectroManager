@@ -7,11 +7,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Electronics Inventory (Modular)</title>
 
-    <script src="js/external/tailwind.js"></script>
-    <script src="js/external/react18.development.js"></script>
-    <script src="js/external/react-dom18.development.js"></script>
-    <script src="js/external/babel.min.js"></script>
-
     <!--
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -19,6 +14,7 @@
     <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 -->
     <script src="js/utils/helpers.js"></script>
+    <script src="js/utils/idb.js"></script>
     <script src="js/utils/storage.js"></script>
     <script src="js/utils/ui-constants.js"></script>
 
@@ -34,6 +30,12 @@
     <script src="js/components/DrawerView.js"></script>
     <script src="js/components/DrawerPage.js"></script>
     <script src="js/components/ThemeSwitcher.js"></script>
+
+
+    <script src="js/external/tailwind.js"></script>
+    <script src="js/external/react18.development.js"></script>
+    <script src="js/external/react-dom18.development.js"></script>
+    <script src="js/external/babel.min.js"></script>
 </head>
 
 <body>
@@ -78,212 +80,155 @@
             const [cells, setCells] = useState([]);
             const [viewingDrawerId, setViewingDrawerId] = useState(null);
             const [itemsPerPage, setItemsPerPage] = useState('all');
-            const [dbInitialized, setDbInitialized] = useState(false);
-            const [appReady, setAppReady] = useState(false);
             const [appTheme, setAppTheme] = useState(window.App.utils.UI.currentTheme);
             const [theme, setTheme] = useState(
                 () => storage.loadConfig().theme
                     || window.App.utils.UI.currentTheme
                     || 'light'
             );
+
+            //const [showAddDrawerForm, setShowAddDrawerForm] = useState(false);
+
             // --- Effects ---
-            useEffect(() => {
-                console.log("Initial load effect running...");
 
-                const loadAllData = async () => {
-        try {
-            // Load components
-            const componentsData = await storage.loadComponents();
-            setComponents(componentsData);
-            
-            // Load config
-            const config = await storage.loadConfig();
-            setCategories(config.categories);
-            setViewMode(config.viewMode);
-            setLowStockConfig(config.lowStockConfig);
-            setCurrencySymbol(config.currencySymbol);
-            setShowTotalValue(config.showTotalValue);
-            setFootprints(config.footprints || []);
-            setItemsPerPage(config.itemsPerPage || 'all');
-            
-            // Apply theme
-            const themeToUse = config.theme || 'light';
-            setTheme(themeToUse);
-            window.App.utils.UI.setTheme(themeToUse);
-            
-            // Load locations, drawers, and cells
-            const locationsData = await storage.loadLocations();
-            setLocations(locationsData || []);
-            
-            const drawersData = await storage.loadDrawers();
-            setDrawers(drawersData || []);
-            
-            const cellsData = await storage.loadCells();
-            setCells(cellsData || []);
-            
-            // Handle derived categories if needed
-            if (config.categories.length === 0 && componentsData.length > 0) {
-                const derivedCategories = [...new Set(componentsData.map(item => item.category).filter(Boolean))];
-                if (derivedCategories.length > 0) {
-                    setCategories(derivedCategories);
-                    console.log("Derived categories from existing components.");
-                }
-            }
-            
-            console.log("All data loaded successfully");
-        } catch (error) {
-            console.error("Error loading application data:", error);
-            // Handle error appropriately
-        }
-    };
-                // Call the async function
-                loadAllData();
-            }, []); // Runs only once on mount
-
+            // Load data from localStorage on initial render
+            // Load data from IndexedDB / localStorage on first render
             useEffect(() => {
-        const initializeApp = async () => {
-            console.log("Initializing application...");
-            try {
-                // First, initialize the database system
-                const dbSuccess = await storage.init();
-                if (!dbSuccess) {
-                    console.error("Failed to initialize database");
-                    // You could show an error message to the user here
-                    return;
-                }
-                
-                setDbInitialized(true);
-                console.log("Database initialized successfully");
-                
-                // Now load all application data
-                await loadAllData();
-                
-                // Mark the app as fully ready
-                setAppReady(true);
-                console.log("Application ready");
-            } catch (error) {
-                console.error("Error initializing application:", error);
-                // Show error message to user
-            }
-        };
-        
-        initializeApp();
-    }, []);
+                (async () => {
+                    console.log("Initial load effect running.");
 
-            useEffect(() => {
-    const loadCellsData = async () => {
-        try {
-            const cellsData = await storage.loadCells();
-            // The normalization is already done in the storage.loadCells method
-            setCells(cellsData || []);
-        } catch (error) {
-            console.error("Error loading cells:", error);
-        }
-    };
-    
-    loadCellsData();
+                    /*  Components & Locations come from IndexedDB */
+                    const loadedComponents = await storage.loadComponents();
+                    setComponents(loadedComponents);
+
+                    const loadedLocations = await storage.loadLocations();
+                    setLocations(loadedLocations);
+
+                    /*  Everything else is still sync/localStorage */
+                    const config = storage.loadConfig();
+                    setCategories(config.categories);
+                    setViewMode(config.viewMode);
+                    setLowStockConfig(config.lowStockConfig);
+                    setCurrencySymbol(config.currencySymbol);
+                    setShowTotalValue(config.showTotalValue);
+                    setFootprints(config.footprints || []);
+                    setItemsPerPage(config.itemsPerPage || 'all');
+
+                    /* Theme handling unchanged */
+                    if ((config.theme || 'dark') !== theme) setTheme(config.theme);
+                    window.App.utils.UI.setTheme(config.theme || theme);
+
+                    /* Drawers / cells still on localStorage */
+                    setDrawers(storage.loadDrawers() || []);
+                    setCells(storage.loadCells() || []);
+
+                    /*  Category fallback re-uses loadedComponents */
+                    if (config.categories.length === 0 && loadedComponents.length > 0) {
+                        const derived = [...new Set(loadedComponents.map(c => c.category).filter(Boolean))];
+                        if (derived.length) setCategories(derived);
+                    }
+
+                    console.log("Initial load complete.");
+                })();
+            }, []);          // still “run once”
+
+// 2️⃣ initialise Cells (and add default availability flag)
+useEffect(() => {
+    (async () => {
+        let loadedCells = await storage.loadCells();   // ← await the Promise
+
+        // ensure every cell has `.available`
+        loadedCells = loadedCells.map(cell => ({
+            ...cell,
+            available: cell.available !== undefined ? cell.available : true
+        }));
+
+        setCells(loadedCells);
+    })();
+}, []);   // still runs once on mount
+
+useEffect(() => {
+    (async () => setDrawers(await storage.loadDrawers()))();
 }, []);
 
-const componentCheck = () => {
-    return window.App.components && 
-           window.App.components.InventoryView &&
-           window.App.components.ComponentForm &&
-           window.App.utils &&
-           window.App.utils.UI;
-};
+useEffect(() => { (async () => await storage.saveCells(cells))(); }, [cells]);
+useEffect(() => { (async () => await storage.saveDrawers(drawers))(); }, [drawers]);
 
-useEffect(() => {
-    if (drawers.length > 0) {
-        storage.saveDrawers(drawers)
-            .then(success => {
-                if (!success) {
-                    console.warn("Failed to save drawers");
-                }
-            })
-            .catch(error => {
-                console.error("Error saving drawers:", error);
-            });
-    }
-}, [drawers]);
 
-useEffect(() => {
-    if (cells.length > 0) {
-        storage.saveCells(cells)
-            .then(success => {
-                if (!success) {
-                    console.warn("Failed to save cells");
+
+            useEffect(() => {
+                if (drawers.length) {
+                    storage.saveDrawers(drawers);          // still sync (localStorage)
                 }
-            })
-            .catch(error => {
-                console.error("Error saving cells:", error);
-            });
-    }
-}, [cells]);
+            }, [drawers]);
+
+            useEffect(() => {
+                if (cells.length) {
+                    storage.saveCells(cells);              // still sync
+                }
+            }, [cells]);
+
+            useEffect(() => {
+                (async () => {
+                    if (locations.length) {
+                        await storage.saveLocations(locations);  // async (IndexedDB)
+                    }
+                })();
+            }, [locations]);
 
             const handleItemsPerPageChange = useCallback((value) => {
                 setItemsPerPage(value);
             }, []);
 
+            // Save components to localStorage whenever they change
             // Use useCallback for stability if passed as dependency elsewhere, though not strictly needed here
             const saveComponentsCallback = useCallback(() => {
-    storage.saveComponents(components)
-        .then(success => {
-            if (!success) {
-                console.warn("Failed to save components");
-            }
-        })
-        .catch(error => {
-            console.error("Error saving components:", error);
-        });
-}, [components]);
+                storage.saveComponents(components);
+            }, [components]);
 
-            // Save configuration 
+
             useEffect(() => {
-    const config = {
-        categories,
-        viewMode,
-        lowStockConfig,
-        currencySymbol,
-        showTotalValue,
-        footprints,
-        itemsPerPage,
-        theme
-    };
-    
-    storage.saveConfig(config)
-        .then(success => {
-            if (!success) {
-                console.warn("Failed to save configuration");
-            }
-        })
-        .catch(error => {
-            console.error("Error saving configuration:", error);
-        });
-}, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]);
+                // Save components whenever the list changes
+                saveComponentsCallback();
+            }, [components, saveComponentsCallback]);
 
-const saveConfigCallback = useCallback(() => {
-    const config = {
-        categories,
-        viewMode,
-        lowStockConfig,
-        currencySymbol,
-        showTotalValue,
-        footprints,
-        itemsPerPage,
-        theme
-    };
-    
-    storage.saveConfig(config)
-        .then(success => {
-            if (!success) {
-                console.warn("Failed to save configuration");
-            }
-        })
-        .catch(error => {
-            console.error("Error saving configuration:", error);
-        });
-}, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]);
+            // Save configuration changes to localStorage
+            useEffect(() => {
+                storage.saveConfig({
+                    categories,
+                    viewMode,
+                    lowStockConfig,
+                    currencySymbol,
+                    showTotalValue,
+                    footprints,
+                    itemsPerPage,
+                    theme // Add theme to saved config
+                });
+            }, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]);
 
+            const saveConfigCallback = useCallback(() => {
+                storage.saveConfig({
+                    categories,
+                    viewMode,
+                    lowStockConfig,
+                    currencySymbol,
+                    showTotalValue,
+                    footprints,
+                    itemsPerPage,
+                    theme // Add theme property
+                });
+            }, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]); // Add theme to dependency array
+
+            useEffect(() => {
+                // Apply theme through the UI system
+                window.App.utils.UI.setTheme(theme);
+
+                // Save theme preference (handled inside setTheme too, but for extra safety)
+                localStorage.setItem('electronicsTheme', theme);
+
+                // Log theme change for debugging
+                console.log(`Theme applied: ${theme}`);
+            }, [theme]);
             // --- Helper Functions / Callbacks for Child Components ---
 
             // Get Theme
@@ -532,18 +477,10 @@ const saveConfigCallback = useCallback(() => {
             };
 
             useEffect(() => {
-    if (locations.length > 0) {
-        storage.saveLocations(locations)
-            .then(success => {
-                if (!success) {
-                    console.warn("Failed to save locations");
-                }
-            })
-            .catch(error => {
-                console.error("Error saving locations:", error);
-            });
-    }
-}, [locations]);
+                storage.saveLocations(locations);
+            }, [locations]);
+
+
 
             // --- Bulk Action Callbacks ---
             const handleToggleSelect = (id) => {
@@ -794,17 +731,37 @@ const saveConfigCallback = useCallback(() => {
             // Add handlers for drawers
             const handleAddDrawer = (newDrawer) => {
                 clearStatusMessages();
+
                 setDrawers(prev => [...prev, newDrawer]);
-                setExportMessage('Drawer added.');
+
+                const newCells = window.App.utils.helpers.generateCellsForDrawer(newDrawer);
+                setCells(prev => [...prev, ...newCells]);
+
+                setExportMessage(
+                    `Drawer “${newDrawer.name}” added with ${newCells.length} empty cell${newCells.length !== 1 ? 's' : ''}.`
+                );
             };
 
-            const handleEditDrawer = (drawerId, updatedDrawer) => {
-                clearStatusMessages();
-                setDrawers(prev => prev.map(drawer =>
-                    drawer.id === drawerId ? updatedDrawer : drawer
-                ));
-                setExportMessage('Drawer updated.');
+            const handleEditDrawer = (updated) => {
+
+                setDrawers(prev => {
+                    const list = prev.map(d => d.id === updated.id ? updated : d);
+                    storage.saveDrawers(list);
+                    return list;
+                });
+
+
+                setCells(prevCells => {
+                    const next = window.App.utils.helpers.syncCellsWithDrawer(
+                        updated,
+                        prevCells,
+                        components          // ← current components array from state
+                    );
+                    storage.saveCells(next);
+                    return next;
+                });
             };
+
 
             const handleDeleteDrawer = (drawerId) => {
                 clearStatusMessages();
@@ -1453,119 +1410,93 @@ const saveConfigCallback = useCallback(() => {
             };
 
             // --- Local Storage Callbacks ---
-            const handleSaveComponentsLS = () => {
-    clearStatusMessages();
-    setLoading(true); // Add a loading state if you have one
-
-    storage.saveComponents(components)
-        .then(success => {
-            setLoading(false);
-            if (success) {
-                setExportMessage('Component data force-saved to database.');
-            } else {
-                setImportError('Error force-saving components to database.');
-            }
-        })
-        .catch(error => {
-            setLoading(false);
-            setImportError(`Error saving: ${error.message}`);
-            console.error("Save error:", error);
-        });
-};
-
-            const handleSaveConfigLS = () => {
+            const handleSaveComponentsLS = async () => {
+                clearStatusMessages();     // ← your existing helper
+                try {
+                    // NEW: await the async helper
+                    const ok = await storage.saveComponents(components);
+                    if (ok) {
+                        setExportMessage("✅ Components saved to IndexedDB.");
+                    } else {
+                        setImportError("❌ Component save failed.");
+                    }
+                } catch (err) {
+                    console.error(err);
+                    setImportError("❌ Component save threw an error.");
+                }
+            };
+            const handleSaveConfigLS = async () => {
                 clearStatusMessages();
-                const currentConfig = { categories, viewMode, lowStockConfig, currencySymbol, showTotalValue };
-                if (storage.saveConfig(currentConfig)) {
-                    setExportMessage('Configuration force-saved to local storage.');
-                } else {
-                    setImportError('Error force-saving configuration to local storage.');
+
+                // Build the same config object you load on start-up
+                const currentConfig = {
+                    categories,
+                    viewMode,
+                    lowStockConfig,
+                    currencySymbol,
+                    showTotalValue,
+                    footprints,
+                    itemsPerPage,
+                    theme
+                };
+
+                try {
+                    // saveConfig is still synchronous (localStorage), but
+                    // awaiting it won’t hurt and keeps both handlers uniform
+                    const ok = await storage.saveConfig(currentConfig);
+                    if (ok) {
+                        setExportMessage("✅ Config saved to LocalStorage.");
+                    } else {
+                        setImportError("❌ Config save failed.");
+                    }
+                } catch (err) {
+                    console.error(err);
+                    setImportError("❌ Config save threw an error.");
                 }
             };
             const handleClearLS = () => {
-    clearStatusMessages();
-    if (window.confirm('Are you sure you want to clear ALL inventory data and settings from the database? This action cannot be undone.')) {
-        setLoading(true); // Add if you have a loading state
-        
-        storage.clearStorage()
-            .then(success => {
-                setLoading(false);
-                if (success) {
-                    // Reset ALL state values to defaults
-                    setComponents([]);
-                    setCategories([]);
-                    setLowStockConfig({});
-                    setViewMode('table');
-                    setSelectedCategory('all');
-                    setSearchTerm('');
-                    setJsonData('');
-                    setImportError('');
-                    setCurrencySymbol('$');
-                    setShowTotalValue(false);
-                    setSelectedComponents([]);
-                    setLocations([]);
-                    setDrawers([]);
-                    setCells([]);
-                    setFootprints([]);
-                    
-                    setExportMessage('Database cleared successfully! Application state reset.');
-                } else {
-                    setImportError('An error occurred while trying to clear the database.');
+                clearStatusMessages();
+                if (window.confirm('Are you sure you want to clear ALL inventory data and settings from local storage? This action cannot be undone.')) {
+                    if (storage.clearStorage()) {
+                        // Reset ALL state values to defaults
+                        setComponents([]);
+                        setCategories([]);
+                        setLowStockConfig({});
+                        setViewMode('table');
+                        setSelectedCategory('all');
+                        setSearchTerm('');
+                        setJsonData('');
+                        setImportError('');
+                        setCurrencySymbol('$');
+                        setShowTotalValue(false);
+                        setSelectedComponents([]);
+
+                        // Also reset locations, drawers, and cells
+                        setLocations([]);
+                        setDrawers([]);
+                        setCells([]);
+
+                        // Reset footprints
+                        setFootprints([]);
+
+                        setExportMessage('Local storage cleared successfully! Application state reset.');
+                    } else {
+                        setImportError('An error occurred while trying to clear local storage.');
+                    }
                 }
-            })
-            .catch(error => {
-                setLoading(false);
-                setImportError(`Error clearing database: ${error.message}`);
-                console.error("Clear storage error:", error);
-            });
-    }
-};
+            };
+
             // --- Get Local Storage Status (for display in Settings) ---
+            // This could be memoized if performance becomes an issue
+            const getLocalStorageStatus = () => ({
+                components: !!localStorage.getItem('electronicsComponents'),
+                categories: !!localStorage.getItem('electronicsCategories'),
+                viewMode: !!localStorage.getItem('electronicsViewMode'),
+                lowStockConfig: !!localStorage.getItem('electronicsLowStockConfig'),
+                currencySymbol: !!localStorage.getItem('electronicsCurrencySymbol'),
+                showTotalValue: !!localStorage.getItem('electronicsShowTotalValue'),
+            });
 
-            const getLocalStorageStatus = () => {
-    // Now we're checking IndexedDB status, but we can return a simple object
-    // since the actual status check will happen in the SettingsView component
-    return {
-        components: components.length > 0,
-        categories: categories.length > 0,
-        viewMode: !!viewMode,
-        lowStockConfig: Object.keys(lowStockConfig).length > 0,
-        currencySymbol: !!currencySymbol,
-        showTotalValue: showTotalValue !== undefined,
-    };
-};
-
-// For a more accurate status, you could add a state variable and function:
-const [dbStatus, setDbStatus] = useState({
-    components: false,
-    categories: false,
-    config: false,
-    locations: false,
-    drawers: false,
-    cells: false
-});
-
-// And add a function to update it:
-const updateDBStatus = useCallback(async () => {
-    try {
-        const componentsData = await storage.loadComponents();
-        const configData = await storage.loadConfig();
-        const locationsData = await storage.loadLocations();
-        const drawersData = await storage.loadDrawers();
-        const cellsData = await storage.loadCells();
-        
-        setDbStatus({
-            components: componentsData && componentsData.length > 0,
-            categories: configData && configData.categories && configData.categories.length > 0,
-            config: !!configData,
-            locations: locationsData && locationsData.length > 0,
-            drawers: drawersData && drawersData.length > 0,
-            cells: cellsData && cellsData.length > 0
-        });
-    } catch (error) {
-        console.error("Error checking DB status:", error);
-    }
-}, []);
 
             // --- Render ---
             return (
@@ -1641,7 +1572,10 @@ const updateDBStatus = useCallback(async () => {
                         currencySymbol: currencySymbol,
                         showTotalValue: showTotalValue,
                         selectedComponents: selectedComponents,
-                        locations: locations,
+                        drawers:    drawers,     
+                        cells:     cells,       
+                        locations:  locations,
+                        footprints: footprints,   
                         selectedLocation: selectedLocation,
                         itemsPerPage: itemsPerPage,
 
@@ -1671,6 +1605,7 @@ const updateDBStatus = useCallback(async () => {
                         jsonData: jsonData,
                         importError: importError,
                         exportMessage: exportMessage,
+                        localStorageStatus: getLocalStorageStatus(), // Pass LS status
                         footprints: footprints,
                         locations: locations,
                         components: components,

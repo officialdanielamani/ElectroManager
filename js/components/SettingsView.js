@@ -1,4 +1,4 @@
-// js/components/SettingsView.js - Updated for IndexedDB compatibility
+// js/components/SettingsView.js
 
 // Ensure the global namespace exists
 window.App = window.App || {};
@@ -7,7 +7,6 @@ window.App.components = window.App.components || {};
 /**
  * React Component for the Settings Page View.
  * Provides access to import/export, category management, low stock config, and display settings.
- * Modified to support IndexedDB operations.
  */
 window.App.components.SettingsView = ({
     // Props
@@ -38,9 +37,9 @@ window.App.components.SettingsView = ({
     onEditCategory, // Function(oldName, newName): Called to rename a category
     onDeleteCategory, // Function(category): Called to delete a category
     onAddDefaultCategory, // Function: Called to add a "Default" category
-    onSaveComponentsLS, // Function: Called to force save components to storage
-    onSaveConfigLS, // Function: Called to force save config to storage
-    onClearLS, // Function: Called to clear all storage
+    onSaveComponentsLS, // Function: Called to force save components to localStorage
+    onSaveConfigLS, // Function: Called to force save config to localStorage
+    onClearLS, // Function: Called to clear all localStorage
     onAddFootprint, // Function(newFootprint): Called to add a new footprint
     onEditFootprint, // Function(oldFootprint, newFootprint): Called to rename a footprint
     onDeleteFootprint, // Function(footprint): Called to delete a footprint
@@ -59,30 +58,8 @@ window.App.components.SettingsView = ({
         body: "text-sm text-gray-600",
         small: "text-xs text-gray-500"
     };
-    const { useState, useEffect } = React;
+    const { useState } = React;
     const { FootprintManager } = window.App.components;
-
-    // State for database status (updated for IndexedDB)
-    const [dbStatus, setDbStatus] = useState({ loading: true, status: {} });
-
-    // Load database status on component mount (for IndexedDB info display)
-    useEffect(() => {
-        // Only run if we have the helper function for database status
-        if (window.App.utils.helpers?.getDatabaseStatus) {
-            window.App.utils.helpers.getDatabaseStatus()
-                .then(status => {
-                    setDbStatus({ loading: false, status });
-                })
-                .catch(error => {
-                    setDbStatus({
-                        loading: false,
-                        status: { error: `Error getting database status: ${error.message}` }
-                    });
-                });
-        } else {
-            setDbStatus({ loading: false, status: { supported: false } });
-        }
-    }, []);
 
     // Use typography with a fallback
     const useTypography = (key) => {
@@ -177,60 +154,37 @@ window.App.components.SettingsView = ({
                 React.createElement('div', { className: UI.cards.body },
                     React.createElement('h3', { className: UI.typography.heading.h3 }, "Electro Manager"),
                     React.createElement('div', { className: "flex items-center mb-3" },
-                        React.createElement('span', { className: `${UI.typography.weight.semibold} ${UI.colors.primary.text}` }, "Version 0.2.0"),
-                        React.createElement('span', { className: `ml-2 px-2 py-1 ${UI.colors.success.bg} text-white text-xs rounded-full` }, "IndexedDB Update")
+                        React.createElement('span', { className: `${UI.typography.weight.semibold} ${UI.colors.primary.text}` }, "Version 0.1.7beta"),
+                        React.createElement('span', { className: `ml-2 px-2 py-1 ${UI.colors.success.bg} text-white text-xs rounded-full` }, "Latest Update")
                     ),
                     // Update date
-                    "Updated: 09 May 2025",
+                    "Updated: 26 April 2025",
 
                     // Changes in this version 
                     React.createElement('div', { className: "mb-4 mt-4" },
                         React.createElement('h4', { className: UI.typography.sectionTitle }, "Changes in this version:"),
                         React.createElement('ul', { className: "list-disc list-inside text-sm space-y-1 ml-2" },
-                            React.createElement('li', null, "Migrated from localStorage to IndexedDB for better performance and storage limits"),
-                            React.createElement('li', null, "Improved data normalization for component storage"),
-                            React.createElement('li', null, "Enhanced theme persistence across sessions"),
-                            React.createElement('li', null, "Added automatic data migration from localStorage"),
-                            React.createElement('li', null, "Improved error handling for storage operations"),
-                            React.createElement('li', null, "Fixed legacy storage format issues with locations and drawers"),
+                            React.createElement('li', null, "Adding advanced filtering option for better search"),
+                            React.createElement('li', null, "Remap some UI for more consistancy"),
+                            React.createElement('li', null, "Add function to assign component Location and Drawers"),
+                            React.createElement('li', null, "Import and Export the location and drawers data"),
+                            React.createElement('li', null, "Fixed error on save data for drawers and cells"),
+                            React.createElement('li', null, "Added ability to mark cells as unavailable in drawers"),
+                            React.createElement('li', null, "Added function to clear all components from a cell at once"),
+                            React.createElement('li', null, "Added view of drawer list for specific locations"),
+                            React.createElement('li', null, "Note: Card View in holding development"),
                         )
                     ),
 
                     React.createElement('div', { className: `mb-4 pt-4 ${UI.utils.borderTop}` },
                         React.createElement('h4', { className: UI.typography.sectionTitle }, "Info:"),
                         React.createElement('ul', { className: "list-disc list-inside text-sm text-red-500 space-y-1 ml-2" },
-                            React.createElement('li', null, "Data is now stored in IndexedDB for improved storage capacity"),
-                            React.createElement('li', null, "Clearing browser data will still affect your data"),
+                            React.createElement('li', null, "All data is store on your browser session, not save in cloud or 3rd party"),
+                            React.createElement('li', null, "Clear data, change browser profile or incognito will effect your file"),
                             React.createElement('li', null, "Please export the JSON data of Component and Location for your own backup"),
                             React.createElement('li', null, "This software is BETA development, don't use for mission critical application"),
                             React.createElement('li', null, "We don't held responsibilities for any data loss, harm or damage while and if using this application"),
                         ),
-                    ),
-                    // IndexedDB status
-                    React.createElement('div', { className: `mt-2 pt-2 ${UI.utils.borderTop}` },
-                        React.createElement('h4', { className: UI.typography.sectionTitle }, "Database Status:"),
-                        dbStatus.loading ?
-                            React.createElement('p', { className: `text-sm text-${UI.getThemeColors().textMuted}` }, "Loading database status...") :
-                            dbStatus.status.error ?
-                                React.createElement('p', { className: "text-sm text-red-500" }, dbStatus.status.error) :
-                                React.createElement('div', null,
-                                    React.createElement('p', { className: `text-sm text-${UI.getThemeColors().textPrimary}` },
-                                        "IndexedDB ",
-                                        dbStatus.status.supported ?
-                                            React.createElement('span', { className: "text-green-500 font-medium" }, "Supported") :
-                                            React.createElement('span', { className: "text-red-500 font-medium" }, "Not Supported")
-                                    ),
-                                    dbStatus.status.stores && Object.keys(dbStatus.status.stores).length > 0 &&
-                                    React.createElement('div', { className: "mt-1 text-sm" },
-                                        React.createElement('p', { className: `text-${UI.getThemeColors().textSecondary}` }, "Store counts:"),
-                                        Object.entries(dbStatus.status.stores).map(([store, count]) =>
-                                            React.createElement('div', { key: store, className: "flex justify-between ml-2" },
-                                                React.createElement('span', null, store),
-                                                React.createElement('span', { className: "font-medium" }, count)
-                                            )
-                                        )
-                                    )
-                                )
                     ),
                     // Credits & Info
                     React.createElement('div', { className: `mt-6 pt-4 ${UI.utils.borderTop} ${UI.typography.small}` },
@@ -326,8 +280,8 @@ window.App.components.SettingsView = ({
 
                     // Add Force Save Buttons here
                     React.createElement('div', { className: `border-t pt-4 mb-4` },
-                        React.createElement('h4', { className: UI.typography.sectionTitle }, "Database Operations"),
-                        React.createElement('p', { className: "text-xs text-yellow-500 mt-2" }, "These operations force immediate saves to the database. Use with caution."),
+                        React.createElement('h4', { className: UI.typography.sectionTitle }, "Local Storage"),
+                        React.createElement('p', { className: "text-xs text-red-500 mt-2" }, "Warn: The data is stored on browser session, if you clear browser data or incognito mode, this will wipe the data."),
                         React.createElement('div', { className: "flex flex-wrap gap-3" },
                             React.createElement('button', {
                                 onClick: onSaveComponentsLS,
@@ -424,7 +378,7 @@ window.App.components.SettingsView = ({
                                                         autoFocus: true,
                                                         onKeyDown: (e) => e.key === 'Enter' && handleSaveCategory()
                                                     }) :
-                                                    React.createElement('span', { className: UI.tables.body.cell }, category)
+                                                    React.createElement('span',  { className: UI.tables.body.cell }, category)
                                             ),
                                             // Component Count
                                             React.createElement('td', { className: `${UI.tables.body.cell} text-center` },
@@ -561,8 +515,8 @@ window.App.components.SettingsView = ({
                                                 React.createElement('th', { className: UI.tables.header.cell }, "Action")
                                             )
                                         ),
-                                        React.createElement('tbody', {
-                                            className: `divide-y divide-${UI.getThemeColors().border} bg-${UI.getThemeColors().cardBackground}`
+                                        React.createElement('tbody', { 
+                                            className: `divide-y divide-${UI.getThemeColors().border} bg-${UI.getThemeColors().cardBackground}` 
                                         },
                                             Object.entries(lowStockConfig).sort(([catA], [catB]) => catA.localeCompare(catB)).map(([category, threshold]) =>
                                                 React.createElement('tr', { key: category, className: UI.tables.body.row },
@@ -625,96 +579,14 @@ window.App.components.SettingsView = ({
                         )
                     )
                 )
-            ),
+            ), // End Display Settings Section
 
-            // End Display Settings Section
-
-            // --- Database Management Section (renamed from Local Storage) ---
+            // --- Local Storage Management Section ---
             React.createElement('div', { className: UI.cards.container },
-                React.createElement('h2', { className: `${UI.typography.heading.h2} ${UI.cards.header}` }, "Database Management"),
+                React.createElement('h2', { className: `${UI.typography.heading.h2} ${UI.cards.header}` }, "Local Storage Management"),
                 React.createElement('div', { className: UI.cards.body },
-                    // Storage Status Display - Updated for IndexedDB
-                    React.createElement('div', { className: `${UI.colors.background.alt} p-4 ${UI.utils.rounded} ${UI.utils.border} mb-4` },
-                        React.createElement('h4', { className: UI.typography.sectionTitle }, "Current Database Status"),
-                        React.createElement('ul', { className: "list-disc list-inside text-sm text-gray-700 space-y-1" },
-                            React.createElement('li', null, "Components: ",
-                                React.createElement('span', {
-                                    className: `font-semibold ${localStorageStatus.components ? UI.colors.success.text : UI.colors.danger.text}`
-                                }, localStorageStatus.components ? 'Yes' : 'No')
-                            ),
-                            React.createElement('li', null, "Categories: ",
-                                React.createElement('span', {
-                                    className: `font-semibold ${localStorageStatus.categories ? UI.colors.success.text : UI.colors.danger.text}`
-                                }, localStorageStatus.categories ? 'Yes' : 'No')
-                            ),
-                            React.createElement('li', null, "View Mode: ",
-                                React.createElement('span', {
-                                    className: `font-semibold ${localStorageStatus.viewMode ? UI.colors.success.text : UI.colors.danger.text}`
-                                }, localStorageStatus.viewMode ? 'Yes' : 'No')
-                            ),
-                            React.createElement('li', null, "Low Stock Config: ",
-                                React.createElement('span', {
-                                    className: `font-semibold ${localStorageStatus.lowStockConfig ? UI.colors.success.text : UI.colors.danger.text}`
-                                }, localStorageStatus.lowStockConfig ? 'Yes' : 'No')
-                            ),
-                            React.createElement('li', null, "Currency Symbol: ",
-                                React.createElement('span', {
-                                    className: `font-semibold ${localStorageStatus.currencySymbol ? UI.colors.success.text : UI.colors.danger.text}`
-                                }, localStorageStatus.currencySymbol ? 'Yes' : 'No')
-                            ),
-                            React.createElement('li', null, "Show Total Value: ",
-                                React.createElement('span', {
-                                    className: `font-semibold ${localStorageStatus.showTotalValue ? UI.colors.success.text : UI.colors.danger.text}`
-                                }, localStorageStatus.showTotalValue ? 'Yes' : 'No')
-                            ),
-                            React.createElement('li', null, "Footprints: ",
-                                React.createElement('span', {
-                                    className: `font-semibold ${footprints && footprints.length > 0 ? UI.colors.success.text : UI.colors.danger.text}`
-                                }, footprints && footprints.length > 0 ? 'Yes' : 'No')
-                            ),
-                            React.createElement('li', null, "Locations: ",
-                                React.createElement('span', {
-                                    className: `font-semibold ${locations && locations.length > 0 ? UI.colors.success.text : UI.colors.danger.text}`
-                                }, locations && locations.length > 0 ? 'Yes' : 'No')
-                            ),
-                            // IndexedDB Specific status items
-                            React.createElement('li', null, "Database Type: ",
-                                React.createElement('span', {
-                                    className: `font-semibold ${UI.colors.primary.text}`
-                                }, "IndexedDB")
-                            )
-                        )
-                    ),
 
-                    // Storage Statistics
-                    React.createElement('div', { className: `${UI.colors.background.alt} p-4 ${UI.utils.rounded} ${UI.utils.border} mb-4` },
-                        React.createElement('h4', { className: UI.typography.sectionTitle }, "Database Statistics"),
-                        React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-4 mt-3" },
-                            // Left column - counts
-                            React.createElement('div', null,
-                                React.createElement('ul', { className: "space-y-1 text-sm" },
-                                    React.createElement('li', { className: "flex justify-between" },
-                                        React.createElement('span', null, "Components:"),
-                                        React.createElement('span', { className: `font-semibold ${UI.typography.weight.semibold}` }, components ? components.length : 0)
-                                    ),
-                                    React.createElement('li', { className: "flex justify-between" },
-                                        React.createElement('span', null, "Categories:"),
-                                        React.createElement('span', { className: `font-semibold ${UI.typography.weight.semibold}` }, categories ? categories.length : 0)
-                                    ),
-                                    React.createElement('li', { className: "flex justify-between" },
-                                        React.createElement('span', null, "Footprints:"),
-                                        React.createElement('span', { className: `font-semibold ${UI.typography.weight.semibold}` }, footprints ? footprints.length : 0)
-                                    ),
-                                    React.createElement('li', { className: "flex justify-between" },
-                                        React.createElement('span', null, "Locations:"),
-                                        React.createElement('span', { className: `font-semibold ${UI.typography.weight.semibold}` }, locations ? locations.length : 0)
-                                    )
-                                )
-                            )
-                        )
-                    ),
-
-                    React.createElement('p', { className: `mb-4 ${UI.typography.body}` }, "Data is automatically saved to the database. Use buttons below to force save or clear all data."),
+                    React.createElement('p', { className: `mb-4 ${UI.typography.body}` }, "Data is auto-saved. Use buttons below to force save or clear all data."),
 
                     // Force Save Buttons
                     React.createElement('div', { className: "flex flex-wrap gap-3 mb-4" },
@@ -747,22 +619,20 @@ window.App.components.SettingsView = ({
                         React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-4 mb-4" },
                             // Clear All Data
                             React.createElement('div', { className: "border border-red-200 rounded p-3 bg-red-50" },
-                                React.createElement('h5', { className: "font-medium text-red-700 mb-2" }, "Danger Zone | Delete All Database Data"),
+                                React.createElement('h5', { className: "font-medium text-red-700 mb-2" }, "Danger Zone | Delete all Local Storage Data"),
                                 React.createElement('p', { className: "text-sm mb-2" },
                                     "Warning: Deletes all components, categories, and settings. There is no way back,"
                                 ),
                                 React.createElement('button', {
                                     onClick: onClearLS,
                                     className: UI.buttons.danger
-                                }, "Clear All Database Data"),
+                                }, "Clear All Local Storage Data"),
                                 React.createElement('p', { className: "text-xs text-red-600 mt-1" }, "I am aware what I am doing when clicking the button above"),
                             ),
                         )
                     )
                 )
             ),
-        ) // End main div
+        )
     )
-};
-
-console.log("SettingsView component loaded with IndexedDB compatibility.");
+}

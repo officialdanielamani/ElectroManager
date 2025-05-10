@@ -1,48 +1,47 @@
-// js/components/InventoryView.js - Updated for IndexedDB compatibility
+// js/components/InventoryView.js
 
-// Ensure the global namespace exists
 window.App = window.App || {};
 window.App.components = window.App.components || {};
-window.App.utils = window.App.utils || {}; // Ensure utils namespace exists
+window.App.utils = window.App.utils || {};
 
-/**
- * React Component for the Inventory Page View.
- * Displays filters, summary, bulk actions, and the component list (table or cards).
- * Modified to work with IndexedDB.
- */
 window.App.components.InventoryView = ({
-    // Props
+    // --- Data ----------------------------------------------------------------
     components = [], // Array: All component objects
     categories = [], // Array: List of category strings
-    viewMode, // String: 'table' or 'card'
-    selectedCategory, // String: Currently selected category filter
-    lowStockConfig, // Object: Low stock thresholds { category: threshold }
-    currencySymbol, // String: Currency symbol
-    showTotalValue, // Boolean: Whether to show total value in summary
-    selectedComponents = [], // Array: IDs of selected components for bulk actions
-    locations = [], // Array: List of location objects
-    footprints = [], // Array: List of footprint strings
-    itemsPerPage, // 
-    onItemsPerPageChange, // 
+    locations = [], // Array: Location objects (rack / shelf / zone)
+    drawers = [], // Array: Drawer metadata (visual containers)
+    cells = [], // Array: Individual cell definitions within drawers
+    footprints = [], // Array: List of footprint strings (e.g., SOIC‑8, 0603)
 
-    // Callbacks
-    onAddComponent, // Function: Called when 'Add Component' button clicked
-    onEditComponent, // Function(component): Called to edit a specific component
-    onDeleteComponent, // Function(id): Called to delete a specific component
-    onUpdateQuantity, // Function(id, delta): Called to change quantity (+1 or -1)
-    onToggleSelect, // Function(id): Called when a component checkbox is toggled
-    onToggleSelectAll, // Function: Called when the select-all checkbox is toggled
-    onBulkEdit, // Function: Called when 'Edit Selected' button clicked
-    onBulkDelete, // Function: Called when 'Delete Selected' button clicked
-    onChangeViewMode, // Function: Called to change view mode ('table'/'card')
-    onToggleFavorite, // Function(id, property): Called when favorite/bookmark/star is toggled
+    // --- UI state ------------------------------------------------------------
+    viewMode,                 // String: 'table' | 'card' – current view toggle
+    selectedCategory,         // String: Category filter selected in UI
+    lowStockConfig,           // Object: { [category]: threshold } for alerts
+    currencySymbol,           // String: e.g., '$', 'RM' – prefix in totals
+    showTotalValue,           // Boolean: true shows total inventory value card
+    itemsPerPage,             // Number | 'all' – pagination page size
+    selectedComponents = [],  // Array<string> of component IDs currently selected
+
+    // Callbacks 
+    onItemsPerPageChange, // (newSize)        → void
+    onAddComponent,       // ()               → void
+    onEditComponent,      // (component)      → void
+    onDeleteComponent,    // (id)             → void
+    onUpdateQuantity,     // (id, delta)      → void
+    onToggleSelect,       // (id)             → void
+    onToggleSelectAll,    // (selectAll)      → void
+    onBulkEdit,           // (ids)            → void
+    onBulkDelete,         // (ids)            → void
+    onChangeViewMode,     // ('table'|'card') → void
+    onToggleFavorite,     // (id)             → void
 }) => {
-    // Get UI constants and helper functions
-    const { helpers, UI } = window.App.utils;
-    const { useState, useEffect, useCallback } = React;
+    const { UI, helpers } = window.App.utils;
+    const { useState, useEffect } = React;
 
-    // --- Advanced Filter States ---
+    /* ----------------------------- Local state ----------------------------- */
     const [advancedFiltersExpanded, setAdvancedFiltersExpanded] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
     const [selectedCategories, setSelectedCategories] = useState([]);
     const [selectedTypes, setSelectedTypes] = useState([]);
     const [selectedMarks, setSelectedMarks] = useState([]);
@@ -50,9 +49,32 @@ window.App.components.InventoryView = ({
     const [selectedFootprints, setSelectedFootprints] = useState([]);
     const [quantityRange, setQuantityRange] = useState(null);
     const [priceRange, setPriceRange] = useState(null);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [loading, setLoading] = useState(false);
+
+    /* -------------------------- Summary statistics ------------------------- */
+    const totalComponents = components.length;
+    const totalItems = components.reduce((s, c) => s + (Number(c.quantity) || 0), 0);
+    const totalValue = helpers.calculateTotalInventoryValue(components);
+
+    const lowStockCount = components.filter(c => helpers.isLowStock(c, lowStockConfig)).length;
+    const outOfStockCount = components.filter(c => (Number(c.quantity) || 0) === 0).length;
+
+    const locationCount = locations.length;
+    const drawerCount = drawers.length;
+    const cellCount = cells.length;
+    const footprintCount = footprints.length;
+
+    const categoryCounts = helpers.calculateCategoryCounts(components);
+
+    const renderSummaryCard = (label, value, colorClass = UI.colors.primary.text) => {
+        const cardClass = `${UI.cards.container} text-center p-4`;
+        const labelClass = `${UI.typography.small} font-medium mb-1`;
+        const valueClass = `${UI.typography.heading.h2} ${colorClass}`;
+
+        return React.createElement('div', { className: cardClass },
+            React.createElement('div', { className: labelClass }, label),
+            React.createElement('div', { className: valueClass }, value)
+        );
+    };
 
     // Clear advanced filters if simple category/search filters change
     useEffect(() => {
@@ -118,7 +140,7 @@ window.App.components.InventoryView = ({
         const matchesFootprint = selectedFootprints.length === 0 ||
             (component.footprint && selectedFootprints.includes(component.footprint));
 
-        // Quantity range filter
+        // Quantity range filter - FIXED LOGIC
         const componentQuantity = component.quantity || 0;
         const matchesQuantity = !quantityRange || (
             // If min and max are defined and equal, filter for exact match
@@ -131,12 +153,12 @@ window.App.components.InventoryView = ({
                 )
         );
 
-        // Price range filter
+        // Price range filter - FIXED LOGIC
         const componentPrice = component.price || 0;
         const matchesPrice = !priceRange || (
             // If min and max are defined and equal, filter for exact match
             (priceRange.min !== null && priceRange.max !== null && priceRange.min === priceRange.max)
-                ? (componentPrice === pricePrice.min)
+                ? (componentPrice === priceRange.min)
                 // Otherwise, use proper range filtering with both min and max boundaries
                 : (
                     (priceRange.min === null || componentPrice >= priceRange.min) &&
@@ -168,20 +190,12 @@ window.App.components.InventoryView = ({
         setCurrentPage(Math.min(Math.max(1, page), totalPages));
     };
 
-    // --- Calculations (using helpers) ---
-    const totalComponents = components.length;
-    const totalItems = components.reduce((sum, comp) => sum + (Number(comp.quantity) || 0), 0);
-    const totalValue = helpers.calculateTotalInventoryValue(components);
-
-    const lowStockCount = components.filter(comp => helpers.isLowStock(comp, lowStockConfig)).length;
-    const categoryCounts = helpers.calculateCategoryCounts(components);
-
     // --- Event Handlers ---
 
     const handleSearchChange = (e) => {
         // Extract the search value safely
         let newSearchTerm = '';
-        
+
         if (e && e.target && e.target.value !== undefined) {
             // Normal event object from input element
             newSearchTerm = e.target.value;
@@ -189,10 +203,10 @@ window.App.components.InventoryView = ({
             // Direct string value
             newSearchTerm = e;
         }
-        
+
         // Update the search term state
         setSearchTerm(newSearchTerm);
-        
+
         // Reset to page 1 when search changes (if using pagination)
         setCurrentPage(1);
     };
@@ -200,73 +214,11 @@ window.App.components.InventoryView = ({
     const handleViewChange = (mode) => {
         // Just pass the mode directly - this is expected to be a string value
         if (mode === 'table' || mode === 'card') {
-            // Set loading state for UI feedback
-            setLoading(true);
-            
-            // Call the parent handler to change the view mode
             onChangeViewMode(mode);
-            
-            // Clear loading state after a short delay to allow UI to update
-            setTimeout(() => setLoading(false), 300);
         } else {
             console.warn("handleViewChange called with invalid mode", mode);
             onChangeViewMode('table'); // Default to table view
         }
-    };
-
-    // Handler functions for component operations
-    const handleComponentAction = (actionType, component, ...args) => {
-        // Show loading indicator
-        setLoading(true);
-        
-        // Perform the action with a small delay to show loading state
-        setTimeout(() => {
-            switch (actionType) {
-                case 'edit':
-                    onEditComponent(component);
-                    break;
-                case 'delete':
-                    onDeleteComponent(component.id);
-                    break;
-                case 'updateQuantity':
-                    onUpdateQuantity(component.id, args[0]); // args[0] = delta
-                    break;
-                case 'toggleFavorite':
-                    onToggleFavorite(component.id, args[0]); // args[0] = property (favorite, bookmark, star)
-                    break;
-                default:
-                    console.warn('Unknown component action:', actionType);
-            }
-            
-            // Clear loading state
-            setLoading(false);
-        }, 100); // Short delay for UI feedback
-    };
-    
-    // Bulk operation handlers with loading state
-    const handleBulkAction = (actionType) => {
-        // Show loading indicator
-        setLoading(true);
-        
-        // Perform the action with a small delay to show loading state
-        setTimeout(() => {
-            switch (actionType) {
-                case 'edit':
-                    onBulkEdit();
-                    break;
-                case 'delete':
-                    onBulkDelete();
-                    break;
-                case 'toggleSelect':
-                    onToggleSelectAll();
-                    break;
-                default:
-                    console.warn('Unknown bulk action:', actionType);
-            }
-            
-            // Clear loading state
-            setLoading(false);
-        }, 100); // Short delay for UI feedback
     };
 
     // --- Render Functions for Table and Card Views ---
@@ -315,7 +267,7 @@ window.App.components.InventoryView = ({
                 React.createElement('div', { className: "flex items-center space-x-1" },
                     // Favorite Icon/Button
                     React.createElement('button', {
-                        onClick: () => handleComponentAction('toggleFavorite', component, 'favorite'),
+                        onClick: () => onToggleFavorite(component.id, 'favorite'),
                         className: `p-1 rounded-full ${component.favorite ? "text-red-500 hover:text-red-600" : 'text-gray-300 hover:text-red-500'}`,
                         title: component.favorite ? "Remove from favorites" : "Add to favorites"
                     },
@@ -335,7 +287,7 @@ window.App.components.InventoryView = ({
 
                     // Bookmark Icon/Button
                     React.createElement('button', {
-                        onClick: () => handleComponentAction('toggleFavorite', component, 'bookmark'),
+                        onClick: () => onToggleFavorite(component.id, 'bookmark'),
                         className: `p-1 rounded-full ${component.bookmark ? "text-blue-500 hover:text-blue-600" : 'text-gray-300 hover:text-blue-500'}`,
                         title: component.bookmark ? "Remove bookmark" : "Add bookmark"
                     },
@@ -353,7 +305,7 @@ window.App.components.InventoryView = ({
 
                     // Star Icon/Button
                     React.createElement('button', {
-                        onClick: () => handleComponentAction('toggleFavorite', component, 'star'),
+                        onClick: () => onToggleFavorite(component.id, 'star'),
                         className: `p-1 rounded-full ${component.star ? "text-yellow-500 hover:text-yellow-600" : 'text-gray-300 hover:text-yellow-500'}`,
                         title: component.star ? "Remove star" : "Add star"
                     },
@@ -376,18 +328,18 @@ window.App.components.InventoryView = ({
             React.createElement('td', { className: "px-4 py-2 whitespace-nowrap text-center" },
                 React.createElement('div', { className: "flex items-center justify-center space-x-1" },
                     React.createElement('button', {
-                        onClick: () => handleComponentAction('updateQuantity', component, -1),
+                        onClick: () => onUpdateQuantity(component.id, -1),
                         className: UI.buttons.icon.danger,
                         title: "Decrease Quantity"
                     }, "-"),
-                    React.createElement('span',{ className: UI.tables.body.cell}, component.quantity || 0),
+                    React.createElement('span', { className: UI.tables.body.cell }, component.quantity || 0),
                     React.createElement('button', {
-                        onClick: () => handleComponentAction('updateQuantity', component, 1),
+                        onClick: () => onUpdateQuantity(component.id, 1),
                         className: UI.buttons.icon.success,
                         title: "Increase Quantity"
                     }, "+")
                 ),
-                lowStock && React.createElement('div', { 
+                lowStock && React.createElement('div', {
                     className: UI.tags.red,
                 }, "Low Stock")
             ),
@@ -398,12 +350,12 @@ window.App.components.InventoryView = ({
             // Actions
             React.createElement('td', { className: UI.tables.body.cellAction },
                 React.createElement('button', {
-                    onClick: () => handleComponentAction('edit', component),
+                    onClick: () => onEditComponent(component),
                     className: "text-indigo-600 hover:text-indigo-900 mr-3",
                     title: "Edit Component"
                 }, "Edit"),
                 React.createElement('button', {
-                    onClick: () => handleComponentAction('delete', component),
+                    onClick: () => onDeleteComponent(component.id),
                     className: "text-red-600 hover:text-red-900",
                     title: "Delete Component"
                 }, "Delete")
@@ -416,7 +368,7 @@ window.App.components.InventoryView = ({
         if (itemsPerPage === 'all' || totalPages <= 1) {
             return null; // Don't render pagination if showing all or only one page
         }
-        
+
         return React.createElement('div', { className: "flex flex-col items-center mb-4" },
             // Pagination controls
             React.createElement('div', { className: "flex justify-center" },
@@ -492,7 +444,7 @@ window.App.components.InventoryView = ({
                     }, ">")
                 )
             ),
-            
+
             // Pagination status text
             filteredComponents.length > 0 && React.createElement('div', { className: "text-center text-sm text-gray-600 mt-2" },
                 `Showing ${(currentPage - 1) * itemsPerPage + 1}-${Math.min(currentPage * itemsPerPage, filteredComponents.length)} of ${filteredComponents.length} items`
@@ -528,24 +480,21 @@ window.App.components.InventoryView = ({
                     alt: component.name || 'Component Image',
                     className: "w-full h-full object-contain p-2",
                     // Fallback placeholder if image fails to load
-                    onError: (e) => { 
-                        e.target.onerror = null; 
-                        e.target.src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150" viewBox="0 0 200 150"><rect width="200" height="150" fill="%23f0f0f0"/><text x="50%" y="50%" font-family="sans-serif" font-size="14" text-anchor="middle" fill="%23999">No Image</text></svg>`; 
-                    }
+                    //onError: (e) => { e.target.onerror = null; e.target.src = `https://placehold.co/200x150/e2e8f0/94a3b8?text=No+Image`; }
                 }),
-                lowStock && React.createElement('span', { 
-                    className: UI.tags.red + " absolute bottom-1 right-1" 
+                lowStock && React.createElement('span', {
+                    className: UI.tags.red + " absolute bottom-1 right-1"
                 }, "LOW")
             ),
             // Card Content
             React.createElement('div', { className: UI.cards.body },
                 // Name & Type
                 React.createElement('div', { className: "flex justify-between items-start mb-2" },
-                    React.createElement('h3', { 
-                        className: UI.typography.heading.h4 + " truncate mr-2", 
-                        title: component.name 
+                    React.createElement('h3', {
+                        className: UI.typography.heading.h4 + " truncate mr-2",
+                        title: component.name
                     }, component.name),
-                    component.type && React.createElement('span', { 
+                    component.type && React.createElement('span', {
                         className: UI.tags.gray
                     }, component.type)
                 ),
@@ -553,21 +502,21 @@ window.App.components.InventoryView = ({
                 React.createElement('div', { className: "text-sm text-gray-600 mb-1 flex justify-between" },
                     React.createElement('span', { className: "font-medium" }, "Footprint:"),
                     component.footprint ?
-                        React.createElement('span', { 
+                        React.createElement('span', {
                             className: UI.tags.gray
                         }, component.footprint)
                         : React.createElement('span', { className: "text-gray-400" }, "-")
                 ),
                 // Category
-                React.createElement('div', { 
-                    className: UI.typography.small + " mb-1" 
+                React.createElement('div', {
+                    className: UI.typography.small + " mb-1"
                 }, component.category),
                 // Price
                 React.createElement('div', { className: "text-md font-semibold text-green-700 mb-3" }, formattedPrice),
                 // Quantity Controls
                 React.createElement('div', { className: "flex items-center justify-center space-x-2 mb-3 border-t border-b py-2 border-gray-100" },
                     React.createElement('button', {
-                        onClick: () => handleComponentAction('updateQuantity', component, -1),
+                        onClick: () => onUpdateQuantity(component.id, -1),
                         className: UI.buttons.icon.danger,
                         title: "Decrease Quantity"
                     },
@@ -577,7 +526,7 @@ window.App.components.InventoryView = ({
                     React.createElement('span', { className: `text-lg font-semibold ${lowStock ? 'text-red-600' : 'text-gray-900'}` }, component.quantity || 0),
 
                     React.createElement('button', {
-                        onClick: () => handleComponentAction('updateQuantity', component, 1),
+                        onClick: () => onUpdateQuantity(component.id, 1),
                         className: UI.buttons.icon.success,
                         title: "Increase Quantity"
                     },
@@ -585,9 +534,9 @@ window.App.components.InventoryView = ({
                             React.createElement('path', { fillRule: "evenodd", d: "M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z", clipRule: "evenodd" })))
                 ),
                 // Info
-                component.info && React.createElement('p', { 
-                    className: UI.typography.small + " mb-2 truncate", 
-                    title: component.info 
+                component.info && React.createElement('p', {
+                    className: UI.typography.small + " mb-2 truncate",
+                    title: component.info
                 },
                     React.createElement('span', { className: "font-medium" }, "Uses: "), component.info),
                 // Datasheets
@@ -605,12 +554,12 @@ window.App.components.InventoryView = ({
                 // Action Buttons
                 React.createElement('div', { className: "flex justify-end space-x-2 border-t border-gray-100 pt-3" },
                     React.createElement('button', {
-                        onClick: () => handleComponentAction('edit', component),
+                        onClick: () => onEditComponent(component),
                         className: UI.buttons.small.info,
                         title: "Edit Component"
                     }, "Edit"),
                     React.createElement('button', {
-                        onClick: () => handleComponentAction('delete', component),
+                        onClick: () => onDeleteComponent(component.id),
                         className: UI.buttons.small.danger,
                         title: "Delete Component"
                     }, "Delete")
@@ -622,66 +571,45 @@ window.App.components.InventoryView = ({
     // --- Main Render ---
     return (
         React.createElement('div', null,
-            // Loading overlay
-            loading && React.createElement('div', { 
-                className: "fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50" 
-            },
-                React.createElement('div', { 
-                    className: "bg-white p-4 rounded-lg shadow-xl" 
-                },
-                    React.createElement('div', { 
-                        className: "w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" 
-                    })
-                )
-            ),
 
             // --- Inventory Summary Stats ---
             React.createElement('div', { className: UI.layout.sectionAlt },
-                React.createElement('h2', { className: UI.typography.subtitle + " mb-3" }, "Inventory Summary"),
-                React.createElement('div', { className: "grid grid-cols-2 md:grid-cols-5 gap-4 text-center mb-4" },
-                    // Total Components Stat
-                    React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
-                        React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Components"),
-                        React.createElement('p', { className: `text-2xl font-semibold text-${UI.colors.primary.text.replace('text-', '')}` }, totalComponents)
-                    ),
-                    // Total Items Stat
-                    React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
-                        React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Total Items"),
-                        React.createElement('p', { className: `text-2xl font-semibold text-${UI.colors.success.text.replace('text-', '')}` }, totalItems)
-                    ),
-                    // Total Value Stat (Conditional)
-                    showTotalValue && React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
-                        React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Total Value"),
-                        React.createElement('p', { className: `text-2xl font-semibold text-${UI.colors.accent.text.replace('text-', '')}` }, helpers.formatCurrency(totalValue, currencySymbol))
-                    ),
-                    // Categories Stat
-                    React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
-                        React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Categories"),
-                        React.createElement('p', { className: `text-2xl font-semibold text-${UI.colors.info.text.replace('text-', '')}` }, (categories || []).length)
-                    ),
-                    // Low Stock Stat
-                    React.createElement('div', { className: `p-3 bg-${UI.getThemeColors().cardBackground} rounded-lg border border-${UI.getThemeColors().border}` },
-                        React.createElement('h3', { className: `${UI.typography.small} font-medium text-${UI.getThemeColors().textMuted}` }, "Low Stock"),
-                        React.createElement('p', { className: `text-2xl font-semibold ${lowStockCount > 0 ? UI.colors.danger.text : `text-${UI.getThemeColors().textMuted}`}` }, lowStockCount)
-                    ),
+                React.createElement('h2', { className: `${UI.typography.subtitle} mb-3` }, 'Inventory Summary'),
+
+                React.createElement('div', {
+                    className: 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4'
+                },
+                    renderSummaryCard('Components', totalComponents, UI.colors.primary.text),
+                    renderSummaryCard('Total Items', totalItems, UI.colors.success.text),
+                    showTotalValue && renderSummaryCard('Total Value', helpers.formatCurrency(totalValue, currencySymbol), UI.colors.accent.text),
+                    renderSummaryCard('Categories', categories.length, UI.colors.info.text),
+                    renderSummaryCard('Low Stock', lowStockCount, lowStockCount ? UI.colors.danger.text : UI.colors.secondary.text),
+                    renderSummaryCard('Out of Stock', outOfStockCount, outOfStockCount ? UI.colors.danger.text : UI.colors.secondary.text),
+                    renderSummaryCard('Locations', locationCount, UI.colors.info.text),
+                    renderSummaryCard('Drawers', drawerCount, UI.colors.info.text),
+                    renderSummaryCard('Cells', cellCount, UI.colors.info.text),
+                    renderSummaryCard('Footprints', footprintCount, UI.colors.info.text)
                 ),
-                // Category Counts
-                totalComponents > 0 && React.createElement('div', { className: `${UI.utils.borderTop} pt-3 mt-3 border-${UI.getThemeColors().border}` },
-                    React.createElement('h3', { className: UI.typography.subtitle + " mb-2" }, "Item Counts by Category"),
-                    React.createElement('div', { className: "flex flex-wrap gap-3" },
-                        categoryCounts.length > 0 ? categoryCounts.map(([category, count]) =>
-                            React.createElement('div', { 
-                                key: category, 
-                                className: `bg-${UI.getThemeColors().cardBackground} border border-${UI.getThemeColors().border} rounded-md px-3 py-1 shadow-sm` 
-                            },
-                                React.createElement('span', { className: `text-sm font-medium text-${UI.getThemeColors().textSecondary}` }, category, ":"),
-                                React.createElement('span', { className: `text-sm font-semibold ${UI.colors.primary.text} ml-1` }, count)
-                            )
-                        ) : React.createElement('p', { className: `${UI.typography.small} italic text-${UI.getThemeColors().textMuted}` }, "No items with categories found.")
+
+                totalComponents > 0 && React.createElement('div', {
+                    className: `${UI.utils.borderTop} pt-3 mt-3 border-${UI.getThemeColors().border}`
+                },
+                    React.createElement('h3', { className: `${UI.typography.subtitle} mb-2` }, 'Item Counts by Category'),
+                    React.createElement('div', { className: 'flex flex-wrap gap-3' },
+                        categoryCounts.length ? categoryCounts.map(([cat, cnt]) => React.createElement('div', {
+                            key: cat,
+                            className: `${UI.cards.container} px-3 py-1`
+                        },
+                            React.createElement('span', { className: `${UI.typography.small} mr-1` }, `${cat}:`),
+                            React.createElement('span', { className: `${UI.typography.small} font-semibold ${UI.colors.primary.text}` }, cnt)
+                        )) : React.createElement('p', { className: `${UI.typography.small} italic` }, 'No items with categories found.')
                     )
                 )
+
+
+
             ),
-            
+
             // --- Advanced Filters Card ---
             React.createElement(window.App.components.AdvancedFilters, {
                 // Props
@@ -691,7 +619,7 @@ window.App.components.InventoryView = ({
                 footprints: footprints,
                 viewMode: viewMode,
                 searchTerm: searchTerm,
-                
+
                 // Filter states
                 selectedCategories: selectedCategories,
                 selectedTypes: selectedTypes,
@@ -701,7 +629,7 @@ window.App.components.InventoryView = ({
                 quantityRange: quantityRange,
                 priceRange: priceRange,
                 itemsPerPage: itemsPerPage, // Pass the prop
-                
+
                 // Callbacks
                 onAddComponent: onAddComponent,
                 onCategoriesChange: setSelectedCategories,
@@ -715,7 +643,7 @@ window.App.components.InventoryView = ({
                 onClearFilters: handleClearAdvancedFilters,
                 onChangeViewMode: handleViewChange,
                 onChangeSearchTerm: handleSearchChange,
-                
+
                 // UI state
                 isExpanded: advancedFiltersExpanded,
                 onToggleExpand: () => setAdvancedFiltersExpanded(!advancedFiltersExpanded)
@@ -730,7 +658,7 @@ window.App.components.InventoryView = ({
                         id: "select-all-filtered-bulk",
                         className: UI.forms.checkbox + " mr-2",
                         checked: selectedComponents.length === filteredComponents.length && filteredComponents.length > 0,
-                        onChange: () => handleBulkAction('toggleSelect'),
+                        onChange: onToggleSelectAll,
                         title: selectedComponents.length === filteredComponents.length ? "Deselect All Visible" : "Select All Visible",
                         disabled: filteredComponents.length === 0
                     }),
@@ -738,13 +666,13 @@ window.App.components.InventoryView = ({
                 ),
                 // Bulk Action Buttons
                 React.createElement('div', { className: "flex gap-2" },
-                    React.createElement('button', { 
-                        onClick: () => handleBulkAction('edit'), 
-                        className: UI.buttons.small.primary 
+                    React.createElement('button', {
+                        onClick: onBulkEdit,
+                        className: UI.buttons.small.primary
                     }, "Edit Selected"),
-                    React.createElement('button', { 
-                        onClick: () => handleBulkAction('delete'), 
-                        className: UI.buttons.small.danger 
+                    React.createElement('button', {
+                        onClick: onBulkDelete,
+                        className: UI.buttons.small.danger
                     }, "Delete Selected")
                 )
             ), // End Bulk Action Bar
@@ -764,7 +692,7 @@ window.App.components.InventoryView = ({
                                             type: "checkbox",
                                             className: UI.forms.checkbox,
                                             checked: selectedComponents.length === filteredComponents.length && filteredComponents.length > 0,
-                                            onChange: () => handleBulkAction('toggleSelect'),
+                                            onChange: onToggleSelectAll,
                                             disabled: filteredComponents.length === 0,
                                             title: selectedComponents.length === filteredComponents.length ? "Deselect All Visible" : "Select All Visible"
                                         })
@@ -822,4 +750,4 @@ window.App.components.InventoryView = ({
     );
 };
 
-console.log("InventoryView component loaded with IndexedDB compatibility.");
+console.log("InventoryView component loaded with clean direct UI references."); // For debugging

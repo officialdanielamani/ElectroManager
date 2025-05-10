@@ -1,4 +1,4 @@
-// js/components/LocationPage.js - Updated for IndexedDB compatibility
+// js/components/LocationPage.js
 
 // Ensure the global namespace exists
 window.App = window.App || {};
@@ -24,7 +24,6 @@ window.App.components.LocationPage = ({
     const { LocationManager } = window.App.components;
 
     const [viewingDrawerId, setViewingDrawerId] = useState(null);
-    const [isLoading, setIsLoading] = useState(false);
 
     // Find the current drawer and its location if viewing a drawer
     const currentDrawer = drawers.find(drawer => drawer.id === viewingDrawerId);
@@ -36,43 +35,13 @@ window.App.components.LocationPage = ({
     // Handler for viewing a drawer
     const handleViewDrawer = (drawerId) => {
         if (onNavigateToDrawer) {
-            setIsLoading(true);
-            
-            // Simulate a small delay to show loading state
-            setTimeout(() => {
-                onNavigateToDrawer(drawerId);
-                setIsLoading(false);
-            }, 100);
+            onNavigateToDrawer(drawerId);
         }
     };
 
     // Handler for returning to location list
     const handleBackToLocations = () => {
         setViewingDrawerId(null);
-    };
-
-    // Handler for adding a location with proper IndexedDB normalization
-    const handleAddLocation = (newLocation) => {
-        // Use the helper to normalize the location data if available
-        if (window.App.utils.helpers && typeof window.App.utils.helpers.normalizeLocation === 'function') {
-            newLocation = window.App.utils.helpers.normalizeLocation(newLocation);
-        }
-        
-        // Call the parent handler
-        onAddLocation(newLocation);
-    };
-
-    // Handler for editing a location with proper IndexedDB normalization
-    const handleEditLocation = (locationId, updatedLocation) => {
-        // Use the helper to normalize the location data if available
-        if (window.App.utils.helpers && typeof window.App.utils.helpers.normalizeLocation === 'function') {
-            updatedLocation = window.App.utils.helpers.normalizeLocation(updatedLocation);
-            // Preserve the original ID
-            updatedLocation.id = locationId;
-        }
-        
-        // Call the parent handler
-        onEditLocation(locationId, updatedLocation);
     };
 
     // Render logic for the LocationPage component
@@ -82,22 +51,12 @@ window.App.components.LocationPage = ({
             "Manage physical storage locations for your components."
         ),
 
-        // Show loading state if navigating
-        isLoading && React.createElement('div', { 
-            className: `p-4 text-center ${UI.colors.background.alt} rounded-lg border border-${UI.getThemeColors().border}`
-        },
-            React.createElement('div', { 
-                className: "w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" 
-            }),
-            React.createElement('p', null, "Loading drawer view...")
-        ),
-
-        !isLoading && React.createElement(LocationManager, {
+        React.createElement(LocationManager, {
             locations,
             components,
             drawers,
-            onAddLocation: handleAddLocation,
-            onEditLocation: handleEditLocation,
+            onAddLocation,
+            onEditLocation,
             onDeleteLocation,
             onEditComponent,
             onNavigateToDrawer: handleViewDrawer,
@@ -106,4 +65,4 @@ window.App.components.LocationPage = ({
     );
 };
 
-console.log("LocationPage component loaded with IndexedDB compatibility.");
+console.log("LocationPage component loaded with theme-aware styling."); // For debugging

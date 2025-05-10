@@ -6,12 +6,10 @@ window.App.utils = window.App.utils || {};
 
 /**
  * Helper functions for the Electronics Inventory App.
- * Updated to work with IndexedDB compatibility.
  */
 window.App.utils.helpers = {
     // Common footprints list
     commonFootprints: [],
-    
     /**
      * Checks if a component is low in stock based on configuration.
      * @param {object} component - The component object.
@@ -28,7 +26,7 @@ window.App.utils.helpers = {
         return threshold > 0 && quantity < threshold;
     },
 
-    getSortedFootprints: function() {
+    getSortedFootprints: function () {
         return [
             { value: "", label: "-- Select footprint --" },
             { value: "__custom__", label: "Custom footprint..." },
@@ -93,14 +91,14 @@ window.App.utils.helpers = {
             if (separatorIndex > 0) { // Ensure colon exists and is not the first character
                 const key = line.substring(0, separatorIndex).trim();
                 const value = line.substring(separatorIndex + 1).trim();
-                
+
                 // Skip special values that should be handled separately
-                if (key === 'locationInfo' || key === 'storageInfo' || 
+                if (key === 'locationInfo' || key === 'storageInfo' ||
                     key === 'favorite' || key === 'bookmark' || key === 'star' ||
                     key === '<object>' || value === '<object>') {
                     return;
                 }
-                
+
                 if (key) { // Ensure key is not empty
                     params[key] = value;
                 }
@@ -158,156 +156,103 @@ window.App.utils.helpers = {
     generateId: () => {
         return `comp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     },
-    
+
     /**
-     * Creates a properly formatted component object with default values for missing fields
-     * @param {object} comp - Component object to normalize
-     * @returns {object} - Component with all required fields and proper structure
+     * Build an array of cell objects for a new drawer.
+     * Each cell has:
+     *    id        "drawer-{drawerId}-r{row}-c{col}"
+     *    drawerId  reference to parent drawer
+     *    row, col  1-based indices
      */
-    normalizeComponent: (comp) => {
-        if (!comp || typeof comp !== 'object') {
-            comp = {}; // Start with empty object if invalid
-        }
-        
-        // Create base component with standard fields and defaults
-        const normalizedComp = {
-            id: comp.id || window.App.utils.helpers.generateId(),
-            name: comp.name || '',
-            category: comp.category || '',
-            type: comp.type || '',
-            quantity: Number(comp.quantity) || 0,
-            price: Number(comp.price) || 0,
-            footprint: comp.footprint || '',
-            info: comp.info || '',
-            datasheets: comp.datasheets || '',
-            image: comp.image || '',
-            // Initialize flag fields 
-            favorite: !!comp.favorite,
-            bookmark: !!comp.bookmark,
-            star: !!comp.star
-        };
+    generateCellsForDrawer: (drawer) => {
+        const rows = drawer.grid?.rows || 3;
+        const cols = drawer.grid?.cols || 3;
+        const now = Date.now();
+        const cells = [];
 
-        // Ensure locationInfo is properly formatted
-        if (!comp.locationInfo || typeof comp.locationInfo === 'string' || comp.locationInfo === '[object Object]') {
-            normalizedComp.locationInfo = { locationId: '', details: '' };
-        } else {
-            normalizedComp.locationInfo = {
-                locationId: comp.locationInfo.locationId || '',
-                details: comp.locationInfo.details || ''
-            };
-        }
-
-        // Ensure storageInfo is properly formatted
-        if (!comp.storageInfo || typeof comp.storageInfo === 'string' || comp.storageInfo === '[object Object]') {
-            normalizedComp.storageInfo = { locationId: '', drawerId: '', cells: [] };
-        } else {
-            // Handle partial storageInfo object (may be missing 'cells' array)
-            normalizedComp.storageInfo = {
-                locationId: comp.storageInfo.locationId || '',
-                drawerId: comp.storageInfo.drawerId || '',
-                cells: Array.isArray(comp.storageInfo.cells) ? comp.storageInfo.cells : []
-            };
-
-            // Handle backward compatibility - if cellId exists but cells array doesn't include it
-            if (comp.storageInfo.cellId && !normalizedComp.storageInfo.cells.includes(comp.storageInfo.cellId)) {
-                normalizedComp.storageInfo.cells.push(comp.storageInfo.cellId);
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                cells.push({
+                    id: `cell-${now}-${r}-${c}`,
+                    drawerId: drawer.id,
+                    coordinate: `${String.fromCharCode(65 + c)}${r + 1}`, // A1, B1 …
+                    nickname: '',
+                    available: true
+                });
             }
         }
-        
-        return normalizedComp;
+        return cells;
     },
-    
+
     /**
-     * Normalizes cells data to ensure all required fields are present
-     * @param {object} cell - Cell object to normalize
-     * @returns {object} - Cell with all required fields
-     */
-    normalizeCell: (cell) => {
-        if (!cell || typeof cell !== 'object') {
-            cell = {}; // Start with empty object if invalid
-        }
-        
-        return {
-            id: cell.id || `cell-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-            drawerId: cell.drawerId || '',
-            coordinate: cell.coordinate || '',
-            nickname: cell.nickname || '',
-            available: cell.available !== undefined ? cell.available : true
-        };
-    },
-    
-    /**
-     * Normalizes drawer data to ensure all required fields are present
-     * @param {object} drawer - Drawer object to normalize
-     * @returns {object} - Drawer with all required fields
-     */
-    normalizeDrawer: (drawer) => {
-        if (!drawer || typeof drawer !== 'object') {
-            drawer = {}; // Start with empty object if invalid
-        }
-        
-        return {
-            id: drawer.id || `drawer-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-            locationId: drawer.locationId || '',
-            name: drawer.name || '',
-            description: drawer.description || '',
-            grid: {
-                rows: parseInt(drawer.grid?.rows || 3, 10),
-                cols: parseInt(drawer.grid?.cols || 3, 10)
+ * Sync the cell grid with a resized drawer.
+ * - Adds any NEW coordinates that now fit inside the grid.
+ * - Removes cells that fall outside the grid *only if they are empty*.
+ *   (If they hold components, they stay but get marked `orphan: true` so the
+ *    UI can highlight them and you can drag-move the parts later.)
+ *
+ * @param {Object} drawer   –– the updated drawer (already has new rows/cols)
+ * @param {Array}  allCells –– entire cells array from state / storage
+ * @param {Array}  components –– components array so we can check occupancy
+ * @return {Array}          –– new cells array (ready for setCells + saveCells)
+ */
+    syncCellsWithDrawer(drawer, allCells, components) {
+        const helpers = window.App.utils.helpers;
+
+        const wanted = new Set();
+        for (let r = 1; r <= drawer.rows; r++) {
+            for (let c = 1; c <= drawer.cols; c++) {
+                wanted.add(`${r}-${c}`);
             }
-        };
-    },
-    
-    /**
-     * Normalizes location data to ensure all required fields are present
-     * @param {object} location - Location object to normalize
-     * @returns {object} - Location with all required fields
-     */
-    normalizeLocation: (location) => {
-        if (!location || typeof location !== 'object') {
-            location = {}; // Start with empty object if invalid
         }
-        
-        return {
-            id: location.id || `loc-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-            name: location.name || '',
-            description: location.description || ''
-        };
-    },
-    
-    /**
-     * Gets database status - for debugging or displaying in the UI
-     * @param {IDBDatabase} db - The IndexedDB database instance
-     * @returns {object} - Status information including object store counts
-     */
-    getDatabaseStatus: async () => {
-        if (!window.indexedDB) {
-            return { supported: false, message: "IndexedDB not supported in this browser" };
-        }
-        
-        try {
-            const status = {
-                supported: true,
-                stores: {}
-            };
-            
-            // Get components count
-            if (window.App.utils.storage && typeof window.App.utils.storage.loadComponents === 'function') {
-                const components = await window.App.utils.storage.loadComponents();
-                status.stores.components = components ? components.length : 0;
+
+        const keep = [];
+        const add = [];
+
+        // 1️⃣ iterate current cells for this drawer
+        for (const cell of allCells) {
+            if (cell.drawerId !== drawer.id) {
+                keep.push(cell);                     // belongs to another drawer
+                continue;
             }
-            
-            // Get other store counts if needed
-            // ...
-            
-            return status;
-        } catch (error) {
-            return {
-                supported: true,
-                error: error.message
-            };
+
+            const key = `${cell.row}-${cell.col}`;
+
+            if (wanted.has(key)) {
+                keep.push({ ...cell, orphan: false });   // still inside grid
+                wanted.delete(key);                      // mark as satisfied
+            } else {
+                // Cell is now outside the grid
+                const occupied = components.some(c => c.locationInfo?.cellId === cell.id);
+                if (occupied) {
+                    // keep it but mark orphaned
+                    keep.push({ ...cell, orphan: true });
+                    console.warn(`Cell ${cell.id} now outside drawer – marked orphan`);
+                }
+                // else drop it entirely
+            }
         }
-    }
+
+        // 2️⃣ create any coordinates still missing
+        for (const key of wanted) {
+            const [row, col] = key.split('-').map(Number);
+            add.push({
+                id: `cell-${drawer.id}-${row}-${col}`,
+                drawerId: drawer.id,
+                row,
+                col,
+                coordinate: `${String.fromCharCode(64 + col)}${row}`, // A1, B3 …
+                nickname: '',
+                available: true,
+                orphan: false
+            });
+        }
+
+        return [...keep, ...add];
+    },
+
+
+
 };
 
-console.log("InventoryHelpers loaded with IndexedDB compatibility.");
+console.log("InventoryHelpers loaded."); // For debugging

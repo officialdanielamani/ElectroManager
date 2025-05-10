@@ -1,4 +1,4 @@
-// js/utils/ui-constants-indexeddb.js
+// js/utils/ui-constants.js
 
 // Create a global namespace if it doesn't exist
 window.App = window.App || {};
@@ -6,7 +6,6 @@ window.App.utils = window.App.utils || {};
 
 /**
  * Central UI styling constants for the Electronics Inventory App.
- * Updated to work with IndexedDB for theme persistence.
  * Provides consistent styling across all components.
  */
 window.App.utils.UI = {
@@ -90,9 +89,10 @@ window.App.utils.UI = {
 
     },
 
+    // Current theme (default to light)
     currentTheme: 'light',
 
-    // Get a style with fallback
+    // NEW HELPER: Get a style with fallback
     getStyle: function (path, defaultValue = '') {
         // Handle direct paths like 'typography.small'
         if (typeof path === 'string') {
@@ -114,7 +114,7 @@ window.App.utils.UI = {
         return path !== undefined ? path : defaultValue;
     },
 
-    // Function to set theme with IndexedDB support only
+    // Function to set theme
     setTheme: function (themeName) {
         if (this.themes[themeName]) {
             this.currentTheme = themeName;
@@ -134,7 +134,6 @@ window.App.utils.UI = {
             this.tags = styles.tags;
             this.modals = styles.modals;
             this.layout = styles.layout;
-            
             // Add colors direct access (for components that need direct color values)
             this.colors = {
                 primary: {
@@ -184,7 +183,6 @@ window.App.utils.UI = {
                     alt: `bg-${this.getThemeColors().background.replace('900', '800').replace('100', '50')}`
                 }
             };
-            
             if (typeof document !== 'undefined') {
                 // Get the body element
                 const bodyElement = document.body;
@@ -194,12 +192,12 @@ window.App.utils.UI = {
                     bodyElement.classList.add(`text-${themeColors.textPrimary}`);
                 }
 
-                // Save theme preference to IndexedDB
-                if (window.App.utils.storage && typeof window.App.utils.storage.saveConfig === 'function') {
-                    window.App.utils.storage.saveConfig({ theme: themeName })
-                        .catch(error => {
-                            console.warn('Failed to save theme preference to IndexedDB:', error);
-                        });
+                try {
+                    if (typeof localStorage !== 'undefined') {
+                        localStorage.setItem('electronicsTheme', themeName);
+                    }
+                } catch (e) {
+                    console.warn('Failed to save theme preference:', e);
                 }
             }
 
@@ -208,6 +206,7 @@ window.App.utils.UI = {
         }
         return false;
     },
+
 
     // Get current theme colors
     getThemeColors: function () {
@@ -342,73 +341,154 @@ window.App.utils.UI = {
         };
     },
 
-    
-    // Initialize the UI system
+    // Initialize default styles based on initial theme
     initialize: function () {
-        // Use a promise-based initialization
-        return new Promise((resolve) => {
-            // Default theme
-            let initialTheme = 'light';
-            
-            // Set a temporary default theme
-            this.currentTheme = initialTheme;
-            this.setTheme(initialTheme);
-            
-            // Try to get theme from IndexedDB if available
-            if (window.App.utils.storage && typeof window.App.utils.storage.loadConfig === 'function') {
-                window.App.utils.storage.loadConfig()
-                    .then(config => {
-                        if (config && config.theme && this.themes[config.theme]) {
-                            // Apply theme from config
-                            this.setTheme(config.theme);
-                        }
-                        resolve(this);
-                    })
-                    .catch(error => {
-                        console.warn('Error loading theme from IndexedDB:', error);
-                        resolve(this);
-                    });
-            } else {
-                // Storage not available, stick with default
-                console.warn('IndexedDB storage not available, using default theme');
-                resolve(this);
+        // Set default theme first
+        this.currentTheme = 'light';
+
+        // Try to load from localStorage if available
+        try {
+            if (typeof localStorage !== 'undefined') {
+                const savedTheme = localStorage.getItem('electronicsTheme');
+                if (savedTheme && this.themes[savedTheme]) {
+                    this.currentTheme = savedTheme;
+                }
             }
-        });
+        } catch (e) {
+            console.warn('Error loading theme from localStorage:', e);
+        }
+
+        // Ensure theme exists
+        if (!this.themes[this.currentTheme]) {
+            console.warn(`Theme "${this.currentTheme}" not found, falling back to light theme`);
+            this.currentTheme = 'light';
+        }
+
+        // Get theme colors BEFORE getting styles
+        const themeColors = this.getThemeColors();
+
+        // Get theme styles based on current theme
+        const styles = this.getThemeStyles();
+
+        // Initialize all UI component styles
+        this.buttons = styles.buttons;
+        this.cards = styles.cards;
+        this.typography = styles.typography;
+        this.forms = styles.forms;
+        this.tables = styles.tables;
+        this.status = styles.status;
+        this.tags = styles.tags;
+        this.modals = styles.modals;
+        this.layout = styles.layout;
+
+        // Add colors direct access
+        const colors = this.getThemeColors();
+        this.colors = {
+            primary: {
+                text: `text-${themeColors.primary}`,
+                bg: `bg-${themeColors.primary}`,
+                border: `border-${colors.primary}`,
+                hover: `hover:bg-${colors.primaryHover}`
+            },
+            secondary: {
+                text: `text-${colors.secondary}`,
+                bg: `bg-${colors.secondary}`,
+                border: `border-${colors.secondary}`,
+                hover: `hover:bg-${colors.secondaryHover}`
+            },
+            danger: {
+                text: `text-${colors.danger}`,
+                bg: `bg-${colors.danger}`,
+                border: `border-${colors.danger}`,
+                hover: `hover:bg-${colors.dangerHover}`
+            },
+            success: {
+                text: `text-${colors.success}`,
+                bg: `bg-${colors.success}`,
+                border: `border-${colors.success}`,
+                hover: `hover:bg-${colors.successHover}`
+            },
+            warning: {
+                text: `text-${colors.warning}`,
+                bg: `bg-${colors.warning}`,
+                border: `border-${colors.warning}`,
+                hover: `hover:bg-${colors.warningHover}`
+            },
+            info: {
+                text: `text-${colors.info}`,
+                bg: `bg-${colors.info}`,
+                border: `border-${colors.info}`,
+                hover: `hover:bg-${colors.infoHover}`
+            },
+            accent: {
+                text: `text-${colors.accent}`,
+                bg: `bg-${colors.accent}`,
+                border: `border-${colors.accent}`,
+                hover: `hover:bg-${colors.accentHover}`
+            },
+            background: {
+                default: `bg-${colors.background}`,
+                alt: `bg-${colors.background.replace('900', '800').replace('100', '50')}`
+            }
+        };
+
+        // Standard utility helpers that don't change with theme
+        this.utils = {
+            divider: 'border-t my-4',
+            shadowSm: 'shadow-sm',
+            shadow: 'shadow',
+            shadowMd: 'shadow-md',
+            rounded: 'rounded-md',
+            roundedLg: 'rounded-lg',
+            roundedFull: 'rounded-full',
+            border: 'border',
+            borderTop: 'border-t',
+            borderBottom: 'border-b'
+        };
+        // Update body class with themeColors
+        const bodyElement = document.body;
+        if (bodyElement) {
+            bodyElement.classList.remove('bg-gray-100', 'bg-gray-900');
+            bodyElement.classList.add(`bg-${themeColors.background}`);
+            bodyElement.classList.add(`text-${themeColors.textPrimary}`);
+        }
+
+        console.log(`UI initialized with ${this.currentTheme} theme`);
+
+        console.log(`UI initialized with ${this.currentTheme} theme`);
+        return this;
     },
 
-    // Standard utility helpers that don't change with theme
-    utils: {
-        divider: 'border-t my-4',
-        shadowSm: 'shadow-sm',
-        shadow: 'shadow',
-        shadowMd: 'shadow-md',
-        rounded: 'rounded-md',
-        roundedLg: 'rounded-lg',
-        roundedFull: 'rounded-full',
-        border: 'border',
-        borderTop: 'border-t',
-        borderBottom: 'border-b'
-    }
+    // Save current theme to localStorage
+    saveThemePreference: function () {
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('electronicsTheme', this.currentTheme);
+            return true;
+        }
+        return false;
+    },
+
+    // Load theme preference from localStorage
+    loadThemePreference: function () {
+        if (typeof localStorage !== 'undefined') {
+            const savedTheme = localStorage.getItem('electronicsTheme');
+            if (savedTheme && this.themes[savedTheme]) {
+                this.currentTheme = savedTheme;
+                return savedTheme;
+            }
+        }
+        return null;
+    },
 };
 
-// Initialize UI when document is ready
+// Initialize UI with default theme
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        window.App.utils.UI.initialize()
-            .then(() => {
-                console.log("UI system initialized with theme:", window.App.utils.UI.currentTheme);
-                // Dispatch an event that other components can listen for
-                document.dispatchEvent(new CustomEvent('ui-initialized'));
-            });
+        window.App.utils.UI.initialize();
     });
 } else {
     // If document is already loaded, initialize immediately
-    window.App.utils.UI.initialize()
-        .then(() => {
-            console.log("UI system initialized with theme:", window.App.utils.UI.currentTheme);
-            // Dispatch an event that other components can listen for
-            document.dispatchEvent(new CustomEvent('ui-initialized'));
-        });
+    window.App.utils.UI.initialize();
 }
 
-console.log("UI constants loaded with IndexedDB-only theme persistence.");
+console.log("UI constants loaded with improved theme support.");
