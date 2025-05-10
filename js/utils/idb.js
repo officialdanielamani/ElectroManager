@@ -9,8 +9,8 @@ window.App.utils = window.App.utils || {};
 window.App.utils.idb = {
     db: null,
     dbName: 'electronicsInventory',
-    dbVersion: 1,
-    stores: ['components', 'locations', 'drawers', 'cells'],
+    dbVersion: 2, // Increased version number to trigger upgrade
+    stores: ['components', 'locations', 'drawers', 'cells', 'categories', 'footprints'],
     
     // Initialize the database
     init: function() {
@@ -37,7 +37,7 @@ window.App.utils.idb = {
                 
                 // Handle database upgrades
                 request.onupgradeneeded = function(event) {
-                    console.log("Upgrading database...");
+                    console.log("Upgrading database from version", event.oldVersion, "to", event.newVersion);
                     var db = event.target.result;
                     
                     // Create object stores if they don't exist
@@ -108,6 +108,36 @@ window.App.utils.idb = {
         return this._saveToStore('cells', cells);
     },
     
+    // Load categories from IndexedDB
+    loadCategories: function() {
+        return this._loadFromStore('categories');
+    },
+    
+    // Save categories to IndexedDB
+    saveCategories: function(categories) {
+        // Convert array of strings to array of objects with id property
+        var categoryObjects = Array.isArray(categories) ? categories.map(function(name, index) {
+            return { id: 'cat-' + index, name: name };
+        }) : [];
+        
+        return this._saveToStore('categories', categoryObjects);
+    },
+    
+    // Load footprints from IndexedDB
+    loadFootprints: function() {
+        return this._loadFromStore('footprints');
+    },
+    
+    // Save footprints to IndexedDB
+    saveFootprints: function(footprints) {
+        // Convert array of strings to array of objects with id property
+        var footprintObjects = Array.isArray(footprints) ? footprints.map(function(name, index) {
+            return { id: 'fp-' + index, name: name };
+        }) : [];
+        
+        return this._saveToStore('footprints', footprintObjects);
+    },
+    
     // Generic method to load data from a store
     _loadFromStore: function(storeName) {
         var self = this;
@@ -128,7 +158,16 @@ window.App.utils.idb = {
                         
                         request.onsuccess = function() {
                             console.log("Loaded", request.result.length, "items from", storeName);
-                            resolve(request.result);
+                            
+                            // For categories and footprints, convert objects to strings array
+                            if (storeName === 'categories' || storeName === 'footprints') {
+                                var result = request.result.map(function(item) {
+                                    return item.name;
+                                });
+                                resolve(result);
+                            } else {
+                                resolve(request.result);
+                            }
                         };
                         
                         request.onerror = function(event) {
@@ -176,7 +215,7 @@ window.App.utils.idb = {
                         clearRequest.onsuccess = function() {
                             // Add all items
                             items.forEach(function(item) {
-                                if (item && item.id) {
+                                if (item && (item.id || storeName === 'categories' || storeName === 'footprints')) {
                                     store.put(item);
                                 }
                             });

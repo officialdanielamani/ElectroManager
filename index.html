@@ -88,6 +88,7 @@
             );
 
             // --- Effects ---
+            // Initial load effect
             useEffect(() => {
                 console.log("Initial load effect running with proper data ordering...");
 
@@ -102,17 +103,21 @@
                             storage.loadComponents(),
                             storage.loadLocations(),
                             storage.loadDrawers(),
-                            storage.loadCells()
+                            storage.loadCells(),
+                            storage.loadCategories(),  // Added this
+                            storage.loadFootprints()   // Added this
                         ])
                             .then(function (results) {
                                 // Destructure results
-                                var [loadedComponents, loadedLocations, loadedDrawers, loadedCells] = results;
+                                var [loadedComponents, loadedLocations, loadedDrawers, loadedCells, loadedCategories, loadedFootprints] = results;
 
                                 console.log("Loaded all data:", {
                                     components: loadedComponents.length,
                                     locations: loadedLocations.length,
                                     drawers: loadedDrawers.length,
-                                    cells: loadedCells.length
+                                    cells: loadedCells.length,
+                                    categories: loadedCategories.length,
+                                    footprints: loadedFootprints.length
                                 });
 
                                 // Now set all state at once to maintain consistency
@@ -120,15 +125,15 @@
                                 setLocations(loadedLocations);
                                 setDrawers(loadedDrawers);
                                 setCells(loadedCells);
+                                setCategories(loadedCategories);  // Set categories from IndexedDB
+                                setFootprints(loadedFootprints);  // Set footprints from IndexedDB
 
-                                // Load config (synchronous)
+                                // Load config (synchronous, no categories or footprints)
                                 var config = storage.loadConfig();
-                                setCategories(config.categories || []);
                                 setViewMode(config.viewMode || 'table');
                                 setLowStockConfig(config.lowStockConfig || {});
                                 setCurrencySymbol(config.currencySymbol || 'RM');
                                 setShowTotalValue(config.showTotalValue || false);
-                                setFootprints(config.footprints || []);
                                 setItemsPerPage(config.itemsPerPage || 'all');
 
                                 // Handle theme
@@ -139,7 +144,7 @@
                                 window.App.utils.UI.setTheme(config.theme || theme || 'dark');
 
                                 // Category fallback
-                                if ((!config.categories || config.categories.length === 0) && loadedComponents.length > 0) {
+                                if ((!loadedCategories || loadedCategories.length === 0) && loadedComponents.length > 0) {
                                     var derived = [...new Set(loadedComponents.map(function (c) {
                                         return c.category;
                                     }).filter(Boolean))];
@@ -147,6 +152,8 @@
                                     if (derived.length) {
                                         console.log("Derived categories:", derived.length);
                                         setCategories(derived);
+                                        // Save the derived categories to IndexedDB
+                                        storage.saveCategories(derived);
                                     }
                                 }
 
@@ -192,7 +199,6 @@
             // ---------- FOR LOCATIONS ----------
             useEffect(() => {
                 if (!locations.length) return;
-
                 // We use a delay to avoid multiple rapid saves during initialization
                 var saveTimeout = setTimeout(function () {
                     console.log("Saving locations...", locations.length);
@@ -225,7 +231,6 @@
             // ---------- FOR DRAWERS ----------
             useEffect(() => {
                 if (!drawers.length) return;
-
                 // We use a delay to avoid multiple rapid saves during initialization
                 var saveTimeout = setTimeout(function () {
                     console.log("Saving drawers...", drawers.length);
@@ -258,7 +263,6 @@
             // ---------- FOR CELLS ----------
             useEffect(() => {
                 if (!cells.length) return;
-
                 // We use a delay to avoid multiple rapid saves during initialization
                 var saveTimeout = setTimeout(function () {
                     console.log("Saving cells...", cells.length);
@@ -281,6 +285,42 @@
                     clearTimeout(saveTimeout);
                 };
             }, [cells]);
+
+
+            useEffect(() => {
+                if (!categories.length) return;
+
+                // Save directly to IndexedDB
+                storage.saveCategories(categories)
+                    .then(function (success) {
+                        if (success) {
+                            console.log("Categories saved to IndexedDB successfully:", categories.length);
+                        } else {
+                            console.warn("Failed to save categories to IndexedDB");
+                        }
+                    })
+                    .catch(function (err) {
+                        console.error("Error saving categories to IndexedDB:", err);
+                    });
+            }, [categories]);
+
+            // Similarly update the useEffect for saving footprints
+            useEffect(() => {
+                if (!footprints.length) return;
+
+                // Save directly to IndexedDB
+                storage.saveFootprints(footprints)
+                    .then(function (success) {
+                        if (success) {
+                            console.log("Footprints saved to IndexedDB successfully:", footprints.length);
+                        } else {
+                            console.warn("Failed to save footprints to IndexedDB");
+                        }
+                    })
+                    .catch(function (err) {
+                        console.error("Error saving footprints to IndexedDB:", err);
+                    });
+            }, [footprints]);
 
             const saveComponentsCallback = useCallback(() => {
                 storage.saveComponents(components);
@@ -313,18 +353,24 @@
             }, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]);
 
             const saveConfigCallback = useCallback(() => {
+                // Save categories and footprints
+                Promise.all([
+                    storage.saveCategories(categories),
+                    storage.saveFootprints(footprints)
+                ]).catch(function (err) {
+                    console.error("Error saving categories/footprints:", err);
+                });
+
+                // Save other configuration settings
                 storage.saveConfig({
-                    categories,
                     viewMode,
                     lowStockConfig,
                     currencySymbol,
                     showTotalValue,
-                    footprints,
                     itemsPerPage,
-                    theme // Add theme property
+                    theme
                 });
-            }, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]); // Add theme to dependency array
-
+            }, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]);
             useEffect(() => {
                 // Apply theme through the UI system
                 window.App.utils.UI.setTheme(theme);
@@ -1815,12 +1861,13 @@
         // --- Render the Application ---
         // Ensure the root element exists before rendering
         const rootElement = document.getElementById('root');
-        if (rootElement) {
-            ReactDOM.render(React.createElement(ElectronicsInventory), rootElement);
-        } else {
-            console.error("Root element (#root) not found in the DOM.");
-        }
-
+if (rootElement) {
+    // Use the new createRoot API for React 18
+    const root = ReactDOM.createRoot(rootElement);
+    root.render(React.createElement(ElectronicsInventory));
+} else {
+    console.error("Root element (#root) not found in the DOM.");
+}
     </script>
 </body>
 

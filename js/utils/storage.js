@@ -45,6 +45,86 @@ window.App.utils.storage = {
             });
     },
     
+    /*** CATEGORIES ***/
+    
+    loadCategories: function() {
+        var self = this;
+        
+        return this.init()
+            .then(function(useIndexedDB) {
+                // Try IndexedDB first if available
+                if (useIndexedDB) {
+                    return window.App.utils.idb.loadCategories()
+                        .catch(function(err) {
+                            console.error("Error loading categories from IndexedDB:", err);
+                            return [];
+                        });
+                }
+                
+                // Otherwise use empty array (no localStorage fallback)
+                return [];
+            });
+    },
+    
+    saveCategories: function(categories) {
+        var self = this;
+        
+        return this.init()
+            .then(function(useIndexedDB) {
+                // Try IndexedDB first if available
+                if (useIndexedDB) {
+                    return window.App.utils.idb.saveCategories(categories)
+                        .catch(function(err) {
+                            console.error("Error saving categories to IndexedDB:", err);
+                            return false;
+                        });
+                }
+                
+                // Otherwise just return false (no localStorage fallback)
+                return false;
+            });
+    },
+    
+    /*** FOOTPRINTS ***/
+    
+    loadFootprints: function() {
+        var self = this;
+        
+        return this.init()
+            .then(function(useIndexedDB) {
+                // Try IndexedDB first if available
+                if (useIndexedDB) {
+                    return window.App.utils.idb.loadFootprints()
+                        .catch(function(err) {
+                            console.error("Error loading footprints from IndexedDB:", err);
+                            return [];
+                        });
+                }
+                
+                // Otherwise use empty array (no localStorage fallback)
+                return [];
+            });
+    },
+    
+    saveFootprints: function(footprints) {
+        var self = this;
+        
+        return this.init()
+            .then(function(useIndexedDB) {
+                // Try IndexedDB first if available
+                if (useIndexedDB) {
+                    return window.App.utils.idb.saveFootprints(footprints)
+                        .catch(function(err) {
+                            console.error("Error saving footprints to IndexedDB:", err);
+                            return false;
+                        });
+                }
+                
+                // Otherwise just return false (no localStorage fallback)
+                return false;
+            });
+    },
+    
     /*** COMPONENTS ***/
     
     loadComponents: function() {
@@ -306,28 +386,20 @@ window.App.utils.storage = {
         }
     },
     
-    /*** CONFIG - Always use localStorage ***/
+    /*** CONFIG - Other settings still use localStorage ***/
     
     loadConfig: function() {
         // Create default config object
         var defaultConfig = {
-            categories: [],
             viewMode: 'table',
             lowStockConfig: {},
             currencySymbol: 'RM',
             showTotalValue: false,
-            footprints: [],
             itemsPerPage: 'all',
             theme: 'dark'
         };
 
         try {
-            // Load categories
-            var savedCategories = localStorage.getItem('electronicsCategories');
-            if (savedCategories) {
-                defaultConfig.categories = JSON.parse(savedCategories);
-            }
-
             // Load view mode
             var savedViewMode = localStorage.getItem('electronicsViewMode');
             if (savedViewMode && (savedViewMode === 'table' || savedViewMode === 'card')) {
@@ -344,12 +416,6 @@ window.App.utils.storage = {
             var savedCurrency = localStorage.getItem('electronicsCurrencySymbol');
             if (savedCurrency) {
                 defaultConfig.currencySymbol = savedCurrency;
-            }
-
-            // Load footprints
-            var savedFootprints = localStorage.getItem('electronicsFootprints');
-            if (savedFootprints) {
-                defaultConfig.footprints = JSON.parse(savedFootprints);
             }
 
             // Load items per page setting
@@ -380,11 +446,6 @@ window.App.utils.storage = {
     saveConfig: function(config) {
         try {
             if (config && typeof config === 'object') {
-                // Save categories
-                if (Array.isArray(config.categories)) {
-                    localStorage.setItem('electronicsCategories', JSON.stringify(config.categories));
-                }
-
                 // Save view mode
                 if (config.viewMode === 'table' || config.viewMode === 'card') {
                     localStorage.setItem('electronicsViewMode', config.viewMode);
@@ -409,11 +470,6 @@ window.App.utils.storage = {
                 // Save theme setting
                 if (config.theme && typeof config.theme === 'string') {
                     localStorage.setItem('electronicsTheme', config.theme);
-                }
-
-                // Save footprints
-                if (Array.isArray(config.footprints)) {
-                    localStorage.setItem('electronicsFootprints', JSON.stringify(config.footprints));
                 }
 
                 // Save items per page setting
@@ -447,12 +503,10 @@ window.App.utils.storage = {
                 // Always clear localStorage (synchronous)
                 try {
                     localStorage.removeItem('electronicsComponents');
-                    localStorage.removeItem('electronicsCategories');
                     localStorage.removeItem('electronicsViewMode');
                     localStorage.removeItem('electronicsLowStockConfig');
                     localStorage.removeItem('electronicsCurrencySymbol');
                     localStorage.removeItem('electronicsShowTotalValue');
-                    localStorage.removeItem('electronicsFootprints');
                     localStorage.removeItem('electronicsLocations');
                     localStorage.removeItem('electronicsDrawers');
                     localStorage.removeItem('electronicsCells');
@@ -471,68 +525,6 @@ window.App.utils.storage = {
                     })
                     .catch(function(err) {
                         console.error("Error clearing all storage:", err);
-                        return false;
-                    });
-            });
-    },
-    
-    migrateToIndexedDB: function() {
-        var self = this;
-        
-        return this.init()
-            .then(function(useIndexedDB) {
-                if (!useIndexedDB) {
-                    console.log("IndexedDB not available for migration");
-                    return false;
-                }
-                
-                var promises = [];
-                var idb = window.App.utils.idb;
-                
-                // Migrate components
-                var components = self._loadComponentsFromLocalStorage();
-                if (components.length > 0) {
-                    promises.push(idb.saveComponents(components)
-                        .then(function(success) {
-                            return { type: 'components', count: components.length, success: success };
-                        }));
-                }
-                
-                // Migrate locations
-                var locations = self._loadLocationsFromLocalStorage();
-                if (locations.length > 0) {
-                    promises.push(idb.saveLocations(locations)
-                        .then(function(success) {
-                            return { type: 'locations', count: locations.length, success: success };
-                        }));
-                }
-                
-                // Migrate drawers
-                var drawers = self._loadDrawersFromLocalStorage();
-                if (drawers.length > 0) {
-                    promises.push(idb.saveDrawers(drawers)
-                        .then(function(success) {
-                            return { type: 'drawers', count: drawers.length, success: success };
-                        }));
-                }
-                
-                // Migrate cells
-                var cells = self._loadCellsFromLocalStorage();
-                if (cells.length > 0) {
-                    promises.push(idb.saveCells(cells)
-                        .then(function(success) {
-                            return { type: 'cells', count: cells.length, success: success };
-                        }));
-                }
-                
-                // Wait for all migrations to complete
-                return Promise.all(promises)
-                    .then(function(results) {
-                        console.log("Migration results:", results);
-                        return results.some(function(r) { return r.success; });
-                    })
-                    .catch(function(err) {
-                        console.error("Error during migration:", err);
                         return false;
                     });
             });
