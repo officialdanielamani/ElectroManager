@@ -76,12 +76,13 @@ window.App.components.ComponentForm = ({
     // Handle changes in form inputs
     const handleChange = (e) => {
         if (isViewOnly) return; // Don't process changes in view-only mode
-        
         const { name, value, type, checked } = e.target;
-
         // For checkbox inputs, use the 'checked' property as the value
-        const newValue = type === 'checkbox' ? checked : value;
-
+        let newValue = type === 'checkbox' ? checked : value;
+        // Sanitize string inputs using DOMPurify if available
+        if (typeof newValue === 'string' && window.DOMPurify) {
+            newValue = window.DOMPurify.sanitize(newValue);
+        }
         setFormData(prevData => ({
             ...prevData,
             [name]: newValue
@@ -91,11 +92,11 @@ window.App.components.ComponentForm = ({
     // Handle numeric field changes with proper conversion
     const handleNumericChange = (e) => {
         if (isViewOnly) return;
-        
         const { name, value } = e.target;
-        // Convert to appropriate numeric type based on field
-        const numericValue = name === 'price' ? parseFloat(value) || 0 : parseInt(value, 10) || 0;
-        
+        // Sanitize input first
+        const sanitizedValue = window.DOMPurify ? window.DOMPurify.sanitize(value) : value;
+        // Then convert to appropriate numeric type
+        const numericValue = name === 'price' ? parseFloat(sanitizedValue) || 0 : parseInt(sanitizedValue, 10) || 0;
         setFormData(prevData => ({
             ...prevData,
             [name]: numericValue
@@ -173,14 +174,13 @@ window.App.components.ComponentForm = ({
     // Handle location changes
     const handleLocationChange = (e) => {
         if (isViewOnly) return;
-        
         const { name, value } = e.target;
-
+        const sanitizedValue = window.DOMPurify ? window.DOMPurify.sanitize(value) : value;
         setFormData(prevData => ({
             ...prevData,
             locationInfo: {
                 ...prevData.locationInfo,
-                [name]: value
+                [name]: sanitizedValue
             }
         }));
     };
@@ -284,12 +284,28 @@ window.App.components.ComponentForm = ({
     const selectedDrawer = drawers.find(drawer => drawer.id === selectedDrawerId);
 
     // Handle form submission
+    // Add this for the parameters textarea when saving
     const handleSubmit = (e) => {
-        e.preventDefault(); // Prevent default form submission
-        if (!isViewOnly) {
-            onSave(formData); // Pass the current form data to the parent save handler
+    e.preventDefault(); // Prevent default form submission
+    if (!isViewOnly) {
+        // Create a copy of the form data to sanitize
+        const sanitizedData = { ...formData };
+        
+        // Sanitize fields that might contain HTML
+        if (window.DOMPurify) {
+            if (sanitizedData.parameters) sanitizedData.parameters = window.DOMPurify.sanitize(sanitizedData.parameters);
+            if (sanitizedData.info) sanitizedData.info = window.DOMPurify.sanitize(sanitizedData.info);
+            if (sanitizedData.datasheets) sanitizedData.datasheets = window.DOMPurify.sanitize(sanitizedData.datasheets);
+            if (sanitizedData.customCategory) sanitizedData.customCategory = window.DOMPurify.sanitize(sanitizedData.customCategory);
+            if (sanitizedData.customFootprint) sanitizedData.customFootprint = window.DOMPurify.sanitize(sanitizedData.customFootprint);
+            // Sanitize nested objects
+            if (sanitizedData.locationInfo?.details) {
+                sanitizedData.locationInfo.details = window.DOMPurify.sanitize(sanitizedData.locationInfo.details);
+            }
         }
-    };
+        onSave(sanitizedData); // Pass the sanitized form data to the parent save handler
+    }
+};
 
     // --- Render ---
     return (

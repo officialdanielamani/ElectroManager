@@ -255,4 +255,63 @@ window.App.utils.helpers = {
 
 };
 
+// Create a sanitize helper function that works safely
+window.App.utils.helpers.sanitize = function(value) {
+    // Return non-string values unchanged
+    if (typeof value !== 'string') return value;
+    
+    // If DOMPurify exists, sanitize the string
+    if (window.DOMPurify) {
+        return window.DOMPurify.sanitize(value);
+    }
+    
+    // Fallback - basic HTML tag removal if DOMPurify not available
+    // This is not as secure as DOMPurify but better than nothing
+    return value.replace(/<[^>]*>?/gm, '');
+};
+
+// Modify parseParameters to sanitize inputs
+window.App.utils.helpers.parseParameters = (text) => {
+    if (!text || typeof text !== 'string') return {};
+    const params = {};
+    text.split('\n').forEach(line => {
+        const separatorIndex = line.indexOf(':');
+        if (separatorIndex > 0) { // Ensure colon exists and is not the first character
+            // Sanitize both key and value
+            const key = window.App.utils.helpers.sanitize(
+                line.substring(0, separatorIndex).trim()
+            );
+            const value = window.App.utils.helpers.sanitize(
+                line.substring(separatorIndex + 1).trim()
+            );
+
+            // Skip special values that should be handled separately
+            if (key === 'locationInfo' || key === 'storageInfo' ||
+                key === 'favorite' || key === 'bookmark' || key === 'star' ||
+                key === '<object>' || value === '<object>') {
+                return;
+            }
+
+            if (key) { // Ensure key is not empty
+                params[key] = value;
+            }
+        }
+    });
+    return params;
+};
+
+// Modify formatDatasheets to sanitize URLs
+window.App.utils.helpers.formatDatasheets = (datasheets) => {
+    if (!datasheets || typeof datasheets !== 'string') return [];
+    return datasheets.split(/[\n,]+/) // Split by newline or comma
+        .map(url => window.App.utils.helpers.sanitize(url.trim())) // Trim and sanitize
+        .filter(url => url && (url.startsWith('http://') || url.startsWith('https://'))); // Basic URL validation
+};
+
+// Add sanitization to any function that generates IDs
+window.App.utils.helpers.generateId = () => {
+    const rawId = `comp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    return window.App.utils.helpers.sanitize(rawId);
+};
+
 console.log("InventoryHelpers loaded."); // For debugging

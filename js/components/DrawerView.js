@@ -233,7 +233,7 @@ window.App.components.DrawerView = ({
             headerRow.push(
                 React.createElement('div', {
                     key: `col-${c}`,
-                    className: `sticky top-0 z-10 bg-${UI.getThemeColors().background} p-2 font-medium border border-${UI.getThemeColors().border} text-center w-[100px] h-[40px]`
+                    className: `sticky top-0 z-10 ${UI.colors.background.default} ${UI.typography.body} border border-${UI.getThemeColors().border} text-center p-2 w-[100px] h-[40px]`
                 }, getColLabel(c))
             );
         }
@@ -251,7 +251,7 @@ window.App.components.DrawerView = ({
                 // Row header (1, 2, 3, ...)
                 React.createElement('div', {
                     key: `row-${r}`,
-                    className: `sticky left-0 z-10 bg-${UI.getThemeColors().background} p-2 font-medium border border-${UI.getThemeColors().border} text-center w-[40px] h-[100px] flex items-center justify-center`
+                    className: `sticky left-0 z-10 bg-${UI.getThemeColors().background} ${UI.typography.body} border border-${UI.getThemeColors().border} text-center w-[40px] h-[100px] flex items-center justify-center`
                 }, r + 1)
             ];
 
@@ -286,10 +286,10 @@ window.App.components.DrawerView = ({
                                 onChange: (e) => setEditCellNickname(e.target.value),
                                 onBlur: handleSaveCellNickname,
                                 onKeyDown: (e) => e.key === 'Enter' && handleSaveCellNickname(),
-                                className: "w-full p-1 text-sm border border-gray-300 rounded",
+                                className: "w-full p-1 ${UI.typography.body}  border border-gray-300 rounded",
                                 autoFocus: true
                             }) :
-                            React.createElement('div', { className: "font-medium text-sm" },
+                            React.createElement('div', { className: `${UI.typography.body} text-sm` },
                                 cell ? (cell.nickname || cell.coordinate) : coordinate, // Show coordinate if cell doesn't exist
                                 cell && !cell.id && React.createElement('span', { className: `text-${UI.getThemeColors().textMuted} text-xs italic block` }, "Click to create"),
                                 cell && cell.id && !isAvailable && React.createElement('span', { className: "text-red-500 text-xs italic block" }, "Unavailable")

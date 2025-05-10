@@ -21,6 +21,7 @@ window.App.components.BulkEditForm = ({
     // Get UI constants
     const { UI } = window.App.utils;
     const { useState, useEffect } = React;
+    const { formHelpers } = window.App.utils;
 
     // Internal state for the bulk edit form fields
     const [bulkData, setBulkData] = useState({
@@ -57,9 +58,9 @@ window.App.components.BulkEditForm = ({
     // Update filtered drawers when storage location changes
     useEffect(() => {
         if (bulkData.storageLocationId) {
-            const filtered = drawers.filter(drawer => drawer.locationId === bulkData.storageLocationId);
+            const filtered = formHelpers.getFilteredDrawers(bulkData.storageLocationId, drawers);
             setFilteredDrawers(filtered);
-
+    
             // Reset drawer selection if the current drawer doesn't belong to the new location
             if (bulkData.drawerId && !filtered.some(drawer => drawer.id === bulkData.drawerId)) {
                 setBulkData(prev => ({
@@ -85,7 +86,7 @@ window.App.components.BulkEditForm = ({
         if (bulkData.drawerId) {
             const drawer = drawers.find(d => d.id === bulkData.drawerId);
             setSelectedDrawer(drawer);
-            setFilteredCells(cells.filter(cell => cell.drawerId === bulkData.drawerId));
+            setFilteredCells(formHelpers.getFilteredCells(bulkData.drawerId, cells));
         } else {
             setSelectedDrawer(null);
             setFilteredCells([]);
@@ -179,75 +180,16 @@ window.App.components.BulkEditForm = ({
         onApply(bulkData); // Pass the current bulk edit state to the parent handler
     };
 
-    // Generate grid elements for drawer cells
-    // Generate grid elements for drawer cells
-const generateCellGrid = () => {
-    if (!selectedDrawer) return null;
-
-    const rows = selectedDrawer.grid?.rows || 3;
-    const cols = selectedDrawer.grid?.cols || 3;
-
-    const gridElements = [];
-
-    // Generate column headers (A, B, C, ...)
-    const headerRow = [React.createElement('div', {
-        key: 'corner',
-        className: `w-8 h-8 bg-${UI.getThemeColors().background} text-center font-medium`
-    })];
-
-    for (let c = 0; c < cols; c++) {
-        const colLabel = String.fromCharCode(65 + c); // A=65 in ASCII
-        headerRow.push(
-            React.createElement('div', {
-                key: `col-${c}`,
-                className: `w-8 h-8 bg-${UI.getThemeColors().background} text-center font-medium`
-            }, colLabel)
+    const generateCellGrid = () => {
+        if (!selectedDrawer) return null;
+        return formHelpers.generateCellGrid(
+            selectedDrawer,
+            filteredCells,
+            bulkData.selectedCells,
+            handleCellToggle,
+            UI
         );
-    }
-
-    gridElements.push(React.createElement('div', { key: 'header-row', className: "flex" }, headerRow));
-
-    // Generate rows with cells
-    for (let r = 0; r < rows; r++) {
-        const rowElements = [
-            // Row header (1, 2, 3, ...)
-            React.createElement('div', {
-                key: `row-${r}`,
-                className: `w-8 h-8 bg-${UI.getThemeColors().background} text-center font-medium flex items-center justify-center`
-            }, r + 1)
-        ];
-
-        // Generate cells for this row
-        for (let c = 0; c < cols; c++) {
-            const coordinate = `${String.fromCharCode(65 + c)}${r + 1}`; // e.g., "A1", "B2"
-            const cell = filteredCells.find(cell => cell.coordinate === coordinate);
-
-            // Cell might not exist in the database yet
-            const cellId = cell ? cell.id : null;
-            const isSelected = cellId && bulkData.selectedCells.includes(cellId);
-
-            // Safely check available property with a default to true
-            const isAvailable = cell ? (cell.available !== false) : true;
-
-            rowElements.push(
-                React.createElement('div', {
-                    key: `cell-${r}-${c}`,
-                    className: `w-8 h-8 border flex items-center justify-center 
-                        ${isSelected ? `bg-${UI.getThemeColors().primary.replace('500', '100').replace('400', '900')} border-${UI.getThemeColors().primary}` : `bg-${UI.getThemeColors().cardBackground} hover:bg-${UI.getThemeColors().background}`} 
-                        ${!isAvailable ? `bg-${UI.getThemeColors().secondary} opacity-70 cursor-not-allowed` : 'cursor-pointer'}`,
-                    onClick: () => cellId && isAvailable && handleCellToggle(cellId),
-                    title: cell ? (cell.nickname || coordinate) + (isAvailable ? '' : ' (Unavailable)') : coordinate
-                },
-                    isSelected ? '✓' : ''
-                )
-            );
-        }
-
-        gridElements.push(React.createElement('div', { key: `row-${r}`, className: "flex" }, rowElements));
-    }
-
-    return gridElements;
-};
+    };
 
     // Get selected cells information
     const getSelectedCellsInfo = () => {
@@ -411,13 +353,14 @@ const generateCellGrid = () => {
 
                         // --- Storage Location Section ---
                         React.createElement('div', { className: `bg-${UI.getThemeColors().background} p-4 rounded border border-${UI.getThemeColors().border} mt-6` },
-                            React.createElement('div', { className: "flex justify-between items-center" },
-                                React.createElement('h3', { className: `text-md font-medium mb-1 text-${UI.getThemeColors().textSecondary}` }, "Storage Location"),
-                                React.createElement('button', {
-                                    className: `text-${UI.getThemeColors().primary} text-sm`,
-                                    onClick: () => setShowDrawerSelector(!showDrawerSelector)
-                                }, showDrawerSelector ? "Hide Drawer Selector" : "Show Drawer Selector")
-                            ),
+    React.createElement('div', { className: "flex justify-between items-center" },
+        React.createElement('h3', { className: `text-md font-medium mb-1 text-${UI.getThemeColors().textSecondary}` }, "Storage Location"),
+        React.createElement('button', {
+            type: "button",
+            className: `${UI.colors.primary.text} text-sm`,
+            onClick: () => setShowDrawerSelector(!showDrawerSelector)
+        }, showDrawerSelector ? "Hide Drawer Selector" : "Show Drawer Selector")
+    ),
 
                             // Location Action
                             React.createElement('div', { className: "mb-3" },
@@ -487,75 +430,39 @@ const generateCellGrid = () => {
                                 ),
 
                                 // Show drawer selection when "set" is selected
-                                bulkData.storageAction === 'set' && React.createElement('div', null,
-                                    // Location dropdown for storage
-                                    React.createElement('div', { className: "mb-3" },
-                                        React.createElement('label', { htmlFor: "storage-location", className: UI.forms.label }, "Select Storage Location"),
-                                        React.createElement('select', {
-                                            id: "storage-location",
-                                            name: "storageLocationId",
-                                            className: UI.forms.select,
-                                            value: bulkData.storageLocationId,
-                                            onChange: handleChange
-                                        },
-                                            React.createElement('option', { value: "" }, "-- Select location --"),
-                                            locations.map(loc => React.createElement('option', { key: loc.id, value: loc.id }, loc.name))
-                                        )
-                                    ),
-
-                                    // Drawer dropdown (filtered by location)
-                                    bulkData.storageLocationId && React.createElement('div', { className: "mb-3" },
-                                        React.createElement('label', { htmlFor: "storage-drawer", className: UI.forms.label }, "Select Drawer"),
-                                        filteredDrawers.length === 0 ?
-                                            React.createElement('p', {
-                                                className: `text-sm text-${UI.getThemeColors().textMuted} italic`
-                                            }, "No drawers found for this location.") :
-                                            React.createElement('select', {
-                                                id: "storage-drawer",
-                                                name: "drawerId",
-                                                className: UI.forms.select,
-                                                value: bulkData.drawerId,
-                                                onChange: handleChange
-                                            },
-                                                React.createElement('option', { value: "" }, "-- Select drawer --"),
-                                                filteredDrawers.map(drawer => React.createElement('option', { key: drawer.id, value: drawer.id }, drawer.name))
-                                            )
-                                    ),
-
-                                    // Cell grid for selection (when drawer is selected)
-                                    bulkData.drawerId && React.createElement('div', { className: "mb-3" },
-                                        React.createElement('label', { className: UI.forms.label }, "Select Cell(s)"),
-                                        React.createElement('p', {
-                                            className: `text-xs text-${UI.getThemeColors().textSecondary} mb-2`
-                                        }, "Click on cells to select/deselect. Multiple cells can be selected."),
-                                        filteredCells.length === 0 ?
-                                            React.createElement('p', {
-                                                className: `text-sm text-${UI.getThemeColors().textMuted} italic`
-                                            }, "No cells defined for this drawer yet.") :
-                                            React.createElement('div', null,
-                                                // Display the grid
-                                                React.createElement('div', {
-                                                    className: `inline-block border border-${UI.getThemeColors().border} bg-${UI.getThemeColors().cardBackground} p-1`
-                                                },
-                                                    generateCellGrid()
-                                                ),
-
-                                                // Selected cells display
-                                                React.createElement('div', { className: "mt-2" },
-                                                    React.createElement('p', {
-                                                        className: `text-xs text-${UI.getThemeColors().textSecondary}`
-                                                    }, "Selected Cells: ",
-                                                        bulkData.selectedCells.length === 0
-                                                            ? React.createElement('span', {
-                                                                className: `italic text-${UI.getThemeColors().textMuted}`
-                                                            }, "None")
-                                                            : getSelectedCellsInfo()
-                                                    )
-                                                )
-                                            )
-                                    )
-                                )
-                            ) // End drawer selector
+                                bulkData.storageAction === 'set' && formHelpers.renderDrawerSelector({
+                                    UI,
+                                    storageInfo: {
+                                        locationId: bulkData.storageLocationId || '',
+                                        drawerId: bulkData.drawerId || '',
+                                        cells: bulkData.selectedCells || []
+                                    },
+                                    locations,
+                                    filteredDrawers,
+                                    selectedDrawerId: bulkData.drawerId,
+                                    filteredCells,
+                                    selectedCells: bulkData.selectedCells,
+                                    handleStorageLocationChange: (e) => {
+                                        const { name, value } = e.target;
+                                        if (name === 'locationId') {
+                                            setBulkData(prev => ({
+                                                ...prev,
+                                                storageLocationId: value,
+                                                drawerId: '',
+                                                selectedCells: []
+                                            }));
+                                        }
+                                    },
+                                    handleDrawerChange: (e) => {
+                                        setBulkData(prev => ({
+                                            ...prev,
+                                            drawerId: e.target.value,
+                                            selectedCells: []
+                                        }));
+                                    },
+                                    handleCellToggle
+                                })
+                            )
                         ),
 
                         // --- Favorite, Bookmark, Star Options ---

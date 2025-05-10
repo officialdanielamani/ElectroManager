@@ -124,6 +124,41 @@ window.App.utils.storage = {
                 return false;
             });
     },
+
+    /*** LOW STOCK ***/
+    loadLowStockConfig: function() {
+        var self = this;
+        
+        return this.init()
+            .then(function(useIndexedDB) {
+                // Use IndexedDB if available
+                if (useIndexedDB) {
+                    return window.App.utils.idb.loadLowStockConfig();
+                }
+                
+                // If IndexedDB not available, return empty object
+                console.warn("IndexedDB not available for low stock config");
+                return {};
+            });
+    },
+    
+    // Save low stock configuration to IndexedDB only
+    saveLowStockConfig: function(config) {
+        var self = this;
+        
+        return this.init()
+            .then(function(useIndexedDB) {
+                // Use IndexedDB if available
+                if (useIndexedDB) {
+                    return window.App.utils.idb.saveLowStockConfig(config);
+                }
+                
+                // If IndexedDB not available, warn and return false
+                console.warn("IndexedDB not available for saving low stock config");
+                return false;
+            });
+    },
+
     
     /*** COMPONENTS ***/
     
@@ -392,11 +427,10 @@ window.App.utils.storage = {
         // Create default config object
         var defaultConfig = {
             viewMode: 'table',
-            lowStockConfig: {},
             currencySymbol: 'RM',
-            showTotalValue: false,
+            showTotalValue: true,
             itemsPerPage: 'all',
-            theme: 'dark'
+            theme: 'light'
         };
 
         try {
@@ -404,12 +438,6 @@ window.App.utils.storage = {
             var savedViewMode = localStorage.getItem('electronicsViewMode');
             if (savedViewMode && (savedViewMode === 'table' || savedViewMode === 'card')) {
                 defaultConfig.viewMode = savedViewMode;
-            }
-
-            // Load low stock configuration
-            var savedLowStockConfig = localStorage.getItem('electronicsLowStockConfig');
-            if (savedLowStockConfig) {
-                defaultConfig.lowStockConfig = JSON.parse(savedLowStockConfig);
             }
 
             // Load currency symbol
@@ -449,11 +477,6 @@ window.App.utils.storage = {
                 // Save view mode
                 if (config.viewMode === 'table' || config.viewMode === 'card') {
                     localStorage.setItem('electronicsViewMode', config.viewMode);
-                }
-
-                // Save low stock configuration
-                if (config.lowStockConfig && typeof config.lowStockConfig === 'object') {
-                    localStorage.setItem('electronicsLowStockConfig', JSON.stringify(config.lowStockConfig));
                 }
 
                 // Save currency symbol
@@ -504,7 +527,6 @@ window.App.utils.storage = {
                 try {
                     localStorage.removeItem('electronicsComponents');
                     localStorage.removeItem('electronicsViewMode');
-                    localStorage.removeItem('electronicsLowStockConfig');
                     localStorage.removeItem('electronicsCurrencySymbol');
                     localStorage.removeItem('electronicsShowTotalValue');
                     localStorage.removeItem('electronicsLocations');

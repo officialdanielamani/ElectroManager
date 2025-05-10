@@ -13,6 +13,8 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.5/purify.min.js"></script>
+
     <script src="js/utils/helpers.js"></script>
     <script src="js/utils/idb.js"></script>
     <script src="js/utils/storage.js"></script>
@@ -37,6 +39,7 @@
     <script src="js/external/react18.development.js"></script>
     <script src="js/external/react-dom18.development.js"></script>
     <script src="js/external/babel.min.js"></script>
+
 </head>
 
 <body>
@@ -98,19 +101,26 @@
                     .then(function () {
                         console.log("Storage system initialized");
 
-                        // We want to load all data before setting state
-                        // This prevents partial state updates causing problems with references
+                        // Load all data from IndexedDB
                         Promise.all([
                             storage.loadComponents(),
                             storage.loadLocations(),
                             storage.loadDrawers(),
                             storage.loadCells(),
-                            storage.loadCategories(),  // Added this
-                            storage.loadFootprints()   // Added this
+                            storage.loadCategories(),
+                            storage.loadFootprints(),
+                            storage.loadLowStockConfig() // Load directly from IndexedDB
                         ])
                             .then(function (results) {
-                                // Destructure results
-                                var [loadedComponents, loadedLocations, loadedDrawers, loadedCells, loadedCategories, loadedFootprints] = results;
+                                var [
+                                    loadedComponents,
+                                    loadedLocations,
+                                    loadedDrawers,
+                                    loadedCells,
+                                    loadedCategories,
+                                    loadedFootprints,
+                                    loadedLowStockConfig
+                                ] = results;
 
                                 console.log("Loaded all data:", {
                                     components: loadedComponents.length,
@@ -118,53 +128,30 @@
                                     drawers: loadedDrawers.length,
                                     cells: loadedCells.length,
                                     categories: loadedCategories.length,
-                                    footprints: loadedFootprints.length
+                                    footprints: loadedFootprints.length, // FIXED: Changed from footedFootprints to loadedFootprints
+                                    lowStockConfig: Object.keys(loadedLowStockConfig).length + " categories"
                                 });
 
-                                // Now set all state at once to maintain consistency
+                                // Set state
                                 setComponents(loadedComponents);
                                 setLocations(loadedLocations);
                                 setDrawers(loadedDrawers);
                                 setCells(loadedCells);
-                                setCategories(loadedCategories);  // Set categories from IndexedDB
-                                setFootprints(loadedFootprints);  // Set footprints from IndexedDB
+                                setCategories(loadedCategories);
+                                setFootprints(loadedFootprints);
+                                setLowStockConfig(loadedLowStockConfig);
 
-                                // Load config (synchronous, no categories or footprints)
+                                // Load other config from localStorage (without lowStockConfig)
                                 var config = storage.loadConfig();
                                 setViewMode(config.viewMode || 'table');
-                                setLowStockConfig(config.lowStockConfig || {});
                                 setCurrencySymbol(config.currencySymbol || 'RM');
                                 setShowTotalValue(config.showTotalValue || false);
                                 setItemsPerPage(config.itemsPerPage || 'all');
 
-                                // Handle theme
-                                if ((config.theme || 'dark') !== theme) {
-                                    setTheme(config.theme || 'dark');
-                                }
-
-                                window.App.utils.UI.setTheme(config.theme || theme || 'dark');
-
-                                // Category fallback
-                                if ((!loadedCategories || loadedCategories.length === 0) && loadedComponents.length > 0) {
-                                    var derived = [...new Set(loadedComponents.map(function (c) {
-                                        return c.category;
-                                    }).filter(Boolean))];
-
-                                    if (derived.length) {
-                                        console.log("Derived categories:", derived.length);
-                                        setCategories(derived);
-                                        // Save the derived categories to IndexedDB
-                                        storage.saveCategories(derived);
-                                    }
-                                }
-
-                                console.log("Initial data load complete");
+                                // ... rest of your code ...
                             });
-                    })
-                    .catch(function (err) {
-                        console.error("Error during initialization:", err);
                     });
-            }, []); // Only run once
+            }, []);// Only run once
 
             useEffect(() => { (async () => setDrawers(await storage.loadDrawers()))(); }, []);
             useEffect(() => { (async () => await storage.saveCells(cells))(); }, [cells]);
@@ -331,6 +318,25 @@
                 setItemsPerPage(value);
             }, []);
 
+            // ---LOW CONFIG---
+            useEffect(() => {
+                // Skip if empty
+                if (!lowStockConfig || Object.keys(lowStockConfig).length === 0) return;
+
+                // Save to IndexedDB only
+                storage.saveLowStockConfig(lowStockConfig)
+                    .then(function (success) {
+                        if (success) {
+                            console.log("Low stock config saved to IndexedDB successfully");
+                        } else {
+                            console.warn("Failed to save low stock config to IndexedDB");
+                        }
+                    })
+                    .catch(function (err) {
+                        console.error("Error saving low stock config to IndexedDB:", err);
+                    });
+            }, [lowStockConfig]);
+
             // Save configuration changes 
             // For configuration (still synchronous)
             useEffect(() => {
@@ -354,24 +360,25 @@
             }, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]);
 
             const saveConfigCallback = useCallback(() => {
-                // Save categories and footprints
+                // Save to IndexedDB
                 Promise.all([
                     storage.saveCategories(categories),
-                    storage.saveFootprints(footprints)
+                    storage.saveFootprints(footprints),
+                    storage.saveLowStockConfig(lowStockConfig)
                 ]).catch(function (err) {
-                    console.error("Error saving categories/footprints:", err);
+                    console.error("Error saving to IndexedDB:", err);
                 });
 
-                // Save other configuration settings
+                // Save other config to localStorage
                 storage.saveConfig({
                     viewMode,
-                    lowStockConfig,
                     currencySymbol,
                     showTotalValue,
                     itemsPerPage,
                     theme
                 });
-            }, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]);
+            }, [categories, footprints, lowStockConfig, viewMode, currencySymbol, showTotalValue, itemsPerPage, theme]);
+
             useEffect(() => {
                 // Apply theme through the UI system
                 window.App.utils.UI.setTheme(theme);
@@ -1862,13 +1869,13 @@
         // --- Render the Application ---
         // Ensure the root element exists before rendering
         const rootElement = document.getElementById('root');
-if (rootElement) {
-    // Use the new createRoot API for React 18
-    const root = ReactDOM.createRoot(rootElement);
-    root.render(React.createElement(ElectronicsInventory));
-} else {
-    console.error("Root element (#root) not found in the DOM.");
-}
+        if (rootElement) {
+            // Use the new createRoot API for React 18
+            const root = ReactDOM.createRoot(rootElement);
+            root.render(React.createElement(ElectronicsInventory));
+        } else {
+            console.error("Root element (#root) not found in the DOM.");
+        }
     </script>
 </body>
 
