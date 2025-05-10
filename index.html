@@ -1616,7 +1616,7 @@
             };
 
             const handleClearLS = async () => {
-                clearStatusMessages(); // Your existing function
+                clearStatusMessages(); 
 
                 if (window.confirm('Are you sure you want to clear ALL inventory data and settings? This action cannot be undone.')) {
                     try {
@@ -1650,18 +1650,6 @@
                     }
                 }
             };
-
-            // --- Get Local Storage Status (for display in Settings) ---
-            // This could be memoized if performance becomes an issue
-            const getLocalStorageStatus = () => ({
-                components: !!localStorage.getItem('electronicsComponents'),
-                categories: !!localStorage.getItem('electronicsCategories'),
-                viewMode: !!localStorage.getItem('electronicsViewMode'),
-                lowStockConfig: !!localStorage.getItem('electronicsLowStockConfig'),
-                currencySymbol: !!localStorage.getItem('electronicsCurrencySymbol'),
-                showTotalValue: !!localStorage.getItem('electronicsShowTotalValue'),
-            });
-
 
             // --- Render ---
             return (
@@ -1770,7 +1758,6 @@
                         jsonData: jsonData,
                         importError: importError,
                         exportMessage: exportMessage,
-                        localStorageStatus: getLocalStorageStatus(), // Pass LS status
                         footprints: footprints,
                         locations: locations,
                         components: components,

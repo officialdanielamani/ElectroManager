@@ -18,10 +18,7 @@ window.App.components.SettingsView = ({
     jsonData, // String: Text content for import/export text area
     importError, // String: Error or success message after import
     exportMessage, // String: Message after export/save attempt
-    localStorageStatus, // Object: Status of localStorage items { key: boolean }
     theme, // String: Current UI theme
-    locations,
-    components,
     // Callbacks
     onExportComponents, // Function: Called when Export Components button is clicked
     onExportConfig, // Function: Called when Export Config button is clicked
@@ -51,25 +48,8 @@ window.App.components.SettingsView = ({
 
     // Ensure we have the UI object
     const { UI } = window.App.utils;
-    // Fallback typography if UI is not loaded properly
-    const typography = UI?.typography || {
-        heading: { h2: "text-2xl font-semibold text-gray-800" },
-        sectionTitle: "font-medium text-gray-700",
-        body: "text-sm text-gray-600",
-        small: "text-xs text-gray-500"
-    };
     const { useState } = React;
     const { FootprintManager } = window.App.components;
-
-    // Use typography with a fallback
-    const useTypography = (key) => {
-        try {
-            return UI.typography[key];
-        } catch (e) {
-            console.warn("UI typography not available, using fallback");
-            return typography[key] || "";
-        }
-    };
 
     // Internal state for settings form controls
     const [editingCategory, setEditingCategory] = useState(null); // Category being edited
@@ -581,9 +561,9 @@ window.App.components.SettingsView = ({
                 )
             ), // End Display Settings Section
 
-            // --- Local Storage Management Section ---
+            // --- Storage Management Section ---
             React.createElement('div', { className: UI.cards.container },
-                React.createElement('h2', { className: `${UI.typography.heading.h2} ${UI.cards.header}` }, "Local Storage Management"),
+                React.createElement('h2', { className: `${UI.typography.heading.h2} ${UI.cards.header}` }, "Storage Management"),
                 React.createElement('div', { className: UI.cards.body },
 
                     React.createElement('p', { className: `mb-4 ${UI.typography.body}` }, "Data is auto-saved. Use buttons below to force save or clear all data."),
@@ -603,10 +583,10 @@ window.App.components.SettingsView = ({
                     // Backup Recommendations
                     React.createElement('div', { className: `mb-4 p-3 ${UI.colors.background.alt} ${UI.utils.rounded} ${UI.utils.border}` },
                         React.createElement('h5', { className: `${UI.typography.weight.medium} mb-2` }, "Backup Recommendations"),
-                        React.createElement('p', { className: "text-sm mb-2" },
+                        React.createElement('p', { className: `${UI.typography.body}` },
                             "Regular backups help prevent data loss. We recommend:"
                         ),
-                        React.createElement('ul', { className: "list-disc list-inside text-sm space-y-1 ml-2" },
+                        React.createElement('ul', { className: `list-disc list-inside ${UI.typography.body} space-y-1 ml-2` },
                             React.createElement('li', null, "Export components data at least once per week"),
                             React.createElement('li', null, "Export locations and drawers after making changes"),
                             React.createElement('li', null, "Keep backup files in multiple locations"),
@@ -614,19 +594,19 @@ window.App.components.SettingsView = ({
                         )
                     ),
 
-                    // Danger Zone - Using light theme styling consistently even in dark mode
+                    // Danger Zone -
                     React.createElement('div', { className: `mt-6 pt-4 ${UI.utils.borderTop}` },
                         React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-4 mb-4" },
                             // Clear All Data
                             React.createElement('div', { className: "border border-red-200 rounded p-3 bg-red-50" },
-                                React.createElement('h5', { className: "font-medium text-red-700 mb-2" }, "Danger Zone | Delete all Local Storage Data"),
-                                React.createElement('p', { className: "text-sm mb-2" },
-                                    "Warning: Deletes all components, categories, and settings. There is no way back,"
+                                React.createElement('h5', { className: "font-medium text-red-700 mb-2" }, "Danger Zone | Delete all data"),
+                                React.createElement('p', { className: `text-red-700 ${UI.typography.body} mb-2` },
+                                    "Warning: Deletes all item in database, and clear all settings (LocalStorage & IndexedDB). There is no way back"
                                 ),
                                 React.createElement('button', {
                                     onClick: onClearLS,
                                     className: UI.buttons.danger
-                                }, "Clear All Local Storage Data"),
+                                }, "Clear All Data"),
                                 React.createElement('p', { className: "text-xs text-red-600 mt-1" }, "I am aware what I am doing when clicking the button above"),
                             ),
                         )
