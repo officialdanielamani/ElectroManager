@@ -38,7 +38,7 @@ window.App.components.AdvancedFilters = ({
     onPriceRangeChange, // Function(range): Update price range
     onItemsPerPageChange, // Function(count): Update items per page
     onClearFilters, // Function: Clear all filters
-    onChangeSearchTerm = () => {}, 
+    onChangeSearchTerm = () => { },
     onAddComponent, // Function: Called when 'Add Component' button clicked
 
     // State
@@ -325,17 +325,28 @@ window.App.components.AdvancedFilters = ({
     const highlightMatch = (text, query) => {
         if (!query || !text) return text;
 
-        const parts = text.split(new RegExp(`(${query})`, 'gi'));
-        return React.createElement('span', null,
-            parts.map((part, index) =>
-                part.toLowerCase() === query.toLowerCase()
-                    ? React.createElement('span', {
-                        key: index,
-                        className: `bg-${UI.getThemeColors().primary.replace('500', '100').replace('400', '900')} text-${UI.getThemeColors().primary.replace('500', '800').replace('400', '300')}`
-                    }, part)
-                    : part
-            )
-        );
+        // Escape special regex characters to prevent errors
+        const escapeRegExp = (string) => {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        };
+
+        try {
+            const parts = text.split(new RegExp(`(${escapeRegExp(query)})`, 'gi'));
+            return React.createElement('span', null,
+                parts.map((part, index) => {
+                    const isMatch = part.toLowerCase() === query.toLowerCase();
+                    return isMatch
+                        ? React.createElement('span', {
+                            key: index,
+                            className: `bg-${UI.getThemeColors().primary.replace('500', '100').replace('400', '900')} text-${UI.getThemeColors().primary.replace('500', '800').replace('400', '300')}`
+                        }, part)
+                        : part;
+                })
+            );
+        } catch (e) {
+            // Fallback if regex fails
+            return text;
+        }
     };
 
     const [exactMatchModes, setExactMatchModes] = useState({
@@ -395,7 +406,7 @@ window.App.components.AdvancedFilters = ({
 
             // Filter mode indicator
             React.createElement('div', { className: "flex justify-between items-center mb-2" },
-                React.createElement('span', { className: `text-xs font-medium text-${UI.colors.primary.text}` },
+                React.createElement('span', { className: `text-xs font-medium text-${UI.getThemeColors().primary}` },
                     exactMatchMode ? "Finding exact value" : "Finding in range"
                 ),
                 // Exact match toggle
@@ -555,16 +566,15 @@ window.App.components.AdvancedFilters = ({
                     onClick: () => {
                         if (typeof onAddComponent === 'function') {
                             onAddComponent();
-                        } else {
-                            console.error("onAddComponent is not a function or undefined");
                         }
                     },
-                    className: UI.buttons.success + " w-full"
+                    className: UI.buttons.success + " w-full",
+                    disabled: typeof onAddComponent !== 'function'
                 }, "+ Add Component")
             ),
-            
+
             // Search Input (column 2)
-            React.createElement('div', { className: "md:col-span-1" },
+            React.createElement('div', { className: "md:col-span-2" },
                 React.createElement('label', {
                     htmlFor: "search-input",
                     className: UI.forms.label
@@ -575,11 +585,11 @@ window.App.components.AdvancedFilters = ({
                         type: "text",
                         placeholder: "Search by name, type, category, info...",
                         className: UI.forms.input + " flex-grow",
-                        value: searchTerm || '',  // Important: bind to prop value
+                        value: searchTerm || '',
                         onChange: (e) => {
-                            // Safely call the change handler
                             if (typeof onChangeSearchTerm === 'function') {
-                                onChangeSearchTerm(e);  // Pass the entire event
+                                // Use e.target.value directly when possible
+                                onChangeSearchTerm(e.target.value);
                             }
                         }
                     }),
@@ -595,17 +605,17 @@ window.App.components.AdvancedFilters = ({
                         title: "Clear search"
                     }, "✕")
                 )
-            
+
             ),
-            
+
             // View Mode Toggle (column 3)
             React.createElement('div', { className: "md:col-span-3 lg:col-span-1" },
                 React.createElement('label', { className: UI.forms.label }, "View Mode"),
                 React.createElement('div', { className: `flex rounded shadow-sm border border-${UI.getThemeColors().border}` },
                     React.createElement('button', {
                         title: "Table View",
-                        className: `flex-1 p-2 text-sm rounded-l ${viewMode === 'table' ? 
-                            `bg-${UI.getThemeColors().primary} text-white` : 
+                        className: `flex-1 p-2 text-sm rounded-l ${viewMode === 'table' ?
+                            `bg-${UI.getThemeColors().primary} text-white` :
                             `bg-${UI.getThemeColors().cardBackground} text-${UI.getThemeColors().textSecondary} hover:bg-${UI.getThemeColors().background}`}`,
                         onClick: () => onChangeViewMode('table')
                     },
@@ -625,8 +635,8 @@ window.App.components.AdvancedFilters = ({
                     ),
                     React.createElement('button', {
                         title: "Card View",
-                        className: `flex-1 p-2 text-sm rounded-r ${viewMode === 'card' ? 
-                            `bg-${UI.getThemeColors().primary} text-white` : 
+                        className: `flex-1 p-2 text-sm rounded-r ${viewMode === 'card' ?
+                            `bg-${UI.getThemeColors().primary} text-white` :
                             `bg-${UI.getThemeColors().cardBackground} text-${UI.getThemeColors().textSecondary} hover:bg-${UI.getThemeColors().background}`}`,
                         onClick: () => onChangeViewMode('card')
                     },
@@ -769,4 +779,4 @@ window.App.components.AdvancedFilters = ({
     );
 };
 
-console.log("AdvancedFilters component loaded with improved dark mode support.");
+console.log("AdvancedFilters done load.");

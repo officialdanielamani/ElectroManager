@@ -414,8 +414,7 @@ const generateCellGrid = () => {
                             React.createElement('div', { className: "flex justify-between items-center" },
                                 React.createElement('h3', { className: `text-md font-medium mb-1 text-${UI.getThemeColors().textSecondary}` }, "Storage Location"),
                                 React.createElement('button', {
-                                    type: "button",
-                                    className: `${UI.colors.primary.text} text-sm`,
+                                    className: `text-${UI.getThemeColors().primary} text-sm`,
                                     onClick: () => setShowDrawerSelector(!showDrawerSelector)
                                 }, showDrawerSelector ? "Hide Drawer Selector" : "Show Drawer Selector")
                             ),
