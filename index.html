@@ -1,12 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Electronics Inventory (Modular)</title>
-
     <!--
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -15,6 +12,7 @@
 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.5/purify.min.js"></script>
 
+    <script src="js/utils/sanitize-utils.js"></script>
     <script src="js/utils/helpers.js"></script>
     <script src="js/utils/idb.js"></script>
     <script src="js/utils/storage.js"></script>
@@ -34,17 +32,14 @@
     <script src="js/components/DrawerPage.js"></script>
     <script src="js/components/ThemeSwitcher.js"></script>
 
-
     <script src="js/external/tailwind.js"></script>
     <script src="js/external/react18.development.js"></script>
     <script src="js/external/react-dom18.development.js"></script>
     <script src="js/external/babel.min.js"></script>
-
 </head>
 
 <body>
     <div id="root"></div>
-
     <script type="text/babel">
         // Ensure App namespace and sub-namespaces exist
         window.App = window.App || {};
@@ -157,7 +152,7 @@
             useEffect(() => { (async () => await storage.saveCells(cells))(); }, [cells]);
             useEffect(() => { (async () => await storage.saveDrawers(drawers))(); }, [drawers]);
 
-            // ---------- FOR COMPONENTS ----------
+            // --- FOR COMPONENTS ---
             useEffect(() => {
                 if (!components.length) return;
 
@@ -184,7 +179,7 @@
                 };
             }, [components]);
 
-            // ---------- FOR LOCATIONS ----------
+            // --- FOR LOCATIONS ---
             useEffect(() => {
                 if (!locations.length) return;
                 // We use a delay to avoid multiple rapid saves during initialization
@@ -216,7 +211,7 @@
                 };
             }, [locations]);
 
-            // ---------- FOR DRAWERS ----------
+            // --- FOR DRAWERS ---
             useEffect(() => {
                 if (!drawers.length) return;
                 // We use a delay to avoid multiple rapid saves during initialization
@@ -248,7 +243,7 @@
                 };
             }, [drawers, cells]);
 
-            // ---------- FOR CELLS ----------
+            // --- FOR CELLS ---
             useEffect(() => {
                 if (!cells.length) return;
                 // We use a delay to avoid multiple rapid saves during initialization
@@ -266,19 +261,15 @@
                         .catch(function (err) {
                             console.error("Error saving cells:", err);
                         });
-                }, 300); // Small delay to batch rapid changes
-
-                // Clear timeout on unmount
+                }, 300); 
                 return function cleanup() {
                     clearTimeout(saveTimeout);
                 };
             }, [cells]);
 
-
+            // --- FOR CATEGORY ---
             useEffect(() => {
                 if (!categories.length) return;
-
-                // Save directly to IndexedDB
                 storage.saveCategories(categories)
                     .then(function (success) {
                         if (success) {
@@ -292,7 +283,7 @@
                     });
             }, [categories]);
 
-            // Similarly update the useEffect for saving footprints
+            // --- FOR FOOTPRINT ---
             useEffect(() => {
                 if (!footprints.length) return;
 
@@ -309,15 +300,7 @@
                         console.error("Error saving footprints to IndexedDB:", err);
                     });
             }, [footprints]);
-
-            const saveComponentsCallback = useCallback(() => {
-                storage.saveComponents(components);
-            }, [components]);
-
-            const handleItemsPerPageChange = useCallback((value) => {
-                setItemsPerPage(value);
-            }, []);
-
+            
             // ---LOW CONFIG---
             useEffect(() => {
                 // Skip if empty
@@ -337,7 +320,7 @@
                     });
             }, [lowStockConfig]);
 
-            // Save configuration changes 
+            // ---SAVE CONFIG---
             // For configuration (still synchronous)
             useEffect(() => {
                 var config = {
@@ -360,7 +343,7 @@
             }, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]);
 
             const saveConfigCallback = useCallback(() => {
-                // Save to IndexedDB
+                // To IndexedDB
                 Promise.all([
                     storage.saveCategories(categories),
                     storage.saveFootprints(footprints),
@@ -368,8 +351,7 @@
                 ]).catch(function (err) {
                     console.error("Error saving to IndexedDB:", err);
                 });
-
-                // Save other config to localStorage
+                // Config to localStorage
                 storage.saveConfig({
                     viewMode,
                     currencySymbol,
@@ -378,6 +360,14 @@
                     theme
                 });
             }, [categories, footprints, lowStockConfig, viewMode, currencySymbol, showTotalValue, itemsPerPage, theme]);
+
+            const saveComponentsCallback = useCallback(() => {
+                storage.saveComponents(components);
+            }, [components]);
+
+            const handleItemsPerPageChange = useCallback((value) => {
+                setItemsPerPage(value);
+            }, []);
 
             useEffect(() => {
                 // Apply theme through the UI system
@@ -389,8 +379,9 @@
                 // Log theme change for debugging
                 console.log(`Theme applied: ${theme}`);
             }, [theme]);
-            // --- Helper Functions / Callbacks for Child Components ---
 
+
+            // --- Helper Functions / Callbacks for Child Components ---
             // Get Theme
             const getThemeColors = () => {
                 // Check if UI and getThemeColors exist
@@ -486,6 +477,7 @@
                 });
                 setShowForm(true);
             };
+
             // Update to handleSaveComponent
             const handleSaveComponent = (componentDataFromForm) => {
                 clearStatusMessages();
@@ -639,8 +631,6 @@
             useEffect(() => {
                 storage.saveLocations(locations);
             }, [locations]);
-
-
 
             // --- Bulk Action Callbacks ---
             const handleToggleSelect = (id) => {
@@ -1585,10 +1575,8 @@
                     setImportError("❌ Component save threw an error.");
                 }
             };
-            const handleSaveConfigLS = async () => {
+            const handleSaveConfig = async () => {
                 clearStatusMessages();
-
-                // Build the same config object you load on start-up
                 const currentConfig = {
                     categories,
                     viewMode,
@@ -1599,10 +1587,7 @@
                     itemsPerPage,
                     theme
                 };
-
                 try {
-                    // saveConfig is still synchronous (localStorage), but
-                    // awaiting it won’t hurt and keeps both handlers uniform
                     const ok = await storage.saveConfig(currentConfig);
                     if (ok) {
                         setExportMessage("✅ Config saved to LocalStorage.");
@@ -1615,7 +1600,7 @@
                 }
             };
 
-            const handleClearLS = async () => {
+            const handleClearStorage = async () => {
                 clearStatusMessages(); 
 
                 if (window.confirm('Are you sure you want to clear ALL inventory data and settings? This action cannot be undone.')) {
@@ -1783,8 +1768,8 @@
                         onDeleteCategory: handleDeleteCategory,
                         onAddDefaultCategory: handleAddDefaultCategory,
                         onSaveComponentsLS: handleSaveComponentsLS,
-                        onSaveConfigLS: handleSaveConfigLS,
-                        onClearLS: handleClearLS,
+                        onSaveConfig: handleSaveConfig,
+                        onClearStorage: handleClearStorage,
                         onAddFootprint: handleAddFootprint,
                         onEditFootprint: handleEditFootprint,
                         onDeleteFootprint: handleDeleteFootprint,

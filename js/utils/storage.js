@@ -196,26 +196,31 @@ window.App.utils.storage = {
     saveComponents: function(components) {
         var self = this;
         
+        // Sanitize components before saving
+        const sanitizedComponents = Array.isArray(components) 
+            ? components.map(comp => window.App.utils.sanitize.component(comp))
+            : [];
+        
         return this.init()
             .then(function(useIndexedDB) {
                 // Try IndexedDB first if available
                 if (useIndexedDB) {
-                    return window.App.utils.idb.saveComponents(components)
+                    return window.App.utils.idb.saveComponents(sanitizedComponents)
                         .catch(function(err) {
                             console.error("Error saving components to IndexedDB:", err);
-                            return self._saveComponentsToLocalStorage(components);
+                            return self._saveComponentsToLocalStorage(sanitizedComponents);
                         });
                 }
                 
                 // Otherwise use localStorage
-                return self._saveComponentsToLocalStorage(components);
+                return self._saveComponentsToLocalStorage(sanitizedComponents);
             });
     },
     
     _saveComponentsToLocalStorage: function(components) {
         try {
             localStorage.setItem('electronicsComponents', JSON.stringify(components));
-            console.log("Saved", components.length, "components to localStorage");
+            console.log("Saved", components.length, "sanitized components to localStorage");
             return true;
         } catch (err) {
             console.error("Error saving components to localStorage:", err);
@@ -259,26 +264,31 @@ window.App.utils.storage = {
     saveLocations: function(locations) {
         var self = this;
         
+        // Sanitize locations before saving
+        const sanitizedLocations = Array.isArray(locations)
+            ? locations.map(loc => window.App.utils.sanitize.location(loc))
+            : [];
+        
         return this.init()
             .then(function(useIndexedDB) {
                 // Try IndexedDB first if available
                 if (useIndexedDB) {
-                    return window.App.utils.idb.saveLocations(locations)
+                    return window.App.utils.idb.saveLocations(sanitizedLocations)
                         .catch(function(err) {
                             console.error("Error saving locations to IndexedDB:", err);
-                            return self._saveLocationsToLocalStorage(locations);
+                            return self._saveLocationsToLocalStorage(sanitizedLocations);
                         });
                 }
                 
                 // Otherwise use localStorage
-                return self._saveLocationsToLocalStorage(locations);
+                return self._saveLocationsToLocalStorage(sanitizedLocations);
             });
     },
     
     _saveLocationsToLocalStorage: function(locations) {
         try {
             localStorage.setItem('electronicsLocations', JSON.stringify(locations));
-            console.log("Saved", locations.length, "locations to localStorage");
+            console.log("Saved", locations.length, "sanitized locations to localStorage");
             return true;
         } catch (err) {
             console.error("Error saving locations to localStorage:", err);
@@ -322,26 +332,31 @@ window.App.utils.storage = {
     saveDrawers: function(drawers) {
         var self = this;
         
+        // Sanitize drawers before saving
+        const sanitizedDrawers = Array.isArray(drawers)
+            ? drawers.map(drawer => window.App.utils.sanitize.drawer(drawer))
+            : [];
+        
         return this.init()
             .then(function(useIndexedDB) {
                 // Try IndexedDB first if available
                 if (useIndexedDB) {
-                    return window.App.utils.idb.saveDrawers(drawers)
+                    return window.App.utils.idb.saveDrawers(sanitizedDrawers)
                         .catch(function(err) {
                             console.error("Error saving drawers to IndexedDB:", err);
-                            return self._saveDrawersToLocalStorage(drawers);
+                            return self._saveDrawersToLocalStorage(sanitizedDrawers);
                         });
                 }
                 
                 // Otherwise use localStorage
-                return self._saveDrawersToLocalStorage(drawers);
+                return self._saveDrawersToLocalStorage(sanitizedDrawers);
             });
     },
     
     _saveDrawersToLocalStorage: function(drawers) {
         try {
             localStorage.setItem('electronicsDrawers', JSON.stringify(drawers));
-            console.log("Saved", drawers.length, "drawers to localStorage");
+            console.log("Saved", drawers.length, "sanitized drawers to localStorage");
             return true;
         } catch (err) {
             console.error("Error saving drawers to localStorage:", err);
@@ -394,26 +409,31 @@ window.App.utils.storage = {
     saveCells: function(cells) {
         var self = this;
         
+        // Sanitize cells before saving
+        const sanitizedCells = Array.isArray(cells)
+            ? cells.map(cell => window.App.utils.sanitize.cell(cell))
+            : [];
+        
         return this.init()
             .then(function(useIndexedDB) {
                 // Try IndexedDB first if available
                 if (useIndexedDB) {
-                    return window.App.utils.idb.saveCells(cells)
+                    return window.App.utils.idb.saveCells(sanitizedCells)
                         .catch(function(err) {
                             console.error("Error saving cells to IndexedDB:", err);
-                            return self._saveCellsToLocalStorage(cells);
+                            return self._saveCellsToLocalStorage(sanitizedCells);
                         });
                 }
                 
                 // Otherwise use localStorage
-                return self._saveCellsToLocalStorage(cells);
+                return self._saveCellsToLocalStorage(sanitizedCells);
             });
     },
     
     _saveCellsToLocalStorage: function(cells) {
         try {
             localStorage.setItem('electronicsCells', JSON.stringify(cells));
-            console.log("Saved", cells.length, "cells to localStorage");
+            console.log("Saved", cells.length, "sanitized cells to localStorage");
             return true;
         } catch (err) {
             console.error("Error saving cells to localStorage:", err);

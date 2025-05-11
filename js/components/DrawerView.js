@@ -74,35 +74,42 @@ window.App.components.DrawerView = ({
     // Handle editing a cell nickname
     const handleEditCellNickname = (cell) => {
         if (!cell || !cell.id) return;
-        setEditingCellId(cell.id);
-        setEditCellNickname(cell.nickname || '');
+        // Sanitize the cell ID
+        const sanitizedCellId = window.App.utils.sanitize.value(cell.id);
+        setEditingCellId(sanitizedCellId);
+        // Sanitize the nickname before setting state
+        const sanitizedNickname = window.App.utils.sanitize.value(cell.nickname || '');
+        setEditCellNickname(sanitizedNickname);
     };
 
     // Handle saving a cell nickname
     const handleSaveCellNickname = () => {
+        // Find the cell being edited
         const cellToUpdate = drawerCells.find(cell => cell.id === editingCellId);
         if (!cellToUpdate) return;
-
-        const trimmedNickname = editCellNickname.trim();
-
+    
+        // Sanitize and trim the nickname
+        const trimmedNickname = window.App.utils.sanitize.value(editCellNickname.trim());
+    
         // Check for duplicate nicknames in this drawer
         const isDuplicate = drawerCells.some(cell =>
             cell.id !== editingCellId &&
             cell.nickname &&
             cell.nickname.toLowerCase() === trimmedNickname.toLowerCase()
         );
-
+    
         if (isDuplicate && trimmedNickname) {
             alert(`Nickname "${trimmedNickname}" is already used in this drawer.`);
             return;
         }
-
-        const updatedCell = {
+    
+        // Create a sanitized updated cell
+        const updatedCell = window.App.utils.sanitize.cell({
             ...cellToUpdate,
             nickname: trimmedNickname,
             available: cellToUpdate.available !== undefined ? cellToUpdate.available : true
-        };
-
+        });
+    
         onEditCell(editingCellId, updatedCell);
         setEditingCellId(null);
         setEditCellNickname('');
@@ -112,29 +119,37 @@ window.App.components.DrawerView = ({
     const handleToggleAvailability = (cellId) => {
         if (!cellId) return;
         
-        const cellToToggle = drawerCells.find(cell => cell.id === cellId);
+        // Sanitize the cell ID
+        const sanitizedCellId = window.App.utils.sanitize.value(cellId);
+        
+        const cellToToggle = drawerCells.find(cell => cell.id === sanitizedCellId);
         if (!cellToToggle) return;
-
-        const updatedCell = {
+    
+        // Create sanitized updated cell with toggled availability
+        const updatedCell = window.App.utils.sanitize.cell({
             ...cellToToggle,
             available: cellToToggle.available === false ? true : false // Toggle the value
-        };
-
-        onEditCell(cellId, updatedCell);
+        });
+    
+        onEditCell(sanitizedCellId, updatedCell);
     };
+    
 
     // Handle emptying a cell by removing all component associations
     const handleEmptyCell = (cellId) => {
         if (!cellId) return;
         
+        // Sanitize the cell ID
+        const sanitizedCellId = window.App.utils.sanitize.value(cellId);
+        
         // Find components assigned to this cell
-        const cellComponents = getComponentsForCell(cellId);
+        const cellComponents = getComponentsForCell(sanitizedCellId);
         
         if (cellComponents.length === 0) {
             alert("This cell is already empty.");
             return;
         }
-
+    
         if (window.confirm(`Remove ${cellComponents.length} component(s) from this cell?`)) {
             // We need to make a copy of the components array to update
             let updatedComponents = [...components];
@@ -154,16 +169,16 @@ window.App.components.DrawerView = ({
                     
                     // Handle new format (cells array)
                     if (updatedComponent.storageInfo.cells && Array.isArray(updatedComponent.storageInfo.cells)) {
-                        updatedComponent.storageInfo.cells = updatedComponent.storageInfo.cells.filter(id => id !== cellId);
+                        updatedComponent.storageInfo.cells = updatedComponent.storageInfo.cells.filter(id => id !== sanitizedCellId);
                     }
                     
                     // Handle legacy format (cellId)
-                    if (updatedComponent.storageInfo.cellId === cellId) {
+                    if (updatedComponent.storageInfo.cellId === sanitizedCellId) {
                         updatedComponent.storageInfo.cellId = '';
                     }
                     
-                    // Update the component in our array
-                    updatedComponents[index] = updatedComponent;
+                    // Sanitize the updated component
+                    updatedComponents[index] = window.App.utils.sanitize.component(updatedComponent);
                 }
             });
             
@@ -182,35 +197,35 @@ window.App.components.DrawerView = ({
     // Handle clicking on a cell
     const handleCellClick = (cell) => {
         if (!cell) return;
-        
         // If we're editing a cell, save before selecting a new one
         if (editingCellId && cell.id !== editingCellId) {
             handleSaveCellNickname();
         }
-
-        setSelectedCellId(cell.id);
+        // Sanitize the cell ID before setting state
+        setSelectedCellId(window.App.utils.sanitize.value(cell.id));
     };
 
     // Handle creating a new cell
     const handleCreateCell = (rowIndex, colIndex) => {
+        // Create the coordinate with clean inputs
         const coordinate = `${String.fromCharCode(65 + colIndex)}${rowIndex + 1}`;
-
+    
         // Check if a cell already exists for this coordinate
         const existingCell = drawerCells.find(cell => cell.coordinate === coordinate);
         if (existingCell) {
             setSelectedCellId(existingCell.id);
             return;
         }
-
-        // Create a new cell
-        const newCell = {
+    
+        // Create a sanitized new cell
+        const newCell = window.App.utils.sanitize.cell({
             id: `cell-${Date.now()}-${Math.random().toString(16).slice(2)}`,
             drawerId: drawer.id,
             coordinate: coordinate,
             nickname: '',
-            available: true // Add this property with default value true
-        };
-
+            available: true
+        });
+    
         onAddCell(newCell);
         setSelectedCellId(newCell.id);
     };

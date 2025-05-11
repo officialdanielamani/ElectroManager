@@ -71,7 +71,7 @@ window.App.utils.helpers = {
      * @param {string} [currencySymbol='$'] - The currency symbol to use.
      * @returns {string} - The formatted currency string (e.g., "$12.34").
      */
-    formatCurrency: (value, currencySymbol = '$') => {
+    formatCurrency: (value, currencySymbol = 'RM') => {
         const number = Number(value) || 0;
         // Basic formatting, ensures two decimal places
         return `${currencySymbol}${number.toFixed(2)}`;
@@ -184,18 +184,18 @@ window.App.utils.helpers = {
         return cells;
     },
 
-    /**
- * Sync the cell grid with a resized drawer.
- * - Adds any NEW coordinates that now fit inside the grid.
- * - Removes cells that fall outside the grid *only if they are empty*.
- *   (If they hold components, they stay but get marked `orphan: true` so the
- *    UI can highlight them and you can drag-move the parts later.)
- *
- * @param {Object} drawer   –– the updated drawer (already has new rows/cols)
- * @param {Array}  allCells –– entire cells array from state / storage
- * @param {Array}  components –– components array so we can check occupancy
- * @return {Array}          –– new cells array (ready for setCells + saveCells)
- */
+     /**
+    * Sync the cell grid with a resized drawer.
+    * - Adds any NEW coordinates that now fit inside the grid.
+    * - Removes cells that fall outside the grid *only if they are empty*.
+    *   (If they hold components, they stay but get marked `orphan: true` so the
+    *    UI can highlight them and you can drag-move the parts later.)
+    *
+    * @param {Object} drawer   –– the updated drawer (already has new rows/cols)
+    * @param {Array}  allCells –– entire cells array from state / storage
+    * @param {Array}  components –– components array so we can check occupancy
+    * @return {Array}          –– new cells array (ready for setCells + saveCells)
+    */
     syncCellsWithDrawer(drawer, allCells, components) {
         const helpers = window.App.utils.helpers;
 
@@ -209,7 +209,7 @@ window.App.utils.helpers = {
         const keep = [];
         const add = [];
 
-        // 1️⃣ iterate current cells for this drawer
+        // Iterate current cells for this drawer
         for (const cell of allCells) {
             if (cell.drawerId !== drawer.id) {
                 keep.push(cell);                     // belongs to another drawer
@@ -233,7 +233,7 @@ window.App.utils.helpers = {
             }
         }
 
-        // 2️⃣ create any coordinates still missing
+        // Create any coordinates still missing
         for (const key of wanted) {
             const [row, col] = key.split('-').map(Number);
             add.push({
@@ -251,67 +251,29 @@ window.App.utils.helpers = {
         return [...keep, ...add];
     },
 
-
-
 };
 
-// Create a sanitize helper function that works safely
-window.App.utils.helpers.sanitize = function(value) {
-    // Return non-string values unchanged
-    if (typeof value !== 'string') return value;
-    
-    // If DOMPurify exists, sanitize the string
-    if (window.DOMPurify) {
-        return window.DOMPurify.sanitize(value);
-    }
-    
-    // Fallback - basic HTML tag removal if DOMPurify not available
-    // This is not as secure as DOMPurify but better than nothing
-    return value.replace(/<[^>]*>?/gm, '');
-};
-
-// Modify parseParameters to sanitize inputs
 window.App.utils.helpers.parseParameters = (text) => {
-    if (!text || typeof text !== 'string') return {};
-    const params = {};
-    text.split('\n').forEach(line => {
-        const separatorIndex = line.indexOf(':');
-        if (separatorIndex > 0) { // Ensure colon exists and is not the first character
-            // Sanitize both key and value
-            const key = window.App.utils.helpers.sanitize(
-                line.substring(0, separatorIndex).trim()
-            );
-            const value = window.App.utils.helpers.sanitize(
-                line.substring(separatorIndex + 1).trim()
-            );
-
-            // Skip special values that should be handled separately
-            if (key === 'locationInfo' || key === 'storageInfo' ||
-                key === 'favorite' || key === 'bookmark' || key === 'star' ||
-                key === '<object>' || value === '<object>') {
-                return;
-            }
-
-            if (key) { // Ensure key is not empty
-                params[key] = value;
-            }
-        }
-    });
-    return params;
+    // Use our central sanitization utility
+    return window.App.utils.sanitize.parseParameters(text);
 };
 
 // Modify formatDatasheets to sanitize URLs
 window.App.utils.helpers.formatDatasheets = (datasheets) => {
     if (!datasheets || typeof datasheets !== 'string') return [];
-    return datasheets.split(/[\n,]+/) // Split by newline or comma
-        .map(url => window.App.utils.helpers.sanitize(url.trim())) // Trim and sanitize
+    
+    // Sanitize the input string first
+    const sanitizedDatasheets = window.App.utils.sanitize.value(datasheets);
+    
+    return sanitizedDatasheets.split(/[\n,]+/) // Split by newline or comma
+        .map(url => url.trim()) // Trim whitespace
         .filter(url => url && (url.startsWith('http://') || url.startsWith('https://'))); // Basic URL validation
 };
 
 // Add sanitization to any function that generates IDs
 window.App.utils.helpers.generateId = () => {
-    const rawId = `comp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    return window.App.utils.helpers.sanitize(rawId);
+    const id = `comp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    return window.App.utils.sanitize.value(id);
 };
 
 console.log("InventoryHelpers loaded."); // For debugging

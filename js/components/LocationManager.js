@@ -34,9 +34,16 @@ window.App.components.LocationManager = ({
     // Handle adding a new location
     const handleAddSubmit = (e) => {
         e.preventDefault();
-        const trimmedName = newLocationName.trim();
-        const trimmedDescription = newLocationDescription.trim();
         
+        // Sanitize inputs
+        const trimmedName = window.App.utils.sanitize.value(newLocationName.trim());
+        const trimmedDescription = window.App.utils.sanitize.value(newLocationDescription.trim());
+    
+        if (!selectedLocationId) {
+            alert("Please select a location for this drawer.");
+            return;
+        }
+    
         if (!trimmedName) {
             alert("Location name cannot be empty.");
             return;
@@ -48,28 +55,35 @@ window.App.components.LocationManager = ({
             return;
         }
         
-        const newLocation = {
+        // Create sanitized location object
+        const newLocation = window.App.utils.sanitize.location({
             id: `loc-${Date.now()}`,
             name: trimmedName,
             description: trimmedDescription
-        };
+        });
         
         onAddLocation(newLocation);
+        // Reset form
         setNewLocationName('');
         setNewLocationDescription('');
     };
 
     // Start editing a location
     const handleStartEdit = (location) => {
-        setEditingLocationId(location.id);
-        setEditLocationName(location.name);
-        setEditLocationDescription(location.description || '');
+        // Sanitize the location data before setting state
+        const sanitizedLocation = window.App.utils.sanitize.location(location);
+        
+        setEditingLocationId(sanitizedLocation.id);
+        setEditLocationName(sanitizedLocation.name);
+        setEditLocationDescription(sanitizedLocation.description || '');
     };
+    
 
     // Save the edited location
     const handleSaveEdit = () => {
-        const trimmedName = editLocationName.trim();
-        const trimmedDescription = editLocationDescription.trim();
+        // Sanitize inputs
+        const trimmedName = window.App.utils.sanitize.value(editLocationName.trim());
+        const trimmedDescription = window.App.utils.sanitize.value(editLocationDescription.trim());
         
         if (!trimmedName) {
             alert("Location name cannot be empty.");
@@ -85,11 +99,12 @@ window.App.components.LocationManager = ({
             return;
         }
         
-        const updatedLocation = {
+        // Create sanitized updated location object
+        const updatedLocation = window.App.utils.sanitize.location({
             id: editingLocationId,
             name: trimmedName,
             description: trimmedDescription
-        };
+        });
         
         onEditLocation(editingLocationId, updatedLocation);
         setEditingLocationId(null);

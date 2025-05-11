@@ -37,73 +37,88 @@ window.App.components.DrawerManager = ({
     const [showAddDrawerForm, setShowAddDrawerForm] = useState(false);
 
     // Handle adding a new drawer
-    function handleAddSubmit(e) {
+    const handleAddSubmit = (e) => {
         e.preventDefault();
-        const trimmedName = newDrawerName.trim();
-        const trimmedDescription = newDrawerDescription.trim();
-
-        if (!selectedLocationId) {
+        
+        // Sanitize inputs
+        const trimmedName = window.App.utils.sanitize.value(newDrawerName.trim());
+        const trimmedDescription = window.App.utils.sanitize.value(newDrawerDescription.trim());
+        const sanitizedLocationId = window.App.utils.sanitize.value(selectedLocationId);
+        
+        // Sanitize and parse numeric inputs
+        const rows = parseInt(window.App.utils.sanitize.value(newDrawerRows), 10) || 3;
+        const cols = parseInt(window.App.utils.sanitize.value(newDrawerCols), 10) || 3;
+    
+        if (!sanitizedLocationId) {
             alert("Please select a location for this drawer.");
             return;
         }
-
+    
         if (!trimmedName) {
             alert("Drawer name cannot be empty.");
             return;
         }
-
+    
         // Check for duplicate drawer names within the same location
-        if (drawers.some(drawer => drawer.locationId === selectedLocationId &&
+        if (drawers.some(drawer => drawer.locationId === sanitizedLocationId &&
             drawer.name.toLowerCase() === trimmedName.toLowerCase()
         )) {
             alert(`Drawer "${trimmedName}" already exists in this location.`);
             return;
         }
-
-        // Fix: Use parseInt with base 10 instead of base 16
-        const newDrawer = {
+    
+        // Create sanitized drawer object
+        const newDrawer = window.App.utils.sanitize.drawer({
             id: `drawer-${Date.now()}`,
-            locationId: selectedLocationId,
+            locationId: sanitizedLocationId,
             name: trimmedName,
             description: trimmedDescription,
             grid: {
-                rows: parseInt(newDrawerRows, 10) || 3,
-                cols: parseInt(newDrawerCols, 10) || 3
+                rows: rows,
+                cols: cols
             }
-        };
-
+        });
+    
         onAddDrawer(newDrawer);
-
+    
         // Reset form
         setNewDrawerName('');
         setNewDrawerDescription('');
         setNewDrawerRows(3);
         setNewDrawerCols(3);
-    }
+    };
 
     // Start editing a drawer
     const handleStartEdit = (drawer) => {
-        setEditingDrawerId(drawer.id);
-        setEditDrawerName(drawer.name);
-        setEditDrawerDescription(drawer.description || '');
-        setEditDrawerRows(drawer.grid?.rows || 3);
-        setEditDrawerCols(drawer.grid?.cols || 3);
+        // Sanitize drawer data
+        const sanitizedDrawer = window.App.utils.sanitize.drawer(drawer);
+        
+        setEditingDrawerId(sanitizedDrawer.id);
+        setEditDrawerName(sanitizedDrawer.name);
+        setEditDrawerDescription(sanitizedDrawer.description || '');
+        setEditDrawerRows(sanitizedDrawer.grid?.rows || 3);
+        setEditDrawerCols(sanitizedDrawer.grid?.cols || 3);
     };
 
     // Save the edited drawer
     const handleSaveEdit = () => {
-        const trimmedName = editDrawerName.trim();
-        const trimmedDescription = editDrawerDescription.trim();
-
+        // Sanitize inputs
+        const trimmedName = window.App.utils.sanitize.value(editDrawerName.trim());
+        const trimmedDescription = window.App.utils.sanitize.value(editDrawerDescription.trim());
+        
+        // Sanitize and parse numeric inputs
+        const rows = parseInt(window.App.utils.sanitize.value(editDrawerRows), 10) || 3;
+        const cols = parseInt(window.App.utils.sanitize.value(editDrawerCols), 10) || 3;
+        
         if (!trimmedName) {
             alert("Drawer name cannot be empty.");
             return;
         }
-
+    
         // Get the current drawer to check location
         const currentDrawer = drawers.find(d => d.id === editingDrawerId);
         if (!currentDrawer) return;
-
+    
         // Check for duplicate names in the same location, excluding the current drawer
         if (drawers.some(drawer =>
             drawer.id !== editingDrawerId &&
@@ -113,18 +128,18 @@ window.App.components.DrawerManager = ({
             alert(`Drawer "${trimmedName}" already exists in this location.`);
             return;
         }
-
-        // Fix: Use parseInt with base 10 instead of base 16
-        const updatedDrawer = {
+    
+        // Create sanitized updated drawer object
+        const updatedDrawer = window.App.utils.sanitize.drawer({
             ...currentDrawer,
             name: trimmedName,
             description: trimmedDescription,
             grid: {
-                rows: parseInt(editDrawerRows, 10) || 3,
-                cols: parseInt(editDrawerCols, 10) || 3
+                rows: rows,
+                cols: cols
             }
-        };
-
+        });
+    
         onEditDrawer(editingDrawerId, updatedDrawer);
         setEditingDrawerId(null);
     };

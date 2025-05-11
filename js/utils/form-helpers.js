@@ -290,3 +290,36 @@ window.App.utils.formHelpers = {
         return drawer ? drawer.name : '';
     }
 };
+
+// Update formatStorageInfo to sanitize inputs
+window.App.utils.formHelpers.formatStorageInfo = function(storageInfo) {
+    // Simply use the centralized sanitization utility
+    return window.App.utils.sanitize.object({
+        locationId: storageInfo?.locationId || '',
+        drawerId: storageInfo?.drawerId || '',
+        cells: Array.isArray(storageInfo?.cells) ? storageInfo.cells : []
+    });
+};
+
+// Update formatLocationInfo to sanitize inputs
+window.App.utils.formHelpers.formatLocationInfo = function(locationInfo) {
+    // Use the centralized sanitization utility
+    return window.App.utils.sanitize.object({
+        locationId: locationInfo?.locationId || '',
+        details: locationInfo?.details || ''
+    });
+};
+
+// Update getLocationName to sanitize output
+window.App.utils.formHelpers.getLocationName = function(locationId, locations) {
+    if (!locationId) return '';
+    const location = locations.find(loc => loc.id === locationId);
+    return location ? window.App.utils.sanitize.value(location.name) : '';
+};
+
+// Update getDrawerName to sanitize output  
+window.App.utils.formHelpers.getDrawerName = function(drawerId, drawers) {
+    if (!drawerId) return '';
+    const drawer = drawers.find(d => d.id === drawerId);
+    return drawer ? window.App.utils.sanitize.value(drawer.name) : '';
+};

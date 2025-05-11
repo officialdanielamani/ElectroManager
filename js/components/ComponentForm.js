@@ -41,6 +41,9 @@ window.App.components.ComponentForm = ({
         error: false
     });
 
+    // Create keydown handler to prevent disallowed characters
+    const handleKeyDown = window.App.utils.sanitize.createKeyDownHandler();
+
     // Initialize with proper structure for missing fields
     useEffect(() => {
         if (!componentData) return;
@@ -73,30 +76,39 @@ window.App.components.ComponentForm = ({
         
     }, [componentData]);
 
-    // Handle changes in form inputs
+    // Handle changes in form inputs with character validation
     const handleChange = (e) => {
         if (isViewOnly) return; // Don't process changes in view-only mode
+        
         const { name, value, type, checked } = e.target;
         // For checkbox inputs, use the 'checked' property as the value
         let newValue = type === 'checkbox' ? checked : value;
-        // Sanitize string inputs using DOMPurify if available
-        if (typeof newValue === 'string' && window.DOMPurify) {
-            newValue = window.DOMPurify.sanitize(newValue);
+        
+        // Filter for allowed characters if it's a string
+        if (typeof newValue === 'string') {
+            newValue = window.App.utils.sanitize.validateAllowedChars(newValue);
         }
+        
         setFormData(prevData => ({
             ...prevData,
             [name]: newValue
         }));
     };
     
-    // Handle numeric field changes with proper conversion
+    // Handle numeric field changes with proper conversion and validation
     const handleNumericChange = (e) => {
         if (isViewOnly) return;
+        
         const { name, value } = e.target;
-        // Sanitize input first
-        const sanitizedValue = window.DOMPurify ? window.DOMPurify.sanitize(value) : value;
+        
+        // First validate for allowed characters
+        const filteredValue = window.App.utils.sanitize.validateAllowedChars(value);
+        
         // Then convert to appropriate numeric type
-        const numericValue = name === 'price' ? parseFloat(sanitizedValue) || 0 : parseInt(sanitizedValue, 10) || 0;
+        const numericValue = name === 'price' 
+            ? parseFloat(filteredValue) || 0 
+            : parseInt(filteredValue, 10) || 0;
+        
         setFormData(prevData => ({
             ...prevData,
             [name]: numericValue
@@ -107,7 +119,9 @@ window.App.components.ComponentForm = ({
     const handleCategoryChange = (e) => {
         if (isViewOnly) return;
         
-        const value = e.target.value;
+        // Sanitize and validate the value
+        const value = window.App.utils.sanitize.validateAllowedChars(e.target.value);
+        
         setFormData(prevData => ({
             ...prevData,
             category: value,
@@ -116,11 +130,12 @@ window.App.components.ComponentForm = ({
         }));
     };
 
-    // Handle image URL changes
+    // Handle image URL changes with validation
     const handleImageUrlChange = (e) => {
         if (isViewOnly) return;
         
-        const url = e.target.value;
+        // Use normal value without character restriction since URLs can contain special chars
+        const url = window.App.utils.sanitize.value(e.target.value);
 
         // Update form data
         setFormData(prevData => ({
@@ -162,7 +177,9 @@ window.App.components.ComponentForm = ({
     const handleFootprintChange = (e) => {
         if (isViewOnly) return;
         
-        const value = e.target.value;
+        // Sanitize and validate the value
+        const value = window.App.utils.sanitize.validateAllowedChars(e.target.value);
+        
         setFormData(prevData => ({
             ...prevData,
             footprint: value,
@@ -171,11 +188,13 @@ window.App.components.ComponentForm = ({
         }));
     };
 
-    // Handle location changes
+    // Handle location changes with validation
     const handleLocationChange = (e) => {
         if (isViewOnly) return;
+        
         const { name, value } = e.target;
-        const sanitizedValue = window.DOMPurify ? window.DOMPurify.sanitize(value) : value;
+        const sanitizedValue = window.App.utils.sanitize.validateAllowedChars(value);
+        
         setFormData(prevData => ({
             ...prevData,
             locationInfo: {
@@ -185,21 +204,22 @@ window.App.components.ComponentForm = ({
         }));
     };
 
-    // Handle storage location changes (drawer assignment)
+    // Handle storage location changes (drawer assignment) with validation
     const handleStorageLocationChange = (e) => {
         if (isViewOnly) return;
         
         const { name, value } = e.target;
+        const sanitizedValue = window.App.utils.sanitize.validateAllowedChars(value);
 
         // Clear drawer and cells if location changes
-        if (name === 'locationId' && value !== formData.storageInfo?.locationId) {
+        if (name === 'locationId' && sanitizedValue !== formData.storageInfo?.locationId) {
             setSelectedDrawerId('');
             setSelectedCells([]);
 
             setFormData(prevData => ({
                 ...prevData,
                 storageInfo: {
-                    locationId: value,
+                    locationId: sanitizedValue,
                     drawerId: '',
                     cells: []
                 }
@@ -209,17 +229,17 @@ window.App.components.ComponentForm = ({
                 ...prevData,
                 storageInfo: {
                     ...prevData.storageInfo,
-                    [name]: value
+                    [name]: sanitizedValue
                 }
             }));
         }
     };
 
-    // Handle drawer selection
+    // Handle drawer selection with validation
     const handleDrawerChange = (e) => {
         if (isViewOnly) return;
         
-        const drawerId = e.target.value;
+        const drawerId = window.App.utils.sanitize.validateAllowedChars(e.target.value);
         setSelectedDrawerId(drawerId);
 
         // Clear selected cells when drawer changes
@@ -239,8 +259,11 @@ window.App.components.ComponentForm = ({
     const handleCellToggle = (cellId) => {
         if (isViewOnly) return;
         
+        // Sanitize the cell ID
+        const sanitizedCellId = window.App.utils.sanitize.validateAllowedChars(cellId);
+        
         // Find the cell from filtered cells
-        const cell = filteredCells.find(c => c.id === cellId);
+        const cell = filteredCells.find(c => c.id === sanitizedCellId);
 
         // Safely check if cell is unavailable before proceeding
         if (!cell || cell.available === false) {
@@ -249,12 +272,12 @@ window.App.components.ComponentForm = ({
 
         let updatedCells;
 
-        if (selectedCells.includes(cellId)) {
+        if (selectedCells.includes(sanitizedCellId)) {
             // Remove cell if already selected
-            updatedCells = selectedCells.filter(id => id !== cellId);
+            updatedCells = selectedCells.filter(id => id !== sanitizedCellId);
         } else {
             // Add cell if not already selected
-            updatedCells = [...selectedCells, cellId];
+            updatedCells = [...selectedCells, sanitizedCellId];
         }
 
         setSelectedCells(updatedCells);
@@ -280,33 +303,97 @@ window.App.components.ComponentForm = ({
         cells
     );
 
-    // Get drawer details for the selected drawer
-    const selectedDrawer = drawers.find(drawer => drawer.id === selectedDrawerId);
-
-    // Handle form submission
-    // Add this for the parameters textarea when saving
+    // Handle form submission with validation
     const handleSubmit = (e) => {
-    e.preventDefault(); // Prevent default form submission
-    if (!isViewOnly) {
-        // Create a copy of the form data to sanitize
-        const sanitizedData = { ...formData };
+        e.preventDefault(); // Prevent default form submission
         
-        // Sanitize fields that might contain HTML
-        if (window.DOMPurify) {
-            if (sanitizedData.parameters) sanitizedData.parameters = window.DOMPurify.sanitize(sanitizedData.parameters);
-            if (sanitizedData.info) sanitizedData.info = window.DOMPurify.sanitize(sanitizedData.info);
-            if (sanitizedData.datasheets) sanitizedData.datasheets = window.DOMPurify.sanitize(sanitizedData.datasheets);
-            if (sanitizedData.customCategory) sanitizedData.customCategory = window.DOMPurify.sanitize(sanitizedData.customCategory);
-            if (sanitizedData.customFootprint) sanitizedData.customFootprint = window.DOMPurify.sanitize(sanitizedData.customFootprint);
-            // Sanitize nested objects
-            if (sanitizedData.locationInfo?.details) {
-                sanitizedData.locationInfo.details = window.DOMPurify.sanitize(sanitizedData.locationInfo.details);
+        if (!isViewOnly) {
+            // Check for any invalid characters across all fields
+            const fieldsToCheck = {
+                'Name': formData.name || '',
+                'Type/Model': formData.type || '',
+                'Info': formData.info || '',
+                'Category': formData.customCategory || '',
+                'Footprint': formData.customFootprint || ''
+            };
+            
+            const invalidFieldChars = {};
+            let hasInvalidChars = false;
+            
+            // Check each field for invalid characters
+            for (const [fieldName, fieldValue] of Object.entries(fieldsToCheck)) {
+                const invalidChars = window.App.utils.sanitize.getInvalidChars(fieldValue);
+                if (invalidChars.length > 0) {
+                    invalidFieldChars[fieldName] = invalidChars;
+                    hasInvalidChars = true;
+                }
             }
+            
+            if (hasInvalidChars) {
+                // Format a warning message about invalid characters
+                let warningMessage = "The following fields contain invalid characters that will be removed:\n\n";
+                
+                for (const [fieldName, chars] of Object.entries(invalidFieldChars)) {
+                    warningMessage += `${fieldName}: ${chars.join(' ')}\n`;
+                }
+                
+                alert(warningMessage);
+                
+                // Auto-clean the data
+                const cleanedData = { ...formData };
+                if (cleanedData.name) cleanedData.name = window.App.utils.sanitize.validateAllowedChars(cleanedData.name);
+                if (cleanedData.type) cleanedData.type = window.App.utils.sanitize.validateAllowedChars(cleanedData.type);
+                if (cleanedData.info) cleanedData.info = window.App.utils.sanitize.validateAllowedChars(cleanedData.info);
+                if (cleanedData.customCategory) cleanedData.customCategory = window.App.utils.sanitize.validateAllowedChars(cleanedData.customCategory);
+                if (cleanedData.customFootprint) cleanedData.customFootprint = window.App.utils.sanitize.validateAllowedChars(cleanedData.customFootprint);
+                
+                // Update form with cleaned data
+                setFormData(cleanedData);
+            }
+            
+            // Final sanitization of all data
+            const sanitizedData = window.App.utils.sanitize.component(formData);
+            
+            // Basic validation
+            if (!sanitizedData.name || !sanitizedData.category) {
+                alert("Component Name and Category are required.");
+                return;
+            }
+            
+            onSave(sanitizedData); // Pass the sanitized form data to the parent save handler
         }
-        onSave(sanitizedData); // Pass the sanitized form data to the parent save handler
-    }
-};
+    };
 
+    // Helper function to create a validation indicator
+    const createValidationIndicator = (value, fieldName) => {
+        const isValid = window.App.utils.sanitize.isValidString(value);
+        
+        if (!isValid) {
+            return React.createElement('div', {
+                className: `absolute right-8 top-1/2 transform -translate-y-1/2`,
+                title: `${fieldName} contains invalid characters that will be removed`
+            },
+                React.createElement('span', {
+                    className: "text-red-500 text-sm font-bold"
+                }, "!")
+            );
+        }
+        
+        return null;
+    };
+
+    // Helper function to create a character counter
+    const createCharCounter = (value, maxLength) => {
+        const length = (value || '').length;
+        const isNearLimit = length > maxLength * 0.8;
+        
+        return React.createElement('div', {
+            className: `absolute bottom-1 right-2 text-xs ${
+                isNearLimit ? 'text-orange-500' : `text-${UI.getThemeColors().textMuted}`
+            }`
+        }, `${length}/${maxLength}`);
+    };
+    
     // --- Render ---
     return (
         React.createElement('div', { className: UI.modals.backdrop },
@@ -344,8 +431,8 @@ window.App.components.ComponentForm = ({
                     className: UI.modals.body 
                 },
                     React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4" },
-                        // Name Input
-                        React.createElement('div', { className: "md:col-span-1" },
+                        // Name Input with validation and character counter
+                        React.createElement('div', { className: "md:col-span-1 relative" },
                             React.createElement('label', { htmlFor: "comp-name", className: UI.forms.label }, 
                                 "Name ", !isViewOnly && React.createElement('span', { className: UI.colors.danger.text }, "*")),
                             React.createElement('input', {
@@ -355,11 +442,19 @@ window.App.components.ComponentForm = ({
                                 className: UI.forms.input,
                                 value: formData.name || '',
                                 onChange: handleChange,
+                                onKeyDown: handleKeyDown,
+                                maxLength: window.App.utils.sanitize.LIMITS.COMPONENT_NAME,
+                                pattern: "[A-Za-z0-9,.\-_ ]*",
                                 required: !isViewOnly,
                                 readOnly: isViewOnly
-                            })
+                            }),
+                            React.createElement('p', { className: UI.forms.hint },
+                                "Component Name . A-Z a-z 0-9 . , - _"
+                            ),
+                            !isViewOnly && createCharCounter(formData.name, window.App.utils.sanitize.LIMITS.COMPONENT_NAME),
+                            !isViewOnly && createValidationIndicator(formData.name, "Name"),
                         ),
-                        // Category Select/Input
+                        // Category Select/Input with validation
                         React.createElement('div', { className: "md:col-span-1" },
                             React.createElement('label', { htmlFor: "comp-category", className: UI.forms.label }, 
                                 "Category ", !isViewOnly && React.createElement('span', { className: UI.colors.danger.text }, "*")),
@@ -385,19 +480,29 @@ window.App.components.ComponentForm = ({
                                         (categories || []).sort().map(cat => React.createElement('option', { key: cat, value: cat }, cat)),
                                         React.createElement('option', { value: "__custom__" }, "Add new...")
                                     ),
-                                    formData.category === '__custom__' && React.createElement('input', {
-                                        name: "customCategory",
-                                        type: "text",
-                                        placeholder: "New category name",
-                                        className: `${UI.forms.input} mt-2`,
-                                        value: formData.customCategory || '',
-                                        onChange: handleChange,
-                                        required: formData.category === '__custom__'
-                                    })
+                                    formData.category === '__custom__' && React.createElement('div', { className: "relative mt-2" },
+                                        React.createElement('input', {
+                                            name: "customCategory",
+                                            type: "text",
+                                            placeholder: "New category name",
+                                            className: UI.forms.input,
+                                            value: formData.customCategory || '',
+                                            onChange: handleChange,
+                                            onKeyDown: handleKeyDown,
+                                            maxLength: window.App.utils.sanitize.LIMITS.CATEGORY,
+                                            pattern: "[A-Za-z0-9,.\-_ ]*",
+                                            required: formData.category === '__custom__'
+                                        }),
+                                        createCharCounter(formData.customCategory, window.App.utils.sanitize.LIMITS.CATEGORY),
+                                        createValidationIndicator(formData.customCategory, "Category")
+                                    ),
+                                    React.createElement('p', { className: UI.forms.hint },
+                                        "Component Category"
+                                    ),
                                 )
                         ),
-                        // Type Input
-                        React.createElement('div', { className: "md:col-span-1" },
+                        // Type Input with validation and character counter
+                        React.createElement('div', { className: "md:col-span-1 relative" },
                             React.createElement('label', { htmlFor: "comp-type", className: UI.forms.label }, "Type / Model"),
                             React.createElement('input', {
                                 id: "comp-type",
@@ -406,9 +511,17 @@ window.App.components.ComponentForm = ({
                                 className: UI.forms.input,
                                 value: formData.type || '',
                                 onChange: handleChange,
+                                onKeyDown: handleKeyDown,
+                                maxLength: window.App.utils.sanitize.LIMITS.COMPONENT_MODEL,
+                                pattern: "[A-Za-z0-9,.\-_ ]*",
                                 placeholder: "e.g., Resistor, LM7805",
                                 readOnly: isViewOnly
-                            })
+                            }),
+                            !isViewOnly && createCharCounter(formData.type, window.App.utils.sanitize.LIMITS.COMPONENT_MODEL),
+                            !isViewOnly && createValidationIndicator(formData.type, "Type"),
+                            React.createElement('p', { className: UI.forms.hint },
+                                "Component Type/Model . A-Z a-z 0-9 . , - _"
+                            ),
                         ),
                         // Quantity Input
                         React.createElement('div', { className: "md:col-span-1" },
@@ -475,8 +588,8 @@ window.App.components.ComponentForm = ({
                                             locations.map(loc => React.createElement('option', { key: loc.id, value: loc.id }, loc.name))
                                         )
                                 ),
-                                // Location Details (e.g., shelf, box)
-                                React.createElement('div', null,
+                                // Location Details with validation
+                                React.createElement('div', { className: "relative" },
                                     React.createElement('label', { htmlFor: "comp-location-details", className: UI.forms.label }, 
                                         "Location Details (Optional)"),
                                     React.createElement('input', {
@@ -486,9 +599,14 @@ window.App.components.ComponentForm = ({
                                         className: UI.forms.input,
                                         value: formData.locationInfo?.details || '',
                                         onChange: handleLocationChange,
+                                        onKeyDown: handleKeyDown,
+                                        maxLength: window.App.utils.sanitize.LIMITS.LOCATION_DESCRIPTION,
+                                        pattern: "[A-Za-z0-9,.\-_ ]*",
                                         placeholder: "e.g., Shelf 3, Box A",
                                         readOnly: isViewOnly
-                                    })
+                                    }),
+                                    !isViewOnly && createCharCounter(formData.locationInfo?.details, window.App.utils.sanitize.LIMITS.LOCATION_DESCRIPTION),
+                                    !isViewOnly && createValidationIndicator(formData.locationInfo?.details, "Location Details")
                                 )
                             ),
 
@@ -514,7 +632,7 @@ window.App.components.ComponentForm = ({
                             )
                         ),
 
-                        // Footprint Select/Input
+                        // Footprint Select/Input with validation
                         React.createElement('div', { className: "md:col-span-1" },
                             React.createElement('label', { htmlFor: "comp-footprint", className: UI.forms.label }, "Footprint"),
                             isViewOnly ?
@@ -538,19 +656,26 @@ window.App.components.ComponentForm = ({
                                         React.createElement('option', { value: "__custom__" }, "Custom footprint..."),
                                         (footprints || []).sort().map(fp => React.createElement('option', { key: fp, value: fp }, fp))
                                     ),
-                                    formData.footprint === '__custom__' && React.createElement('input', {
-                                        name: "customFootprint",
-                                        type: "text",
-                                        placeholder: "Enter custom footprint",
-                                        className: `${UI.forms.input} mt-2`,
-                                        value: formData.customFootprint || '',
-                                        onChange: handleChange,
-                                        required: formData.footprint === '__custom__'
-                                    })
+                                    formData.footprint === '__custom__' && React.createElement('div', { className: "relative mt-2" },
+                                        React.createElement('input', {
+                                            name: "customFootprint",
+                                            type: "text",
+                                            placeholder: "Enter custom footprint",
+                                            className: UI.forms.input,
+                                            value: formData.customFootprint || '',
+                                            onChange: handleChange,
+                                            onKeyDown: handleKeyDown,
+                                            maxLength: window.App.utils.sanitize.LIMITS.FOOTPRINT,
+                                            pattern: "[A-Za-z0-9,.\-_ ]*",
+                                            required: formData.footprint === '__custom__'
+                                        }),
+                                        createCharCounter(formData.customFootprint, window.App.utils.sanitize.LIMITS.FOOTPRINT),
+                                        createValidationIndicator(formData.customFootprint, "Footprint")
+                                    )
                                 )
                         ),
-                        // Info Input
-                        React.createElement('div', { className: "md:col-span-2" },
+                        // Info Input with validation and character counter
+                        React.createElement('div', { className: "md:col-span-2 relative" },
                             React.createElement('label', { htmlFor: "comp-info", className: UI.forms.label }, "Info"),
                             React.createElement('input', {
                                 id: "comp-info",
@@ -559,9 +684,14 @@ window.App.components.ComponentForm = ({
                                 className: UI.forms.input,
                                 value: formData.info || '',
                                 onChange: handleChange,
+                                onKeyDown: handleKeyDown,
+                                maxLength: window.App.utils.sanitize.LIMITS.COMPONENT_INFO,
+                                pattern: "[A-Za-z0-9,.\-_ ]*",
                                 placeholder: "e.g., Voltage regulation",
                                 readOnly: isViewOnly
-                            })
+                            }),
+                            !isViewOnly && createCharCounter(formData.info, window.App.utils.sanitize.LIMITS.COMPONENT_INFO),
+                            !isViewOnly && createValidationIndicator(formData.info, "Info")
                         ),
                         // Datasheets Textarea
                         React.createElement('div', { className: "md:col-span-2" },
@@ -756,4 +886,4 @@ window.App.components.ComponentForm = ({
     );
 }; // End ComponentForm
 
-console.log("ComponentForm component loaded - fixed version with proper form-helpers integration.");
+console.log("ComponentForm component loaded with improved validation and character limits.");

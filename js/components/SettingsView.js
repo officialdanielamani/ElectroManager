@@ -35,8 +35,8 @@ window.App.components.SettingsView = ({
     onDeleteCategory, // Function(category): Called to delete a category
     onAddDefaultCategory, // Function: Called to add a "Default" category
     onSaveComponentsLS, // Function: Called to force save components to localStorage
-    onSaveConfigLS, // Function: Called to force save config to localStorage
-    onClearLS, // Function: Called to clear all localStorage
+    onSaveConfig, // Function: Called to force save config to localStorage
+    onClearStorage, // Function: Called to clear all localStorage
     onAddFootprint, // Function(newFootprint): Called to add a new footprint
     onEditFootprint, // Function(oldFootprint, newFootprint): Called to rename a footprint
     onDeleteFootprint, // Function(footprint): Called to delete a footprint
@@ -61,48 +61,53 @@ window.App.components.SettingsView = ({
 
     // Handle low stock threshold submission
     const handleAddLowStock = () => {
-        if (!newLowStockCategory || newLowStockThreshold < 1) {
+        // Sanitize the category input
+        const category = window.App.utils.sanitize.value(newLowStockCategory);
+        // Parse and validate the threshold value
+        const threshold = parseInt(window.App.utils.sanitize.value(newLowStockThreshold), 10) || 5;    
+        if (!category || threshold < 1) {
             alert("Please select a category and enter a threshold greater than 0.");
             return;
         }
-        onAddLowStock(newLowStockCategory, newLowStockThreshold);
+        onAddLowStock(category, threshold);
         // Reset the form
         setNewLowStockThreshold(5);
     };
 
     // Start editing category
     const handleStartEditCategory = (category) => {
-        setEditingCategory(category);
-        setNewCategoryName(category);
+        // Sanitize the category before setting state
+        const sanitizedCategory = window.App.utils.sanitize.value(category);
+        setEditingCategory(sanitizedCategory);
+        setNewCategoryName(sanitizedCategory);
     };
 
     // Save edited category name
     const handleSaveCategory = () => {
-        const trimmedNewName = newCategoryName.trim();
+        // Sanitize the new name
+        const sanitizedOldName = window.App.utils.sanitize.value(editingCategory);
+        const trimmedNewName = window.App.utils.sanitize.value(newCategoryName.trim());
         // Validate
         if (!trimmedNewName) {
             alert("Category name cannot be empty.");
             return;
         }
-
-        if (trimmedNewName === editingCategory) {
+        if (trimmedNewName === sanitizedOldName) {
             // No change, just cancel
             setEditingCategory(null);
             setNewCategoryName('');
             return;
         }
-
         if (categories.includes(trimmedNewName)) {
             alert(`Category "${trimmedNewName}" already exists.`);
             return;
         }
-
         // Call parent handler and reset state
-        onEditCategory(editingCategory, trimmedNewName);
+        onEditCategory(sanitizedOldName, trimmedNewName);
         setEditingCategory(null);
         setNewCategoryName('');
     };
-
+    
     // Cancel category editing
     const handleCancelCategoryEdit = () => {
         setEditingCategory(null);
@@ -268,7 +273,7 @@ window.App.components.SettingsView = ({
                                 className: UI.buttons.primary
                             }, "Force Save Components"),
                             React.createElement('button', {
-                                onClick: onSaveConfigLS,
+                                onClick: onSaveConfig,
                                 className: UI.buttons.info
                             }, "Force Save Configuration")
                         ),
@@ -575,7 +580,7 @@ window.App.components.SettingsView = ({
                             className: UI.buttons.primary
                         }, "Force Save Components"),
                         React.createElement('button', {
-                            onClick: onSaveConfigLS,
+                            onClick: onSaveConfig,
                             className: UI.buttons.info
                         }, "Force Save Configuration"),
                     ),
@@ -604,7 +609,7 @@ window.App.components.SettingsView = ({
                                     "Warning: Deletes all item in database, and clear all settings (LocalStorage & IndexedDB). There is no way back"
                                 ),
                                 React.createElement('button', {
-                                    onClick: onClearLS,
+                                    onClick: onClearStorage,
                                     className: UI.buttons.danger
                                 }, "Clear All Data"),
                                 React.createElement('p', { className: "text-xs text-red-600 mt-1" }, "I am aware what I am doing when clicking the button above"),

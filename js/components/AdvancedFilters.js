@@ -45,8 +45,9 @@ window.App.components.AdvancedFilters = ({
     isExpanded, // Boolean: Whether the filter panel is expanded
     onToggleExpand, // Function: Toggle expanded state
 }) => {
+
     // Get UI constants
-    const { helpers, UI } = window.App.utils;
+    const { UI } = window.App.utils;
     const { useState, useEffect } = React;
 
     // Extract unique types from components
@@ -83,7 +84,6 @@ window.App.components.AdvancedFilters = ({
             // Set stats, ensuring min is never below 0
             setPriceStats({
                 min: Math.max(0, calculatedPriceMin),
-                // Use a sensible default max for the slider UI if actual max is 0 or less than min
                 max: Math.max(Math.max(0, calculatedPriceMin), Math.max(...prices) || 0) || 100
             });
 
@@ -574,10 +574,10 @@ window.App.components.AdvancedFilters = ({
             ),
 
             // Search Input (column 2)
-            React.createElement('div', { className: "md:col-span-2" },
+            React.createElement('div', { className: "md:col-span-1" },
                 React.createElement('label', {
                     htmlFor: "search-input",
-                    className: UI.forms.label
+                    className: UI.typography.body
                 }, "Search Components"),
                 React.createElement('div', { className: "flex" },
                     React.createElement('input', {
@@ -605,12 +605,11 @@ window.App.components.AdvancedFilters = ({
                         title: "Clear search"
                     }, "✕")
                 )
-
             ),
 
             // View Mode Toggle (column 3)
             React.createElement('div', { className: "md:col-span-3 lg:col-span-1" },
-                React.createElement('label', { className: UI.forms.label }, "View Mode"),
+                React.createElement('label', { className: UI.typography.body }, "View Mode"),
                 React.createElement('div', { className: `flex rounded shadow-sm border border-${UI.getThemeColors().border}` },
                     React.createElement('button', {
                         title: "Table View",
@@ -661,13 +660,13 @@ window.App.components.AdvancedFilters = ({
             React.createElement('div', { className: "flex items-center" },
                 React.createElement('h3', { className: UI.typography.heading.h3 }, "Advanced Filters"),
                 activeFilterCount > 0 && React.createElement('span', {
-                    className: "ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full"
+                    className: `ml-2 ${UI.buttons.small.info} `
                 }, `${activeFilterCount} active`)
             ),
             // Expand/collapse icon
             React.createElement('svg', {
                 xmlns: "http://www.w3.org/2000/svg",
-                className: `h-5 w-5 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`,
+                className: `h-5 w-5 ${UI.colors.secondary} transform transition-transform ${isExpanded ? 'rotate-180' : ''}`,
                 fill: "none",
                 viewBox: "0 0 24 24",
                 stroke: "currentColor"

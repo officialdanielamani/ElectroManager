@@ -1,4 +1,4 @@
-// js/components/BulkEditForm.js - With improved theme support
+// js/components/BulkEditForm.js - With improved validation and sanitization
 
 // Ensure the global namespace exists
 window.App = window.App || {};
@@ -6,6 +6,7 @@ window.App.components = window.App.components || {};
 
 /**
  * React Component for the Bulk Edit Modal Form.
+ * Allows editing multiple components at once with improved validation and sanitization.
  */
 window.App.components.BulkEditForm = ({
     // Props
@@ -18,10 +19,11 @@ window.App.components.BulkEditForm = ({
     onApply, // Function: Callback when apply button clicked, passes bulk edit data
     onCancel // Function: Callback when cancel button or close icon clicked
 }) => {
-    // Get UI constants
+    // Get UI constants and helpers
     const { UI } = window.App.utils;
     const { useState, useEffect } = React;
     const { formHelpers } = window.App.utils;
+    const { sanitize } = window.App.utils;
 
     // Internal state for the bulk edit form fields
     const [bulkData, setBulkData] = useState({
@@ -54,6 +56,9 @@ window.App.components.BulkEditForm = ({
     const [filteredDrawers, setFilteredDrawers] = useState([]);
     const [filteredCells, setFilteredCells] = useState([]);
     const [selectedDrawer, setSelectedDrawer] = useState(null);
+
+    // Create keydown handler to prevent disallowed characters
+    const handleKeyDown = sanitize.createKeyDownHandler();
 
     // Update filtered drawers when storage location changes
     useEffect(() => {
@@ -97,27 +102,48 @@ window.App.components.BulkEditForm = ({
         }
     }, [bulkData.drawerId, drawers, cells]);
 
-    // Handle input changes
+    // Handle input changes with sanitization
     const handleChange = (e) => {
         const { name, value } = e.target;
+        // Sanitize input value
+        const sanitizedValue = sanitize.validateAllowedChars(value);
+        
         setBulkData(prevData => ({
             ...prevData,
-            [name]: value
+            [name]: sanitizedValue
         }));
     };
 
-    // Handle checkbox changes
-    const handleCheckboxChange = (e) => {
-        const { name, checked } = e.target;
-        setBulkData(prevData => ({
-            ...prevData,
-            [name]: checked
-        }));
+    // Handle numeric field changes with proper conversion and validation
+    const handleNumericChange = (e) => {
+        const { name, value } = e.target;
+        
+        // First validate for allowed characters
+        const filteredValue = sanitize.validateAllowedChars(value);
+        
+        // Then convert to appropriate numeric type if needed
+        if (name === 'quantity' || name === 'price') {
+            const numericValue = name === 'price' 
+                ? parseFloat(filteredValue) || 0 
+                : parseInt(filteredValue, 10) || 0;
+            
+            setBulkData(prevData => ({
+                ...prevData,
+                [name]: numericValue
+            }));
+        } else {
+            // For other fields, just use the sanitized string
+            setBulkData(prevData => ({
+                ...prevData,
+                [name]: filteredValue
+            }));
+        }
     };
 
     // Handle category selection, including "Add new..."
     const handleCategoryChange = (e) => {
-        const value = e.target.value;
+        const value = sanitize.validateAllowedChars(e.target.value);
+        
         setBulkData(prevData => ({
             ...prevData,
             category: value,
@@ -125,10 +151,11 @@ window.App.components.BulkEditForm = ({
             customCategory: value === '__custom__' ? prevData.customCategory : ''
         }));
     };
-
-    // Handle footprint selection, including "Custom..."
+    
+    // Handle footprint selection, including custom option
     const handleFootprintChange = (e) => {
-        const value = e.target.value;
+        const value = sanitize.validateAllowedChars(e.target.value);
+        
         setBulkData(prevData => ({
             ...prevData,
             footprint: value,
@@ -137,10 +164,11 @@ window.App.components.BulkEditForm = ({
         }));
     };
 
-    // Handle cell selection/deselection
+    // Handle cell selection/deselection with validation
     const handleCellToggle = (cellId) => {
         // Find the cell from filtered cells
-        const cell = filteredCells.find(c => c.id === cellId);
+        const sanitizedCellId = sanitize.validateAllowedChars(cellId);
+        const cell = filteredCells.find(c => c.id === sanitizedCellId);
 
         // Don't allow toggling unavailable cells
         if (!cell || cell.available === false) {
@@ -151,17 +179,17 @@ window.App.components.BulkEditForm = ({
             const updatedCells = [...prevData.selectedCells];
 
             // Toggle selected state
-            if (updatedCells.includes(cellId)) {
+            if (updatedCells.includes(sanitizedCellId)) {
                 // Remove cell if already selected
                 return {
                     ...prevData,
-                    selectedCells: updatedCells.filter(id => id !== cellId)
+                    selectedCells: updatedCells.filter(id => id !== sanitizedCellId)
                 };
             } else {
                 // Add cell if not already selected
                 return {
                     ...prevData,
-                    selectedCells: [...updatedCells, cellId]
+                    selectedCells: [...updatedCells, sanitizedCellId]
                 };
             }
         });
@@ -169,40 +197,89 @@ window.App.components.BulkEditForm = ({
 
     // Add new handler for toggle switch changes
     const handleBooleanChange = (name, value) => {
+        // No need to sanitize boolean values
         setBulkData(prevData => ({
             ...prevData,
             [name]: value
         }));
     };
 
-    // Handle applying the changes
+    // Handle applying the changes with validation
     const handleApply = () => {
-        onApply(bulkData); // Pass the current bulk edit state to the parent handler
-    };
-
-    const generateCellGrid = () => {
-        if (!selectedDrawer) return null;
-        return formHelpers.generateCellGrid(
-            selectedDrawer,
-            filteredCells,
-            bulkData.selectedCells,
-            handleCellToggle,
-            UI
-        );
-    };
-
-    // Get selected cells information
-    const getSelectedCellsInfo = () => {
-        if (bulkData.selectedCells.length === 0) return "";
-
-        return bulkData.selectedCells.map(cellId => {
-            const cell = cells.find(c => c.id === cellId);
-            // Only include available cells in the info
-            if (cell && cell.available !== false) {
-                return cell.nickname || cell.coordinate;
+        // Check for any invalid characters across all fields
+        const fieldsToCheck = {
+            'Type/Model': bulkData.type || '',
+            'Category': bulkData.customCategory || '',
+            'Footprint': bulkData.customFootprint || '',
+            'Location Details': bulkData.locationDetails || ''
+        };
+        
+        const invalidFieldChars = {};
+        let hasInvalidChars = false;
+        
+        // Check each field for invalid characters
+        for (const [fieldName, fieldValue] of Object.entries(fieldsToCheck)) {
+            const invalidChars = sanitize.getInvalidChars(fieldValue);
+            if (invalidChars.length > 0) {
+                invalidFieldChars[fieldName] = invalidChars;
+                hasInvalidChars = true;
             }
-            return cellId;
-        }).filter(Boolean).join(", "); // Filter out any undefined values
+        }
+        
+        if (hasInvalidChars) {
+            // Format a warning message about invalid characters
+            let warningMessage = "The following fields contain invalid characters that will be removed:\n\n";
+            
+            for (const [fieldName, chars] of Object.entries(invalidFieldChars)) {
+                warningMessage += `${fieldName}: ${chars.join(' ')}\n`;
+            }
+            
+            alert(warningMessage);
+            
+            // Auto-clean the data
+            const cleanedData = { ...bulkData };
+            if (cleanedData.type) cleanedData.type = sanitize.validateAllowedChars(cleanedData.type);
+            if (cleanedData.customCategory) cleanedData.customCategory = sanitize.validateAllowedChars(cleanedData.customCategory);
+            if (cleanedData.customFootprint) cleanedData.customFootprint = sanitize.validateAllowedChars(cleanedData.customFootprint);
+            if (cleanedData.locationDetails) cleanedData.locationDetails = sanitize.validateAllowedChars(cleanedData.locationDetails);
+            
+            // Update form with cleaned data
+            setBulkData(cleanedData);
+            return;
+        }
+
+        // Validate custom category if selected
+        if (bulkData.category === '__custom__' && !bulkData.customCategory.trim()) {
+            alert("New category name cannot be empty when 'Add new category' is selected.");
+            return;
+        }
+        
+        // Validate custom footprint if selected
+        if (bulkData.footprint === '__custom__' && !bulkData.customFootprint.trim()) {
+            alert("Custom footprint name cannot be empty when 'Custom footprint' is selected.");
+            return;
+        }
+        
+        // If setting location but no location selected
+        if (bulkData.locationAction === 'set' && !bulkData.locationId) {
+            alert("Please select a location or choose a different location action.");
+            return;
+        }
+        
+        // If setting drawer location but no location selected
+        if (bulkData.storageAction === 'set' && !bulkData.storageLocationId) {
+            alert("Please select a storage location or choose a different storage action.");
+            return;
+        }
+        
+        // Validate drawer selection if storage location is selected
+        if (bulkData.storageAction === 'set' && bulkData.storageLocationId && 
+            bulkData.drawerId && bulkData.selectedCells.length === 0) {
+            alert("Please select at least one cell in the drawer or clear the drawer selection.");
+            return;
+        }
+
+        onApply(sanitize.object(bulkData)); // Apply sanitized bulk edit data
     };
 
     // --- Main Render ---
@@ -254,26 +331,53 @@ window.App.components.BulkEditForm = ({
                                 (categories || []).sort().map(cat => React.createElement('option', { key: cat, value: cat }, cat)),
                                 React.createElement('option', { value: "__custom__" }, "Add new category...")
                             ),
-                            bulkData.category === '__custom__' && React.createElement('input', {
-                                name: "customCategory",
-                                type: "text",
-                                placeholder: "Enter new category name",
-                                className: UI.forms.input,
-                                value: bulkData.customCategory || '',
-                                onChange: handleChange
-                            })
+                            bulkData.category === '__custom__' && React.createElement('div', { className: "relative mt-2" },
+                                React.createElement('input', {
+                                    name: "customCategory",
+                                    type: "text",
+                                    placeholder: "Enter new category name",
+                                    className: UI.forms.input,
+                                    value: bulkData.customCategory || '',
+                                    onChange: handleChange,
+                                    onKeyDown: handleKeyDown,
+                                    maxLength: sanitize.LIMITS.CATEGORY,
+                                    pattern: "[A-Za-z0-9,.\-_ ]*"
+                                }),
+                                // Character counter for custom category
+                                React.createElement('div', {
+                                    className: `absolute bottom-1 right-2 text-xs ${
+                                        (bulkData.customCategory?.length || 0) > sanitize.LIMITS.CATEGORY * 0.8 
+                                            ? 'text-orange-500' 
+                                            : `text-${UI.getThemeColors().textMuted}`
+                                    }`
+                                }, `${bulkData.customCategory?.length || 0}/${sanitize.LIMITS.CATEGORY}`)
+                            )
                         ),
                         // Type
                         React.createElement('div', null,
                             React.createElement('label', { className: UI.forms.label }, "Change Type To"),
-                            React.createElement('input', {
-                                name: "type",
-                                type: "text",
-                                placeholder: "Leave blank to keep existing type",
-                                className: UI.forms.input,
-                                value: bulkData.type,
-                                onChange: handleChange
-                            })
+                            React.createElement('div', { className: "relative" },
+                                React.createElement('input', {
+                                    name: "type",
+                                    type: "text",
+                                    placeholder: "Leave blank to keep existing type",
+                                    className: UI.forms.input,
+                                    value: bulkData.type,
+                                    onChange: handleChange,
+                                    onKeyDown: handleKeyDown,
+                                    maxLength: sanitize.LIMITS.COMPONENT_MODEL,
+                                    pattern: "[A-Za-z0-9,.\-_ ]*"
+                                }),
+                                // Character counter for type
+                                React.createElement('div', {
+                                    className: `absolute bottom-1 right-2 text-xs ${
+                                        (bulkData.type?.length || 0) > sanitize.LIMITS.COMPONENT_MODEL * 0.8 
+                                            ? 'text-orange-500' 
+                                            : `text-${UI.getThemeColors().textMuted}`
+                                    }`
+                                }, `${bulkData.type?.length || 0}/${sanitize.LIMITS.COMPONENT_MODEL}`)
+                            ),
+                            React.createElement('p', { className: UI.forms.hint }, "Leave blank to keep existing value")
                         ),
                         // Quantity Adjustment
                         React.createElement('div', null,
@@ -296,7 +400,7 @@ window.App.components.BulkEditForm = ({
                                     placeholder: "Value",
                                     className: UI.forms.input,
                                     value: bulkData.quantity,
-                                    onChange: handleChange
+                                    onChange: handleNumericChange
                                 })
                             ),
                             React.createElement('p', { className: UI.forms.hint }, "Leave value blank for no quantity change.")
@@ -323,7 +427,7 @@ window.App.components.BulkEditForm = ({
                                     placeholder: "Value",
                                     className: UI.forms.input,
                                     value: bulkData.price,
-                                    onChange: handleChange
+                                    onChange: handleNumericChange
                                 })
                             ),
                             React.createElement('p', { className: UI.forms.hint }, "Leave value blank for no price change.")
@@ -341,26 +445,39 @@ window.App.components.BulkEditForm = ({
                                 React.createElement('option', { value: "__custom__" }, "Custom footprint..."),
                                 (commonFootprints || []).map(fp => React.createElement('option', { key: fp, value: fp }, fp)),
                             ),
-                            bulkData.footprint === '__custom__' && React.createElement('input', {
-                                name: "customFootprint",
-                                type: "text",
-                                placeholder: "Enter custom footprint",
-                                className: UI.forms.input,
-                                value: bulkData.customFootprint || '',
-                                onChange: handleChange
-                            })
+                            bulkData.footprint === '__custom__' && React.createElement('div', { className: "relative mt-2" },
+                                React.createElement('input', {
+                                    name: "customFootprint",
+                                    type: "text",
+                                    placeholder: "Enter custom footprint",
+                                    className: UI.forms.input,
+                                    value: bulkData.customFootprint || '',
+                                    onChange: handleChange,
+                                    onKeyDown: handleKeyDown,
+                                    maxLength: sanitize.LIMITS.FOOTPRINT,
+                                    pattern: "[A-Za-z0-9,.\-_ ]*"
+                                }),
+                                // Character counter for custom footprint
+                                React.createElement('div', {
+                                    className: `absolute bottom-1 right-2 text-xs ${
+                                        (bulkData.customFootprint?.length || 0) > sanitize.LIMITS.FOOTPRINT * 0.8 
+                                            ? 'text-orange-500' 
+                                            : `text-${UI.getThemeColors().textMuted}`
+                                    }`
+                                }, `${bulkData.customFootprint?.length || 0}/${sanitize.LIMITS.FOOTPRINT}`)
+                            )
                         ),
 
                         // --- Storage Location Section ---
                         React.createElement('div', { className: `bg-${UI.getThemeColors().background} p-4 rounded border border-${UI.getThemeColors().border} mt-6` },
-    React.createElement('div', { className: "flex justify-between items-center" },
-        React.createElement('h3', { className: `text-md font-medium mb-1 text-${UI.getThemeColors().textSecondary}` }, "Storage Location"),
-        React.createElement('button', {
-            type: "button",
-            className: `${UI.colors.primary.text} text-sm`,
-            onClick: () => setShowDrawerSelector(!showDrawerSelector)
-        }, showDrawerSelector ? "Hide Drawer Selector" : "Show Drawer Selector")
-    ),
+                            React.createElement('div', { className: "flex justify-between items-center" },
+                                React.createElement('h3', { className: `text-md font-medium mb-1 text-${UI.getThemeColors().textSecondary}` }, "Storage Location"),
+                                React.createElement('button', {
+                                    type: "button",
+                                    className: `${UI.colors.primary.text} text-sm`,
+                                    onClick: () => setShowDrawerSelector(!showDrawerSelector)
+                                }, showDrawerSelector ? "Hide Drawer Selector" : "Show Drawer Selector")
+                            ),
 
                             // Location Action
                             React.createElement('div', { className: "mb-3" },
@@ -393,7 +510,7 @@ window.App.components.BulkEditForm = ({
                                     )
                                 ),
                                 // Location Details
-                                React.createElement('div', null,
+                                React.createElement('div', { className: "relative" },
                                     React.createElement('label', { className: UI.forms.label }, "Location Details (Optional)"),
                                     React.createElement('input', {
                                         name: "locationDetails",
@@ -401,8 +518,19 @@ window.App.components.BulkEditForm = ({
                                         placeholder: "e.g., Shelf 3, Box A",
                                         className: UI.forms.input,
                                         value: bulkData.locationDetails,
-                                        onChange: handleChange
-                                    })
+                                        onChange: handleChange,
+                                        onKeyDown: handleKeyDown,
+                                        maxLength: sanitize.LIMITS.LOCATION_DESCRIPTION,
+                                        pattern: "[A-Za-z0-9,.\-_ ]*"
+                                    }),
+                                    // Character counter for location details
+                                    React.createElement('div', {
+                                        className: `absolute bottom-1 right-2 text-xs ${
+                                            (bulkData.locationDetails?.length || 0) > sanitize.LIMITS.LOCATION_DESCRIPTION * 0.8 
+                                                ? 'text-orange-500' 
+                                                : `text-${UI.getThemeColors().textMuted}`
+                                        }`
+                                    }, `${bulkData.locationDetails?.length || 0}/${sanitize.LIMITS.LOCATION_DESCRIPTION}`)
                                 )
                             ),
 
@@ -444,19 +572,23 @@ window.App.components.BulkEditForm = ({
                                     selectedCells: bulkData.selectedCells,
                                     handleStorageLocationChange: (e) => {
                                         const { name, value } = e.target;
+                                        const sanitizedValue = sanitize.validateAllowedChars(value);
+                                        
                                         if (name === 'locationId') {
                                             setBulkData(prev => ({
                                                 ...prev,
-                                                storageLocationId: value,
+                                                storageLocationId: sanitizedValue,
                                                 drawerId: '',
                                                 selectedCells: []
                                             }));
                                         }
                                     },
                                     handleDrawerChange: (e) => {
+                                        const sanitizedValue = sanitize.validateAllowedChars(e.target.value);
+                                        
                                         setBulkData(prev => ({
                                             ...prev,
-                                            drawerId: e.target.value,
+                                            drawerId: sanitizedValue,
                                             selectedCells: []
                                         }));
                                     },
@@ -592,4 +724,4 @@ window.App.components.BulkEditForm = ({
     );
 };
 
-console.log("BulkEditForm component loaded with theme-aware styling."); // For debugging
+console.log("BulkEditForm component updated with improved validation and sanitization.");
