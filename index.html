@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -25,6 +26,7 @@
     <script src="js/components/BulkEditForm.js"></script>
     <script src="js/components/InventoryView.js"></script>
     <script src="js/components/SettingsView.js"></script>
+    <script src="js/components/CategoryManager.js"></script>
     <script src="js/components/FootprintManager.js"></script>
     <script src="js/components/LocationManager.js"></script>
     <script src="js/components/LocationPage.js"></script>
@@ -70,7 +72,7 @@
             const [importError, setImportError] = useState(''); // Message after import attempt
             const [exportMessage, setExportMessage] = useState(''); // Message after export/save attempt
             const [lowStockConfig, setLowStockConfig] = useState({}); // { category: threshold }
-            const [currencySymbol, setCurrencySymbol] = useState('$');
+            const [currencySymbol, setCurrencySymbol] = useState('RM');
             const [showTotalValue, setShowTotalValue] = useState(false);
             const [selectedComponents, setSelectedComponents] = useState([]); // Array of selected component IDs for bulk actions
             const [showBulkEditForm, setShowBulkEditForm] = useState(false);
@@ -82,6 +84,7 @@
             const [viewingDrawerId, setViewingDrawerId] = useState(null);
             const [itemsPerPage, setItemsPerPage] = useState('all');
             const [appTheme, setAppTheme] = useState(window.App.utils.UI.currentTheme);
+            const [configLoaded, setConfigLoaded] = useState(false);
             const [theme, setTheme] = useState(
                 () => storage.loadConfig().theme
                     || window.App.utils.UI.currentTheme
@@ -99,6 +102,7 @@
                         console.log("Storage system initialized");
 
                         // Load all data from IndexedDB
+                        // Load all data from IndexedDB
                         Promise.all([
                             storage.loadComponents(),
                             storage.loadLocations(),
@@ -106,7 +110,7 @@
                             storage.loadCells(),
                             storage.loadCategories(),
                             storage.loadFootprints(),
-                            storage.loadLowStockConfig() // Load directly from IndexedDB
+                            storage.loadLowStockConfig()
                         ])
                             .then(function (results) {
                                 var [
@@ -125,11 +129,11 @@
                                     drawers: loadedDrawers.length,
                                     cells: loadedCells.length,
                                     categories: loadedCategories.length,
-                                    footprints: loadedFootprints.length, // FIXED: Changed from footedFootprints to loadedFootprints
+                                    footprints: loadedFootprints.length,
                                     lowStockConfig: Object.keys(loadedLowStockConfig).length + " categories"
                                 });
 
-                                // Set state
+                                // Set state - THIS WAS MISSING!
                                 setComponents(loadedComponents);
                                 setLocations(loadedLocations);
                                 setDrawers(loadedDrawers);
@@ -138,21 +142,26 @@
                                 setFootprints(loadedFootprints);
                                 setLowStockConfig(loadedLowStockConfig);
 
-                                // Load other config from localStorage (without lowStockConfig)
+                                // Load other config from localStorage
                                 var config = storage.loadConfig();
                                 setViewMode(config.viewMode || 'table');
                                 setCurrencySymbol(config.currencySymbol || 'RM');
                                 setShowTotalValue(config.showTotalValue || false);
                                 setItemsPerPage(config.itemsPerPage || 'all');
+                                setTheme(config.theme || 'light');
 
-                                // ... rest of your code ...
+                                // IMPORTANT: Mark config as loaded
+                                setConfigLoaded(true);
                             });
                     });
             }, []);// Only run once
 
-            useEffect(() => { (async () => setDrawers(await storage.loadDrawers()))(); }, []);
-            useEffect(() => { (async () => await storage.saveCells(cells))(); }, [cells]);
-            useEffect(() => { (async () => await storage.saveDrawers(drawers))(); }, [drawers]);
+            setTimeout(() => {
+                console.log("=== FINAL STATE CHECK ===");
+                console.log("Components:", components.length);
+                console.log("Locations:", locations.length);
+                console.log("Categories:", categories.length);
+            }, 100);
 
             // --- FOR COMPONENTS ---
             useEffect(() => {
@@ -263,7 +272,7 @@
                         .catch(function (err) {
                             console.error("Error saving cells:", err);
                         });
-                }, 300); 
+                }, 300);
                 return function cleanup() {
                     clearTimeout(saveTimeout);
                 };
@@ -302,7 +311,7 @@
                         console.error("Error saving footprints to IndexedDB:", err);
                     });
             }, [footprints]);
-            
+
             // ---LOW CONFIG---
             useEffect(() => {
                 // Skip if empty
@@ -325,6 +334,9 @@
             // ---SAVE CONFIG---
             // For configuration (still synchronous)
             useEffect(() => {
+                // Don't save until config is loaded
+                if (!configLoaded) return;
+
                 var config = {
                     categories,
                     viewMode,
@@ -342,7 +354,7 @@
                 } else {
                     console.warn("Failed to save config");
                 }
-            }, [categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]);
+            }, [configLoaded, categories, viewMode, lowStockConfig, currencySymbol, showTotalValue, footprints, itemsPerPage, theme]);
 
             const saveConfigCallback = useCallback(() => {
                 // To IndexedDB

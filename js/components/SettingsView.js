@@ -14,9 +14,6 @@ window.App.components.SettingsView = ({
     lowStockConfig = {}, // Object: Low stock thresholds { category: threshold }
     footprints = [], // Array: List of footprint strings
     components = [], // Array: All components
-    locations = [], // Array: All locations
-    drawers = [], // Array: All drawers
-    cells = [], // Array: All cells
 
     // Configuration props
     currencySymbol = 'RM', // String: Currency symbol
@@ -42,16 +39,13 @@ window.App.components.SettingsView = ({
     const { UI } = window.App.utils;
     const { storage } = window.App.utils;
     const { useState } = React;
-    const { FootprintManager } = window.App.components;
+    const { CategoryManager, FootprintManager } = window.App.components;
 
     // Internal state for settings form controls
-    const [editingCategory, setEditingCategory] = useState(null); // Category being edited
-    const [newCategoryName, setNewCategoryName] = useState(''); // New name for edited category
     const [newLowStockCategory, setNewLowStockCategory] = useState(''); // Category for new low stock threshold
     const [newLowStockThreshold, setNewLowStockThreshold] = useState(5); // Threshold value
     const [viewMode, setViewMode] = useState('table'); // 'table' or 'card'
     const [itemsPerPage, setItemsPerPage] = useState('all'); //
-    const [newCategory, setNewCategory] = useState('');
 
     // State for import/export
     const [importError, setImportError] = useState(''); // Error or success message after import
@@ -63,432 +57,6 @@ window.App.components.SettingsView = ({
     const clearStatusMessages = () => {
         setImportError('');
         setExportMessage('');
-    };
-
-    // --- Category Management Functions ---
-
-    // Handle adding a default category
-    const handleAddDefaultCategory = () => {
-        clearStatusMessages();
-        const defaultCategoryName = "Default";
-        if (!categories.includes(defaultCategoryName)) {
-            const updatedCategories = [...categories, defaultCategoryName].sort();
-            onUpdateCategories(updatedCategories);
-            setExportMessage(`"${defaultCategoryName}" category added.`);
-        } else {
-            setExportMessage(`"${defaultCategoryName}" category already exists.`);
-        }
-    };
-
-    // Start editing category
-    const handleStartEditCategory = (category) => {
-        clearStatusMessages();
-        setEditingCategory(category);
-        setNewCategoryName(category);
-    };
-
-    // Save edited category name
-    const handleSaveCategory = () => {
-        clearStatusMessages();
-        const trimmedNewName = newCategoryName.trim();
-
-        // Validate
-        if (!trimmedNewName) {
-            alert("Category name cannot be empty.");
-            return;
-        }
-
-        if (trimmedNewName === editingCategory) {
-            // No change, just cancel
-            setEditingCategory(null);
-            setNewCategoryName('');
-            return;
-        }
-
-        if (categories.includes(trimmedNewName)) {
-            alert(`Category "${trimmedNewName}" already exists.`);
-            return;
-        }
-
-        // Update category list
-        const updatedCategories = categories.map(cat =>
-            cat === editingCategory ? trimmedNewName : cat
-        ).sort();
-
-        onUpdateCategories(updatedCategories);
-
-        // Update components using the old category name
-        const updatedComponents = components.map(comp =>
-            comp.category === editingCategory ? { ...comp, category: trimmedNewName } : comp
-        );
-
-        onUpdateComponents(updatedComponents);
-
-        // Update low stock config if the category existed there
-        if (lowStockConfig.hasOwnProperty(editingCategory)) {
-            const newConfig = { ...lowStockConfig };
-            newConfig[trimmedNewName] = newConfig[editingCategory];
-            delete newConfig[editingCategory];
-            onUpdateLowStockConfig(newConfig);
-        }
-
-        setEditingCategory(null);
-        setNewCategoryName('');
-        setExportMessage(`Category "${editingCategory}" renamed to "${trimmedNewName}".`);
-    };
-
-    // Add these functions after existing category management functions
-    const handleRestoreDefaultCategories = () => {
-        clearStatusMessages();
-
-        const defaultCategories = [
-            "Resistors", "Capacitors", "Inductors", "Diodes", "Transistors",
-            "ICs", "Connectors", "Switches", "LEDs", "Sensors", "Modules",
-            "Passive", "Active", "Mechanical", "Power", "RF", "Analog", "Digital"
-        ];
-
-        if (window.confirm('This will add common electronic component categories to your list. Continue?')) {
-            // Merge current categories with defaults to avoid duplicates
-            const merged = [...new Set([...categories, ...defaultCategories])].sort();
-            onUpdateCategories(merged);
-            setExportMessage('Common categories added to your list.');
-        }
-    };
-
-    const handleDeleteAllCategories = () => {
-        clearStatusMessages();
-
-        const componentsCount = components.filter(comp => comp.category && comp.category !== 'Default').length;
-
-        if (componentsCount > 0) {
-            const confirmMessage = `This will delete all categories except "Default" and move ${componentsCount} component(s) to "Default" category. Continue?`;
-            if (!window.confirm(confirmMessage)) return;
-        } else {
-            if (!window.confirm('This will delete all categories except "Default". Continue?')) return;
-        }
-
-        // Move all components to Default category
-        const updatedComponents = components.map(comp => {
-            if (comp.category && comp.category !== 'Default') {
-                return { ...comp, category: 'Default' };
-            }
-            return comp;
-        });
-
-        onUpdateComponents(updatedComponents);
-
-        // Keep only Default category
-        onUpdateCategories(['Default']);
-
-        // Clear low stock config
-        onUpdateLowStockConfig({});
-
-        setExportMessage(`All categories deleted except "Default". ${componentsCount} component(s) moved to "Default".`);
-    };
-
-    const handleAddNewCategory = () => {
-        clearStatusMessages();
-        const trimmedCategory = newCategory.trim();
-
-        if (!trimmedCategory) {
-            alert("Category name cannot be empty.");
-            return;
-        }
-
-        if (categories.includes(trimmedCategory)) {
-            alert(`Category "${trimmedCategory}" already exists.`);
-            return;
-        }
-
-        const updatedCategories = [...categories, trimmedCategory].sort();
-        onUpdateCategories(updatedCategories);
-        setNewCategory('');
-        setExportMessage(`Category "${trimmedCategory}" added.`);
-    };
-
-    // Cancel category editing
-    const handleCancelCategoryEdit = () => {
-        setEditingCategory(null);
-        setNewCategoryName('');
-    };
-
-    // Delete a category
-    const handleDeleteCategory = (categoryToDelete) => {
-        clearStatusMessages();
-        const defaultCategoryName = "Default";
-
-        // Ensure the default category exists if we need to move items to it
-        if (!categories.includes(defaultCategoryName)) {
-            onUpdateCategories([...categories, defaultCategoryName].sort());
-        }
-
-        // Remove the category from the list
-        const updatedCategories = categories.filter(cat => cat !== categoryToDelete);
-        onUpdateCategories(updatedCategories);
-
-        // Reassign components from the deleted category to the default one
-        const updatedComponents = components.map(comp =>
-            comp.category === categoryToDelete ? { ...comp, category: defaultCategoryName } : comp
-        );
-
-        onUpdateComponents(updatedComponents);
-
-        // Remove the category from low stock config if it exists
-        if (lowStockConfig.hasOwnProperty(categoryToDelete)) {
-            const newConfig = { ...lowStockConfig };
-            delete newConfig[categoryToDelete];
-            onUpdateLowStockConfig(newConfig);
-        }
-
-        setExportMessage(`Category "${categoryToDelete}" deleted. Components moved to "${defaultCategoryName}".`);
-    };
-
-    // --- Low Stock Configuration Functions ---
-
-    // Handle low stock category selection
-    const handleLowStockCategoryChange = (e) => {
-        const category = e.target.value;
-        setNewLowStockCategory(category);
-
-        // If there's already a threshold for this category, load it
-        if (category && lowStockConfig && lowStockConfig[category]) {
-            setNewLowStockThreshold(lowStockConfig[category]);
-        } else {
-            // Otherwise reset to default
-            setNewLowStockThreshold(5);
-        }
-    };
-
-    // Handle adding a low stock threshold
-    const handleAddLowStock = () => {
-        clearStatusMessages();
-
-        if (!newLowStockCategory || newLowStockThreshold < 1) {
-            alert("Please select a category and enter a threshold greater than 0.");
-            return;
-        }
-
-        const updatedConfig = { ...lowStockConfig, [newLowStockCategory]: newLowStockThreshold };
-        onUpdateLowStockConfig(updatedConfig);
-        setExportMessage(`Low stock threshold ${lowStockConfig[newLowStockCategory] ? 'updated' : 'added'} for ${newLowStockCategory}.`);
-    };
-
-    // Handle removing a low stock threshold
-    const handleRemoveLowStock = (category) => {
-        clearStatusMessages();
-
-        const updatedConfig = { ...lowStockConfig };
-        delete updatedConfig[category];
-
-        onUpdateLowStockConfig(updatedConfig);
-        setExportMessage(`Low stock threshold removed for ${category}.`);
-    };
-
-    // --- Footprint Management Functions ---
-
-    // Handle adding a footprint
-    const handleAddFootprint = (newFootprint) => {
-        clearStatusMessages();
-        const trimmedFootprint = newFootprint.trim();
-
-        if (!trimmedFootprint) {
-            setExportMessage('Footprint name cannot be empty.');
-            return;
-        }
-
-        if (footprints.includes(trimmedFootprint)) {
-            setExportMessage(`Footprint "${trimmedFootprint}" already exists.`);
-            return;
-        }
-
-        const updatedFootprints = [...footprints, trimmedFootprint].sort();
-        onUpdateFootprints(updatedFootprints);
-        setExportMessage(`Footprint "${trimmedFootprint}" added.`);
-    };
-
-    // Handle editing a footprint
-    const handleEditFootprint = (oldFootprint, newFootprint) => {
-        clearStatusMessages();
-        const trimmedNewFootprint = newFootprint.trim();
-
-        if (!trimmedNewFootprint) {
-            setExportMessage('Footprint name cannot be empty.');
-            return;
-        }
-
-        if (footprints.includes(trimmedNewFootprint)) {
-            setExportMessage(`Footprint "${trimmedNewFootprint}" already exists.`);
-            return;
-        }
-
-        // Update footprint list
-        const updatedFootprints = footprints.map(fp =>
-            fp === oldFootprint ? trimmedNewFootprint : fp
-        ).sort();
-
-        onUpdateFootprints(updatedFootprints);
-
-        // Update components using the old footprint
-        const updatedComponents = components.map(comp =>
-            comp.footprint === oldFootprint ? { ...comp, footprint: trimmedNewFootprint } : comp
-        );
-
-        onUpdateComponents(updatedComponents);
-        setExportMessage(`Footprint "${oldFootprint}" renamed to "${trimmedNewFootprint}".`);
-    };
-
-    // Handle deleting a footprint
-    const handleDeleteFootprint = (footprintToDelete) => {
-        clearStatusMessages();
-
-        // Check if any components are using this footprint
-        const componentsUsingFootprint = components.filter(comp => comp.footprint === footprintToDelete);
-
-        if (componentsUsingFootprint.length > 0) {
-            const confirmMessage = `${componentsUsingFootprint.length} component(s) are using this footprint. Removing it will clear the footprint from these components. Continue?`;
-            if (!window.confirm(confirmMessage)) {
-                return;
-            }
-
-            // Clear footprint from components
-            const updatedComponents = components.map(comp =>
-                comp.footprint === footprintToDelete ? { ...comp, footprint: '' } : comp
-            );
-
-            onUpdateComponents(updatedComponents);
-        }
-
-        // Remove the footprint from the list
-        const updatedFootprints = footprints.filter(fp => fp !== footprintToDelete);
-        onUpdateFootprints(updatedFootprints);
-        setExportMessage(`Footprint "${footprintToDelete}" deleted.`);
-    };
-
-    // Handle restoring default footprints
-    const handleRestoreDefaultFootprints = () => {
-        clearStatusMessages();
-
-        // Define the default footprints list
-        const defaultFootprints = [
-            "0603", "0805", "1206", "1210", "0402", "0201", "2512",
-            "SOT-23", "SOT-223", "SOT-89", "SOT-143",
-            "SOIC-8", "SOIC-16", "TSSOP-16", "TSSOP-20",
-            "DIP-8", "DIP-14", "DIP-16", "DIP-20", "DIP-28",
-            "QFP-32", "QFP-44", "QFP-64", "QFP-100",
-            "QFN-16", "QFN-20", "QFN-24", "QFN-32",
-            "TO-92", "TO-220", "TO-247", "TO-263", "TO-252"
-        ];
-
-        if (window.confirm('This will add common electronic component footprints to your list. Continue?')) {
-            // Merge current footprints with defaults to avoid duplicates
-            const merged = [...new Set([...defaultFootprints, ...footprints])].sort();
-            onUpdateFootprints(merged);
-            setExportMessage('Common footprints added to your list.');
-        }
-    };
-
-    const handleDeleteAllFootprints = () => {
-        clearStatusMessages();
-
-        // Check which components have footprints
-        const componentsUsingFootprints = components.filter(comp => comp.footprint && comp.footprint !== '');
-
-        if (componentsUsingFootprints.length > 0) {
-            const confirmMessage = `This will delete all footprints and clear the footprint from ${componentsUsingFootprints.length} component(s). Continue?`;
-            if (!window.confirm(confirmMessage)) return;
-
-            // Clear footprints from all components
-            const updatedComponents = components.map(comp =>
-                comp.footprint ? { ...comp, footprint: '' } : comp
-            );
-            onUpdateComponents(updatedComponents);
-            setExportMessage(`All footprints deleted. Footprints cleared from ${componentsUsingFootprints.length} component(s).`);
-        } else {
-            if (!window.confirm('This will delete all footprints. Continue?')) return;
-            setExportMessage('All footprints deleted.');
-        }
-
-        // Clear the footprints array
-        onUpdateFootprints([]);
-    };
-
-    // --- Storage Management Functions ---
-    // Save components to storage
-    const handleSaveComponentsLS = async () => {
-        clearStatusMessages();
-        try {
-            const ok = await storage.saveComponents(components);
-            if (ok) {
-                setExportMessage("✅ Components saved to IndexedDB.");
-            } else {
-                setImportError("❌ Component save failed.");
-            }
-        } catch (err) {
-            console.error(err);
-            setImportError("❌ Component save threw an error.");
-        }
-    };
-
-    // Save configuration to storage
-    const handleSaveConfig = async () => {
-        clearStatusMessages();
-
-        // Create config object using local state + props
-        const currentConfig = {
-            categories,
-            viewMode: viewMode,
-            lowStockConfig,
-            currencySymbol,
-            showTotalValue,
-            footprints,
-            itemsPerPage: itemsPerPage,
-            theme
-        };
-
-        try {
-            const ok = await storage.saveConfig(currentConfig);
-            if (ok) {
-                setExportMessage("✅ Config saved to LocalStorage.");
-            } else {
-                setImportError("❌ Config save failed.");
-            }
-        } catch (err) {
-            console.error(err);
-            setImportError("❌ Config save threw an error.");
-        }
-    };
-
-    // Clear all storage
-    const handleClearStorage = async () => {
-        clearStatusMessages();
-
-        if (window.confirm('Are you sure you want to clear ALL inventory data and settings? This action cannot be undone.')) {
-            try {
-                const cleared = await storage.clearStorage();
-
-                if (cleared) {
-                    // Reset state values using the passed-in update callbacks
-                    onUpdateComponents([]);
-                    onUpdateCategories([]);
-                    onUpdateLowStockConfig({});
-                    onUpdateLocations([]);
-                    onUpdateDrawers([]);
-                    onUpdateCells([]);
-                    onUpdateFootprints([]);
-
-                    // Reset local state
-                    setViewMode('table');
-                    setItemsPerPage('all');
-
-                    setExportMessage('All storage cleared successfully! Application state reset. You may need to refresh the page to see all changes.');
-                } else {
-                    setImportError('An error occurred while trying to clear storage.');
-                }
-            } catch (err) {
-                console.error("Error clearing storage:", err);
-                setImportError(`Error clearing storage: ${err.message}`);
-            }
-        }
     };
 
     // --- Backup & Restore Functions (New Unified Approach) ---
@@ -595,6 +163,130 @@ window.App.components.SettingsView = ({
                 setImportError(`Error restoring backup: ${err.message}`);
             });
     };
+
+    // --- Category Management Functions ---
+
+    // --- Footprint Management Functions ---
+
+    // --- Low Stock Configuration Functions ---
+    const handleLowStockCategoryChange = (e) => {
+        const category = e.target.value;
+        setNewLowStockCategory(category);
+
+        // If there's already a threshold for this category, load it
+        if (category && lowStockConfig && lowStockConfig[category]) {
+            setNewLowStockThreshold(lowStockConfig[category]);
+        } else {
+            // Otherwise reset to default
+            setNewLowStockThreshold(5);
+        }
+    };
+
+    // Handle adding a low stock threshold
+    const handleAddLowStock = () => {
+        clearStatusMessages();
+
+        if (!newLowStockCategory || newLowStockThreshold < 1) {
+            alert("Please select a category and enter a threshold greater than 0.");
+            return;
+        }
+
+        const updatedConfig = { ...lowStockConfig, [newLowStockCategory]: newLowStockThreshold };
+        onUpdateLowStockConfig(updatedConfig);
+        setExportMessage(`Low stock threshold ${lowStockConfig[newLowStockCategory] ? 'updated' : 'added'} for ${newLowStockCategory}.`);
+    };
+
+    // Handle removing a low stock threshold
+    const handleRemoveLowStock = (category) => {
+        clearStatusMessages();
+
+        const updatedConfig = { ...lowStockConfig };
+        delete updatedConfig[category];
+
+        onUpdateLowStockConfig(updatedConfig);
+        setExportMessage(`Low stock threshold removed for ${category}.`);
+    };
+
+    // --- Storage Management Functions ---
+
+    // Save components to storage
+    const handleSaveComponentsLS = async () => {
+        clearStatusMessages();
+        try {
+            const ok = await storage.saveComponents(components);
+            if (ok) {
+                setExportMessage("✅ Components saved to IndexedDB.");
+            } else {
+                setImportError("❌ Component save failed.");
+            }
+        } catch (err) {
+            console.error(err);
+            setImportError("❌ Component save threw an error.");
+        }
+    };
+
+    // Save configuration to storage
+    const handleSaveConfig = async () => {
+        clearStatusMessages();
+
+        // Create config object using local state + props
+        const currentConfig = {
+            categories,
+            viewMode: viewMode,
+            lowStockConfig,
+            currencySymbol,
+            showTotalValue,
+            footprints,
+            itemsPerPage: itemsPerPage,
+            theme
+        };
+
+        try {
+            const ok = await storage.saveConfig(currentConfig);
+            if (ok) {
+                setExportMessage("✅ Config saved to LocalStorage.");
+            } else {
+                setImportError("❌ Config save failed.");
+            }
+        } catch (err) {
+            console.error(err);
+            setImportError("❌ Config save threw an error.");
+        }
+    };
+
+    // Clear all storage
+    const handleClearStorage = async () => {
+        clearStatusMessages();
+
+        if (window.confirm('Are you sure you want to clear ALL inventory data and settings? This action cannot be undone.')) {
+            try {
+                const cleared = await storage.clearStorage();
+
+                if (cleared) {
+                    // Reset state values using the passed-in update callbacks
+                    onUpdateComponents([]);
+                    onUpdateCategories([]);
+                    onUpdateLowStockConfig({});
+                    onUpdateLocations([]);
+                    onUpdateDrawers([]);
+                    onUpdateCells([]);
+                    onUpdateFootprints([]);
+
+                    // Reset local state
+                    setViewMode('table');
+                    setItemsPerPage('all');
+
+                    setExportMessage('All storage cleared successfully! Application state reset. You may need to refresh the page to see all changes.');
+                } else {
+                    setImportError('An error occurred while trying to clear storage.');
+                }
+            } catch (err) {
+                console.error("Error clearing storage:", err);
+                setImportError(`Error clearing storage: ${err.message}`);
+            }
+        }
+    };
+
     // --- Render Method ---
 
     return (
@@ -706,104 +398,15 @@ window.App.components.SettingsView = ({
                     React.createElement('p', { className: `mb-4 ${UI.typography.body}` },
                         `Edit or delete categories. Deleting moves components to "Default".`
                     ),
-
-                    // Add New Category Section
-                    React.createElement('div', { className: `mb-6 p-4 ${UI.colors.background.alt} ${UI.utils.rounded}` },
-                        React.createElement('h4', { className: UI.typography.sectionTitle }, "Add New Category"),
-                        React.createElement('div', { className: "flex gap-3" },
-                            React.createElement('input', {
-                                type: "text",
-                                value: newCategory,
-                                onChange: (e) => setNewCategory(e.target.value),
-                                className: UI.forms.input + " flex-grow",
-                                placeholder: "Enter category name...",
-                                onKeyDown: (e) => e.key === 'Enter' && handleAddNewCategory()
-                            }),
-                            React.createElement('button', {
-                                onClick: handleAddNewCategory,
-                                className: UI.buttons.primary,
-                                disabled: !newCategory.trim()
-                            }, "Add")
-                        )
-                    ),
-
-                    React.createElement('div', { className: "overflow-x-auto" },
-                        React.createElement('table', { className: UI.tables.container },
-                            React.createElement('thead', { className: UI.tables.header.row },
-                                React.createElement('tr', null,
-                                    React.createElement('th', { className: UI.tables.header.cell }, "Category Name"),
-                                    React.createElement('th', { className: UI.tables.header.cell }, "Component Count"),
-                                    React.createElement('th', { className: UI.tables.header.cell }, "Actions")
-                                )
-                            ),
-                            React.createElement('tbody', { className: "bg-white divide-y divide-gray-200" },
-                                categories.length === 0 ?
-                                    React.createElement('tr', null,
-                                        React.createElement('td', { colSpan: "3", className: "py-4 px-4 text-center text-gray-500 italic" }, "No categories defined.")
-                                    ) :
-                                    categories.sort().map(category => {
-                                        const componentCount = components.filter(comp => comp.category === category).length;
-                                        return React.createElement('tr', { key: category, className: UI.tables.body.row },
-                                            React.createElement('td', { className: UI.tables.body.cell },
-                                                editingCategory === category ?
-                                                    React.createElement('input', {
-                                                        type: "text",
-                                                        value: newCategoryName,
-                                                        onChange: (e) => setNewCategoryName(e.target.value),
-                                                        className: UI.forms.input,
-                                                        autoFocus: true,
-                                                        onKeyDown: (e) => e.key === 'Enter' && handleSaveCategory()
-                                                    }) :
-                                                    React.createElement('span', { className: UI.tables.body.cell }, category)
-                                            ),
-                                            React.createElement('td', { className: `${UI.tables.body.cell} text-center` },
-                                                componentCount
-                                            ),
-                                            React.createElement('td', { className: UI.tables.body.cellAction },
-                                                editingCategory === category ?
-                                                    React.createElement('div', { className: "flex justify-center space-x-2" },
-                                                        React.createElement('button', {
-                                                            onClick: handleSaveCategory,
-                                                            className: UI.buttons.small.success,
-                                                            title: "Save"
-                                                        }, "Save"),
-                                                        React.createElement('button', {
-                                                            onClick: handleCancelCategoryEdit,
-                                                            className: UI.buttons.small.secondary,
-                                                            title: "Cancel"
-                                                        }, "Cancel")
-                                                    ) :
-                                                    React.createElement('div', { className: "flex justify-center space-x-2" },
-                                                        React.createElement('button', {
-                                                            onClick: () => handleStartEditCategory(category),
-                                                            className: UI.buttons.small.primary,
-                                                            title: "Edit"
-                                                        }, "Edit"),
-                                                        React.createElement('button', {
-                                                            onClick: () => handleDeleteCategory(category),
-                                                            className: UI.buttons.small.danger,
-                                                            title: "Delete",
-                                                            disabled: category === 'Default'
-                                                        }, "Delete")
-                                                    )
-                                            )
-                                        );
-                                    })
-                            )
-                        )
-                    ),
-
-                    // Restore Default and Delete All buttons
-                    React.createElement('div', { className: "mt-4 flex gap-3" },
-                        React.createElement('button', {
-                            onClick: handleRestoreDefaultCategories,
-                            className: UI.buttons.secondary
-                        }, 'Restore Default Categories'),
-                        React.createElement('button', {
-                            onClick: handleDeleteAllCategories,
-                            className: UI.buttons.danger
-                        }, 'Delete All Categories')
-                    )
+                    React.createElement(CategoryManager, {
+                        categories,
+                        components,
+                        lowStockConfig,
+                        onUpdateCategories,
+                        onUpdateComponents,
+                        onUpdateLowStockConfig,
+                        onShowMessage: setExportMessage
+                    })
                 )
             ), // End Category Management Section
 
@@ -816,11 +419,10 @@ window.App.components.SettingsView = ({
                     ),
                     React.createElement(FootprintManager, {
                         footprints,
-                        onAddFootprint: handleAddFootprint,
-                        onEditFootprint: handleEditFootprint,
-                        onDeleteFootprint: handleDeleteFootprint,
-                        onRestoreDefaults: handleRestoreDefaultFootprints,
-                        onDeleteAll: handleDeleteAllFootprints  // NEW: Add this prop
+                        components,  // Pass components so FootprintManager can check usage
+                        onUpdateFootprints,  // Pass the callback to update footprints
+                        onUpdateComponents,  // Pass the callback to update components
+                        onShowMessage: setExportMessage  // Pass message display function
                     })
                 )
             ), // End Footprint Management Section

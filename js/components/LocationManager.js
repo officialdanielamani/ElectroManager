@@ -31,19 +31,23 @@ window.App.components.LocationManager = ({
     const [expandedLocations, setExpandedLocations] = useState({});
     const [showAddLocationForm, setShowAddLocationForm] = useState(false);
 
+    // Create keydown handler to prevent disallowed characters
+    const handleKeyDown = window.App.utils.sanitize.createKeyDownHandler();
+
+    // Create change handler for allowed characters
+    const handleChange = (setter) => (e) => {
+        const sanitizedValue = window.App.utils.sanitize.validateAllowedChars(e.target.value);
+        setter(sanitizedValue);
+    };
+
     // Handle adding a new location
     const handleAddSubmit = (e) => {
         e.preventDefault();
         
-        // Sanitize inputs
-        const trimmedName = window.App.utils.sanitize.value(newLocationName.trim());
-        const trimmedDescription = window.App.utils.sanitize.value(newLocationDescription.trim());
-    
-        if (!selectedLocationId) {
-            alert("Please select a location for this drawer.");
-            return;
-        }
-    
+        // Final sanitization before submission
+        const trimmedName = window.App.utils.sanitize.locationName(newLocationName);
+        const trimmedDescription = window.App.utils.sanitize.locationDescription(newLocationDescription);
+        
         if (!trimmedName) {
             alert("Location name cannot be empty.");
             return;
@@ -66,6 +70,7 @@ window.App.components.LocationManager = ({
         // Reset form
         setNewLocationName('');
         setNewLocationDescription('');
+        setShowAddLocationForm(false);
     };
 
     // Start editing a location
@@ -77,13 +82,12 @@ window.App.components.LocationManager = ({
         setEditLocationName(sanitizedLocation.name);
         setEditLocationDescription(sanitizedLocation.description || '');
     };
-    
 
     // Save the edited location
     const handleSaveEdit = () => {
-        // Sanitize inputs
-        const trimmedName = window.App.utils.sanitize.value(editLocationName.trim());
-        const trimmedDescription = window.App.utils.sanitize.value(editLocationDescription.trim());
+        // Final sanitization before saving
+        const trimmedName = window.App.utils.sanitize.locationName(editLocationName);
+        const trimmedDescription = window.App.utils.sanitize.locationDescription(editLocationDescription);
         
         if (!trimmedName) {
             alert("Location name cannot be empty.");
@@ -168,8 +172,8 @@ window.App.components.LocationManager = ({
             // Form (conditionally rendered based on state)
             showAddLocationForm && React.createElement('div', { className: UI.cards.body },
                 React.createElement('form', { onSubmit: handleAddSubmit, className: "space-y-3" },
-                    // Name input
-                    React.createElement('div', null,
+                    // Name input with validation
+                    React.createElement('div', { className: "relative" },
                         React.createElement('label', { 
                             htmlFor: "new-location-name", 
                             className: UI.forms.label 
@@ -178,13 +182,28 @@ window.App.components.LocationManager = ({
                             id: "new-location-name",
                             type: "text",
                             value: newLocationName,
-                            onChange: (e) => setNewLocationName(e.target.value),
+                            onChange: handleChange(setNewLocationName),
+                            onKeyDown: handleKeyDown,
+                            maxLength: window.App.utils.sanitize.LIMITS.LOCATION_NAME,
+                            pattern: "[A-Za-z0-9,.\-_ ]*",
                             placeholder: "e.g., Lab Room 101",
-                            className: UI.forms.input
-                        })
+                            className: UI.forms.input,
+                            required: true
+                        }),
+                        React.createElement('p', { className: UI.forms.hint },
+                            `Location name. A-Z a-z 0-9 . , - _ (max ${window.App.utils.sanitize.LIMITS.LOCATION_NAME} chars)`
+                        ),
+                        // Character counter
+                        React.createElement('div', {
+                            className: `absolute bottom-1 right-2 text-xs ${
+                                newLocationName.length > window.App.utils.sanitize.LIMITS.LOCATION_NAME * 0.8 
+                                    ? 'text-orange-500' 
+                                    : `text-${UI.getThemeColors().textMuted}`
+                            }`
+                        }, `${newLocationName.length}/${window.App.utils.sanitize.LIMITS.LOCATION_NAME}`)
                     ),
-                    // Description input
-                    React.createElement('div', null,
+                    // Description input with validation
+                    React.createElement('div', { className: "relative" },
                         React.createElement('label', { 
                             htmlFor: "new-location-description", 
                             className: UI.forms.label
@@ -193,16 +212,31 @@ window.App.components.LocationManager = ({
                             id: "new-location-description",
                             type: "text",
                             value: newLocationDescription,
-                            onChange: (e) => setNewLocationDescription(e.target.value),
+                            onChange: handleChange(setNewLocationDescription),
+                            onKeyDown: handleKeyDown,
+                            maxLength: window.App.utils.sanitize.LIMITS.LOCATION_DESCRIPTION,
+                            pattern: "[A-Za-z0-9,.\-_ ]*",
                             placeholder: "e.g., Main electronics workbench",
                             className: UI.forms.input
-                        })
+                        }),
+                        React.createElement('p', { className: UI.forms.hint },
+                            `Location description. A-Z a-z 0-9 . , - _ (max ${window.App.utils.sanitize.LIMITS.LOCATION_DESCRIPTION} chars)`
+                        ),
+                        // Character counter
+                        React.createElement('div', {
+                            className: `absolute bottom-1 right-2 text-xs ${
+                                newLocationDescription.length > window.App.utils.sanitize.LIMITS.LOCATION_DESCRIPTION * 0.8 
+                                    ? 'text-orange-500' 
+                                    : `text-${UI.getThemeColors().textMuted}`
+                            }`
+                        }, `${newLocationDescription.length}/${window.App.utils.sanitize.LIMITS.LOCATION_DESCRIPTION}`)
                     ),
                     // Submit button
                     React.createElement('div', null,
                         React.createElement('button', {
                             type: "submit",
-                            className: UI.buttons.primary
+                            className: UI.buttons.primary,
+                            disabled: !newLocationName.trim()
                         }, "Add Location")
                     )
                 )
@@ -260,22 +294,46 @@ window.App.components.LocationManager = ({
                                                 React.createElement('span', { className: `font-medium text-${UI.getThemeColors().textPrimary}` }, location.name),
                                                 location.description && React.createElement('span', { className: `ml-2 text-sm text-${UI.getThemeColors().textMuted}` }, `(${location.description})`)
                                             ) :
-                                            // Edit form inline
+                                            // Edit form inline with validation
                                             React.createElement('div', { className: "flex-1 flex space-x-2" },
-                                                React.createElement('input', {
-                                                    type: "text",
-                                                    value: editLocationName,
-                                                    onChange: (e) => setEditLocationName(e.target.value),
-                                                    className: "p-1 border border-gray-300 rounded text-sm w-full max-w-xs",
-                                                    placeholder: "Location name"
-                                                }),
-                                                React.createElement('input', {
-                                                    type: "text",
-                                                    value: editLocationDescription,
-                                                    onChange: (e) => setEditLocationDescription(e.target.value),
-                                                    className: "p-1 border border-gray-300 rounded text-sm w-full",
-                                                    placeholder: "Description (optional)"
-                                                })
+                                                React.createElement('div', { className: "relative flex-grow max-w-xs" },
+                                                    React.createElement('input', {
+                                                        type: "text",
+                                                        value: editLocationName,
+                                                        onChange: handleChange(setEditLocationName),
+                                                        onKeyDown: handleKeyDown,
+                                                        maxLength: window.App.utils.sanitize.LIMITS.LOCATION_NAME,
+                                                        pattern: "[A-Za-z0-9,.\-_ ]*",
+                                                        className: "p-1 border border-gray-300 rounded text-sm w-full",
+                                                        placeholder: "Location name"
+                                                    }),
+                                                    React.createElement('div', {
+                                                        className: `absolute -bottom-5 right-0 text-xs ${
+                                                            editLocationName.length > window.App.utils.sanitize.LIMITS.LOCATION_NAME * 0.8 
+                                                                ? 'text-orange-500' 
+                                                                : 'text-gray-400'
+                                                        }`
+                                                    }, `${editLocationName.length}/${window.App.utils.sanitize.LIMITS.LOCATION_NAME}`)
+                                                ),
+                                                React.createElement('div', { className: "relative flex-grow" },
+                                                    React.createElement('input', {
+                                                        type: "text",
+                                                        value: editLocationDescription,
+                                                        onChange: handleChange(setEditLocationDescription),
+                                                        onKeyDown: handleKeyDown,
+                                                        maxLength: window.App.utils.sanitize.LIMITS.LOCATION_DESCRIPTION,
+                                                        pattern: "[A-Za-z0-9,.\-_ ]*",
+                                                        className: "p-1 border border-gray-300 rounded text-sm w-full",
+                                                        placeholder: "Description (optional)"
+                                                    }),
+                                                    React.createElement('div', {
+                                                        className: `absolute -bottom-5 right-0 text-xs ${
+                                                            editLocationDescription.length > window.App.utils.sanitize.LIMITS.LOCATION_DESCRIPTION * 0.8 
+                                                                ? 'text-orange-500' 
+                                                                : 'text-gray-400'
+                                                        }`
+                                                    }, `${editLocationDescription.length}/${window.App.utils.sanitize.LIMITS.LOCATION_DESCRIPTION}`)
+                                                )
                                             )
                                     ),
                                     
@@ -371,4 +429,4 @@ window.App.components.LocationManager = ({
     );
 };
 
-console.log("LocationManager component loaded with theme-aware styling."); // For debugging
+console.log("LocationManager component loaded with input sanitization!"); // For debugging

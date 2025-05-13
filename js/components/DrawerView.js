@@ -439,7 +439,7 @@ window.App.components.DrawerView = ({
                             className: `flex justify-between items-center p-2 bg-${UI.getThemeColors().background} rounded border border-${UI.getThemeColors().border}`
                         },
                             React.createElement('div', null,
-                                React.createElement('div', { className: "font-medium" }, comp.name),
+                                React.createElement('div', { className: `font-medium text-${UI.getThemeColors().textSecondary} `}, comp.name),
                                 React.createElement('div', { className: `text-xs text-${UI.getThemeColors().textSecondary}` },
                                     `${comp.category} • Model/Type: ${comp.type || ""}`
                                 )
