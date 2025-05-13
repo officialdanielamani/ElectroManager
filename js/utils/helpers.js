@@ -184,70 +184,90 @@ window.App.utils.helpers = {
         return cells;
     },
 
-     /**
-    * Sync the cell grid with a resized drawer.
-    * - Adds any NEW coordinates that now fit inside the grid.
-    * - Removes cells that fall outside the grid *only if they are empty*.
-    *   (If they hold components, they stay but get marked `orphan: true` so the
-    *    UI can highlight them and you can drag-move the parts later.)
-    *
-    * @param {Object} drawer   –– the updated drawer (already has new rows/cols)
-    * @param {Array}  allCells –– entire cells array from state / storage
-    * @param {Array}  components –– components array so we can check occupancy
-    * @return {Array}          –– new cells array (ready for setCells + saveCells)
-    */
-    syncCellsWithDrawer(drawer, allCells, components) {
-        const helpers = window.App.utils.helpers;
+    /**
+* Sync the cell grid with a resized drawer.
+* - Adds any NEW coordinates that now fit inside the grid.
+* - Removes cells that fall outside the grid *only if they are empty*.
+*   (If they hold components, they stay but get marked `orphan: true` so the
+*    UI can highlight them and you can drag-move the parts later.)
+*
+* @param {Object} drawer   –– the updated drawer (already has new rows/cols)
+* @param {Array}  allCells –– entire cells array from state / storage
+* @param {Array}  components –– components array so we can check occupancy
+* @return {Array}          –– new cells array (ready for setCells + saveCells)
+*/
+    syncCellsWithDrawer: function (drawer, allCells, components) {
+        // Properly access the grid dimensions from the drawer object
+        const rows = drawer.grid?.rows || 3;
+        const cols = drawer.grid?.cols || 3;
 
+        // Build a set of all coordinates that should be in the grid
         const wanted = new Set();
-        for (let r = 1; r <= drawer.rows; r++) {
-            for (let c = 1; c <= drawer.cols; c++) {
-                wanted.add(`${r}-${c}`);
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                // Store coordinate in format that matches how it's stored in cells
+                const coordinate = `${String.fromCharCode(65 + c)}${r + 1}`; // A1, B1, etc.
+                wanted.add(coordinate);
             }
         }
 
         const keep = [];
         const add = [];
 
-        // Iterate current cells for this drawer
+        // Iterate through current cells
         for (const cell of allCells) {
             if (cell.drawerId !== drawer.id) {
-                keep.push(cell);                     // belongs to another drawer
+                // Not part of this drawer, keep it unchanged
+                keep.push(cell);
                 continue;
             }
 
-            const key = `${cell.row}-${cell.col}`;
-
-            if (wanted.has(key)) {
-                keep.push({ ...cell, orphan: false });   // still inside grid
-                wanted.delete(key);                      // mark as satisfied
+            // Check if the coordinate is still within the grid
+            if (wanted.has(cell.coordinate)) {
+                // Cell is still inside grid, keep it but ensure orphan flag is false
+                keep.push({ ...cell, orphan: false });
+                wanted.delete(cell.coordinate); // Mark as satisfied
             } else {
                 // Cell is now outside the grid
-                const occupied = components.some(c => c.locationInfo?.cellId === cell.id);
+
+                // Check if any components are using this cell
+                const occupied = components.some(comp =>
+                    comp.storageInfo &&
+                    (
+                        // Check new format (cells array)
+                        (Array.isArray(comp.storageInfo.cells) &&
+                            comp.storageInfo.cells.includes(cell.id)) ||
+                        // Check old format (single cellId)
+                        comp.storageInfo.cellId === cell.id
+                    )
+                );
+
                 if (occupied) {
-                    // keep it but mark orphaned
+                    // Cell contains components, keep it but mark as orphaned
                     keep.push({ ...cell, orphan: true });
-                    console.warn(`Cell ${cell.id} now outside drawer – marked orphan`);
+                    console.warn(`Cell ${cell.id} (${cell.coordinate}) now outside drawer grid – marked orphan`);
                 }
-                // else drop it entirely
+                // If not occupied, simply drop it (don't add to keep array)
             }
         }
 
-        // Create any coordinates still missing
-        for (const key of wanted) {
-            const [row, col] = key.split('-').map(Number);
+        // Create cells for any coordinates still needed
+        for (const coordinate of wanted) {
+            // Generate a unique ID for the new cell
+            const now = Date.now();
+            const randomSuffix = Math.random().toString(16).slice(2);
+
             add.push({
-                id: `cell-${drawer.id}-${row}-${col}`,
+                id: `cell-${now}-${randomSuffix}`,
                 drawerId: drawer.id,
-                row,
-                col,
-                coordinate: `${String.fromCharCode(64 + col)}${row}`, // A1, B3 …
+                coordinate: coordinate,
                 nickname: '',
                 available: true,
                 orphan: false
             });
         }
 
+        // Return combined array of kept and new cells
         return [...keep, ...add];
     },
 
@@ -261,10 +281,10 @@ window.App.utils.helpers.parseParameters = (text) => {
 // Modify formatDatasheets to sanitize URLs
 window.App.utils.helpers.formatDatasheets = (datasheets) => {
     if (!datasheets || typeof datasheets !== 'string') return [];
-    
+
     // Sanitize the input string first
     const sanitizedDatasheets = window.App.utils.sanitize.value(datasheets);
-    
+
     return sanitizedDatasheets.split(/[\n,]+/) // Split by newline or comma
         .map(url => url.trim()) // Trim whitespace
         .filter(url => url && (url.startsWith('http://') || url.startsWith('https://'))); // Basic URL validation

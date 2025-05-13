@@ -17,29 +17,29 @@ window.App.utils.sanitize = {
         COMPONENT_INFO: 128,
         CATEGORY: 32,
         FOOTPRINT: 32,
-        
+
         // Location fields
         LOCATION_NAME: 32,
         LOCATION_DESCRIPTION: 64,
-        
+
         // Drawer fields
         DRAWER_NAME: 32,
         DRAWER_NICKNAME: 16,
         DRAWER_DESCRIPTION: 64,
-        
+
         // Cell fields
         CELL_NICKNAME: 16
     },
-    
+
     // Add regex pattern for allowed characters: A-Z, a-z, 0-9, comma, dot, dash, underscore, space
     ALLOWED_CHARS_PATTERN: /^[A-Za-z0-9,.\-_ ]*$/,
-    
+
     /**
      * Sanitizes a string value using DOMPurify
      * @param {any} value - The value to sanitize
      * @returns {any} - The sanitized value if string, otherwise unchanged
      */
-    value: function(value) {
+    value: function (value) {
         // Return non-string values unchanged
         if (value === null || value === undefined || typeof value !== 'string') {
             return value;
@@ -53,24 +53,24 @@ window.App.utils.sanitize = {
         // Fallback - basic HTML tag removal if DOMPurify not available
         return value.replace(/<[^>]*>?/gm, '');
     },
-    
+
     /**
      * Validates and filters input for allowed characters only
      * @param {string} value - The string to validate
      * @returns {string} - String with only allowed characters
      */
-    validateAllowedChars: function(value) {
+    validateAllowedChars: function (value) {
         if (typeof value !== 'string') return '';
-        
+
         // First sanitize the value
         const sanitized = this.value(value);
-        
+
         // Then filter out any disallowed characters
         return sanitized.split('')
             .filter(char => this.ALLOWED_CHARS_PATTERN.test(char))
             .join('');
     },
-    
+
     /**
      * Validates string length and allowed characters
      * @param {string} value - The string to validate
@@ -78,55 +78,55 @@ window.App.utils.sanitize = {
      * @param {string} defaultValue - Default value if invalid
      * @returns {string} - Validated string
      */
-    validateLength: function(value, maxLength, defaultValue = '') {
+    validateLength: function (value, maxLength, defaultValue = '') {
         if (typeof value !== 'string') return defaultValue;
-        
+
         // First sanitize the value
         const sanitized = this.value(value);
-        
+
         // Then filter allowed characters
         const filtered = sanitized.split('')
             .filter(char => this.ALLOWED_CHARS_PATTERN.test(char))
             .join('');
-        
+
         // Finally, check length and truncate if needed
         return filtered.length <= maxLength ? filtered : filtered.substring(0, maxLength);
     },
-    
+
     /**
      * Check if a string contains only valid characters
      * @param {string} value - The string to check
      * @returns {boolean} - True if valid, false if contains invalid chars
      */
-    isValidString: function(value) {
+    isValidString: function (value) {
         if (typeof value !== 'string') return false;
-        
+
         // Check each character in the string
         for (let i = 0; i < value.length; i++) {
             if (!this.ALLOWED_CHARS_PATTERN.test(value[i])) {
                 return false;
             }
         }
-        
+
         return true;
     },
-    
+
     /**
      * Get array of invalid characters in a string
      * @param {string} value - The string to check
      * @returns {Array} - Array of invalid characters
      */
-    getInvalidChars: function(value) {
+    getInvalidChars: function (value) {
         if (typeof value !== 'string') return [];
-        
+
         const invalidChars = new Set();
-        
+
         for (let i = 0; i < value.length; i++) {
             if (!this.ALLOWED_CHARS_PATTERN.test(value[i])) {
                 invalidChars.add(value[i]);
             }
         }
-        
+
         return Array.from(invalidChars);
     },
 
@@ -135,7 +135,7 @@ window.App.utils.sanitize = {
      * @param {Object} obj - The object to sanitize
      * @returns {Object} - A new object with all string values sanitized
      */
-    object: function(obj) {
+    object: function (obj) {
         if (!obj || typeof obj !== 'object') {
             return this.value(obj);
         }
@@ -150,7 +150,7 @@ window.App.utils.sanitize = {
         for (const key in obj) {
             if (Object.prototype.hasOwnProperty.call(obj, key)) {
                 const value = obj[key];
-                
+
                 if (typeof value === 'object' && value !== null) {
                     sanitized[key] = this.object(value);
                 } else {
@@ -166,55 +166,55 @@ window.App.utils.sanitize = {
      * @param {Event} event - DOM event with target input
      * @returns {string} - Sanitized input value
      */
-    input: function(event) {
+    input: function (event) {
         if (!event || !event.target) return '';
         return this.value(event.target.value);
     },
-    
+
     /**
      * Field-specific validators
      */
-    componentName: function(name) {
+    componentName: function (name) {
         return this.validateLength(name, this.LIMITS.COMPONENT_NAME);
     },
-    
-    componentModel: function(model) {
+
+    componentModel: function (model) {
         return this.validateLength(model, this.LIMITS.COMPONENT_MODEL);
     },
-    
-    componentInfo: function(info) {
+
+    componentInfo: function (info) {
         return this.validateLength(info, this.LIMITS.COMPONENT_INFO);
     },
-    
-    category: function(category) {
+
+    category: function (category) {
         return this.validateLength(category, this.LIMITS.CATEGORY);
     },
-    
-    footprint: function(footprint) {
+
+    footprint: function (footprint) {
         return this.validateLength(footprint, this.LIMITS.FOOTPRINT);
     },
-    
-    locationName: function(name) {
+
+    locationName: function (name) {
         return this.validateLength(name, this.LIMITS.LOCATION_NAME);
     },
-    
-    locationDescription: function(desc) {
+
+    locationDescription: function (desc) {
         return this.validateLength(desc, this.LIMITS.LOCATION_DESCRIPTION);
     },
-    
-    drawerName: function(name) {
+
+    drawerName: function (name) {
         return this.validateLength(name, this.LIMITS.DRAWER_NAME);
     },
-    
-    drawerNickname: function(nickname) {
+
+    drawerNickname: function (nickname) {
         return this.validateLength(nickname, this.LIMITS.DRAWER_NICKNAME);
     },
-    
-    drawerDescription: function(desc) {
+
+    drawerDescription: function (desc) {
         return this.validateLength(desc, this.LIMITS.DRAWER_DESCRIPTION);
     },
-    
-    cellNickname: function(nickname) {
+
+    cellNickname: function (nickname) {
         return this.validateLength(nickname, this.LIMITS.CELL_NICKNAME);
     },
 
@@ -223,39 +223,39 @@ window.App.utils.sanitize = {
      * @param {Object} component - The component object to sanitize
      * @returns {Object} - A sanitized copy of the component
      */
-    component: function(component) {
+    component: function (component) {
         if (!component || typeof component !== 'object') {
             return {};
         }
 
         const sanitized = { ...component };
-        
+
         // Use specific validators for each field
         if (typeof sanitized.name === 'string') {
             sanitized.name = this.componentName(sanitized.name);
         }
-        
+
         if (typeof sanitized.type === 'string') {
             sanitized.type = this.componentModel(sanitized.type);
         }
-        
+
         if (typeof sanitized.info === 'string') {
             sanitized.info = this.componentInfo(sanitized.info);
         }
-        
+
         if (typeof sanitized.category === 'string') {
             sanitized.category = this.category(sanitized.category);
         }
-        
+
         if (typeof sanitized.footprint === 'string') {
             sanitized.footprint = this.footprint(sanitized.footprint);
         }
-        
+
         // Other string fields
         const otherStringFields = [
             'datasheets', 'image', 'customCategory', 'customFootprint'
         ];
-        
+
         otherStringFields.forEach(field => {
             if (typeof sanitized[field] === 'string') {
                 sanitized[field] = this.value(sanitized[field]);
@@ -266,7 +266,7 @@ window.App.utils.sanitize = {
         if (sanitized.locationInfo && typeof sanitized.locationInfo === 'object') {
             sanitized.locationInfo = this.object(sanitized.locationInfo);
         }
-        
+
         if (sanitized.storageInfo && typeof sanitized.storageInfo === 'object') {
             sanitized.storageInfo = this.object(sanitized.storageInfo);
         }
@@ -284,11 +284,11 @@ window.App.utils.sanitize = {
      * @param {Object} location - Location object to sanitize
      * @returns {Object} - Sanitized location object
      */
-    location: function(location) {
+    location: function (location) {
         if (!location || typeof location !== 'object') {
             return {};
         }
-        
+
         return {
             id: this.value(location.id),
             name: this.locationName(location.name || ''),
@@ -301,18 +301,18 @@ window.App.utils.sanitize = {
      * @param {Object} drawer - Drawer object to sanitize
      * @returns {Object} - Sanitized drawer object
      */
-    drawer: function(drawer) {
+    drawer: function (drawer) {
         if (!drawer || typeof drawer !== 'object') {
             return {};
         }
-        
+
         const sanitized = {
             id: this.value(drawer.id),
             locationId: this.value(drawer.locationId),
             name: this.drawerName(drawer.name || ''),
             description: this.drawerDescription(drawer.description || '')
         };
-        
+
         // Handle grid dimensions
         if (drawer.grid && typeof drawer.grid === 'object') {
             sanitized.grid = {
@@ -322,7 +322,7 @@ window.App.utils.sanitize = {
         } else {
             sanitized.grid = { rows: 3, cols: 3 };
         }
-        
+
         return sanitized;
     },
 
@@ -331,11 +331,11 @@ window.App.utils.sanitize = {
      * @param {Object} cell - Cell object to sanitize
      * @returns {Object} - Sanitized cell object
      */
-    cell: function(cell) {
+    cell: function (cell) {
         if (!cell || typeof cell !== 'object') {
             return {};
         }
-        
+
         return {
             id: this.value(cell.id),
             drawerId: this.value(cell.drawerId),
@@ -351,35 +351,37 @@ window.App.utils.sanitize = {
      * @param {Function} sanitizeFn - Sanitization function to apply to each item
      * @returns {Array} - Sanitized array of objects
      */
-    array: function(items, sanitizeFn) {
+    array: function (items, sanitizeFn) {
         if (!Array.isArray(items)) {
             return [];
         }
-        
-        return items.map(item => 
-            typeof sanitizeFn === 'function' 
-                ? sanitizeFn(item) 
+
+        return items.map(item =>
+            typeof sanitizeFn === 'function'
+                ? sanitizeFn(item)
                 : this.object(item)
         );
     },
-    
+
     /**
      * Parse parameters from string format to object, with sanitization
      * @param {string} text - Parameter text in format "key: value"
      * @returns {Object} - Sanitized parameters object
      */
-    parseParameters: function(text) {
+    parseParameters: function (text) {
         if (!text || typeof text !== 'string') return {};
-        
+
         const params = {};
+        // Just use basic XSS protection without filtering out special characters
         const sanitizedText = this.value(text);
-        
+
         sanitizedText.split('\n').forEach(line => {
             const separatorIndex = line.indexOf(':');
             if (separatorIndex > 0) { // Ensure colon exists and is not the first character
-                // Sanitize key and value with allowed character validation
+                // For key, still restrict to safer characters (needs to be a valid object property)
                 const key = this.validateAllowedChars(line.substring(0, separatorIndex).trim());
-                const value = this.validateAllowedChars(line.substring(separatorIndex + 1).trim());
+                // For value, allow more special characters
+                const value = line.substring(separatorIndex + 1).trim();
 
                 // Skip special values that should be handled separately
                 if (key === 'locationInfo' || key === 'storageInfo' ||
@@ -393,17 +395,17 @@ window.App.utils.sanitize = {
                 }
             }
         });
-        
+
         return params;
     },
-    
+
     /**
      * Creates a safe version of react's setState that sanitizes input
      * @param {Function} setState - React's setState function
      * @returns {Function} - Sanitized setState wrapper
      */
-    createSafeSetState: function(setState) {
-        return function(value) {
+    createSafeSetState: function (setState) {
+        return function (value) {
             // If value is a function (functional update), wrap it
             if (typeof value === 'function') {
                 setState(prevState => {
@@ -416,46 +418,46 @@ window.App.utils.sanitize = {
             }
         };
     },
-    
+
     /**
      * Creates a keydown handler that prevents disallowed characters
      * @returns {Function} - Keydown event handler
      */
-    createKeyDownHandler: function() {
-        return function(e) {
+    createKeyDownHandler: function () {
+        return function (e) {
             // Allow control keys (backspace, delete, arrows, etc.)
-            if (e.ctrlKey || e.metaKey || e.altKey || 
-                e.key === 'Backspace' || e.key === 'Delete' || 
-                e.key === 'ArrowLeft' || e.key === 'ArrowRight' || 
-                e.key === 'Home' || e.key === 'End' || 
+            if (e.ctrlKey || e.metaKey || e.altKey ||
+                e.key === 'Backspace' || e.key === 'Delete' ||
+                e.key === 'ArrowLeft' || e.key === 'ArrowRight' ||
+                e.key === 'Home' || e.key === 'End' ||
                 e.key === 'Tab') {
                 return; // Allow these keys
             }
-            
+
             // Check if the key is an allowed character
             if (!window.App.utils.sanitize.ALLOWED_CHARS_PATTERN.test(e.key)) {
                 e.preventDefault(); // Prevent typing disallowed characters
             }
         };
     },
-    
+
     /**
      * Creates a change handler that filters input for allowed characters
      * @param {Function} setFormData - State setter function
      * @returns {Function} - Change event handler
      */
-    createAllowedCharsChangeHandler: function(setFormData) {
-        return function(e) {
+    createAllowedCharsChangeHandler: function (setFormData) {
+        return function (e) {
             const { name, value, type, checked } = e.target;
             // For checkbox inputs, use the 'checked' property as the value
             let newValue = type === 'checkbox' ? checked : value;
-            
+
             // Filter input for allowed characters if it's a string
             if (typeof newValue === 'string') {
                 // Sanitize and filter characters
                 newValue = window.App.utils.sanitize.validateAllowedChars(newValue);
             }
-            
+
             setFormData(prevData => ({
                 ...prevData,
                 [name]: newValue

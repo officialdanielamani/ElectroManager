@@ -34,7 +34,7 @@ window.App.components.ComponentForm = ({
     const [showStorageSelector, setShowStorageSelector] = useState(false);
     const [selectedCells, setSelectedCells] = useState([]);
     const [selectedDrawerId, setSelectedDrawerId] = useState('');
-    
+
     // Image preview state - simplified to just track loading and error states
     const [imagePreview, setImagePreview] = useState({
         loading: false,
@@ -47,19 +47,19 @@ window.App.components.ComponentForm = ({
     // Initialize with proper structure for missing fields
     useEffect(() => {
         if (!componentData) return;
-        
+
         // Format storage info using helper
         const storageInfo = formHelpers.formatStorageInfo(componentData.storageInfo);
-        
+
         // Format location info using helper
         const locationInfo = formHelpers.formatLocationInfo(componentData.locationInfo);
-        
+
         // Handle legacy format - convert single cellId to array of cells
-        if (componentData.storageInfo?.cellId && 
+        if (componentData.storageInfo?.cellId &&
             !storageInfo.cells.includes(componentData.storageInfo.cellId)) {
             storageInfo.cells.push(componentData.storageInfo.cellId);
         }
-        
+
         // Set form data
         setFormData({
             ...componentData,
@@ -69,46 +69,46 @@ window.App.components.ComponentForm = ({
             bookmark: componentData.bookmark || false,
             star: componentData.star || false
         });
-        
+
         // Set selected cells and drawer ID for UI state
         setSelectedCells(storageInfo.cells || []);
         setSelectedDrawerId(storageInfo.drawerId || '');
-        
+
     }, [componentData]);
 
     // Handle changes in form inputs with character validation
     const handleChange = (e) => {
         if (isViewOnly) return; // Don't process changes in view-only mode
-        
+
         const { name, value, type, checked } = e.target;
         // For checkbox inputs, use the 'checked' property as the value
         let newValue = type === 'checkbox' ? checked : value;
-        
+
         // Filter for allowed characters if it's a string
         if (typeof newValue === 'string') {
             newValue = window.App.utils.sanitize.validateAllowedChars(newValue);
         }
-        
+
         setFormData(prevData => ({
             ...prevData,
             [name]: newValue
         }));
     };
-    
+
     // Handle numeric field changes with proper conversion and validation
     const handleNumericChange = (e) => {
         if (isViewOnly) return;
-        
+
         const { name, value } = e.target;
-        
+
         // First validate for allowed characters
         const filteredValue = window.App.utils.sanitize.validateAllowedChars(value);
-        
+
         // Then convert to appropriate numeric type
-        const numericValue = name === 'price' 
-            ? parseFloat(filteredValue) || 0 
+        const numericValue = name === 'price'
+            ? parseFloat(filteredValue) || 0
             : parseInt(filteredValue, 10) || 0;
-        
+
         setFormData(prevData => ({
             ...prevData,
             [name]: numericValue
@@ -118,10 +118,10 @@ window.App.components.ComponentForm = ({
     // Handle category selection, including the "Add new..." option
     const handleCategoryChange = (e) => {
         if (isViewOnly) return;
-        
+
         // Sanitize and validate the value
         const value = window.App.utils.sanitize.validateAllowedChars(e.target.value);
-        
+
         setFormData(prevData => ({
             ...prevData,
             category: value,
@@ -133,7 +133,7 @@ window.App.components.ComponentForm = ({
     // Handle image URL changes with validation
     const handleImageUrlChange = (e) => {
         if (isViewOnly) return;
-        
+
         // Use normal value without character restriction since URLs can contain special chars
         const url = window.App.utils.sanitize.value(e.target.value);
 
@@ -176,10 +176,10 @@ window.App.components.ComponentForm = ({
     // Handle footprint selection, including the "Custom footprint..." option
     const handleFootprintChange = (e) => {
         if (isViewOnly) return;
-        
+
         // Sanitize and validate the value
         const value = window.App.utils.sanitize.validateAllowedChars(e.target.value);
-        
+
         setFormData(prevData => ({
             ...prevData,
             footprint: value,
@@ -191,10 +191,10 @@ window.App.components.ComponentForm = ({
     // Handle location changes with validation
     const handleLocationChange = (e) => {
         if (isViewOnly) return;
-        
+
         const { name, value } = e.target;
         const sanitizedValue = window.App.utils.sanitize.validateAllowedChars(value);
-        
+
         setFormData(prevData => ({
             ...prevData,
             locationInfo: {
@@ -207,7 +207,7 @@ window.App.components.ComponentForm = ({
     // Handle storage location changes (drawer assignment) with validation
     const handleStorageLocationChange = (e) => {
         if (isViewOnly) return;
-        
+
         const { name, value } = e.target;
         const sanitizedValue = window.App.utils.sanitize.validateAllowedChars(value);
 
@@ -238,7 +238,7 @@ window.App.components.ComponentForm = ({
     // Handle drawer selection with validation
     const handleDrawerChange = (e) => {
         if (isViewOnly) return;
-        
+
         const drawerId = window.App.utils.sanitize.validateAllowedChars(e.target.value);
         setSelectedDrawerId(drawerId);
 
@@ -258,10 +258,10 @@ window.App.components.ComponentForm = ({
     // Handle cell selection/deselection
     const handleCellToggle = (cellId) => {
         if (isViewOnly) return;
-        
+
         // Sanitize the cell ID
         const sanitizedCellId = window.App.utils.sanitize.validateAllowedChars(cellId);
-        
+
         // Find the cell from filtered cells
         const cell = filteredCells.find(c => c.id === sanitizedCellId);
 
@@ -291,9 +291,34 @@ window.App.components.ComponentForm = ({
         }));
     };
 
+    const handleParametersChange = (e) => {
+        if (isViewOnly) return;
+
+        // For parameters, we don't want to restrict characters as much
+        const { name, value } = e.target;
+
+        setFormData(prevData => ({
+            ...prevData,
+            [name]: value // Don't filter characters for parameters
+        }));
+    };
+
+    const handleDatasheetsChange = (e) => {
+        if (isViewOnly) return;
+
+        // For datasheets URLs, allow all characters since URLs contain
+        // special characters like ?, &, =, %, +, #, etc.
+        const { name, value } = e.target;
+
+        setFormData(prevData => ({
+            ...prevData,
+            [name]: value // Don't filter characters for URLs
+        }));
+    };
+
     // Get filtered drawers using helper
     const filteredDrawers = formHelpers.getFilteredDrawers(
-        formData.storageInfo?.locationId, 
+        formData.storageInfo?.locationId,
         drawers
     );
 
@@ -306,7 +331,7 @@ window.App.components.ComponentForm = ({
     // Handle form submission with validation
     const handleSubmit = (e) => {
         e.preventDefault(); // Prevent default form submission
-        
+
         if (!isViewOnly) {
             // Check for any invalid characters across all fields
             const fieldsToCheck = {
@@ -316,10 +341,10 @@ window.App.components.ComponentForm = ({
                 'Category': formData.customCategory || '',
                 'Footprint': formData.customFootprint || ''
             };
-            
+
             const invalidFieldChars = {};
             let hasInvalidChars = false;
-            
+
             // Check each field for invalid characters
             for (const [fieldName, fieldValue] of Object.entries(fieldsToCheck)) {
                 const invalidChars = window.App.utils.sanitize.getInvalidChars(fieldValue);
@@ -328,17 +353,17 @@ window.App.components.ComponentForm = ({
                     hasInvalidChars = true;
                 }
             }
-            
+
             if (hasInvalidChars) {
                 // Format a warning message about invalid characters
                 let warningMessage = "The following fields contain invalid characters that will be removed:\n\n";
-                
+
                 for (const [fieldName, chars] of Object.entries(invalidFieldChars)) {
                     warningMessage += `${fieldName}: ${chars.join(' ')}\n`;
                 }
-                
+
                 alert(warningMessage);
-                
+
                 // Auto-clean the data
                 const cleanedData = { ...formData };
                 if (cleanedData.name) cleanedData.name = window.App.utils.sanitize.validateAllowedChars(cleanedData.name);
@@ -346,20 +371,20 @@ window.App.components.ComponentForm = ({
                 if (cleanedData.info) cleanedData.info = window.App.utils.sanitize.validateAllowedChars(cleanedData.info);
                 if (cleanedData.customCategory) cleanedData.customCategory = window.App.utils.sanitize.validateAllowedChars(cleanedData.customCategory);
                 if (cleanedData.customFootprint) cleanedData.customFootprint = window.App.utils.sanitize.validateAllowedChars(cleanedData.customFootprint);
-                
+
                 // Update form with cleaned data
                 setFormData(cleanedData);
             }
-            
+
             // Final sanitization of all data
             const sanitizedData = window.App.utils.sanitize.component(formData);
-            
+
             // Basic validation
             if (!sanitizedData.name || !sanitizedData.category) {
                 alert("Component Name and Category are required.");
                 return;
             }
-            
+
             onSave(sanitizedData); // Pass the sanitized form data to the parent save handler
         }
     };
@@ -367,7 +392,7 @@ window.App.components.ComponentForm = ({
     // Helper function to create a validation indicator
     const createValidationIndicator = (value, fieldName) => {
         const isValid = window.App.utils.sanitize.isValidString(value);
-        
+
         if (!isValid) {
             return React.createElement('div', {
                 className: `absolute right-8 top-1/2 transform -translate-y-1/2`,
@@ -378,7 +403,7 @@ window.App.components.ComponentForm = ({
                 }, "!")
             );
         }
-        
+
         return null;
     };
 
@@ -386,21 +411,20 @@ window.App.components.ComponentForm = ({
     const createCharCounter = (value, maxLength) => {
         const length = (value || '').length;
         const isNearLimit = length > maxLength * 0.8;
-        
+
         return React.createElement('div', {
-            className: `absolute bottom-1 right-2 text-xs ${
-                isNearLimit ? 'text-orange-500' : `text-${UI.getThemeColors().textMuted}`
-            }`
+            className: `absolute bottom-1 right-2 text-xs ${isNearLimit ? 'text-orange-500' : `text-${UI.getThemeColors().textMuted}`
+                }`
         }, `${length}/${maxLength}`);
     };
-    
+
     // --- Render ---
     return (
         React.createElement('div', { className: UI.modals.backdrop },
             React.createElement('div', { className: UI.modals.container },
                 // Header
                 React.createElement('div', { className: UI.modals.header },
-                    React.createElement('h2', { className: UI.typography.title }, 
+                    React.createElement('h2', { className: UI.typography.title },
                         isViewOnly ? 'View Component' : (isEditMode ? 'Edit Component' : 'Add New Component')),
                     React.createElement('button', {
                         onClick: onCancel,
@@ -425,15 +449,15 @@ window.App.components.ComponentForm = ({
                     )
                 ),
                 // Form Body (Scrollable)
-                React.createElement('form', { 
+                React.createElement('form', {
                     id: 'component-form',
-                    onSubmit: handleSubmit, 
-                    className: UI.modals.body 
+                    onSubmit: handleSubmit,
+                    className: UI.modals.body
                 },
                     React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4" },
                         // Name Input with validation and character counter
                         React.createElement('div', { className: "md:col-span-1 relative" },
-                            React.createElement('label', { htmlFor: "comp-name", className: UI.forms.label }, 
+                            React.createElement('label', { htmlFor: "comp-name", className: UI.forms.label },
                                 "Name ", !isViewOnly && React.createElement('span', { className: UI.colors.danger.text }, "*")),
                             React.createElement('input', {
                                 id: "comp-name",
@@ -456,7 +480,7 @@ window.App.components.ComponentForm = ({
                         ),
                         // Category Select/Input with validation
                         React.createElement('div', { className: "md:col-span-1" },
-                            React.createElement('label', { htmlFor: "comp-category", className: UI.forms.label }, 
+                            React.createElement('label', { htmlFor: "comp-category", className: UI.forms.label },
                                 "Category ", !isViewOnly && React.createElement('span', { className: UI.colors.danger.text }, "*")),
                             isViewOnly ?
                                 React.createElement('input', {
@@ -539,7 +563,7 @@ window.App.components.ComponentForm = ({
                         ),
                         // Price Input
                         React.createElement('div', { className: "md:col-span-1" },
-                            React.createElement('label', { htmlFor: "comp-price", className: UI.forms.label }, 
+                            React.createElement('label', { htmlFor: "comp-price", className: UI.forms.label },
                                 `Price (${currencySymbol || '$'})`),
                             React.createElement('input', {
                                 id: "comp-price",
@@ -558,7 +582,7 @@ window.App.components.ComponentForm = ({
                         // Storage Location Section
                         React.createElement('div', { className: `md:col-span-2 border-t pt-4 mt-2 border-${UI.getThemeColors().border}` },
                             React.createElement('div', { className: "flex justify-between items-center" },
-                                React.createElement('h3', { className: `text-md font-medium mb-3 text-${UI.getThemeColors().textSecondary}` }, 
+                                React.createElement('h3', { className: `text-md font-medium mb-3 text-${UI.getThemeColors().textSecondary}` },
                                     "Storage Location"),
                                 !isViewOnly && React.createElement('button', {
                                     type: "button",
@@ -573,7 +597,7 @@ window.App.components.ComponentForm = ({
                                 React.createElement('div', null,
                                     React.createElement('label', { htmlFor: "comp-location", className: UI.forms.label }, "Location"),
                                     isViewOnly ?
-                                        React.createElement('div', { 
+                                        React.createElement('div', {
                                             className: `p-2 border border-${UI.getThemeColors().border} rounded bg-${UI.getThemeColors().cardBackground}`
                                         }, formHelpers.getLocationName(formData.locationInfo?.locationId, locations) || "Not assigned") :
                                         React.createElement('select', {
@@ -590,7 +614,7 @@ window.App.components.ComponentForm = ({
                                 ),
                                 // Location Details with validation
                                 React.createElement('div', { className: "relative" },
-                                    React.createElement('label', { htmlFor: "comp-location-details", className: UI.forms.label }, 
+                                    React.createElement('label', { htmlFor: "comp-location-details", className: UI.forms.label },
                                         "Location Details (Optional)"),
                                     React.createElement('input', {
                                         id: "comp-location-details",
@@ -611,21 +635,21 @@ window.App.components.ComponentForm = ({
                             ),
 
                             // Drawer Storage Section (expandable)
-                            (showStorageSelector || isViewOnly) && 
-                                // Using the form-helpers to render the drawer selector
-                                formHelpers.renderDrawerSelector({
-                                    UI,
-                                    storageInfo: formData.storageInfo || {},
-                                    locations,
-                                    filteredDrawers,
-                                    selectedDrawerId,
-                                    filteredCells,
-                                    selectedCells,
-                                    handleStorageLocationChange,
-                                    handleDrawerChange,
-                                    handleCellToggle,
-                                    readOnly: isViewOnly
-                                }),
+                            (showStorageSelector || isViewOnly) &&
+                            // Using the form-helpers to render the drawer selector
+                            formHelpers.renderDrawerSelector({
+                                UI,
+                                storageInfo: formData.storageInfo || {},
+                                locations,
+                                filteredDrawers,
+                                selectedDrawerId,
+                                filteredCells,
+                                selectedCells,
+                                handleStorageLocationChange,
+                                handleDrawerChange,
+                                handleCellToggle,
+                                readOnly: isViewOnly
+                            }),
 
                             React.createElement('p', { className: UI.forms.hint },
                                 "Specify where this component is physically stored."
@@ -702,11 +726,12 @@ window.App.components.ComponentForm = ({
                                 className: UI.forms.textarea,
                                 rows: "3",
                                 value: formData.datasheets || '',
-                                onChange: handleChange,
+                                onChange: handleDatasheetsChange, // Use the special handler
+                                // No onKeyDown handler that would block special characters
                                 placeholder: "One URL per line or comma-separated...",
                                 readOnly: isViewOnly
                             }),
-                            !isViewOnly && React.createElement('p', { className: UI.forms.hint }, 
+                            !isViewOnly && React.createElement('p', { className: UI.forms.hint },
                                 "Enter full URLs (http:// or https://)."
                             )
                         ),
@@ -725,7 +750,7 @@ window.App.components.ComponentForm = ({
                                         placeholder: "https://example.com/image.jpg",
                                         readOnly: isViewOnly
                                     }),
-                                    !isViewOnly && React.createElement('p', { className: UI.forms.hint }, 
+                                    !isViewOnly && React.createElement('p', { className: UI.forms.hint },
                                         "Optional direct link to image."
                                     )
                                 ),
@@ -750,7 +775,7 @@ window.App.components.ComponentForm = ({
                         ),
                         // Parameters Textarea
                         React.createElement('div', { className: "md:col-span-2" },
-                            React.createElement('label', { htmlFor: "comp-parameters", className: UI.forms.label }, 
+                            React.createElement('label', { htmlFor: "comp-parameters", className: UI.forms.label },
                                 "Additional Parameters"),
                             React.createElement('textarea', {
                                 id: "comp-parameters",
@@ -758,18 +783,19 @@ window.App.components.ComponentForm = ({
                                 className: UI.forms.textarea,
                                 rows: "5",
                                 value: formData.parameters || '',
-                                onChange: handleChange,
-                                placeholder: "One per line:\nVoltage: 5V\nTolerance: 5%",
+                                onChange: handleParametersChange, // New handler
+                                // No onKeyDown handler that would block special characters
+                                placeholder: "One per line:\nVoltage: >5V\nTolerance: +- ~5%\nAmp: <3.2A",
                                 readOnly: isViewOnly
                             }),
-                            !isViewOnly && React.createElement('p', { className: UI.forms.hint }, 
+                            !isViewOnly && React.createElement('p', { className: UI.forms.hint },
                                 "Format: \"Name: Value\"."
                             )
                         ),
 
                         // --- Favorite, Bookmark, Star Toggles ---
                         React.createElement('div', { className: `md:col-span-2 mt-4 border-t pt-4 border-${UI.getThemeColors().border}` },
-                            React.createElement('h3', { className: `text-md font-medium mb-3 text-${UI.getThemeColors().textSecondary}` }, 
+                            React.createElement('h3', { className: `text-md font-medium mb-3 text-${UI.getThemeColors().textSecondary}` },
                                 "Component Marks:"),
                             React.createElement('div', { className: "flex flex-wrap gap-6" },
                                 // Favorite Toggle
@@ -802,7 +828,7 @@ window.App.components.ComponentForm = ({
                                         "Favorite"
                                     )
                                 ),
-                                
+
                                 // Bookmark Toggle
                                 React.createElement('label', {
                                     htmlFor: "comp-bookmark",
@@ -831,7 +857,7 @@ window.App.components.ComponentForm = ({
                                         "Bookmark"
                                     )
                                 ),
-                                
+
                                 // Star Toggle
                                 React.createElement('label', {
                                     htmlFor: "comp-star",

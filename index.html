@@ -5,19 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Electronics Inventory (Modular)</title>
     <!--
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.5/purify.min.js">
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.5/purify.min.js">
 -->
     </script>
 
     <script src="js/utils/sanitize-utils.js"></script>
+    <script src="js/utils/ui-constants.js"></script>
     <script src="js/utils/helpers.js"></script>
     <script src="js/utils/idb.js"></script>
     <script src="js/utils/storage.js"></script>
-    <script src="js/utils/ui-constants.js"></script>
     <script src="js/utils/form-helpers.js"></script>
 
     <script src="js/components/ComponentForm.js"></script>
@@ -404,15 +404,9 @@
             // Get the theme colors
             const themeColors = getThemeColors();
 
-            // Clear status messages (import/export)
-            const clearStatusMessages = () => {
-                setImportError('');
-                setExportMessage('');
-            };
-
             // --- Component CRUD Callbacks ---
             const handleAddComponent = () => {
-                clearStatusMessages();
+                //clearStatusMessages();
                 // Prepare initial data for the form (empty component)
                 setEditComponentData({
                     id: '', name: '', category: '', customCategory: '', type: '', quantity: 0, price: 0,
@@ -422,7 +416,7 @@
             };
 
             const handleEditComponent = (componentToEdit) => {
-                clearStatusMessages();
+                //clearStatusMessages();
 
                 // Create a deep copy of the component
                 const cleanComponent = { ...componentToEdit };
@@ -482,7 +476,7 @@
 
             // Update to handleSaveComponent
             const handleSaveComponent = (componentDataFromForm) => {
-                clearStatusMessages();
+                //clearStatusMessages();
                 let categoryToSave = componentDataFromForm.category;
                 let footprintToSave = componentDataFromForm.footprint;
                 let newCategoryAdded = false;
@@ -594,7 +588,7 @@
             };
 
             const handleDeleteComponent = (idToDelete) => {
-                clearStatusMessages();
+                //clearStatusMessages();
                 if (window.confirm('Are you sure you want to delete this component? This action cannot be undone.')) {
                     setComponents(prev => prev.filter(comp => comp.id !== idToDelete));
                     // Also remove from selection if it was selected
@@ -666,13 +660,13 @@
             };
 
             const handleBulkEdit = () => {
-                clearStatusMessages();
+                //clearStatusMessages();
                 if (selectedComponents.length === 0) return;
                 setShowBulkEditForm(true); // Open the bulk edit modal
             };
 
             const handleApplyBulkEdit = (bulkEditData) => {
-                clearStatusMessages();
+                //clearStatusMessages();
                 let categoryToApply = bulkEditData.category;
                 let footprintToApply = bulkEditData.footprint;
                 let newCategoryAdded = false;
@@ -819,7 +813,7 @@
                 setExportMessage(`${selectedComponents.length} component(s) updated.`);
             };
             const handleBulkDelete = () => {
-                clearStatusMessages();
+                //clearStatusMessages();
                 if (selectedComponents.length === 0) return;
                 if (window.confirm(`Are you sure you want to delete ${selectedComponents.length} selected component(s)? This action cannot be undone.`)) {
                     setComponents(prev => prev.filter(comp => !selectedComponents.includes(comp.id)));
@@ -831,13 +825,13 @@
 
             //-- Location Management--
             const handleAddLocation = (newLocation) => {
-                clearStatusMessages();
+                //clearStatusMessages();
                 setLocations(prev => [...prev, newLocation]);
                 setExportMessage('Location added.');
             };
 
             const handleEditLocation = (locationId, updatedLocation) => {
-                clearStatusMessages();
+                //clearStatusMessages();
                 setLocations(prev => prev.map(loc =>
                     loc.id === locationId ? updatedLocation : loc
                 ));
@@ -845,7 +839,7 @@
             };
 
             const handleDeleteLocation = (locationId) => {
-                clearStatusMessages();
+                //clearStatusMessages();
 
                 // Check if any components are assigned to this location
                 const assignedComponents = components.filter(comp =>
@@ -882,7 +876,7 @@
 
             // Add handlers for drawers
             const handleAddDrawer = (newDrawer) => {
-                clearStatusMessages();
+                //clearStatusMessages();
 
                 setDrawers(prev => [...prev, newDrawer]);
 
@@ -916,7 +910,7 @@
 
 
             const handleDeleteDrawer = (drawerId) => {
-                clearStatusMessages();
+                //clearStatusMessages();
 
                 // Check if any components are assigned to this drawer
                 const assignedComponents = components.filter(comp =>
@@ -957,13 +951,13 @@
 
             // Add handlers for cells
             const handleAddCell = (newCell) => {
-                clearStatusMessages();
+                //clearStatusMessages();
                 setCells(prev => [...prev, newCell]);
                 setExportMessage('Cell added.');
             };
 
             const handleEditCell = (cellId, updatedCell) => {
-                clearStatusMessages();
+                //clearStatusMessages();
                 setCells(prev => prev.map(cell =>
                     cell.id === cellId ? updatedCell : cell
                 ));
@@ -972,7 +966,7 @@
             };
 
             const handleDeleteCell = (cellId) => {
-                clearStatusMessages();
+                //clearStatusMessages();
 
                 // Check if any components are assigned to this cell
                 const assignedComponents = components.filter(comp =>
@@ -1065,578 +1059,6 @@
                 document.body.className = `bg-${window.App.utils.UI.themes[appTheme].colors.background}`;
             }, [appTheme]);
 
-            //-- Footprint Management---
-            const handleAddFootprint = (newFootprint) => {
-                clearStatusMessages();
-                const trimmedFootprint = newFootprint.trim();
-                if (!trimmedFootprint) {
-                    setExportMessage('Footprint name cannot be empty.');
-                    return;
-                }
-                if (footprints.includes(trimmedFootprint)) {
-                    setExportMessage(`Footprint "${trimmedFootprint}" already exists.`);
-                    return;
-                }
-
-                setFootprints(prev => [...prev, trimmedFootprint].sort());
-                setExportMessage(`Footprint "${trimmedFootprint}" added.`);
-            };
-
-            const handleEditFootprint = (oldFootprint, newFootprint) => {
-                clearStatusMessages();
-                const trimmedNewFootprint = newFootprint.trim();
-                if (!trimmedNewFootprint) {
-                    setExportMessage('Footprint name cannot be empty.');
-                    return;
-                }
-                if (footprints.includes(trimmedNewFootprint)) {
-                    setExportMessage(`Footprint "${trimmedNewFootprint}" already exists.`);
-                    return;
-                }
-
-                // Update footprint list
-                setFootprints(prev => prev.map(fp => fp === oldFootprint ? trimmedNewFootprint : fp).sort());
-
-                // Update components using the old footprint
-                setComponents(prev => prev.map(comp =>
-                    comp.footprint === oldFootprint ? { ...comp, footprint: trimmedNewFootprint } : comp
-                ));
-
-                setExportMessage(`Footprint "${oldFootprint}" renamed to "${trimmedNewFootprint}".`);
-            };
-
-            const handleDeleteFootprint = (footprintToDelete) => {
-                clearStatusMessages();
-                // Check if any components are using this footprint
-                const componentsUsingFootprint = components.filter(comp => comp.footprint === footprintToDelete);
-
-                if (componentsUsingFootprint.length > 0) {
-                    const confirmMessage = `${componentsUsingFootprint.length} component(s) are using this footprint. Removing it will clear the footprint from these components. Continue?`;
-                    if (!window.confirm(confirmMessage)) {
-                        return;
-                    }
-
-                    // Clear footprint from components
-                    setComponents(prev => prev.map(comp =>
-                        comp.footprint === footprintToDelete ? { ...comp, footprint: '' } : comp
-                    ));
-                }
-
-                // Remove the footprint from the list
-                setFootprints(prev => prev.filter(fp => fp !== footprintToDelete));
-                setExportMessage(`Footprint "${footprintToDelete}" deleted.`);
-            };
-
-            const handleRestoreDefaultFootprints = () => {
-                clearStatusMessages();
-                // Define the default footprints list here
-                const defaultFootprints = [
-                    "0603", "0805", "1206", "1210", "0402", "0201", "2512",
-                    "SOT-23", "SOT-223", "SOT-89", "SOT-143",
-                    "SOIC-8", "SOIC-16", "TSSOP-16", "TSSOP-20",
-                    "DIP-8", "DIP-14", "DIP-16", "DIP-20", "DIP-28",
-                    "QFP-32", "QFP-44", "QFP-64", "QFP-100",
-                    "QFN-16", "QFN-20", "QFN-24", "QFN-32",
-                    "TO-92", "TO-220", "TO-247", "TO-263", "TO-252"
-                ];
-
-                if (window.confirm('This will add common electronic component footprints to your list. Continue?')) {
-                    // Merge current footprints with defaults to avoid duplicates
-                    const merged = [...new Set([...defaultFootprints, ...footprints])].sort();
-                    setFootprints(merged);
-                    setExportMessage('Common footprints added to your list.');
-                }
-            };
-
-            // --- Data Management Callbacks (Import/Export) ---
-            const handleExportComponents = () => {
-                clearStatusMessages();
-                try {
-                    // Make sure all objects are properly serialized as JSON objects
-                    // Deep copy the components to avoid modifying the original objects
-                    const componentsToExport = components.map(comp => {
-                        // Create a deep copy of the component
-                        const compCopy = { ...comp };
-
-                        // Make sure locationInfo is a proper object, not a string
-                        if (compCopy.locationInfo === '[object Object]' || typeof compCopy.locationInfo === 'string') {
-                            compCopy.locationInfo = { locationId: '', details: '' };
-                        }
-
-                        // Make sure storageInfo is a proper object, not a string
-                        if (compCopy.storageInfo === '[object Object]' || typeof compCopy.storageInfo === 'string') {
-                            compCopy.storageInfo = { locationId: '', drawerId: '', cells: [] };
-                        }
-
-                        return compCopy;
-                    });
-
-                    const componentsJson = JSON.stringify(componentsToExport, null, 2); // Pretty print JSON
-                    setJsonData(componentsJson);
-                    setExportMessage('Components data ready in text area below. Copy or download.');
-                } catch (err) {
-                    console.error("Error exporting components:", err);
-                    setImportError(`Error exporting components: ${err.message}`);
-                }
-            };
-            const handleExportConfig = () => {
-                clearStatusMessages();
-                try {
-                    const configData = {
-                        categories: categories,
-                        lowStockConfig: lowStockConfig,
-                        viewMode: viewMode,
-                        currencySymbol: currencySymbol,
-                        showTotalValue: showTotalValue
-                    };
-                    setJsonData(JSON.stringify(configData, null, 2));
-                    setExportMessage('Configuration data ready in text area below. Copy or download.');
-                } catch (err) {
-                    console.error("Error exporting configuration:", err);
-                    setImportError(`Error exporting configuration: ${err.message}`);
-                }
-            };
-
-            const handleFileImport = (event, importType) => {
-                clearStatusMessages();
-                const file = event.target.files[0];
-                if (!file) return;
-
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const text = e.target.result;
-                    setJsonData(text); // Show loaded JSON in textarea
-                    try {
-                        if (importType === 'components') {
-                            importComponentsData(text);
-                        } else if (importType === 'config') {
-                            importConfigData(text);
-                        }
-                    } catch (err) {
-                        setImportError(`Import failed: ${err.message}`);
-                        // Clear textarea on failure? Maybe not, user might want to fix it.
-                        // setJsonData('');
-                    }
-                };
-                reader.onerror = (e) => {
-                    console.error("Error reading file:", e.target.error);
-                    setImportError(`Error reading file: ${e.target.error}`);
-                };
-                reader.readAsText(file);
-
-                // Reset file input to allow importing the same file again
-                event.target.value = null;
-            };
-
-            const importComponentsData = (jsonDataToImport) => {
-                // This function is called *after* file read is successful
-                try {
-                    const data = JSON.parse(jsonDataToImport);
-                    if (!Array.isArray(data)) {
-                        throw new Error('Imported components data must be an array.');
-                    }
-
-                    // Validate and sanitize imported data (ensure price/quantity are numbers)
-                    const validatedData = data.map(comp => ({
-                        ...comp,
-                        id: comp.id || helpers.generateId(), // Assign ID if missing
-                        price: Number(comp.price) || 0,
-                        quantity: Number(comp.quantity) || 0
-                    }));
-
-                    setComponents(validatedData); // Replace existing components
-
-                    // Update categories based on imported data (merge unique)
-                    const importedCategories = [...new Set(validatedData.map(item => item.category).filter(Boolean))];
-                    setCategories(prev => [...new Set([...prev, ...importedCategories])].sort());
-
-                    setImportError(`Import successful! ${validatedData.length} components loaded.`);
-                    // Optionally clear JSON area after successful import
-                    // setJsonData('');
-                } catch (err) {
-                    console.error("Error importing components data:", err);
-                    // Re-throw error to be caught by the file handler's catch block
-                    throw new Error(`Invalid JSON format or data structure: ${err.message}`);
-                }
-            };
-
-            const importConfigData = (jsonDataToImport) => {
-                try {
-                    const data = JSON.parse(jsonDataToImport);
-                    if (!data || typeof data !== 'object') {
-                        throw new Error('Invalid configuration data format.');
-                    }
-
-                    let messages = [];
-                    let configChanged = false;
-
-                    // Import Categories (Merge unique)
-                    if (data.categories && Array.isArray(data.categories)) {
-                        const uniqueCategories = [...new Set([...categories, ...data.categories.filter(Boolean)])].sort();
-                        if (uniqueCategories.length !== categories.length || !uniqueCategories.every((cat, i) => cat === categories[i])) {
-                            setCategories(uniqueCategories);
-                            messages.push(`${data.categories.length} categories processed.`);
-                            configChanged = true;
-                        } else {
-                            messages.push('Categories checked (no changes).');
-                        }
-                    } else {
-                        messages.push('No categories found in import file.');
-                    }
-
-                    // Import Low Stock Config (Overwrite)
-                    if (data.lowStockConfig && typeof data.lowStockConfig === 'object') {
-                        setLowStockConfig(data.lowStockConfig);
-                        messages.push('Low stock config imported.');
-                        configChanged = true;
-                    } else {
-                        messages.push('No low stock config found in import file.');
-                    }
-
-                    // Import View Mode (Overwrite)
-                    if (data.viewMode && (data.viewMode === 'table' || data.viewMode === 'card')) {
-                        if (viewMode !== data.viewMode) {
-                            setViewMode(data.viewMode);
-                            messages.push(`View mode set to '${data.viewMode}'.`);
-                            configChanged = true;
-                        } else {
-                            messages.push('View mode checked (no change).');
-                        }
-                    } else {
-                        messages.push('No valid view mode found in import file.');
-                    }
-
-                    // Import Currency Symbol (Overwrite)
-                    if (data.currencySymbol && typeof data.currencySymbol === 'string') {
-                        if (currencySymbol !== data.currencySymbol) {
-                            setCurrencySymbol(data.currencySymbol);
-                            messages.push(`Currency set to '${data.currencySymbol}'.`);
-                            configChanged = true;
-                        } else {
-                            messages.push('Currency checked (no change).');
-                        }
-                    } else {
-                        messages.push('No currency symbol found in import file.');
-                    }
-
-                    // Import Show Total Value (Overwrite)
-                    if (typeof data.showTotalValue === 'boolean') {
-                        if (showTotalValue !== data.showTotalValue) {
-                            setShowTotalValue(data.showTotalValue);
-                            messages.push(`Show total value set to ${data.showTotalValue}.`);
-                            configChanged = true;
-                        } else {
-                            messages.push('Show total value checked (no change).');
-                        }
-                    } else {
-                        messages.push('No total value display setting found in import file.');
-                    }
-
-                    if (configChanged) {
-                        setImportError(`Configuration import finished: ${messages.join(' ')}`);
-                    } else {
-                        setImportError(`Configuration import checked: No changes applied. ${messages.join(' ')}`);
-                    }
-                    // Optionally clear JSON area after successful import
-                    // setJsonData('');
-
-                } catch (err) {
-                    console.error("Error importing config data:", err);
-                    // Re-throw error
-                    throw new Error(`Invalid JSON format or data structure: ${err.message}`);
-                }
-            };
-
-
-            const handleDownloadJson = () => {
-                clearStatusMessages();
-                if (!jsonData) {
-                    setExportMessage('No data in the text area to download.');
-                    return;
-                }
-                try {
-                    const element = document.createElement('a');
-                    const file = new Blob([jsonData], { type: 'application/json' });
-                    element.href = URL.createObjectURL(file);
-                    // Suggest filename based on content (simple check)
-                    const suggestedFilename = jsonData.includes('"lowStockConfig":') ? 'electronics_config.json' : 'electronics_inventory.json';
-                    element.download = suggestedFilename;
-                    document.body.appendChild(element); // Required for Firefox
-                    element.click();
-                    document.body.removeChild(element);
-                    URL.revokeObjectURL(element.href); // Clean up blob URL
-                    setExportMessage('JSON file download initiated!');
-                } catch (err) {
-                    console.error("Error downloading JSON:", err);
-                    setImportError(`Error creating download: ${err.message}`);
-                }
-            };
-
-            const handleCopyJson = () => {
-                clearStatusMessages();
-                if (!jsonData) {
-                    setExportMessage('No data in the text area to copy.');
-                    return;
-                }
-                if (navigator.clipboard && window.isSecureContext) { // Use modern clipboard API if available
-                    navigator.clipboard.writeText(jsonData)
-                        .then(() => setExportMessage('JSON copied to clipboard!'))
-                        .catch(err => {
-                            console.error('Failed to copy using navigator.clipboard:', err);
-                            setImportError('Failed to copy to clipboard.');
-                        });
-                } else { // Fallback for older browsers/insecure contexts (less reliable)
-                    try {
-                        const textArea = document.createElement("textarea");
-                        textArea.value = jsonData;
-                        textArea.style.position = "fixed"; // Prevent scrolling to bottom
-                        textArea.style.left = "-9999px";
-                        document.body.appendChild(textArea);
-                        textArea.focus();
-                        textArea.select();
-                        document.execCommand('copy');
-                        document.body.removeChild(textArea);
-                        setExportMessage('JSON copied to clipboard (using fallback method).');
-                    } catch (err) {
-                        console.error('Failed to copy using fallback method:', err);
-                        setImportError('Failed to copy to clipboard.');
-                    }
-                }
-            };
-
-            // --- Settings Page Callbacks ---
-            const handleAddLowStock = (category, threshold) => {
-                clearStatusMessages();
-                setLowStockConfig(prev => ({ ...prev, [category]: threshold }));
-                setExportMessage(`Low stock threshold ${lowStockConfig[category] ? 'updated' : 'added'} for ${category}.`);
-            };
-
-            const handleRemoveLowStock = (category) => {
-                clearStatusMessages();
-                setLowStockConfig(prev => {
-                    const updatedConfig = { ...prev };
-                    delete updatedConfig[category];
-                    return updatedConfig;
-                });
-                setExportMessage(`Low stock threshold removed for ${category}.`);
-            };
-
-            const handleEditCategory = (oldName, newName) => {
-                clearStatusMessages();
-                // Update category list
-                setCategories(prev => prev.map(cat => cat === oldName ? newName : cat).sort());
-                // Update components using the old category name
-                setComponents(prev => prev.map(comp => comp.category === oldName ? { ...comp, category: newName } : comp));
-                // Update low stock config if the category existed there
-                if (lowStockConfig.hasOwnProperty(oldName)) {
-                    setLowStockConfig(prevConfig => {
-                        const newConfig = { ...prevConfig };
-                        newConfig[newName] = newConfig[oldName]; // Copy threshold
-                        delete newConfig[oldName]; // Remove old entry
-                        return newConfig;
-                    });
-                }
-                // If the currently selected filter was the old name, update it (or reset)
-                if (selectedCategory === oldName) {
-                    setSelectedCategory(newName);
-                }
-                setExportMessage(`Category "${oldName}" renamed to "${newName}".`);
-            };
-
-            const handleDeleteCategory = (categoryToDelete) => {
-                clearStatusMessages();
-                const defaultCategoryName = "Default"; // Or "Uncategorized"
-
-                // Ensure the default category exists if we need to move items to it
-                if (!categories.includes(defaultCategoryName)) {
-                    setCategories(prev => [...prev, defaultCategoryName].sort());
-                }
-
-                // Remove the category from the list
-                setCategories(prev => prev.filter(cat => cat !== categoryToDelete));
-
-                // Reassign components from the deleted category to the default one
-                setComponents(prev => prev.map(comp =>
-                    comp.category === categoryToDelete ? { ...comp, category: defaultCategoryName } : comp
-                ));
-
-                // Remove the category from low stock config if it exists
-                if (lowStockConfig.hasOwnProperty(categoryToDelete)) {
-                    setLowStockConfig(prevConfig => {
-                        const newConfig = { ...prevConfig };
-                        delete newConfig[categoryToDelete];
-                        return newConfig;
-                    });
-                }
-
-                // Reset filters if the deleted category was selected
-                if (selectedCategory === categoryToDelete) setSelectedCategory('all');
-                // Reset low stock form if the deleted category was selected there
-                // (Handled inside the SettingsView component state reset)
-
-                setExportMessage(`Category "${categoryToDelete}" deleted. Components moved to "${defaultCategoryName}".`);
-            };
-
-            const handleAddDefaultCategory = () => {
-                clearStatusMessages();
-                const defaultCategoryName = "Default";
-                if (!categories.includes(defaultCategoryName)) {
-                    setCategories(prev => [...prev, defaultCategoryName].sort());
-                    setExportMessage(`"${defaultCategoryName}" category added.`);
-                } else {
-                    setExportMessage(`"${defaultCategoryName}" category already exists.`);
-                }
-            };
-
-            // --- Export Location & Drawers ---
-            const handleExportLocations = () => {
-                clearStatusMessages();
-                try {
-                    const locationsData = {
-                        locations: locations,
-                        drawers: drawers,
-                        cells: cells
-                    };
-                    setJsonData(JSON.stringify(locationsData, null, 2));
-                    setExportMessage('Locations and drawers data ready in text area below. Copy or download.');
-                } catch (err) {
-                    console.error("Error exporting locations:", err);
-                    setImportError(`Error exporting locations: ${err.message}`);
-                }
-            };
-
-            const importLocationsData = (jsonDataToImport) => {
-                try {
-                    const data = JSON.parse(jsonDataToImport);
-
-                    // Validate the imported data structure
-                    if (!data.locations || !Array.isArray(data.locations)) {
-                        throw new Error('Invalid locations data format.');
-                    }
-
-                    // Import locations
-                    if (data.locations && Array.isArray(data.locations)) {
-                        setLocations(data.locations);
-                    }
-
-                    // Import drawers if available
-                    if (data.drawers && Array.isArray(data.drawers)) {
-                        setDrawers(data.drawers);
-                    }
-
-                    // Import cells if available
-                    if (data.cells && Array.isArray(data.cells)) {
-                        setCells(data.cells);
-                    }
-
-                    setImportError('Locations, drawers, and cells imported successfully!');
-                } catch (err) {
-                    console.error("Error importing locations data:", err);
-                    throw new Error(`Invalid JSON format or data structure: ${err.message}`);
-                }
-            };
-
-            const handleLocationsFileImport = (event) => {
-                clearStatusMessages();
-                const file = event.target.files[0];
-                if (!file) return;
-
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const text = e.target.result;
-                    setJsonData(text); // Show loaded JSON in textarea
-                    try {
-                        importLocationsData(text);
-                    } catch (err) {
-                        setImportError(`Import failed: ${err.message}`);
-                    }
-                };
-                reader.onerror = (e) => {
-                    console.error("Error reading file:", e.target.error);
-                    setImportError(`Error reading file: ${e.target.error}`);
-                };
-                reader.readAsText(file);
-
-                // Reset file input to allow importing the same file again
-                event.target.value = null;
-            };
-
-            // --- Local Storage Callbacks ---
-            const handleSaveComponentsLS = async () => {
-                clearStatusMessages();     // ← your existing helper
-                try {
-                    // NEW: await the async helper
-                    const ok = await storage.saveComponents(components);
-                    if (ok) {
-                        setExportMessage("✅ Components saved to IndexedDB.");
-                    } else {
-                        setImportError("❌ Component save failed.");
-                    }
-                } catch (err) {
-                    console.error(err);
-                    setImportError("❌ Component save threw an error.");
-                }
-            };
-            const handleSaveConfig = async () => {
-                clearStatusMessages();
-                const currentConfig = {
-                    categories,
-                    viewMode,
-                    lowStockConfig,
-                    currencySymbol,
-                    showTotalValue,
-                    footprints,
-                    itemsPerPage,
-                    theme
-                };
-                try {
-                    const ok = await storage.saveConfig(currentConfig);
-                    if (ok) {
-                        setExportMessage("✅ Config saved to LocalStorage.");
-                    } else {
-                        setImportError("❌ Config save failed.");
-                    }
-                } catch (err) {
-                    console.error(err);
-                    setImportError("❌ Config save threw an error.");
-                }
-            };
-
-            const handleClearStorage = async () => {
-                clearStatusMessages(); 
-
-                if (window.confirm('Are you sure you want to clear ALL inventory data and settings? This action cannot be undone.')) {
-                    try {
-                        const cleared = await storage.clearStorage();
-
-                        if (cleared) {
-                            // Reset ALL state values to defaults
-                            setComponents([]);
-                            setCategories([]);
-                            setLowStockConfig({});
-                            setViewMode('table');
-                            setSelectedCategory('all');
-                            setSearchTerm('');
-                            setJsonData('');
-                            setImportError('');
-                            setCurrencySymbol('$');
-                            setShowTotalValue(false);
-                            setSelectedComponents([]);
-                            setLocations([]);
-                            setDrawers([]);
-                            setCells([]);
-                            setFootprints([]);
-
-                            setExportMessage('All storage cleared successfully! Application state reset.');
-                        } else {
-                            setImportError('An error occurred while trying to clear storage.');
-                        }
-                    } catch (err) {
-                        console.error("Error clearing storage:", err);
-                        setImportError(`Error clearing storage: ${err.message}`);
-                    }
-                }
-            };
 
             // --- Render ---
             return (
@@ -1736,48 +1158,38 @@
                         onItemsPerPageChange: handleItemsPerPageChange,
                     }),
 
+
                     currentPage === 'data' && React.createElement(SettingsView, {
-                        // Pass state
+                        // Data
                         categories: categories,
                         lowStockConfig: lowStockConfig,
+                        footprints: footprints,
+                        components: components,
+                        locations: locations,
+                        drawers: drawers,
+                        cells: cells,
+
+                        // Config
                         currencySymbol: currencySymbol,
                         showTotalValue: showTotalValue,
-                        jsonData: jsonData,
-                        importError: importError,
-                        exportMessage: exportMessage,
-                        footprints: footprints,
-                        locations: locations,
-                        components: components,
-                        theme: theme, // Pass theme state
-                        onAddLocation: handleAddLocation,
-                        onEditLocation: handleEditLocation,
-                        onDeleteLocation: handleDeleteLocation,
-                        // Pass callbacks
-                        onExportComponents: handleExportComponents,
-                        onExportConfig: handleExportConfig,
-                        onImportComponentsFile: (e) => handleFileImport(e, 'components'),
-                        onImportConfigFile: (e) => handleFileImport(e, 'config'),
-                        onDownloadJson: handleDownloadJson,
-                        onExportLocations: handleExportLocations,
-                        onImportLocationsFile: handleLocationsFileImport,
-                        onCopyJson: handleCopyJson,
-                        onClearJsonArea: () => { setJsonData(''); clearStatusMessages(); },
-                        onChangeCurrency: (e) => { setCurrencySymbol(e.target.value); clearStatusMessages(); },
-                        onChangeShowTotalValue: (e) => { setShowTotalValue(e.target.checked); clearStatusMessages(); },
-                        onAddLowStock: handleAddLowStock,
-                        onRemoveLowStock: handleRemoveLowStock,
-                        onEditCategory: handleEditCategory,
-                        onDeleteCategory: handleDeleteCategory,
-                        onAddDefaultCategory: handleAddDefaultCategory,
-                        onSaveComponentsLS: handleSaveComponentsLS,
-                        onSaveConfig: handleSaveConfig,
-                        onClearStorage: handleClearStorage,
-                        onAddFootprint: handleAddFootprint,
-                        onEditFootprint: handleEditFootprint,
-                        onDeleteFootprint: handleDeleteFootprint,
-                        onEditComponent: handleEditComponent,
-                        onRestoreDefaultFootprints: handleRestoreDefaultFootprints,
-                        onChangeTheme: handleThemeChange, // Add theme change handler
+                        theme: theme,
+
+                        // Update callbacks
+                        onUpdateCategories: setCategories,
+                        onUpdateLowStockConfig: setLowStockConfig,
+                        onUpdateComponents: setComponents,
+                        onUpdateLocations: setLocations,
+                        onUpdateDrawers: setDrawers,
+                        onUpdateCells: setCells,
+                        onUpdateFootprints: setFootprints,
+
+                        // Event callbacks
+                        onChangeCurrency: (e) => { setCurrencySymbol(e.target.value) },
+                        onChangeShowTotalValue: (e) => { setShowTotalValue(e.target.checked) },
+                        onChangeTheme: handleThemeChange,
+
+                        // Component edit callback
+                        onEditComponent: handleEditComponent
                     }),
 
                     currentPage === 'locations' && React.createElement(LocationPage, {

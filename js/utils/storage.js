@@ -1,4 +1,5 @@
-// js/utils/storage.js - Modified to work with ES5 for compatibility
+// js/utils/storage.js - Modified to include unified backup and restore
+
 console.log("Loading storage.js...");
 
 // Create a global namespace if it doesn't exist
@@ -158,7 +159,6 @@ window.App.utils.storage = {
                 return false;
             });
     },
-
     
     /*** COMPONENTS ***/
     
@@ -529,6 +529,165 @@ window.App.utils.storage = {
         return false;
     },
     
+    /*** NEW UNIFIED BACKUP AND RESTORE FUNCTIONALITY ***/
+    
+    // Create a complete backup of all IndexedDB data
+    createBackup: function() {
+        var self = this;
+        
+        return this.init()
+            .then(function(useIndexedDB) {
+                if (!useIndexedDB) {
+                    return Promise.reject(new Error("IndexedDB not available"));
+                }
+                
+                // List of all stores to backup
+                var stores = window.App.utils.idb.stores;
+                
+                // Create promises for loading each store
+                var loadPromises = stores.map(function(storeName) {
+                    // Use the appropriate load function for each store type
+                    if (storeName === 'lowStockConfig') {
+                        return self.loadLowStockConfig().then(function(config) {
+                            // Convert config object to array for consistency
+                            var configArray = [];
+                            for (var category in config) {
+                                if (config.hasOwnProperty(category)) {
+                                    configArray.push({
+                                        id: 'lowstock-' + category.replace(/[^a-zA-Z0-9-_]/g, '_'),
+                                        category: category,
+                                        threshold: config[category]
+                                    });
+                                }
+                            }
+                            return { store: storeName, data: configArray };
+                        });
+                    } else if (storeName === 'categories' || storeName === 'footprints') {
+                        // These stores need special handling since they are arrays of strings
+                        return window.App.utils.idb['load' + storeName.charAt(0).toUpperCase() + storeName.slice(1)]()
+                            .then(function(items) {
+                                // Convert arrays of strings to arrays of objects with id and name
+                                var objectItems = items.map(function(name, index) {
+                                    return { id: storeName.slice(0, 2) + '-' + index, name: name };
+                                });
+                                return { store: storeName, data: objectItems };
+                            });
+                    } else {
+                        // Regular stores
+                        return window.App.utils.idb['load' + storeName.charAt(0).toUpperCase() + storeName.slice(1)]()
+                            .then(function(items) {
+                                return { store: storeName, data: items };
+                            });
+                    }
+                });
+                
+                // Wait for all data to be loaded
+                return Promise.all(loadPromises)
+                    .then(function(results) {
+                        // Convert results array to an object keyed by store name
+                        var data = {};
+                        results.forEach(function(result) {
+                            data[result.store] = result.data;
+                        });
+                        
+                        // Create the backup object with metadata
+                        var backup = {
+                            metadata: {
+                                version: "0.1.7beta",  // App version
+                                date: new Date().toISOString(),
+                                stores: stores
+                            },
+                            data: data
+                        };
+                        
+                        return backup;
+                    });
+            });
+    },
+
+    // Restore from a backup
+    restoreBackup: function(backup, options) {
+        var self = this;
+        options = options || { restoreAll: true, stores: [] };
+        
+        return this.init()
+            .then(function(useIndexedDB) {
+                if (!useIndexedDB) {
+                    return Promise.reject(new Error("IndexedDB not available"));
+                }
+                
+                // Validate backup format
+                if (!backup || !backup.metadata || !backup.data) {
+                    return Promise.reject(new Error("Invalid backup format"));
+                }
+                
+                // Get the list of stores to restore
+                var storesToRestore = options.restoreAll 
+                    ? backup.metadata.stores 
+                    : options.stores.filter(function(store) {
+                        return backup.metadata.stores.includes(store);
+                    });
+                
+                if (storesToRestore.length === 0) {
+                    return Promise.resolve({ success: false, message: "No valid stores to restore" });
+                }
+                
+                // Create promises for saving each store
+                var savePromises = storesToRestore.map(function(storeName) {
+                    var storeData = backup.data[storeName];
+                    
+                    if (!storeData) {
+                        return Promise.resolve({ store: storeName, success: false, message: "No data found" });
+                    }
+                    
+                    // Use the appropriate save function for each store type
+                    if (storeName === 'lowStockConfig') {
+                        // Convert array back to object for lowStockConfig
+                        var config = {};
+                        storeData.forEach(function(item) {
+                            if (item.category) {
+                                config[item.category] = item.threshold;
+                            }
+                        });
+                        return self.saveLowStockConfig(config)
+                            .then(function(success) {
+                                return { store: storeName, success: success };
+                            });
+                    } else if (storeName === 'categories' || storeName === 'footprints') {
+                        // These stores need special handling since they are arrays of strings
+                        var items = storeData.map(function(item) {
+                            return item.name;
+                        });
+                        return window.App.utils.idb['save' + storeName.charAt(0).toUpperCase() + storeName.slice(1)](items)
+                            .then(function(success) {
+                                return { store: storeName, success: success };
+                            });
+                    } else {
+                        // Regular stores
+                        return window.App.utils.idb['save' + storeName.charAt(0).toUpperCase() + storeName.slice(1)](storeData)
+                            .then(function(success) {
+                                return { store: storeName, success: success };
+                            });
+                    }
+                });
+                
+                // Wait for all saves to complete
+                return Promise.all(savePromises)
+                    .then(function(results) {
+                        // Count successful saves
+                        var successCount = results.filter(function(result) {
+                            return result.success;
+                        }).length;
+                        
+                        return {
+                            success: successCount > 0,
+                            message: successCount + " of " + storesToRestore.length + " stores restored successfully",
+                            details: results
+                        };
+                    });
+            });
+    },
+    
     /*** UTILITY FUNCTIONS ***/
     
     clearStorage: function() {
@@ -573,4 +732,4 @@ window.App.utils.storage = {
     }
 };
 
-console.log("storage.js loaded successfully");
+console.log("storage.js loaded successfully with unified backup and restore functionality");

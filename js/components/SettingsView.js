@@ -9,45 +9,38 @@ window.App.components = window.App.components || {};
  * Provides access to import/export, category management, low stock config, and display settings.
  */
 window.App.components.SettingsView = ({
-    // Props
-    categories, // Array: List of category strings
-    lowStockConfig, // Object: Low stock thresholds { category: threshold }
-    currencySymbol, // String: Currency symbol
-    showTotalValue, // Boolean: Whether to show total value in summary
-    footprints, // Array: List of footprint strings
-    jsonData, // String: Text content for import/export text area
-    importError, // String: Error or success message after import
-    exportMessage, // String: Message after export/save attempt
-    theme, // String: Current UI theme
-    // Callbacks
-    onExportComponents, // Function: Called when Export Components button is clicked
-    onExportConfig, // Function: Called when Export Config button is clicked
-    onImportComponentsFile, // Function(event): Called when component file is selected for import
-    onImportConfigFile, // Function(event): Called when config file is selected for import
-    onDownloadJson, // Function: Called when Download JSON button is clicked
-    onCopyJson, // Function: Called when Copy JSON button is clicked
-    onClearJsonArea, // Function: Called when Clear Area button is clicked
-    onChangeCurrency, // Function(event): Called when currency input changes
-    onChangeShowTotalValue, // Function(event): Called when show total value checkbox changes
-    onAddLowStock, // Function(category, threshold): Called to add/update low stock threshold
-    onRemoveLowStock, // Function(category): Called to remove low stock threshold
-    onEditCategory, // Function(oldName, newName): Called to rename a category
-    onDeleteCategory, // Function(category): Called to delete a category
-    onAddDefaultCategory, // Function: Called to add a "Default" category
-    onSaveComponentsLS, // Function: Called to force save components to localStorage
-    onSaveConfig, // Function: Called to force save config to localStorage
-    onClearStorage, // Function: Called to clear all localStorage
-    onAddFootprint, // Function(newFootprint): Called to add a new footprint
-    onEditFootprint, // Function(oldFootprint, newFootprint): Called to rename a footprint
-    onDeleteFootprint, // Function(footprint): Called to delete a footprint
-    onExportLocations, // Function: Called when Export Locations button is clicked
-    onImportLocationsFile, // Function(event): Called when locations file is selected for import
-    onRestoreDefaultFootprints, // Function: Called to restore default footprints
-    onChangeTheme, // Function(theme): Called when theme is changed
-}) => {
+    // Data props
+    categories = [], // Array: List of category strings
+    lowStockConfig = {}, // Object: Low stock thresholds { category: threshold }
+    footprints = [], // Array: List of footprint strings
+    components = [], // Array: All components
+    locations = [], // Array: All locations
+    drawers = [], // Array: All drawers
+    cells = [], // Array: All cells
 
-    // Ensure we have the UI object
+    // Configuration props
+    currencySymbol = 'RM', // String: Currency symbol
+    showTotalValue = false, // Boolean: Whether to show total value in summary
+    theme = 'light', // String: Current UI theme
+
+    // Callbacks that update parent state
+    onUpdateCategories, // Function(categories): Update categories in parent
+    onUpdateLowStockConfig, // Function(config): Update lowStockConfig in parent
+    onUpdateComponents, // Function(components): Update components in parent
+    onUpdateLocations, // Function(locations): Update locations in parent
+    onUpdateDrawers, // Function(drawers): Update drawers in parent
+    onUpdateCells, // Function(cells): Update cells in parent
+    onUpdateFootprints, // Function(footprints): Update footprints in parent
+
+    // Configuration update callbacks
+    onChangeCurrency, // Function(e): Called when currency input changes
+    onChangeShowTotalValue, // Function(e): Called when show total value checkbox changes
+    onChangeTheme, // Function(theme): Called when theme is changed
+
+}) => {
+    // Get UI constants and required hooks
     const { UI } = window.App.utils;
+    const { storage } = window.App.utils;
     const { useState } = React;
     const { FootprintManager } = window.App.components;
 
@@ -56,68 +49,207 @@ window.App.components.SettingsView = ({
     const [newCategoryName, setNewCategoryName] = useState(''); // New name for edited category
     const [newLowStockCategory, setNewLowStockCategory] = useState(''); // Category for new low stock threshold
     const [newLowStockThreshold, setNewLowStockThreshold] = useState(5); // Threshold value
+    const [viewMode, setViewMode] = useState('table'); // 'table' or 'card'
+    const [itemsPerPage, setItemsPerPage] = useState('all'); //
+    const [newCategory, setNewCategory] = useState('');
 
-    // --- Event Handlers ---
+    // State for import/export
+    const [importError, setImportError] = useState(''); // Error or success message after import
+    const [exportMessage, setExportMessage] = useState(''); // Message after export/save attempt
 
-    // Handle low stock threshold submission
-    const handleAddLowStock = () => {
-        // Sanitize the category input
-        const category = window.App.utils.sanitize.value(newLowStockCategory);
-        // Parse and validate the threshold value
-        const threshold = parseInt(window.App.utils.sanitize.value(newLowStockThreshold), 10) || 5;    
-        if (!category || threshold < 1) {
-            alert("Please select a category and enter a threshold greater than 0.");
-            return;
+    // --- Helper Functions ---
+
+    // Clear status messages
+    const clearStatusMessages = () => {
+        setImportError('');
+        setExportMessage('');
+    };
+
+    // --- Category Management Functions ---
+
+    // Handle adding a default category
+    const handleAddDefaultCategory = () => {
+        clearStatusMessages();
+        const defaultCategoryName = "Default";
+        if (!categories.includes(defaultCategoryName)) {
+            const updatedCategories = [...categories, defaultCategoryName].sort();
+            onUpdateCategories(updatedCategories);
+            setExportMessage(`"${defaultCategoryName}" category added.`);
+        } else {
+            setExportMessage(`"${defaultCategoryName}" category already exists.`);
         }
-        onAddLowStock(category, threshold);
-        // Reset the form
-        setNewLowStockThreshold(5);
     };
 
     // Start editing category
     const handleStartEditCategory = (category) => {
-        // Sanitize the category before setting state
-        const sanitizedCategory = window.App.utils.sanitize.value(category);
-        setEditingCategory(sanitizedCategory);
-        setNewCategoryName(sanitizedCategory);
+        clearStatusMessages();
+        setEditingCategory(category);
+        setNewCategoryName(category);
     };
 
     // Save edited category name
     const handleSaveCategory = () => {
-        // Sanitize the new name
-        const sanitizedOldName = window.App.utils.sanitize.value(editingCategory);
-        const trimmedNewName = window.App.utils.sanitize.value(newCategoryName.trim());
+        clearStatusMessages();
+        const trimmedNewName = newCategoryName.trim();
+
         // Validate
         if (!trimmedNewName) {
             alert("Category name cannot be empty.");
             return;
         }
-        if (trimmedNewName === sanitizedOldName) {
+
+        if (trimmedNewName === editingCategory) {
             // No change, just cancel
             setEditingCategory(null);
             setNewCategoryName('');
             return;
         }
+
         if (categories.includes(trimmedNewName)) {
             alert(`Category "${trimmedNewName}" already exists.`);
             return;
         }
-        // Call parent handler and reset state
-        onEditCategory(sanitizedOldName, trimmedNewName);
+
+        // Update category list
+        const updatedCategories = categories.map(cat =>
+            cat === editingCategory ? trimmedNewName : cat
+        ).sort();
+
+        onUpdateCategories(updatedCategories);
+
+        // Update components using the old category name
+        const updatedComponents = components.map(comp =>
+            comp.category === editingCategory ? { ...comp, category: trimmedNewName } : comp
+        );
+
+        onUpdateComponents(updatedComponents);
+
+        // Update low stock config if the category existed there
+        if (lowStockConfig.hasOwnProperty(editingCategory)) {
+            const newConfig = { ...lowStockConfig };
+            newConfig[trimmedNewName] = newConfig[editingCategory];
+            delete newConfig[editingCategory];
+            onUpdateLowStockConfig(newConfig);
+        }
+
         setEditingCategory(null);
         setNewCategoryName('');
+        setExportMessage(`Category "${editingCategory}" renamed to "${trimmedNewName}".`);
     };
-    
+
+    // Add these functions after existing category management functions
+    const handleRestoreDefaultCategories = () => {
+        clearStatusMessages();
+
+        const defaultCategories = [
+            "Resistors", "Capacitors", "Inductors", "Diodes", "Transistors",
+            "ICs", "Connectors", "Switches", "LEDs", "Sensors", "Modules",
+            "Passive", "Active", "Mechanical", "Power", "RF", "Analog", "Digital"
+        ];
+
+        if (window.confirm('This will add common electronic component categories to your list. Continue?')) {
+            // Merge current categories with defaults to avoid duplicates
+            const merged = [...new Set([...categories, ...defaultCategories])].sort();
+            onUpdateCategories(merged);
+            setExportMessage('Common categories added to your list.');
+        }
+    };
+
+    const handleDeleteAllCategories = () => {
+        clearStatusMessages();
+
+        const componentsCount = components.filter(comp => comp.category && comp.category !== 'Default').length;
+
+        if (componentsCount > 0) {
+            const confirmMessage = `This will delete all categories except "Default" and move ${componentsCount} component(s) to "Default" category. Continue?`;
+            if (!window.confirm(confirmMessage)) return;
+        } else {
+            if (!window.confirm('This will delete all categories except "Default". Continue?')) return;
+        }
+
+        // Move all components to Default category
+        const updatedComponents = components.map(comp => {
+            if (comp.category && comp.category !== 'Default') {
+                return { ...comp, category: 'Default' };
+            }
+            return comp;
+        });
+
+        onUpdateComponents(updatedComponents);
+
+        // Keep only Default category
+        onUpdateCategories(['Default']);
+
+        // Clear low stock config
+        onUpdateLowStockConfig({});
+
+        setExportMessage(`All categories deleted except "Default". ${componentsCount} component(s) moved to "Default".`);
+    };
+
+    const handleAddNewCategory = () => {
+        clearStatusMessages();
+        const trimmedCategory = newCategory.trim();
+
+        if (!trimmedCategory) {
+            alert("Category name cannot be empty.");
+            return;
+        }
+
+        if (categories.includes(trimmedCategory)) {
+            alert(`Category "${trimmedCategory}" already exists.`);
+            return;
+        }
+
+        const updatedCategories = [...categories, trimmedCategory].sort();
+        onUpdateCategories(updatedCategories);
+        setNewCategory('');
+        setExportMessage(`Category "${trimmedCategory}" added.`);
+    };
+
     // Cancel category editing
     const handleCancelCategoryEdit = () => {
         setEditingCategory(null);
         setNewCategoryName('');
     };
 
-    // Handle low stock category selection, also update threshold if already configured
+    // Delete a category
+    const handleDeleteCategory = (categoryToDelete) => {
+        clearStatusMessages();
+        const defaultCategoryName = "Default";
+
+        // Ensure the default category exists if we need to move items to it
+        if (!categories.includes(defaultCategoryName)) {
+            onUpdateCategories([...categories, defaultCategoryName].sort());
+        }
+
+        // Remove the category from the list
+        const updatedCategories = categories.filter(cat => cat !== categoryToDelete);
+        onUpdateCategories(updatedCategories);
+
+        // Reassign components from the deleted category to the default one
+        const updatedComponents = components.map(comp =>
+            comp.category === categoryToDelete ? { ...comp, category: defaultCategoryName } : comp
+        );
+
+        onUpdateComponents(updatedComponents);
+
+        // Remove the category from low stock config if it exists
+        if (lowStockConfig.hasOwnProperty(categoryToDelete)) {
+            const newConfig = { ...lowStockConfig };
+            delete newConfig[categoryToDelete];
+            onUpdateLowStockConfig(newConfig);
+        }
+
+        setExportMessage(`Category "${categoryToDelete}" deleted. Components moved to "${defaultCategoryName}".`);
+    };
+
+    // --- Low Stock Configuration Functions ---
+
+    // Handle low stock category selection
     const handleLowStockCategoryChange = (e) => {
         const category = e.target.value;
         setNewLowStockCategory(category);
+
         // If there's already a threshold for this category, load it
         if (category && lowStockConfig && lowStockConfig[category]) {
             setNewLowStockThreshold(lowStockConfig[category]);
@@ -127,7 +259,344 @@ window.App.components.SettingsView = ({
         }
     };
 
-    // --- Render ---
+    // Handle adding a low stock threshold
+    const handleAddLowStock = () => {
+        clearStatusMessages();
+
+        if (!newLowStockCategory || newLowStockThreshold < 1) {
+            alert("Please select a category and enter a threshold greater than 0.");
+            return;
+        }
+
+        const updatedConfig = { ...lowStockConfig, [newLowStockCategory]: newLowStockThreshold };
+        onUpdateLowStockConfig(updatedConfig);
+        setExportMessage(`Low stock threshold ${lowStockConfig[newLowStockCategory] ? 'updated' : 'added'} for ${newLowStockCategory}.`);
+    };
+
+    // Handle removing a low stock threshold
+    const handleRemoveLowStock = (category) => {
+        clearStatusMessages();
+
+        const updatedConfig = { ...lowStockConfig };
+        delete updatedConfig[category];
+
+        onUpdateLowStockConfig(updatedConfig);
+        setExportMessage(`Low stock threshold removed for ${category}.`);
+    };
+
+    // --- Footprint Management Functions ---
+
+    // Handle adding a footprint
+    const handleAddFootprint = (newFootprint) => {
+        clearStatusMessages();
+        const trimmedFootprint = newFootprint.trim();
+
+        if (!trimmedFootprint) {
+            setExportMessage('Footprint name cannot be empty.');
+            return;
+        }
+
+        if (footprints.includes(trimmedFootprint)) {
+            setExportMessage(`Footprint "${trimmedFootprint}" already exists.`);
+            return;
+        }
+
+        const updatedFootprints = [...footprints, trimmedFootprint].sort();
+        onUpdateFootprints(updatedFootprints);
+        setExportMessage(`Footprint "${trimmedFootprint}" added.`);
+    };
+
+    // Handle editing a footprint
+    const handleEditFootprint = (oldFootprint, newFootprint) => {
+        clearStatusMessages();
+        const trimmedNewFootprint = newFootprint.trim();
+
+        if (!trimmedNewFootprint) {
+            setExportMessage('Footprint name cannot be empty.');
+            return;
+        }
+
+        if (footprints.includes(trimmedNewFootprint)) {
+            setExportMessage(`Footprint "${trimmedNewFootprint}" already exists.`);
+            return;
+        }
+
+        // Update footprint list
+        const updatedFootprints = footprints.map(fp =>
+            fp === oldFootprint ? trimmedNewFootprint : fp
+        ).sort();
+
+        onUpdateFootprints(updatedFootprints);
+
+        // Update components using the old footprint
+        const updatedComponents = components.map(comp =>
+            comp.footprint === oldFootprint ? { ...comp, footprint: trimmedNewFootprint } : comp
+        );
+
+        onUpdateComponents(updatedComponents);
+        setExportMessage(`Footprint "${oldFootprint}" renamed to "${trimmedNewFootprint}".`);
+    };
+
+    // Handle deleting a footprint
+    const handleDeleteFootprint = (footprintToDelete) => {
+        clearStatusMessages();
+
+        // Check if any components are using this footprint
+        const componentsUsingFootprint = components.filter(comp => comp.footprint === footprintToDelete);
+
+        if (componentsUsingFootprint.length > 0) {
+            const confirmMessage = `${componentsUsingFootprint.length} component(s) are using this footprint. Removing it will clear the footprint from these components. Continue?`;
+            if (!window.confirm(confirmMessage)) {
+                return;
+            }
+
+            // Clear footprint from components
+            const updatedComponents = components.map(comp =>
+                comp.footprint === footprintToDelete ? { ...comp, footprint: '' } : comp
+            );
+
+            onUpdateComponents(updatedComponents);
+        }
+
+        // Remove the footprint from the list
+        const updatedFootprints = footprints.filter(fp => fp !== footprintToDelete);
+        onUpdateFootprints(updatedFootprints);
+        setExportMessage(`Footprint "${footprintToDelete}" deleted.`);
+    };
+
+    // Handle restoring default footprints
+    const handleRestoreDefaultFootprints = () => {
+        clearStatusMessages();
+
+        // Define the default footprints list
+        const defaultFootprints = [
+            "0603", "0805", "1206", "1210", "0402", "0201", "2512",
+            "SOT-23", "SOT-223", "SOT-89", "SOT-143",
+            "SOIC-8", "SOIC-16", "TSSOP-16", "TSSOP-20",
+            "DIP-8", "DIP-14", "DIP-16", "DIP-20", "DIP-28",
+            "QFP-32", "QFP-44", "QFP-64", "QFP-100",
+            "QFN-16", "QFN-20", "QFN-24", "QFN-32",
+            "TO-92", "TO-220", "TO-247", "TO-263", "TO-252"
+        ];
+
+        if (window.confirm('This will add common electronic component footprints to your list. Continue?')) {
+            // Merge current footprints with defaults to avoid duplicates
+            const merged = [...new Set([...defaultFootprints, ...footprints])].sort();
+            onUpdateFootprints(merged);
+            setExportMessage('Common footprints added to your list.');
+        }
+    };
+
+    const handleDeleteAllFootprints = () => {
+        clearStatusMessages();
+
+        // Check which components have footprints
+        const componentsUsingFootprints = components.filter(comp => comp.footprint && comp.footprint !== '');
+
+        if (componentsUsingFootprints.length > 0) {
+            const confirmMessage = `This will delete all footprints and clear the footprint from ${componentsUsingFootprints.length} component(s). Continue?`;
+            if (!window.confirm(confirmMessage)) return;
+
+            // Clear footprints from all components
+            const updatedComponents = components.map(comp =>
+                comp.footprint ? { ...comp, footprint: '' } : comp
+            );
+            onUpdateComponents(updatedComponents);
+            setExportMessage(`All footprints deleted. Footprints cleared from ${componentsUsingFootprints.length} component(s).`);
+        } else {
+            if (!window.confirm('This will delete all footprints. Continue?')) return;
+            setExportMessage('All footprints deleted.');
+        }
+
+        // Clear the footprints array
+        onUpdateFootprints([]);
+    };
+
+    // --- Storage Management Functions ---
+    // Save components to storage
+    const handleSaveComponentsLS = async () => {
+        clearStatusMessages();
+        try {
+            const ok = await storage.saveComponents(components);
+            if (ok) {
+                setExportMessage("✅ Components saved to IndexedDB.");
+            } else {
+                setImportError("❌ Component save failed.");
+            }
+        } catch (err) {
+            console.error(err);
+            setImportError("❌ Component save threw an error.");
+        }
+    };
+
+    // Save configuration to storage
+    const handleSaveConfig = async () => {
+        clearStatusMessages();
+
+        // Create config object using local state + props
+        const currentConfig = {
+            categories,
+            viewMode: viewMode,
+            lowStockConfig,
+            currencySymbol,
+            showTotalValue,
+            footprints,
+            itemsPerPage: itemsPerPage,
+            theme
+        };
+
+        try {
+            const ok = await storage.saveConfig(currentConfig);
+            if (ok) {
+                setExportMessage("✅ Config saved to LocalStorage.");
+            } else {
+                setImportError("❌ Config save failed.");
+            }
+        } catch (err) {
+            console.error(err);
+            setImportError("❌ Config save threw an error.");
+        }
+    };
+
+    // Clear all storage
+    const handleClearStorage = async () => {
+        clearStatusMessages();
+
+        if (window.confirm('Are you sure you want to clear ALL inventory data and settings? This action cannot be undone.')) {
+            try {
+                const cleared = await storage.clearStorage();
+
+                if (cleared) {
+                    // Reset state values using the passed-in update callbacks
+                    onUpdateComponents([]);
+                    onUpdateCategories([]);
+                    onUpdateLowStockConfig({});
+                    onUpdateLocations([]);
+                    onUpdateDrawers([]);
+                    onUpdateCells([]);
+                    onUpdateFootprints([]);
+
+                    // Reset local state
+                    setViewMode('table');
+                    setItemsPerPage('all');
+
+                    setExportMessage('All storage cleared successfully! Application state reset. You may need to refresh the page to see all changes.');
+                } else {
+                    setImportError('An error occurred while trying to clear storage.');
+                }
+            } catch (err) {
+                console.error("Error clearing storage:", err);
+                setImportError(`Error clearing storage: ${err.message}`);
+            }
+        }
+    };
+
+    // --- Backup & Restore Functions (New Unified Approach) ---
+
+    // Create a complete backup of all data
+    const handleCreateBackup = () => {
+        clearStatusMessages();
+
+        storage.createBackup()
+            .then(function (backup) {
+                try {
+                    const backupJson = JSON.stringify(backup, null, 2);
+
+                    // Create and trigger download
+                    const element = document.createElement('a');
+                    const file = new Blob([backupJson], { type: 'application/json' });
+                    element.href = URL.createObjectURL(file);
+
+                    // Generate a filename with current date
+                    const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+                    element.download = `electronics_backup_${date}.json`;
+
+                    document.body.appendChild(element);
+                    element.click();
+                    document.body.removeChild(element);
+                    URL.revokeObjectURL(element.href);
+
+                    setExportMessage('Backup created and downloaded successfully!');
+                } catch (err) {
+                    console.error("Error downloading backup:", err);
+                    setImportError(`Error creating backup: ${err.message}`);
+                }
+            })
+            .catch(function (err) {
+                console.error("Error creating backup:", err);
+                setImportError(`Error creating backup: ${err.message}`);
+            });
+    };
+
+    // Import a backup file
+    const handleFileImport = (event) => {
+        clearStatusMessages();
+
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const backup = JSON.parse(e.target.result);
+
+                // Confirm import
+                if (window.confirm(`This will replace your current data with the backup from ${new Date(backup.metadata.date).toLocaleString()}. Continue?`)) {
+                    restoreFromBackup(backup);
+                }
+            } catch (err) {
+                console.error("Error parsing backup file:", err);
+                setImportError(`Invalid backup file: ${err.message}`);
+            }
+        };
+
+        reader.onerror = (e) => {
+            console.error("Error reading backup file:", e.target.error);
+            setImportError(`Error reading backup file: ${e.target.error}`);
+        };
+
+        reader.readAsText(file);
+
+        // Reset file input
+        event.target.value = null;
+    };
+
+    // Restore from a backup
+    const restoreFromBackup = (backup) => {
+        storage.restoreBackup(backup)
+            .then(function (result) {
+                if (result.success) {
+                    setImportError(`Backup restored successfully! ${result.message}`);
+
+                    // Reload data after restore
+                    Promise.all([
+                        storage.loadComponents(),
+                        storage.loadLocations(),
+                        storage.loadDrawers(),
+                        storage.loadCells(),
+                        storage.loadCategories(),
+                        storage.loadFootprints(),
+                        storage.loadLowStockConfig()
+                    ]).then(function (results) {
+                        onUpdateComponents(results[0]);
+                        onUpdateLocations(results[1]);
+                        onUpdateDrawers(results[2]);
+                        onUpdateCells(results[3]);
+                        onUpdateCategories(results[4]);
+                        onUpdateFootprints(results[5]);
+                        onUpdateLowStockConfig(results[6]);
+                    });
+                } else {
+                    setImportError(`Error restoring backup: ${result.message}`);
+                }
+            })
+            .catch(function (err) {
+                console.error("Error restoring backup:", err);
+                setImportError(`Error restoring backup: ${err.message}`);
+            });
+    };
+    // --- Render Method ---
+
     return (
         React.createElement('div', { className: "space-y-8" },
 
@@ -180,9 +649,9 @@ window.App.components.SettingsView = ({
             ),
             //-- End of System Info
 
-            // --- Import/Export Section ---
+            // --- Backup & Restore Section (New Unified UI) ---
             React.createElement('div', { className: UI.cards.container },
-                React.createElement('h2', { className: `${UI.typography.heading.h2} ${UI.cards.header}` }, "Import / Export Data"),
+                React.createElement('h2', { className: `${UI.typography.heading.h2} ${UI.cards.header}` }, "Backup & Restore"),
                 React.createElement('div', { className: UI.cards.body },
                     // Messages (Error, Success, Info)
                     importError && React.createElement('div', {
@@ -191,151 +660,73 @@ window.App.components.SettingsView = ({
                     exportMessage && !importError && React.createElement('div', {
                         className: UI.status.info
                     }, exportMessage),
-                    // Components & Config Export/Import Buttons
-                    React.createElement('p', { className: UI.forms.hint }, "Please save the JSON file for backup as you may accidentally clear all data"),
-                    React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-6 mb-6" },
-                        // Components Data Section
-                        React.createElement('div', null,
-                            React.createElement('h4', { className: UI.typography.sectionTitle }, "Components Data"),
-                            React.createElement('div', { className: "flex flex-wrap gap-2" },
-                                React.createElement('button', {
-                                    onClick: onExportComponents,
-                                    className: UI.buttons.primary
-                                }, "Export Components"),
+
+                    // Main actions - just two primary buttons
+                    React.createElement('div', { className: "flex flex-col md:flex-row gap-4 mb-6" },
+                        // Backup button
+                        React.createElement('div', { className: "flex-grow" },
+                            React.createElement('h4', { className: UI.typography.sectionTitle }, "Backup All Data"),
+                            React.createElement('p', { className: "text-sm mb-2" },
+                                "Create a complete backup of your inventory, including components, locations, drawers, and all settings."
+                            ),
+                            React.createElement('button', {
+                                onClick: handleCreateBackup,
+                                className: UI.buttons.primary + " w-full"
+                            }, "Create & Download Backup")
+                        ),
+
+                        // Restore button
+                        React.createElement('div', { className: "flex-grow" },
+                            React.createElement('h4', { className: UI.typography.sectionTitle }, "Restore From Backup"),
+                            React.createElement('p', { className: "text-sm mb-2" },
+                                "Restore your inventory from a previously created backup file. Will replace all current data!"
+                            ),
+                            React.createElement('div', { className: "flex flex-col" },
                                 React.createElement('input', {
                                     type: "file",
-                                    id: "import-components-file",
+                                    id: "import-backup-file",
                                     accept: ".json",
-                                    onChange: onImportComponentsFile,
+                                    onChange: handleFileImport,
                                     className: "hidden"
                                 }),
                                 React.createElement('label', {
-                                    htmlFor: "import-components-file",
-                                    className: UI.buttons.success
-                                }, "Import Components")
-                            ),
-                            React.createElement('p', { className: UI.forms.hint }, "Import replaces components. Export generates JSON below.")
-                        ),
-                        // Configuration Section
-                        React.createElement('div', null,
-                            React.createElement('h4', { className: UI.typography.sectionTitle }, "Configuration"),
-                            React.createElement('div', { className: "flex flex-wrap gap-2" },
-                                React.createElement('button', {
-                                    onClick: onExportConfig,
-                                    className: UI.buttons.info
-                                }, "Export Config"),
-                                React.createElement('input', {
-                                    type: "file",
-                                    id: "import-config-file",
-                                    accept: ".json",
-                                    onChange: onImportConfigFile,
-                                    className: "hidden"
-                                }),
-                                React.createElement('label', {
-                                    htmlFor: "import-config-file",
-                                    className: UI.buttons.accent
-                                }, "Import Config")
-                            ),
-                            React.createElement('p', { className: UI.forms.hint }, "Includes categories, settings. Import merges/overwrites.")
-                        )
-                    ),
-
-                    //Import/Export Location & Drawers
-                    React.createElement('div', null,
-                        React.createElement('h4', { className: UI.typography.sectionTitle }, "Locations & Drawers"),
-                        React.createElement('div', { className: "flex flex-wrap gap-2" },
-                            React.createElement('button', {
-                                onClick: onExportLocations,
-                                className: UI.buttons.warning
-                            }, "Export Locations & Drawers"),
-                            React.createElement('input', {
-                                type: "file",
-                                id: "import-locations-file",
-                                accept: ".json",
-                                onChange: onImportLocationsFile,
-                                className: "hidden"
-                            }),
-                            React.createElement('label', {
-                                htmlFor: "import-locations-file",
-                                className: UI.buttons.warning
-                            }, "Import Locations & Drawers")
-                        ),
-                        React.createElement('p', { className: UI.forms.hint }, "Export/import locations, drawers and cells.")
-                    ),
-
-                    // Add Force Save Buttons here
-                    React.createElement('div', { className: `border-t pt-4 mb-4` },
-                        React.createElement('h4', { className: UI.typography.sectionTitle }, "Local Storage"),
-                        React.createElement('p', { className: "text-xs text-red-500 mt-2" }, "Warn: The data is stored on browser session, if you clear browser data or incognito mode, this will wipe the data."),
-                        React.createElement('div', { className: "flex flex-wrap gap-3" },
-                            React.createElement('button', {
-                                onClick: onSaveComponentsLS,
-                                className: UI.buttons.primary
-                            }, "Force Save Components"),
-                            React.createElement('button', {
-                                onClick: onSaveConfig,
-                                className: UI.buttons.info
-                            }, "Force Save Configuration")
-                        ),
-                        React.createElement('p', { className: UI.forms.hint }, "Data is auto-saved. Use buttons above to force save.")
-                    ),
-
-                    // JSON Text Area (conditional)
-                    jsonData && React.createElement('div', { className: `mt-4 ${UI.utils.borderTop} pt-4` },
-                        React.createElement('label', {
-                            htmlFor: "json-data-area",
-                            className: UI.forms.label
-                        }, "Generated JSON Data:"),
-                        React.createElement('textarea', {
-                            id: "json-data-area",
-                            readOnly: true,
-                            className: `w-full p-2 border border-${UI.getThemeColors().border} rounded h-40 font-mono text-xs bg-${UI.getThemeColors().background.replace('gray-900', 'gray-800').replace('gray-100', 'gray-50')}`,
-                            value: jsonData
-                        }),
-                        React.createElement('div', { className: "flex flex-wrap gap-2 mt-2" },
-                            React.createElement('button', {
-                                onClick: onDownloadJson,
-                                className: UI.buttons.accent
-                            }, "Download JSON"),
-                            React.createElement('button', {
-                                onClick: onCopyJson,
-                                className: UI.buttons.secondary
-                            }, "Copy JSON"),
-                            React.createElement('button', {
-                                onClick: onClearJsonArea,
-                                className: UI.buttons.warning
-                            }, "Clear Area")
+                                    htmlFor: "import-backup-file",
+                                    className: UI.buttons.success + " w-full text-center cursor-pointer"
+                                }, "Select Backup File")
+                            )
                         )
                     )
                 )
-            ), // End Import/Export Section
-
-            // Theme Configuration Section
-            React.createElement('div', { className: UI.cards.container },
-                React.createElement('h2', {
-                    className: `${UI.typography.heading.h2} ${UI.cards.header}`
-                },
-                    "Theme Configuration"
-                ),
-                React.createElement('div', { className: UI.cards.body },
-                    // This is your ThemeSwitcher component
-                    React.createElement(
-                        window.App.components.ThemeSwitcher,
-                        {
-                            currentTheme: theme,
-                            onThemeChange: onChangeTheme
-                        }
-                    )
-                )
-            ),
+            ), // End Backup & Restore Section
 
             // --- Category Management Section ---
             React.createElement('div', { className: UI.cards.container },
                 React.createElement('h2', { className: `${UI.typography.heading.h2} ${UI.cards.header}` }, "Category Management"),
                 React.createElement('div', { className: UI.cards.body },
                     React.createElement('p', { className: `mb-4 ${UI.typography.body}` },
-                        `Edit or delete categories. Deleting moves components to "${categories.includes('Default') ? 'Default' : 'Uncategorized'}".`
+                        `Edit or delete categories. Deleting moves components to "Default".`
                     ),
+
+                    // Add New Category Section
+                    React.createElement('div', { className: `mb-6 p-4 ${UI.colors.background.alt} ${UI.utils.rounded}` },
+                        React.createElement('h4', { className: UI.typography.sectionTitle }, "Add New Category"),
+                        React.createElement('div', { className: "flex gap-3" },
+                            React.createElement('input', {
+                                type: "text",
+                                value: newCategory,
+                                onChange: (e) => setNewCategory(e.target.value),
+                                className: UI.forms.input + " flex-grow",
+                                placeholder: "Enter category name...",
+                                onKeyDown: (e) => e.key === 'Enter' && handleAddNewCategory()
+                            }),
+                            React.createElement('button', {
+                                onClick: handleAddNewCategory,
+                                className: UI.buttons.primary,
+                                disabled: !newCategory.trim()
+                            }, "Add")
+                        )
+                    ),
+
                     React.createElement('div', { className: "overflow-x-auto" },
                         React.createElement('table', { className: UI.tables.container },
                             React.createElement('thead', { className: UI.tables.header.row },
@@ -350,9 +741,9 @@ window.App.components.SettingsView = ({
                                     React.createElement('tr', null,
                                         React.createElement('td', { colSpan: "3", className: "py-4 px-4 text-center text-gray-500 italic" }, "No categories defined.")
                                     ) :
-                                    categories.sort().map(category =>
-                                        React.createElement('tr', { key: category, className: UI.tables.body.row },
-                                            // Category Name (editable)
+                                    categories.sort().map(category => {
+                                        const componentCount = components.filter(comp => comp.category === category).length;
+                                        return React.createElement('tr', { key: category, className: UI.tables.body.row },
                                             React.createElement('td', { className: UI.tables.body.cell },
                                                 editingCategory === category ?
                                                     React.createElement('input', {
@@ -363,16 +754,13 @@ window.App.components.SettingsView = ({
                                                         autoFocus: true,
                                                         onKeyDown: (e) => e.key === 'Enter' && handleSaveCategory()
                                                     }) :
-                                                    React.createElement('span',  { className: UI.tables.body.cell }, category)
+                                                    React.createElement('span', { className: UI.tables.body.cell }, category)
                                             ),
-                                            // Component Count
                                             React.createElement('td', { className: `${UI.tables.body.cell} text-center` },
-                                                categories.length > 0 ? categories.filter(cat => cat === category).length : 0
+                                                componentCount
                                             ),
-                                            // Actions
                                             React.createElement('td', { className: UI.tables.body.cellAction },
                                                 editingCategory === category ?
-                                                    // Edit Mode Actions
                                                     React.createElement('div', { className: "flex justify-center space-x-2" },
                                                         React.createElement('button', {
                                                             onClick: handleSaveCategory,
@@ -385,7 +773,6 @@ window.App.components.SettingsView = ({
                                                             title: "Cancel"
                                                         }, "Cancel")
                                                     ) :
-                                                    // Normal Mode Actions
                                                     React.createElement('div', { className: "flex justify-center space-x-2" },
                                                         React.createElement('button', {
                                                             onClick: () => handleStartEditCategory(category),
@@ -393,24 +780,29 @@ window.App.components.SettingsView = ({
                                                             title: "Edit"
                                                         }, "Edit"),
                                                         React.createElement('button', {
-                                                            onClick: () => onDeleteCategory(category),
+                                                            onClick: () => handleDeleteCategory(category),
                                                             className: UI.buttons.small.danger,
                                                             title: "Delete",
-                                                            disabled: category === 'Default' && categories.some(c => c === 'Default')
+                                                            disabled: category === 'Default'
                                                         }, "Delete")
                                                     )
                                             )
-                                        )
-                                    )
+                                        );
+                                    })
                             )
                         )
                     ),
-                    React.createElement('div', { className: "mt-4" },
+
+                    // Restore Default and Delete All buttons
+                    React.createElement('div', { className: "mt-4 flex gap-3" },
                         React.createElement('button', {
-                            onClick: onAddDefaultCategory,
-                            className: UI.buttons.secondary,
-                            disabled: categories.includes('Default')
-                        }, 'Ensure "Default" Category Exists')
+                            onClick: handleRestoreDefaultCategories,
+                            className: UI.buttons.secondary
+                        }, 'Restore Default Categories'),
+                        React.createElement('button', {
+                            onClick: handleDeleteAllCategories,
+                            className: UI.buttons.danger
+                        }, 'Delete All Categories')
                     )
                 )
             ), // End Category Management Section
@@ -424,10 +816,11 @@ window.App.components.SettingsView = ({
                     ),
                     React.createElement(FootprintManager, {
                         footprints,
-                        onAddFootprint,
-                        onEditFootprint,
-                        onDeleteFootprint,
-                        onRestoreDefaults: onRestoreDefaultFootprints
+                        onAddFootprint: handleAddFootprint,
+                        onEditFootprint: handleEditFootprint,
+                        onDeleteFootprint: handleDeleteFootprint,
+                        onRestoreDefaults: handleRestoreDefaultFootprints,
+                        onDeleteAll: handleDeleteAllFootprints  // NEW: Add this prop
                     })
                 )
             ), // End Footprint Management Section
@@ -500,8 +893,8 @@ window.App.components.SettingsView = ({
                                                 React.createElement('th', { className: UI.tables.header.cell }, "Action")
                                             )
                                         ),
-                                        React.createElement('tbody', { 
-                                            className: `divide-y divide-${UI.getThemeColors().border} bg-${UI.getThemeColors().cardBackground}` 
+                                        React.createElement('tbody', {
+                                            className: `divide-y divide-${UI.getThemeColors().border} bg-${UI.getThemeColors().cardBackground}`
                                         },
                                             Object.entries(lowStockConfig).sort(([catA], [catB]) => catA.localeCompare(catB)).map(([category, threshold]) =>
                                                 React.createElement('tr', { key: category, className: UI.tables.body.row },
@@ -509,7 +902,7 @@ window.App.components.SettingsView = ({
                                                     React.createElement('td', { className: `${UI.tables.body.cell} text-center` }, threshold),
                                                     React.createElement('td', { className: UI.tables.body.cellAction },
                                                         React.createElement('button', {
-                                                            onClick: () => onRemoveLowStock(category),
+                                                            onClick: () => handleRemoveLowStock(category),
                                                             className: `${UI.colors.danger.text} hover:text-red-800 text-xs`,
                                                             title: "Remove threshold"
                                                         }, "Remove")
@@ -562,6 +955,14 @@ window.App.components.SettingsView = ({
                             ),
                             React.createElement('p', { className: UI.forms.hint }, "Calculates and displays the sum of (price * quantity) for all components.")
                         )
+                    ),
+                    // Theme Selector
+                    React.createElement('div', { className: "mt-6" },
+                        React.createElement('h3', { className: UI.typography.sectionTitle }, "Theme"),
+                        React.createElement(window.App.components.ThemeSwitcher, {
+                            currentTheme: theme,
+                            onThemeChange: onChangeTheme
+                        })
                     )
                 )
             ), // End Display Settings Section
@@ -576,11 +977,11 @@ window.App.components.SettingsView = ({
                     // Force Save Buttons
                     React.createElement('div', { className: "flex flex-wrap gap-3 mb-4" },
                         React.createElement('button', {
-                            onClick: onSaveComponentsLS,
+                            onClick: handleSaveComponentsLS,
                             className: UI.buttons.primary
                         }, "Force Save Components"),
                         React.createElement('button', {
-                            onClick: onSaveConfig,
+                            onClick: handleSaveConfig,
                             className: UI.buttons.info
                         }, "Force Save Configuration"),
                     ),
@@ -592,10 +993,10 @@ window.App.components.SettingsView = ({
                             "Regular backups help prevent data loss. We recommend:"
                         ),
                         React.createElement('ul', { className: `list-disc list-inside ${UI.typography.body} space-y-1 ml-2` },
-                            React.createElement('li', null, "Export components data at least once per week"),
-                            React.createElement('li', null, "Export locations and drawers after making changes"),
+                            React.createElement('li', null, "Create a complete backup at least once per week"),
+                            React.createElement('li', null, "Backup after making significant changes"),
                             React.createElement('li', null, "Keep backup files in multiple locations"),
-                            React.createElement('li', null, "Test imports occasionally to verify backup integrity")
+                            React.createElement('li', null, "Test restoring backups occasionally to verify integrity")
                         )
                     ),
 
@@ -609,7 +1010,7 @@ window.App.components.SettingsView = ({
                                     "Warning: Deletes all item in database, and clear all settings (LocalStorage & IndexedDB). There is no way back"
                                 ),
                                 React.createElement('button', {
-                                    onClick: onClearStorage,
+                                    onClick: handleClearStorage,
                                     className: UI.buttons.danger
                                 }, "Clear All Data"),
                                 React.createElement('p', { className: "text-xs text-red-600 mt-1" }, "I am aware what I am doing when clicking the button above"),
@@ -620,4 +1021,6 @@ window.App.components.SettingsView = ({
             ),
         )
     )
-}
+};
+
+console.log("SettingsView component fully refactored and loaded!");

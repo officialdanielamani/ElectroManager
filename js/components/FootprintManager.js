@@ -5,152 +5,159 @@ window.App = window.App || {};
 window.App.components = window.App.components || {};
 
 /**
- * React Component for managing footprints.
+ * React Component for managing component footprints
  */
 window.App.components.FootprintManager = ({
-    // Props
-    footprints, // Array: List of footprint strings
-    // Callbacks
-    onAddFootprint, // Function(newFootprint): Called to add a new footprint
-    onEditFootprint, // Function(oldFootprint, newFootprint): Called to rename a footprint
-    onDeleteFootprint, // Function(footprint): Called to delete a footprint
-    onRestoreDefaults, // Function: Called to restore default footprints
+    footprints = [], // Array: List of footprint strings
+    onAddFootprint, // Function(footprint): Add new footprint
+    onEditFootprint, // Function(oldFootprint, newFootprint): Edit existing footprint
+    onDeleteFootprint, // Function(footprint): Delete footprint
+    onRestoreDefaults, // Function(): Restore default footprints
+    onDeleteAll // Function(): Delete all footprints (NEW)
 }) => {
     const { UI } = window.App.utils;
     const { useState } = React;
 
-    // Internal state
+    // State for new footprint input
     const [newFootprint, setNewFootprint] = useState('');
+    
+    // State for editing
     const [editingFootprint, setEditingFootprint] = useState(null);
-    const [editedFootprintName, setEditedFootprintName] = useState('');
+    const [editFootprintName, setEditFootprintName] = useState('');
 
-    // Handle adding a new footprint
-    const handleAddSubmit = (e) => {
-        e.preventDefault();
-        onAddFootprint(newFootprint);
-        setNewFootprint(''); // Clear the input after submission
+    // Handle adding new footprint
+    const handleAddFootprint = () => {
+        const trimmed = newFootprint.trim();
+        if (trimmed && onAddFootprint) {
+            onAddFootprint(trimmed);
+            setNewFootprint('');
+        }
     };
 
     // Start editing a footprint
     const handleStartEdit = (footprint) => {
         setEditingFootprint(footprint);
-        setEditedFootprintName(footprint);
+        setEditFootprintName(footprint);
     };
 
-    // Save the edited footprint
+    // Save edited footprint
     const handleSaveEdit = () => {
-        onEditFootprint(editingFootprint, editedFootprintName);
+        const trimmed = editFootprintName.trim();
+        if (trimmed && trimmed !== editingFootprint && onEditFootprint) {
+            onEditFootprint(editingFootprint, trimmed);
+        }
         setEditingFootprint(null);
-        setEditedFootprintName('');
+        setEditFootprintName('');
     };
 
     // Cancel editing
     const handleCancelEdit = () => {
         setEditingFootprint(null);
-        setEditedFootprintName('');
+        setEditFootprintName('');
     };
 
-    return React.createElement('div', { className: "space-y-4" },
-        // Add new footprint form
-        React.createElement('div', { className: "mb-4" },
-            React.createElement('h4', { className: UI.typography.sectionTitle }, "Add New Footprint"),
-            React.createElement('form', { onSubmit: handleAddSubmit, className: "flex gap-2" },
-                React.createElement('input', {
-                    type: "text",
-                    value: newFootprint,
-                    onChange: (e) => setNewFootprint(e.target.value),
-                    placeholder: "Enter footprint name",
-                    className: UI.forms.input
-                }),
-                React.createElement('button', {
-                    type: "submit",
-                    className: UI.buttons.primary
-                }, "Add")
-            )
-        ),
-        
-        // Footprints list
-        React.createElement('div', { className: "overflow-x-auto" },
-            React.createElement('table', { className: UI.tables.container },
-                React.createElement('thead', { className: `${UI.tables.header.row} sticky top-0` },
-                    React.createElement('tr', null,
-                        React.createElement('th', { className: UI.tables.header.cell }, "Footprint"),
-                        React.createElement('th', { className: UI.tables.header.cell }, "Action")
-                    )
-                ),
-                React.createElement('tbody', { 
-                    className: `divide-y divide-${UI.getThemeColors().border} bg-${UI.getThemeColors().cardBackground}` 
-                },
-                    footprints.length === 0 ?
+    return (
+        React.createElement('div', { className: "space-y-6" },
+            // Add New Footprint Section
+            React.createElement('div', { className: `p-4 ${UI.colors.background.alt} ${UI.utils.rounded}` },
+                React.createElement('h4', { className: UI.typography.sectionTitle }, "Add New Footprint"),
+                React.createElement('div', { className: "flex gap-3" },
+                    React.createElement('input', {
+                        type: "text",
+                        value: newFootprint,
+                        onChange: (e) => setNewFootprint(e.target.value),
+                        className: UI.forms.input + " flex-grow",
+                        placeholder: "Enter footprint name...",
+                        onKeyDown: (e) => e.key === 'Enter' && handleAddFootprint()
+                    }),
+                    React.createElement('button', {
+                        onClick: handleAddFootprint,
+                        className: UI.buttons.primary,
+                        disabled: !newFootprint.trim()
+                    }, "Add")
+                )
+            ),
+
+            // Footprints Table
+            React.createElement('div', { className: "overflow-x-auto" },
+                React.createElement('table', { className: UI.tables.container },
+                    React.createElement('thead', { className: UI.tables.header.row },
                         React.createElement('tr', null,
-                            React.createElement('td', { 
-                                colSpan: "2", 
-                                className: `py-4 px-4 text-center text-${UI.getThemeColors().textMuted} italic` 
-                            }, 
-                            "No footprints defined.")
-                        ) :
-                        footprints.sort().map(footprint =>
-                            React.createElement('tr', { key: footprint, className: UI.tables.body.row },
-                                // Footprint Name (editable)
-                                React.createElement('td', { className: UI.tables.body.cell },
-                                    editingFootprint === footprint ?
-                                        React.createElement('input', {
-                                            type: "text",
-                                            value: editedFootprintName,
-                                            onChange: (e) => setEditedFootprintName(e.target.value),
-                                            className: UI.forms.input,
-                                            autoFocus: true,
-                                            onKeyDown: (e) => e.key === 'Enter' && handleSaveEdit()
-                                        }) :
-                                        React.createElement('span', { 
-                                            className: `text-sm text-${UI.getThemeColors().textSecondary}` 
-                                        }, 
-                                        footprint)
-                                ),
-                                // Actions
-                                React.createElement('td', { className: UI.tables.body.cellAction },
-                                    editingFootprint === footprint ?
-                                        // Edit Mode Actions
-                                        React.createElement('div', { className: "flex justify-center space-x-2" },
-                                            React.createElement('button', {
-                                                onClick: handleSaveEdit,
-                                                className: UI.buttons.small.success,
-                                                title: "Save"
-                                            }, "Save"),
-                                            React.createElement('button', {
-                                                onClick: handleCancelEdit,
-                                                className: UI.buttons.small.secondary,
-                                                title: "Cancel"
-                                            }, "Cancel")
-                                        ) :
-                                        // Normal Mode Actions
-                                        React.createElement('div', { className: "flex justify-center space-x-2" },
-                                            React.createElement('button', {
-                                                onClick: () => handleStartEdit(footprint),
-                                                className: UI.buttons.small.primary,
-                                                title: "Edit"
-                                            }, "Edit"),
-                                            React.createElement('button', {
-                                                onClick: () => onDeleteFootprint(footprint),
-                                                className: UI.buttons.small.danger,
-                                                title: "Delete"
-                                            }, "Delete")
-                                        )
+                            React.createElement('th', { className: UI.tables.header.cell }, "Footprint Name"),
+                            React.createElement('th', { className: UI.tables.header.cell }, "Actions")
+                        )
+                    ),
+                    React.createElement('tbody', { className: "bg-white divide-y divide-gray-200" },
+                        footprints.length === 0 ?
+                            React.createElement('tr', null,
+                                React.createElement('td', { colSpan: "2", className: "py-4 px-4 text-center text-gray-500 italic" }, 
+                                    "No footprints defined."
+                                )
+                            ) :
+                            footprints.sort().map(footprint => 
+                                React.createElement('tr', { key: footprint, className: UI.tables.body.row },
+                                    // Footprint Name (editable)
+                                    React.createElement('td', { className: UI.tables.body.cell },
+                                        editingFootprint === footprint ?
+                                            React.createElement('input', {
+                                                type: "text",
+                                                value: editFootprintName,
+                                                onChange: (e) => setEditFootprintName(e.target.value),
+                                                className: UI.forms.input,
+                                                autoFocus: true,
+                                                onKeyDown: (e) => e.key === 'Enter' && handleSaveEdit()
+                                            }) :
+                                            React.createElement('span', null, footprint)
+                                    ),
+                                    // Actions
+                                    React.createElement('td', { className: UI.tables.body.cellAction },
+                                        editingFootprint === footprint ?
+                                            React.createElement('div', { className: "flex justify-center space-x-2" },
+                                                React.createElement('button', {
+                                                    onClick: handleSaveEdit,
+                                                    className: UI.buttons.small.success,
+                                                    title: "Save"
+                                                }, "Save"),
+                                                React.createElement('button', {
+                                                    onClick: handleCancelEdit,
+                                                    className: UI.buttons.small.secondary,
+                                                    title: "Cancel"
+                                                }, "Cancel")
+                                            ) :
+                                            React.createElement('div', { className: "flex justify-center space-x-2" },
+                                                React.createElement('button', {
+                                                    onClick: () => handleStartEdit(footprint),
+                                                    className: UI.buttons.small.primary,
+                                                    title: "Edit"
+                                                }, "Edit"),
+                                                React.createElement('button', {
+                                                    onClick: () => onDeleteFootprint && onDeleteFootprint(footprint),
+                                                    className: UI.buttons.small.danger,
+                                                    title: "Delete"
+                                                }, "Delete")
+                                            )
+                                    )
                                 )
                             )
-                        )
+                    )
                 )
+            ),
+
+            // Restore Default and Delete All buttons
+            React.createElement('div', { className: "flex gap-3" },
+                React.createElement('button', {
+                    onClick: onRestoreDefaults,
+                    className: UI.buttons.secondary,
+                    disabled: !onRestoreDefaults
+                }, 'Restore Default Footprints'),
+                React.createElement('button', {
+                    onClick: onDeleteAll,
+                    className: UI.buttons.danger,
+                    disabled: !onDeleteAll
+                }, 'Delete All Footprints')
             )
-        ),
-        
-        // Restore defaults button
-        React.createElement('div', { className: "mt-4 text-right" },
-            React.createElement('button', {
-                onClick: onRestoreDefaults,
-                className: UI.buttons.secondary
-            }, "Restore Default Footprints")
         )
     );
 };
 
-console.log("FootprintManager component loaded with theme-aware styling."); // For debugging
+console.log("FootprintManager component updated with consistent UI!");
