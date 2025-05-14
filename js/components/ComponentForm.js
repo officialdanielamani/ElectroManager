@@ -31,18 +31,15 @@ window.App.components.ComponentForm = ({
 
     // Internal state to manage form inputs, initialized from props
     const [formData, setFormData] = useState(componentData || {});
-    const [showStorageSelector, setShowStorageSelector] = useState(false);
-    const [selectedCells, setSelectedCells] = useState([]);
-    const [selectedDrawerId, setSelectedDrawerId] = useState('');
+    
+    // Add state for managing location/drawer mode
+    const [storageMode, setStorageMode] = useState('location'); // 'location' or 'drawer'
 
     // Image preview state - simplified to just track loading and error states
     const [imagePreview, setImagePreview] = useState({
         loading: false,
         error: false
     });
-
-    // Create keydown handler to prevent disallowed characters
-    const handleKeyDown = window.App.utils.sanitize.createKeyDownHandler();
 
     // Initialize with proper structure for missing fields
     useEffect(() => {
@@ -60,6 +57,14 @@ window.App.components.ComponentForm = ({
             storageInfo.cells.push(componentData.storageInfo.cellId);
         }
 
+        // Determine initial storage mode based on existing data
+        let initialMode = 'location';
+if (storageInfo.drawerId) {
+    initialMode = 'drawer';
+} else if (locationInfo.locationId) {
+    initialMode = 'location';
+}
+
         // Set form data
         setFormData({
             ...componentData,
@@ -70,30 +75,29 @@ window.App.components.ComponentForm = ({
             star: componentData.star || false
         });
 
-        // Set selected cells and drawer ID for UI state
-        setSelectedCells(storageInfo.cells || []);
-        setSelectedDrawerId(storageInfo.drawerId || '');
+        setStorageMode(initialMode);
 
     }, [componentData]);
 
-    // Handle changes in form inputs with character validation
-    const handleChange = (e) => {
-        if (isViewOnly) return; // Don't process changes in view-only mode
-
-        const { name, value, type, checked } = e.target;
-        // For checkbox inputs, use the 'checked' property as the value
-        let newValue = type === 'checkbox' ? checked : value;
-
-        // Filter for allowed characters if it's a string
-        if (typeof newValue === 'string') {
-            newValue = window.App.utils.sanitize.validateAllowedChars(newValue);
-        }
-
-        setFormData(prevData => ({
-            ...prevData,
-            [name]: newValue
+    // Handle storage mode change
+    const handleStorageModeChange = (mode) => {
+    setStorageMode(mode);
+    
+    // Clear the opposite data based on mode selection
+    if (mode === 'location') {
+        // Clear drawer data but keep location data
+        setFormData(prev => ({
+            ...prev,
+            storageInfo: { locationId: '', drawerId: '', cells: [] }
         }));
-    };
+    } else if (mode === 'drawer') {
+        // Clear location data but keep drawer data
+        setFormData(prev => ({
+            ...prev,
+            locationInfo: { locationId: '', details: '' }
+        }));
+    }
+};
 
     // Handle numeric field changes with proper conversion and validation
     const handleNumericChange = (e) => {
@@ -112,21 +116,6 @@ window.App.components.ComponentForm = ({
         setFormData(prevData => ({
             ...prevData,
             [name]: numericValue
-        }));
-    };
-
-    // Handle category selection, including the "Add new..." option
-    const handleCategoryChange = (e) => {
-        if (isViewOnly) return;
-
-        // Sanitize and validate the value
-        const value = window.App.utils.sanitize.validateAllowedChars(e.target.value);
-
-        setFormData(prevData => ({
-            ...prevData,
-            category: value,
-            // Reset custom category input if a standard category is selected
-            customCategory: value === '__custom__' ? prevData.customCategory : ''
         }));
     };
 
@@ -173,124 +162,6 @@ window.App.components.ComponentForm = ({
         });
     };
 
-    // Handle footprint selection, including the "Custom footprint..." option
-    const handleFootprintChange = (e) => {
-        if (isViewOnly) return;
-
-        // Sanitize and validate the value
-        const value = window.App.utils.sanitize.validateAllowedChars(e.target.value);
-
-        setFormData(prevData => ({
-            ...prevData,
-            footprint: value,
-            // Reset custom footprint input if a standard footprint is selected
-            customFootprint: value === '__custom__' ? prevData.customFootprint : ''
-        }));
-    };
-
-    // Handle location changes with validation
-    const handleLocationChange = (e) => {
-        if (isViewOnly) return;
-
-        const { name, value } = e.target;
-        const sanitizedValue = window.App.utils.sanitize.validateAllowedChars(value);
-
-        setFormData(prevData => ({
-            ...prevData,
-            locationInfo: {
-                ...prevData.locationInfo,
-                [name]: sanitizedValue
-            }
-        }));
-    };
-
-    // Handle storage location changes (drawer assignment) with validation
-    const handleStorageLocationChange = (e) => {
-        if (isViewOnly) return;
-
-        const { name, value } = e.target;
-        const sanitizedValue = window.App.utils.sanitize.validateAllowedChars(value);
-
-        // Clear drawer and cells if location changes
-        if (name === 'locationId' && sanitizedValue !== formData.storageInfo?.locationId) {
-            setSelectedDrawerId('');
-            setSelectedCells([]);
-
-            setFormData(prevData => ({
-                ...prevData,
-                storageInfo: {
-                    locationId: sanitizedValue,
-                    drawerId: '',
-                    cells: []
-                }
-            }));
-        } else {
-            setFormData(prevData => ({
-                ...prevData,
-                storageInfo: {
-                    ...prevData.storageInfo,
-                    [name]: sanitizedValue
-                }
-            }));
-        }
-    };
-
-    // Handle drawer selection with validation
-    const handleDrawerChange = (e) => {
-        if (isViewOnly) return;
-
-        const drawerId = window.App.utils.sanitize.validateAllowedChars(e.target.value);
-        setSelectedDrawerId(drawerId);
-
-        // Clear selected cells when drawer changes
-        setSelectedCells([]);
-
-        setFormData(prevData => ({
-            ...prevData,
-            storageInfo: {
-                ...prevData.storageInfo,
-                drawerId: drawerId,
-                cells: []
-            }
-        }));
-    };
-
-    // Handle cell selection/deselection
-    const handleCellToggle = (cellId) => {
-        if (isViewOnly) return;
-
-        // Sanitize the cell ID
-        const sanitizedCellId = window.App.utils.sanitize.validateAllowedChars(cellId);
-
-        // Find the cell from filtered cells
-        const cell = filteredCells.find(c => c.id === sanitizedCellId);
-
-        // Safely check if cell is unavailable before proceeding
-        if (!cell || cell.available === false) {
-            return; // Don't toggle unavailable cells
-        }
-
-        let updatedCells;
-
-        if (selectedCells.includes(sanitizedCellId)) {
-            // Remove cell if already selected
-            updatedCells = selectedCells.filter(id => id !== sanitizedCellId);
-        } else {
-            // Add cell if not already selected
-            updatedCells = [...selectedCells, sanitizedCellId];
-        }
-
-        setSelectedCells(updatedCells);
-
-        setFormData(prevData => ({
-            ...prevData,
-            storageInfo: {
-                ...prevData.storageInfo,
-                cells: updatedCells
-            }
-        }));
-    };
-
     const handleParametersChange = (e) => {
         if (isViewOnly) return;
 
@@ -316,17 +187,15 @@ window.App.components.ComponentForm = ({
         }));
     };
 
-    // Get filtered drawers using helper
-    const filteredDrawers = formHelpers.getFilteredDrawers(
-        formData.storageInfo?.locationId,
-        drawers
-    );
+    const handleCheckboxChange = (e) => {
+        if (isViewOnly) return;
 
-    // Get filtered cells using helper
-    const filteredCells = formHelpers.getFilteredCells(
-        selectedDrawerId,
-        cells
-    );
+        const { name, checked } = e.target;
+        setFormData(prevData => ({
+            ...prevData,
+            [name]: checked
+        }));
+    };
 
     // Handle form submission with validation
     const handleSubmit = (e) => {
@@ -389,35 +258,6 @@ window.App.components.ComponentForm = ({
         }
     };
 
-    // Helper function to create a validation indicator
-    const createValidationIndicator = (value, fieldName) => {
-        const isValid = window.App.utils.sanitize.isValidString(value);
-
-        if (!isValid) {
-            return React.createElement('div', {
-                className: `absolute right-8 top-1/2 transform -translate-y-1/2`,
-                title: `${fieldName} contains invalid characters that will be removed`
-            },
-                React.createElement('span', {
-                    className: "text-red-500 text-sm font-bold"
-                }, "!")
-            );
-        }
-
-        return null;
-    };
-
-    // Helper function to create a character counter
-    const createCharCounter = (value, maxLength) => {
-        const length = (value || '').length;
-        const isNearLimit = length > maxLength * 0.8;
-
-        return React.createElement('div', {
-            className: `absolute bottom-1 right-2 text-xs ${isNearLimit ? 'text-orange-500' : `text-${UI.getThemeColors().textMuted}`
-                }`
-        }, `${length}/${maxLength}`);
-    };
-
     // --- Render ---
     return (
         React.createElement('div', { className: UI.modals.backdrop },
@@ -456,97 +296,53 @@ window.App.components.ComponentForm = ({
                 },
                     React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4" },
                         // Name Input with validation and character counter
-                        React.createElement('div', { className: "md:col-span-1 relative" },
-                            React.createElement('label', { htmlFor: "comp-name", className: UI.forms.label },
-                                "Name ", !isViewOnly && React.createElement('span', { className: UI.colors.danger.text }, "*")),
-                            React.createElement('input', {
-                                id: "comp-name",
+                        React.createElement('div', { className: "md:col-span-1" },
+                            React.createElement(window.App.components.shared.ValidatedInput, {
                                 name: "name",
-                                type: "text",
-                                className: UI.forms.input,
                                 value: formData.name || '',
-                                onChange: handleChange,
-                                onKeyDown: handleKeyDown,
-                                maxLength: window.App.utils.sanitize.LIMITS.COMPONENT_NAME,
-                                pattern: "[A-Za-z0-9,.\-_ ]*",
+                                onChange: (value) => setFormData(prev => ({ ...prev, name: value })),
+                                fieldType: "componentName",
+                                label: "Component Name",
                                 required: !isViewOnly,
                                 readOnly: isViewOnly
-                            }),
-                            React.createElement('p', { className: UI.forms.hint },
-                                "Component Name . A-Z a-z 0-9 . , - _"
-                            ),
-                            !isViewOnly && createCharCounter(formData.name, window.App.utils.sanitize.LIMITS.COMPONENT_NAME),
-                            !isViewOnly && createValidationIndicator(formData.name, "Name"),
+                            })
                         ),
                         // Category Select/Input with validation
                         React.createElement('div', { className: "md:col-span-1" },
-                            React.createElement('label', { htmlFor: "comp-category", className: UI.forms.label },
-                                "Category ", !isViewOnly && React.createElement('span', { className: UI.colors.danger.text }, "*")),
                             isViewOnly ?
-                                React.createElement('input', {
-                                    id: "comp-category",
-                                    type: "text",
-                                    className: UI.forms.input,
+                                React.createElement(window.App.components.shared.ValidatedInput, {
+                                    name: "category",
                                     value: formData.category || '',
+                                    label: "Category",
                                     readOnly: true
                                 }) :
-                                React.createElement(React.Fragment, null,
-                                    React.createElement('select', {
-                                        id: "comp-category",
-                                        name: "category",
-                                        className: UI.forms.select,
-                                        value: formData.category || '',
-                                        onChange: handleCategoryChange,
-                                        required: !isViewOnly,
-                                        disabled: isViewOnly
-                                    },
-                                        React.createElement('option', { value: "" }, "-- Select category --"),
-                                        (categories || []).sort().map(cat => React.createElement('option', { key: cat, value: cat }, cat)),
-                                        React.createElement('option', { value: "__custom__" }, "Add new...")
-                                    ),
-                                    formData.category === '__custom__' && React.createElement('div', { className: "relative mt-2" },
-                                        React.createElement('input', {
-                                            name: "customCategory",
-                                            type: "text",
-                                            placeholder: "New category name",
-                                            className: UI.forms.input,
-                                            value: formData.customCategory || '',
-                                            onChange: handleChange,
-                                            onKeyDown: handleKeyDown,
-                                            maxLength: window.App.utils.sanitize.LIMITS.CATEGORY,
-                                            pattern: "[A-Za-z0-9,.\-_ ]*",
-                                            required: formData.category === '__custom__'
-                                        }),
-                                        createCharCounter(formData.customCategory, window.App.utils.sanitize.LIMITS.CATEGORY),
-                                        createValidationIndicator(formData.customCategory, "Category")
-                                    ),
-                                    React.createElement('p', { className: UI.forms.hint },
-                                        "Component Category"
-                                    ),
-                                )
+                                React.createElement(window.App.components.shared.SelectWithCustom, {
+                                    name: "category",
+                                    value: formData.category || '',
+                                    onChange: (value) => setFormData(prev => ({ ...prev, category: value })),
+                                    options: categories,
+                                    fieldType: "category",
+                                    label: "Category",
+                                    required: true,
+                                    customValue: formData.customCategory || '',
+                                    onCustomChange: (value) => setFormData(prev => ({ ...prev, customCategory: value })),
+                                    customOption: { value: '__custom__', label: 'Add new...' }
+                                })
                         ),
                         // Type Input with validation and character counter
-                        React.createElement('div', { className: "md:col-span-1 relative" },
-                            React.createElement('label', { htmlFor: "comp-type", className: UI.forms.label }, "Type / Model"),
-                            React.createElement('input', {
-                                id: "comp-type",
+                        React.createElement('div', { className: "md:col-span-1" },
+                            React.createElement(window.App.components.shared.ValidatedInput, {
                                 name: "type",
-                                type: "text",
-                                className: UI.forms.input,
                                 value: formData.type || '',
-                                onChange: handleChange,
-                                onKeyDown: handleKeyDown,
-                                maxLength: window.App.utils.sanitize.LIMITS.COMPONENT_MODEL,
-                                pattern: "[A-Za-z0-9,.\-_ ]*",
+                                onChange: (value) => setFormData(prev => ({ ...prev, type: value })),
+                                fieldType: "componentModel",
+                                label: "Type / Model",
                                 placeholder: "e.g., Resistor, LM7805",
-                                readOnly: isViewOnly
-                            }),
-                            !isViewOnly && createCharCounter(formData.type, window.App.utils.sanitize.LIMITS.COMPONENT_MODEL),
-                            !isViewOnly && createValidationIndicator(formData.type, "Type"),
-                            React.createElement('p', { className: UI.forms.hint },
-                                "Component Type/Model . A-Z a-z 0-9 . , - _"
-                            ),
+                                readOnly: isViewOnly,
+                                hint: "Component Type/Model . A-Z a-z 0-9 . , - _"
+                            })
                         ),
+
                         // Quantity Input
                         React.createElement('div', { className: "md:col-span-1" },
                             React.createElement('label', { htmlFor: "comp-quantity", className: UI.forms.label }, "Quantity"),
@@ -579,143 +375,113 @@ window.App.components.ComponentForm = ({
                             })
                         ),
 
-                        // Storage Location Section
+                        // Storage Location Section - UPDATED WITH MODE SELECTOR
                         React.createElement('div', { className: `md:col-span-2 border-t pt-4 mt-2 border-${UI.getThemeColors().border}` },
-                            React.createElement('div', { className: "flex justify-between items-center" },
-                                React.createElement('h3', { className: `text-md font-medium mb-3 text-${UI.getThemeColors().textSecondary}` },
-                                    "Storage Location"),
-                                !isViewOnly && React.createElement('button', {
-                                    type: "button",
-                                    className: `text-${UI.getThemeColors().primary} text-sm`,
-                                    onClick: () => setShowStorageSelector(!showStorageSelector)
-                                }, showStorageSelector ? "Hide Drawer Selector" : "Show Drawer Selector")
+                            React.createElement('h3', { className: `text-lg font-medium mb-3 text-${UI.getThemeColors().textSecondary}` },
+                                "Physical Storage Location"
+                            ),
+                            
+                            // Storage Mode Selector (only show if not view-only)
+                            !isViewOnly && React.createElement('div', { className: "mb-4" },
+                                React.createElement('label', { className: UI.forms.label }, "Storage Assignment Type"),
+                                React.createElement('div', { className: "flex space-x-2" },
+    React.createElement('button', {
+        type: "button",
+        onClick: () => handleStorageModeChange('location'),
+        className: `px-3 py-1 text-sm rounded ${storageMode === 'location' ? 
+            UI.buttons.primary : UI.buttons.secondary}`
+    }, "General Location"),
+    React.createElement('button', {
+        type: "button",
+        onClick: () => handleStorageModeChange('drawer'),
+        className: `px-3 py-1 text-sm rounded ${storageMode === 'drawer' ? 
+            UI.buttons.primary : UI.buttons.secondary}`
+    }, "Drawer Storage")
+),
+                                React.createElement('p', { className: UI.forms.hint },
+    "Choose how to store this component: general location or specific drawer cells."
+)
                             ),
 
-                            // Basic Location Information
-                            React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-4 mb-3" },
-                                // Location Dropdown
-                                React.createElement('div', null,
-                                    React.createElement('label', { htmlFor: "comp-location", className: UI.forms.label }, "Location"),
-                                    isViewOnly ?
-                                        React.createElement('div', {
-                                            className: `p-2 border border-${UI.getThemeColors().border} rounded bg-${UI.getThemeColors().cardBackground}`
-                                        }, formHelpers.getLocationName(formData.locationInfo?.locationId, locations) || "Not assigned") :
-                                        React.createElement('select', {
-                                            id: "comp-location",
-                                            name: "locationId",
-                                            className: UI.forms.select,
-                                            value: formData.locationInfo?.locationId || '',
-                                            onChange: handleLocationChange,
-                                            disabled: isViewOnly
-                                        },
-                                            React.createElement('option', { value: "" }, "-- No location assigned --"),
-                                            locations.map(loc => React.createElement('option', { key: loc.id, value: loc.id }, loc.name))
-                                        )
-                                ),
-                                // Location Details with validation
-                                React.createElement('div', { className: "relative" },
-                                    React.createElement('label', { htmlFor: "comp-location-details", className: UI.forms.label },
-                                        "Location Details (Optional)"),
-                                    React.createElement('input', {
-                                        id: "comp-location-details",
-                                        name: "details",
-                                        type: "text",
-                                        className: UI.forms.input,
-                                        value: formData.locationInfo?.details || '',
-                                        onChange: handleLocationChange,
-                                        onKeyDown: handleKeyDown,
-                                        maxLength: window.App.utils.sanitize.LIMITS.LOCATION_DESCRIPTION,
-                                        pattern: "[A-Za-z0-9,.\-_ ]*",
-                                        placeholder: "e.g., Shelf 3, Box A",
-                                        readOnly: isViewOnly
-                                    }),
-                                    !isViewOnly && createCharCounter(formData.locationInfo?.details, window.App.utils.sanitize.LIMITS.LOCATION_DESCRIPTION),
-                                    !isViewOnly && createValidationIndicator(formData.locationInfo?.details, "Location Details")
-                                )
+                            // Location Selector (when mode is 'location' or 'both')
+                            storageMode === 'location' && React.createElement('div', { className: "mb-4" },
+                                React.createElement(window.App.components.shared.LocationSelector, {
+                                    locationInfo: formData.locationInfo,
+                                    storageInfo: { locationId: '', drawerId: '', cells: [] }, // Empty storage for location-only
+                                    locations: locations,
+                                    drawers: [],
+                                    cells: [],
+                                    onLocationChange: (locationInfo) => setFormData(prev => ({ ...prev, locationInfo })),
+                                    onStorageChange: () => {}, // No-op for location-only mode
+                                    readOnly: isViewOnly,
+                                    showDrawerSelector: false, // Never show drawer selector in location mode
+                                    showLocationDetails: true,
+                                    allowMultipleCells: false,
+                                    showCellGrid: false,
+                                    expandedByDefault: false,
+                                    hideToggle: true,
+                                    label: "Physical Location"
+                                })
                             ),
 
-                            // Drawer Storage Section (expandable)
-                            (showStorageSelector || isViewOnly) &&
-                            // Using the form-helpers to render the drawer selector
-                            formHelpers.renderDrawerSelector({
-                                UI,
-                                storageInfo: formData.storageInfo || {},
-                                locations,
-                                filteredDrawers,
-                                selectedDrawerId,
-                                filteredCells,
-                                selectedCells,
-                                handleStorageLocationChange,
-                                handleDrawerChange,
-                                handleCellToggle,
-                                readOnly: isViewOnly
-                            }),
+                            // Drawer Selector (when mode is 'drawer' or 'both')
+                            storageMode === 'drawer' && React.createElement('div', null,
+                                React.createElement(window.App.components.shared.LocationSelector, {
+                                    locationInfo: { locationId: '', details: '' }, // Empty location for drawer-only
+                                    storageInfo: formData.storageInfo,
+                                    locations: locations,
+                                    drawers: drawers,
+                                    cells: cells,
+                                    onLocationChange: () => {}, // No-op for drawer-only mode
+                                    onStorageChange: (storageInfo) => setFormData(prev => ({ ...prev, storageInfo })),
+                                    readOnly: isViewOnly,
+                                    showDrawerSelector: true, // Always show drawer selector in drawer mode
+                                    showLocationDetails: false, // Never show location details in drawer mode
+                                    allowMultipleCells: true,
+                                    showCellGrid: true,
+                                    expandedByDefault: true, // Always expanded for drawer selection
+                                    hideToggle: true,
+                                    label: "Drawer Selector"
+                                })
+                            ),
 
                             React.createElement('p', { className: UI.forms.hint },
-                                "Specify where this component is physically stored."
+                                "Specify where this component is physically stored. Use general location for broad placement and drawer storage for precise cell-level organization."
                             )
                         ),
 
                         // Footprint Select/Input with validation
                         React.createElement('div', { className: "md:col-span-1" },
-                            React.createElement('label', { htmlFor: "comp-footprint", className: UI.forms.label }, "Footprint"),
                             isViewOnly ?
-                                React.createElement('input', {
-                                    id: "comp-footprint",
-                                    type: "text",
-                                    className: UI.forms.input,
+                                React.createElement(window.App.components.shared.ValidatedInput, {
+                                    name: "footprint",
                                     value: formData.footprint || '',
+                                    label: "Footprint",
                                     readOnly: true
                                 }) :
-                                React.createElement(React.Fragment, null,
-                                    React.createElement('select', {
-                                        id: "comp-footprint",
-                                        name: "footprint",
-                                        className: UI.forms.select,
-                                        value: formData.footprint || '',
-                                        onChange: handleFootprintChange,
-                                        disabled: isViewOnly
-                                    },
-                                        React.createElement('option', { value: "" }, "-- Select footprint --"),
-                                        React.createElement('option', { value: "__custom__" }, "Custom footprint..."),
-                                        (footprints || []).sort().map(fp => React.createElement('option', { key: fp, value: fp }, fp))
-                                    ),
-                                    formData.footprint === '__custom__' && React.createElement('div', { className: "relative mt-2" },
-                                        React.createElement('input', {
-                                            name: "customFootprint",
-                                            type: "text",
-                                            placeholder: "Enter custom footprint",
-                                            className: UI.forms.input,
-                                            value: formData.customFootprint || '',
-                                            onChange: handleChange,
-                                            onKeyDown: handleKeyDown,
-                                            maxLength: window.App.utils.sanitize.LIMITS.FOOTPRINT,
-                                            pattern: "[A-Za-z0-9,.\-_ ]*",
-                                            required: formData.footprint === '__custom__'
-                                        }),
-                                        createCharCounter(formData.customFootprint, window.App.utils.sanitize.LIMITS.FOOTPRINT),
-                                        createValidationIndicator(formData.customFootprint, "Footprint")
-                                    )
-                                )
+                                React.createElement(window.App.components.shared.SelectWithCustom, {
+                                    name: "footprint",
+                                    value: formData.footprint || '',
+                                    onChange: (value) => setFormData(prev => ({ ...prev, footprint: value })),
+                                    options: footprints,
+                                    fieldType: "footprint",
+                                    label: "Footprint",
+                                    customValue: formData.customFootprint || '',
+                                    onCustomChange: (value) => setFormData(prev => ({ ...prev, customFootprint: value })),
+                                    customOption: { value: '__custom__', label: 'Custom footprint...' }
+                                })
                         ),
                         // Info Input with validation and character counter
-                        React.createElement('div', { className: "md:col-span-2 relative" },
-                            React.createElement('label', { htmlFor: "comp-info", className: UI.forms.label }, "Info"),
-                            React.createElement('input', {
-                                id: "comp-info",
+                        React.createElement('div', { className: "md:col-span-2" },
+                            React.createElement(window.App.components.shared.ValidatedInput, {
                                 name: "info",
-                                type: "text",
-                                className: UI.forms.input,
                                 value: formData.info || '',
-                                onChange: handleChange,
-                                onKeyDown: handleKeyDown,
-                                maxLength: window.App.utils.sanitize.LIMITS.COMPONENT_INFO,
-                                pattern: "[A-Za-z0-9,.\-_ ]*",
+                                onChange: (value) => setFormData(prev => ({ ...prev, info: value })),
+                                fieldType: "componentInfo",
+                                label: "Info",
                                 placeholder: "e.g., Voltage regulation",
                                 readOnly: isViewOnly
-                            }),
-                            !isViewOnly && createCharCounter(formData.info, window.App.utils.sanitize.LIMITS.COMPONENT_INFO),
-                            !isViewOnly && createValidationIndicator(formData.info, "Info")
+                            })
                         ),
                         // Datasheets Textarea
                         React.createElement('div', { className: "md:col-span-2" },
@@ -808,7 +574,7 @@ window.App.components.ComponentForm = ({
                                         name: "favorite",
                                         type: "checkbox",
                                         checked: formData.favorite || false,
-                                        onChange: handleChange,
+                                        onChange: handleCheckboxChange,
                                         className: UI.forms.checkbox,
                                         disabled: isViewOnly
                                     }),
@@ -839,7 +605,7 @@ window.App.components.ComponentForm = ({
                                         name: "bookmark",
                                         type: "checkbox",
                                         checked: formData.bookmark || false,
-                                        onChange: handleChange,
+                                        onChange: handleCheckboxChange,
                                         className: UI.forms.checkbox,
                                         disabled: isViewOnly
                                     }),
@@ -868,7 +634,7 @@ window.App.components.ComponentForm = ({
                                         name: "star",
                                         type: "checkbox",
                                         checked: formData.star || false,
-                                        onChange: handleChange,
+                                        onChange: handleCheckboxChange,
                                         className: UI.forms.checkbox,
                                         disabled: isViewOnly
                                     }),
@@ -912,4 +678,4 @@ window.App.components.ComponentForm = ({
     );
 }; // End ComponentForm
 
-console.log("ComponentForm component loaded with improved validation and character limits.");
+console.log("ComponentForm component loaded with separated location and drawer selector modes.");

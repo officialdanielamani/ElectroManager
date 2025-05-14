@@ -172,7 +172,7 @@ window.App.utils.sanitize = {
     },
 
     /**
-     * Field-specific validators
+     * Field-specific validators - Fixed to use proper this context
      */
     componentName: function (name) {
         return this.validateLength(name, this.LIMITS.COMPONENT_NAME);
@@ -405,16 +405,17 @@ window.App.utils.sanitize = {
      * @returns {Function} - Sanitized setState wrapper
      */
     createSafeSetState: function (setState) {
+        const sanitizeUtils = this;
         return function (value) {
             // If value is a function (functional update), wrap it
             if (typeof value === 'function') {
                 setState(prevState => {
                     const nextState = value(prevState);
-                    return window.App.utils.sanitize.object(nextState);
+                    return sanitizeUtils.object(nextState);
                 });
             } else {
                 // Otherwise sanitize and set directly
-                setState(window.App.utils.sanitize.object(value));
+                setState(sanitizeUtils.object(value));
             }
         };
     },
@@ -424,6 +425,7 @@ window.App.utils.sanitize = {
      * @returns {Function} - Keydown event handler
      */
     createKeyDownHandler: function () {
+        const sanitizeUtils = this;
         return function (e) {
             // Allow control keys (backspace, delete, arrows, etc.)
             if (e.ctrlKey || e.metaKey || e.altKey ||
@@ -435,7 +437,7 @@ window.App.utils.sanitize = {
             }
 
             // Check if the key is an allowed character
-            if (!window.App.utils.sanitize.ALLOWED_CHARS_PATTERN.test(e.key)) {
+            if (!sanitizeUtils.ALLOWED_CHARS_PATTERN.test(e.key)) {
                 e.preventDefault(); // Prevent typing disallowed characters
             }
         };
@@ -447,6 +449,7 @@ window.App.utils.sanitize = {
      * @returns {Function} - Change event handler
      */
     createAllowedCharsChangeHandler: function (setFormData) {
+        const sanitizeUtils = this;
         return function (e) {
             const { name, value, type, checked } = e.target;
             // For checkbox inputs, use the 'checked' property as the value
@@ -455,7 +458,7 @@ window.App.utils.sanitize = {
             // Filter input for allowed characters if it's a string
             if (typeof newValue === 'string') {
                 // Sanitize and filter characters
-                newValue = window.App.utils.sanitize.validateAllowedChars(newValue);
+                newValue = sanitizeUtils.validateAllowedChars(newValue);
             }
 
             setFormData(prevData => ({

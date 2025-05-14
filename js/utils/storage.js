@@ -449,7 +449,7 @@ window.App.utils.storage = {
             viewMode: 'table',
             currencySymbol: 'RM',
             showTotalValue: true,
-            itemsPerPage: 'all',
+            itemsPerPage: '50',
             theme: 'light'
         };
 
