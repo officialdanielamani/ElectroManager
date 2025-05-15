@@ -45,7 +45,7 @@ window.App.components.SettingsView = ({
     const [newLowStockCategory, setNewLowStockCategory] = useState(''); // Category for new low stock threshold
     const [newLowStockThreshold, setNewLowStockThreshold] = useState(5); // Threshold value
     const [viewMode, setViewMode] = useState('table'); // 'table' or 'card'
-    const [itemsPerPage, setItemsPerPage] = useState('all'); //
+    const [itemsPerPage, setItemsPerPage] = useState('50'); //
 
     // State for import/export
     const [importError, setImportError] = useState(''); // Error or success message after import
@@ -109,8 +109,7 @@ window.App.components.SettingsView = ({
                 const backup = JSON.parse(e.target.result);
 
                 // Confirm import
-                if (window.confirm(`This will replace your current data with the backup from ${new Date(backup.metadata.date).toLocaleString()}. Continue?`)) {
-                    restoreFromBackup(backup);
+                if (window.confirm(`This will replace your current data with the backup from ${new Date(backup.meta.d).toLocaleString()}. Continue?`)) {    restoreFromBackup(backup);
                 }
             } catch (err) {
                 console.error("Error parsing backup file:", err);
@@ -274,7 +273,7 @@ window.App.components.SettingsView = ({
 
                     // Reset local state
                     setViewMode('table');
-                    setItemsPerPage('all');
+                    setItemsPerPage('50');
 
                     setExportMessage('All storage cleared successfully! Application state reset. You may need to refresh the page to see all changes.');
                 } else {
