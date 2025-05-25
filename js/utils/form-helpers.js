@@ -1,4 +1,4 @@
-// js/utils/form-helpers.js
+// js/utils/form-helpers.js - Updated for unified storage system
 
 window.App = window.App || {};
 window.App.utils = window.App.utils || {};
@@ -13,9 +13,9 @@ window.App.utils.formHelpers = {
      * @param {boolean} readOnly - Whether the grid is in view-only mode
      * @returns {Array} Grid elements for rendering
      */
-    generateCellGrid: function(drawer, filteredCells, selectedCells, handleCellToggle, UI, readOnly = false) {
+    generateCellGrid: function (drawer, filteredCells, selectedCells, handleCellToggle, UI, readOnly = false) {
         if (!drawer) return null;
-        
+
         const themeColors = UI.getThemeColors();
         const rows = drawer.grid?.rows || 3;
         const cols = drawer.grid?.cols || 3;
@@ -53,28 +53,28 @@ window.App.utils.formHelpers = {
             for (let c = 0; c < cols; c++) {
                 const coordinate = `${String.fromCharCode(65 + c)}${r + 1}`; // e.g., "A1", "B2"
                 const cell = filteredCells.find(cell => cell.coordinate === coordinate);
-                
+
                 // Cell might not exist in the database yet
                 const cellId = cell ? cell.id : null;
                 const isSelected = cellId && selectedCells.includes(cellId);
-                
+
                 // Safely check available property with a default to true
                 const isAvailable = cell ? (cell.available !== false) : true;
-                
+
                 // Determine cell classes based on state
                 const cellClasses = `w-8 h-8 border flex items-center justify-center 
                     ${isSelected ? `bg-${themeColors.primary.replace('500', '100').replace('400', '900')} border-${themeColors.primary}` : `bg-${themeColors.cardBackground} hover:bg-${themeColors.background}`}
                     ${!isAvailable ? `bg-${themeColors.secondary} opacity-70 cursor-not-allowed` : ''}
                     ${!readOnly && cellId && isAvailable ? 'cursor-pointer' : ''}`;
-                
+
                 rowElements.push(
                     React.createElement('div', {
                         key: `cell-${r}-${c}`,
                         className: cellClasses,
-                        onClick: (!readOnly && cellId && isAvailable && handleCellToggle) ? 
+                        onClick: (!readOnly && cellId && isAvailable && handleCellToggle) ?
                             () => handleCellToggle(cellId) : undefined,
-                        title: cell ? 
-                            (cell.nickname || coordinate) + (isAvailable ? '' : ' (Unavailable)') : 
+                        title: cell ?
+                            (cell.nickname || coordinate) + (isAvailable ? '' : ' (Unavailable)') :
                             coordinate
                     },
                         isSelected ? '✓' : ''
@@ -87,239 +87,318 @@ window.App.utils.formHelpers = {
 
         return gridElements;
     },
-    
+
     /**
-     * Format storage info object consistently
-     * @param {Object} storageInfo - Raw storage info from component data
-     * @returns {Object} Properly formatted storage info
+     * Format and validate storage object structure
+     * @param {Object} storage - Storage object to format
+     * @returns {Object} Properly formatted storage object
      */
-    formatStorageInfo: function(storageInfo) {
-        // Handle null/malformed storageInfo
-        if (!storageInfo || typeof storageInfo === 'string' || storageInfo === '[object Object]') {
-            return { locationId: '', drawerId: '', cells: [] };
+    formatStorage: function (storage) {
+        // Handle null/malformed storage
+        if (!storage || typeof storage === 'string' || storage === '[object Object]') {
+            return { locationId: '', details: '', drawerId: '', cells: [] };
         }
-        
-        // Ensure all required fields exist
+
+        // Ensure all required fields exist with proper types
         return {
-            locationId: storageInfo.locationId || '',
-            drawerId: storageInfo.drawerId || '',
-            cells: Array.isArray(storageInfo.cells) ? storageInfo.cells : []
+            locationId: typeof storage.locationId === 'string' ? storage.locationId : '',
+            details: typeof storage.details === 'string' ? storage.details : '',
+            drawerId: typeof storage.drawerId === 'string' ? storage.drawerId : '',
+            cells: Array.isArray(storage.cells) ? storage.cells : []
         };
     },
-    
-    /**
-     * Format location info object consistently
-     * @param {Object} locationInfo - Raw location info from component data
-     * @returns {Object} Properly formatted location info
-     */
-    formatLocationInfo: function(locationInfo) {
-        // Handle null/malformed locationInfo
-        if (!locationInfo || typeof locationInfo === 'string' || locationInfo === '[object Object]') {
-            return { locationId: '', details: '' };
-        }
-        
-        return locationInfo;
-    },
-    
+
     /**
      * Get filtered drawers based on selected location
      * @param {string} locationId - Selected location ID
      * @param {Array} allDrawers - All available drawers
      * @returns {Array} Filtered drawers for this location
      */
-    getFilteredDrawers: function(locationId, allDrawers) {
-        if (!locationId) return [];
+    getFilteredDrawers: function (locationId, allDrawers) {
+        if (!locationId || !Array.isArray(allDrawers)) return [];
         return allDrawers.filter(drawer => drawer.locationId === locationId);
     },
-    
+
     /**
      * Get filtered cells for a drawer
      * @param {string} drawerId - Selected drawer ID
      * @param {Array} allCells - All available cells
      * @returns {Array} Filtered cells for this drawer
      */
-    getFilteredCells: function(drawerId, allCells) {
-        if (!drawerId) return [];
+    getFilteredCells: function (drawerId, allCells) {
+        if (!drawerId || !Array.isArray(allCells)) return [];
         return allCells.filter(cell => cell.drawerId === drawerId);
     },
-    
+
     /**
-     * Render drawer selector UI section
-     * @param {Object} options - Various options and data for the drawer selector
-     * @returns {React.Element} Drawer selector UI
+     * Get components assigned to a specific location (unified storage)
+     * @param {string} locationId - Location ID to filter by
+     * @param {Array} components - Array of all components
+     * @returns {Array} Components assigned to this location
      */
-    renderDrawerSelector: function(options) {
-        const {
-            UI,
-            storageInfo,
-            locations,
-            filteredDrawers,
-            selectedDrawerId,
-            filteredCells,
-            selectedCells,
-            handleStorageLocationChange,
-            handleDrawerChange,
-            handleCellToggle,
-            readOnly = false
-        } = options;
-        
-        const themeColors = UI.getThemeColors();
-        // Store reference to this object for helper methods
-        const helpers = this;
-        
-        return React.createElement('div', {
-            className: `mb-4 p-3 border rounded bg-${themeColors.background}`
-        },
-            React.createElement('h4', {
-                className: `text-sm font-medium mb-2 text-${themeColors.textSecondary}`
-            }, readOnly ? "Drawer Storage Location" : "Drawer Storage Assignment"),
-
-            // Location dropdown for storage
-            React.createElement('div', { className: "mb-3" },
-                React.createElement('label', { htmlFor: "storage-location", className: UI.forms.label }, 
-                    "Storage Location"),
-                readOnly ? 
-                    // View-only mode
-                    React.createElement('div', { 
-                        className: `p-2 border border-${themeColors.border} rounded bg-${themeColors.cardBackground}`
-                    }, helpers.getLocationName(storageInfo.locationId, locations) || "Not assigned") :
-                    // Edit mode
-                    React.createElement('select', {
-                        id: "storage-location",
-                        name: "locationId",
-                        className: UI.forms.select,
-                        value: storageInfo.locationId || '',
-                        onChange: handleStorageLocationChange,
-                        disabled: readOnly
-                    },
-                        React.createElement('option', { value: "" }, "-- Select location --"),
-                        locations.map(loc => React.createElement('option', { key: loc.id, value: loc.id }, loc.name))
-                    )
-            ),
-
-            // Drawer dropdown (filtered by location)
-            storageInfo.locationId && React.createElement('div', { className: "mb-3" },
-                React.createElement('label', { htmlFor: "storage-drawer", className: UI.forms.label }, "Drawer"),
-                filteredDrawers.length === 0 ?
-                    React.createElement('p', {
-                        className: `text-sm text-${themeColors.textMuted} italic`
-                    }, "No drawers found for this location.") :
-                    readOnly ?
-                        // View-only mode
-                        React.createElement('div', { 
-                            className: `p-2 border border-${themeColors.border} rounded bg-${themeColors.cardBackground}`
-                        }, helpers.getDrawerName(storageInfo.drawerId, filteredDrawers) || "Not assigned") :
-                        // Edit mode
-                        React.createElement('select', {
-                            id: "storage-drawer",
-                            name: "drawerId",
-                            className: UI.forms.select,
-                            value: selectedDrawerId,
-                            onChange: handleDrawerChange,
-                            disabled: readOnly
-                        },
-                            React.createElement('option', { value: "" }, "-- Select drawer --"),
-                            filteredDrawers.map(drawer => React.createElement('option', { key: drawer.id, value: drawer.id }, drawer.name))
-                        )
-            ),
-
-            // Cell grid for selection (when drawer is selected)
-            selectedDrawerId && React.createElement('div', { className: "mb-3" },
-                React.createElement('label', { className: UI.forms.label }, readOnly ? "Selected Cell(s)" : "Select Cell(s)"),
-                filteredCells.length === 0 ?
-                    React.createElement('p', {
-                        className: `text-sm text-${themeColors.textMuted} italic`
-                    }, "No cells defined for this drawer yet.") :
-                    React.createElement('div', null,
-                        // Cell selection instructions (not shown in view-only mode)
-                        !readOnly && React.createElement('p', {
-                            className: `text-xs text-${themeColors.textMuted} mb-2`
-                        }, "Click on cells to select/deselect. Multiple cells can be selected."),
-
-                        // Display the grid
-                        React.createElement('div', {
-                            className: `inline-block border border-${themeColors.border} bg-${themeColors.cardBackground} p-1`
-                        },
-                            helpers.generateCellGrid(
-                                filteredDrawers.find(d => d.id === selectedDrawerId),
-                                filteredCells,
-                                selectedCells,
-                                handleCellToggle,
-                                UI,
-                                readOnly
-                            )
-                        ),
-
-                        // Selected cells display
-                        React.createElement('div', { className: "mt-2" },
-                            React.createElement('p', { className: `text-xs text-${themeColors.textSecondary}` }, "Selected Cells: ",
-                                selectedCells.length === 0
-                                    ? React.createElement('span', { className: `italic text-${themeColors.textMuted}` }, "None")
-                                    : selectedCells.map(cellId => {
-                                        const cell = filteredCells.find(c => c.id === cellId);
-                                        return cell ? (cell.nickname || cell.coordinate) : cellId;
-                                    }).join(', ')
-                            )
-                        )
-                    )
-            )
+    getComponentsForLocation: function (locationId, components) {
+        if (!locationId || !Array.isArray(components)) return [];
+        return components.filter(comp => 
+            comp.storage && comp.storage.locationId === locationId
         );
     },
-    
+
     /**
-     * Get location name by ID
+     * Get components assigned to a specific drawer (unified storage)
+     * @param {string} drawerId - Drawer ID to filter by
+     * @param {Array} components - Array of all components
+     * @returns {Array} Components assigned to this drawer
+     */
+    getComponentsForDrawer: function (drawerId, components) {
+        if (!drawerId || !Array.isArray(components)) return [];
+        return components.filter(comp =>
+            comp.storage && comp.storage.drawerId === drawerId
+        );
+    },
+
+    /**
+     * Get components assigned to a specific cell (unified storage)
+     * @param {string} cellId - Cell ID to filter by
+     * @param {Array} components - Array of all components
+     * @returns {Array} Components assigned to this cell
+     */
+    getComponentsForCell: function (cellId, components) {
+        if (!cellId || !Array.isArray(components)) return [];
+        return components.filter(comp =>
+            comp.storage && 
+            comp.storage.cells && 
+            Array.isArray(comp.storage.cells) && 
+            comp.storage.cells.includes(cellId)
+        );
+    },
+
+    /**
+     * Get location name by ID with sanitization
      * @param {string} locationId - Location ID
      * @param {Array} locations - All available locations
      * @returns {string} Location name or empty string
      */
-    getLocationName: function(locationId, locations) {
-        if (!locationId) return '';
+    getLocationName: function (locationId, locations) {
+        if (!locationId || !Array.isArray(locations)) return '';
         const location = locations.find(loc => loc.id === locationId);
-        return location ? location.name : '';
+        return location ? window.App.utils.sanitize.value(location.name) : '';
     },
-    
+
     /**
-     * Get drawer name by ID
+     * Get drawer name by ID with sanitization
      * @param {string} drawerId - Drawer ID
      * @param {Array} drawers - Available drawers
      * @returns {string} Drawer name or empty string
      */
-    getDrawerName: function(drawerId, drawers) {
-        if (!drawerId) return '';
+    getDrawerName: function (drawerId, drawers) {
+        if (!drawerId || !Array.isArray(drawers)) return '';
         const drawer = drawers.find(d => d.id === drawerId);
-        return drawer ? drawer.name : '';
+        return drawer ? window.App.utils.sanitize.value(drawer.name) : '';
+    },
+
+    /**
+     * Get cell coordinate or nickname by ID
+     * @param {string} cellId - Cell ID
+     * @param {Array} cells - Available cells
+     * @returns {string} Cell coordinate/nickname or empty string
+     */
+    getCellName: function (cellId, cells) {
+        if (!cellId || !Array.isArray(cells)) return '';
+        const cell = cells.find(c => c.id === cellId);
+        if (!cell) return '';
+        return cell.nickname || cell.coordinate || '';
+    },
+
+    /**
+     * Format storage location for display
+     * @param {Object} storage - Storage object
+     * @param {Array} locations - Available locations
+     * @param {Array} drawers - Available drawers
+     * @param {Array} cells - Available cells
+     * @returns {string} Formatted storage location string
+     */
+    formatStorageDisplay: function (storage, locations, drawers, cells) {
+        if (!storage || typeof storage !== 'object') return 'Not assigned';
+
+        const parts = [];
+
+        // Add location
+        if (storage.locationId) {
+            const locationName = this.getLocationName(storage.locationId, locations);
+            if (locationName) {
+                parts.push(locationName);
+            }
+        }
+
+        // Add location details
+        if (storage.details) {
+            parts.push(`(${storage.details})`);
+        }
+
+        // Add drawer
+        if (storage.drawerId) {
+            const drawerName = this.getDrawerName(storage.drawerId, drawers);
+            if (drawerName) {
+                parts.push(`→ ${drawerName}`);
+                
+                // Add cells
+                if (storage.cells && Array.isArray(storage.cells) && storage.cells.length > 0) {
+                    const cellNames = storage.cells.map(cellId => 
+                        this.getCellName(cellId, cells)
+                    ).filter(name => name);
+                    
+                    if (cellNames.length > 0) {
+                        parts.push(`[${cellNames.join(', ')}]`);
+                    }
+                }
+            }
+        }
+
+        return parts.length > 0 ? parts.join(' ') : 'Not assigned';
+    },
+
+    /**
+     * Validate storage assignment
+     * @param {Object} storage - Storage object to validate
+     * @param {Array} locations - Available locations
+     * @param {Array} drawers - Available drawers
+     * @param {Array} cells - Available cells
+     * @returns {Object} Validation result with isValid and errors array
+     */
+    validateStorage: function (storage, locations, drawers, cells) {
+        const errors = [];
+        const formattedStorage = this.formatStorage(storage);
+
+        // Check location exists
+        if (formattedStorage.locationId) {
+            const location = locations.find(loc => loc.id === formattedStorage.locationId);
+            if (!location) {
+                errors.push('Selected location does not exist');
+            }
+        }
+
+        // Check drawer exists and belongs to location
+        if (formattedStorage.drawerId) {
+            const drawer = drawers.find(d => d.id === formattedStorage.drawerId);
+            if (!drawer) {
+                errors.push('Selected drawer does not exist');
+            } else if (formattedStorage.locationId && drawer.locationId !== formattedStorage.locationId) {
+                errors.push('Selected drawer does not belong to the selected location');
+            }
+        }
+
+        // Check cells exist and belong to drawer
+        if (formattedStorage.cells && formattedStorage.cells.length > 0) {
+            if (!formattedStorage.drawerId) {
+                errors.push('Cells selected but no drawer specified');
+            } else {
+                const invalidCells = [];
+                formattedStorage.cells.forEach(cellId => {
+                    const cell = cells.find(c => c.id === cellId);
+                    if (!cell) {
+                        invalidCells.push(cellId);
+                    } else if (cell.drawerId !== formattedStorage.drawerId) {
+                        invalidCells.push(`${cellId} (wrong drawer)`);
+                    }
+                });
+                
+                if (invalidCells.length > 0) {
+                    errors.push(`Invalid cells: ${invalidCells.join(', ')}`);
+                }
+            }
+        }
+
+        return {
+            isValid: errors.length === 0,
+            errors: errors,
+            formattedStorage: formattedStorage
+        };
+    },
+
+    /**
+     * Clear storage assignment from components
+     * @param {Array} components - Components array
+     * @param {string} type - Type of clearing: 'location', 'drawer', 'cell'
+     * @param {string} id - ID of the location/drawer/cell being cleared
+     * @returns {Array} Updated components array
+     */
+    clearStorageAssignments: function (components, type, id) {
+        if (!Array.isArray(components) || !type || !id) return components;
+
+        return components.map(comp => {
+            if (!comp.storage) return comp;
+
+            const updatedComp = { ...comp };
+            const storage = { ...comp.storage };
+
+            switch (type) {
+                case 'location':
+                    if (storage.locationId === id) {
+                        // Clear entire storage when location is removed
+                        updatedComp.storage = { locationId: '', details: '', drawerId: '', cells: [] };
+                    }
+                    break;
+
+                case 'drawer':
+                    if (storage.drawerId === id) {
+                        // Clear drawer and cells, keep location
+                        storage.drawerId = '';
+                        storage.cells = [];
+                        updatedComp.storage = storage;
+                    }
+                    break;
+
+                case 'cell':
+                    if (storage.cells && Array.isArray(storage.cells)) {
+                        const filteredCells = storage.cells.filter(cellId => cellId !== id);
+                        if (filteredCells.length !== storage.cells.length) {
+                            storage.cells = filteredCells;
+                            updatedComp.storage = storage;
+                        }
+                    }
+                    break;
+            }
+
+            return updatedComp;
+        });
+    },
+
+    /**
+     * Get storage statistics for a location
+     * @param {string} locationId - Location ID
+     * @param {Array} components - All components
+     * @param {Array} drawers - All drawers
+     * @param {Array} cells - All cells
+     * @returns {Object} Storage statistics
+     */
+    getLocationStorageStats: function (locationId, components, drawers, cells) {
+        const locationComponents = this.getComponentsForLocation(locationId, components);
+        const locationDrawers = this.getFilteredDrawers(locationId, drawers);
+        
+        let totalCells = 0;
+        let occupiedCells = 0;
+
+        locationDrawers.forEach(drawer => {
+            const drawerCells = this.getFilteredCells(drawer.id, cells);
+            totalCells += drawerCells.length;
+            
+            drawerCells.forEach(cell => {
+                const cellComponents = this.getComponentsForCell(cell.id, components);
+                if (cellComponents.length > 0) {
+                    occupiedCells++;
+                }
+            });
+        });
+
+        return {
+            totalComponents: locationComponents.length,
+            totalDrawers: locationDrawers.length,
+            totalCells: totalCells,
+            occupiedCells: occupiedCells,
+            freeCells: totalCells - occupiedCells,
+            occupancyRate: totalCells > 0 ? Math.round((occupiedCells / totalCells) * 100) : 0
+        };
     }
 };
 
-// Update formatStorageInfo to sanitize inputs
-window.App.utils.formHelpers.formatStorageInfo = function(storageInfo) {
-    // Simply use the centralized sanitization utility
-    return window.App.utils.sanitize.object({
-        locationId: storageInfo?.locationId || '',
-        drawerId: storageInfo?.drawerId || '',
-        cells: Array.isArray(storageInfo?.cells) ? storageInfo.cells : []
-    });
-};
-
-// Update formatLocationInfo to sanitize inputs
-window.App.utils.formHelpers.formatLocationInfo = function(locationInfo) {
-    // Use the centralized sanitization utility
-    return window.App.utils.sanitize.object({
-        locationId: locationInfo?.locationId || '',
-        details: locationInfo?.details || ''
-    });
-};
-
-// Update getLocationName to sanitize output
-window.App.utils.formHelpers.getLocationName = function(locationId, locations) {
-    if (!locationId) return '';
-    const location = locations.find(loc => loc.id === locationId);
-    return location ? window.App.utils.sanitize.value(location.name) : '';
-};
-
-// Update getDrawerName to sanitize output  
-window.App.utils.formHelpers.getDrawerName = function(drawerId, drawers) {
-    if (!drawerId) return '';
-    const drawer = drawers.find(d => d.id === drawerId);
-    return drawer ? window.App.utils.sanitize.value(drawer.name) : '';
-};
+console.log("Form helpers updated with unified storage system.");

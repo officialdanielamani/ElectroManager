@@ -1,4 +1,4 @@
-// js/components/BulkEditForm.js - Improved with unified Physical Storage Location system
+// js/components/BulkEditForm.js - Fixed with unified Physical Storage Location system
 
 // Ensure the global namespace exists
 window.App = window.App || {};
@@ -13,9 +13,9 @@ window.App.components.BulkEditForm = ({
     categories, // Array: List of available category strings
     commonFootprints, // Array: List of common footprint strings
     selectedCount, // Number: How many components are selected
-    locations, // Array: List of location objects
-    drawers, // Array: List of drawer objects
-    cells, // Array: List of cell objects
+    locations = [], // Array: List of location objects
+    drawers = [], // Array: List of drawer objects  
+    cells = [], // Array: List of cell objects
     onApply, // Function: Callback when apply button clicked, passes bulk edit data
     onCancel // Function: Callback when cancel button or close icon clicked
 }) => {
@@ -29,21 +29,17 @@ window.App.components.BulkEditForm = ({
         customCategory: '',
         type: '',
         quantity: '',
-        quantityAction: 'set', // 'set', 'increment', 'decrement'
+        quantityAction: 'set',
         price: '',
-        priceAction: 'set', // 'set', 'increase', 'decrease'
+        priceAction: 'set',
         footprint: '',
         customFootprint: '',
-        // Flag fields
-        favorite: null, // null = no change, true/false = set value
+        favorite: null,
         bookmark: null,
         star: null,
-        // Storage action and mode
-        storageAction: 'keep', // 'keep', 'location', 'drawer', 'clear'
-        // Location fields (when storageAction is 'location')
-        locationInfo: { locationId: '', details: '' },
-        // Storage/drawer fields (when storageAction is 'drawer')
-        storageInfo: { locationId: '', drawerId: '', cells: [] }
+        // FIXED: Unified storage
+        storageAction: 'keep', // 'keep', 'set', 'clear'
+        storage: { locationId: '', details: '', drawerId: '', cells: [] }
     });
 
     // Handle form field changes
@@ -59,25 +55,17 @@ window.App.components.BulkEditForm = ({
         setBulkData(prev => ({
             ...prev,
             storageAction: action,
-            // Clear both location and storage info when changing actions
-            locationInfo: { locationId: '', details: '' },
-            storageInfo: { locationId: '', drawerId: '', cells: [] }
+            // Clear storage info when changing actions
+            storage: { locationId: '', details: '', drawerId: '', cells: [] }
         }));
     };
 
-    // Handle location info changes
-    const handleLocationChange = (locationInfo) => {
+    // FIXED: Handle storage info changes
+    const handleStorageChange = (storage) => {
+        console.log("BulkEditForm - Storage changed:", storage);
         setBulkData(prev => ({
             ...prev,
-            locationInfo
-        }));
-    };
-
-    // Handle storage info changes
-    const handleStorageChange = (storageInfo) => {
-        setBulkData(prev => ({
-            ...prev,
-            storageInfo
+            storage: storage
         }));
     };
 
@@ -87,6 +75,114 @@ window.App.components.BulkEditForm = ({
             ...prev,
             [name]: value
         }));
+    };
+
+    // FIXED: Apply bulk edits function
+    const applyBulkEditsToComponents = (components, selectedComponents, bulkEditData, categories) => {
+        let categoryToApply = bulkEditData.category;
+        let footprintToApply = bulkEditData.footprint;
+        let newCategoryAdded = false;
+        let newCategory = null;
+
+        // Handle custom category from bulk edit
+        if (bulkEditData.category === '__custom__' && bulkEditData.customCategory) {
+            categoryToApply = bulkEditData.customCategory.trim();
+            if (categoryToApply && !categories.includes(categoryToApply)) {
+                newCategory = categoryToApply;
+                newCategoryAdded = true;
+            } else if (!categoryToApply) {
+                categoryToApply = '';
+            }
+        }
+
+        // Handle custom footprint from bulk edit
+        if (bulkEditData.footprint === '__custom__' && bulkEditData.customFootprint) {
+            footprintToApply = bulkEditData.customFootprint.trim();
+            if (!footprintToApply) footprintToApply = '';
+        } else if (bulkEditData.footprint === '__custom__') {
+            footprintToApply = '';
+        }
+
+        // Apply changes to components
+        const updatedComponents = components.map(comp => {
+            // Apply changes only to selected components
+            if (selectedComponents.includes(comp.id)) {
+                const updates = {};
+
+                // Apply Category (if specified and valid)
+                if (categoryToApply && categoryToApply !== '__custom__') {
+                    updates.category = categoryToApply;
+                }
+
+                // Apply Type (if specified)
+                if (bulkEditData.type.trim()) {
+                    updates.type = bulkEditData.type.trim();
+                }
+
+                // Apply Footprint (if specified and valid)
+                if (footprintToApply && footprintToApply !== '__custom__') {
+                    updates.footprint = footprintToApply;
+                }
+
+                // Apply Quantity Adjustment
+                if (bulkEditData.quantity !== '' && !isNaN(bulkEditData.quantity)) {
+                    const changeValue = parseInt(bulkEditData.quantity, 10) || 0;
+                    const currentQuantity = Number(comp.quantity) || 0;
+                    if (bulkEditData.quantityAction === 'set') {
+                        updates.quantity = Math.max(0, changeValue);
+                    } else if (bulkEditData.quantityAction === 'increment') {
+                        updates.quantity = currentQuantity + changeValue;
+                    } else if (bulkEditData.quantityAction === 'decrement') {
+                        updates.quantity = Math.max(0, currentQuantity - changeValue);
+                    }
+                }
+
+                // Apply Price Adjustment
+                if (bulkEditData.price !== '' && !isNaN(bulkEditData.price)) {
+                    const priceChangeValue = parseFloat(bulkEditData.price) || 0;
+                    const currentPrice = Number(comp.price) || 0;
+                    if (bulkEditData.priceAction === 'set') {
+                        updates.price = Math.max(0, priceChangeValue);
+                    } else if (bulkEditData.priceAction === 'increase') {
+                        updates.price = Math.max(0, currentPrice + priceChangeValue);
+                    } else if (bulkEditData.priceAction === 'decrease') {
+                        updates.price = Math.max(0, currentPrice - priceChangeValue);
+                    }
+                }
+
+                // Apply Favorite status (if defined)
+                if (bulkEditData.favorite !== null) {
+                    updates.favorite = bulkEditData.favorite;
+                }
+
+                // Apply Bookmark status (if defined)
+                if (bulkEditData.bookmark !== null) {
+                    updates.bookmark = bulkEditData.bookmark;
+                }
+
+                // Apply Star status (if defined)
+                if (bulkEditData.star !== null) {
+                    updates.star = bulkEditData.star;
+                }
+
+                // FIXED: Apply Storage Updates
+                if (bulkEditData.storageAction === 'clear') {
+                    updates.storage = { locationId: '', details: '', drawerId: '', cells: [] };
+                } else if (bulkEditData.storageAction === 'set' && bulkEditData.storage.locationId) {
+                    updates.storage = bulkEditData.storage;
+                }
+
+                // Return the component with applied updates
+                return { ...comp, ...updates };
+            }
+            // Return unchanged component if not selected
+            return comp;
+        });
+
+        return {
+            updatedComponents,
+            newCategory
+        };
     };
 
     // Handle applying the changes with validation
@@ -143,28 +239,21 @@ window.App.components.BulkEditForm = ({
             return;
         }
 
-        // Validate location action selections
-        if (bulkData.storageAction === 'location' && !bulkData.locationInfo.locationId) {
-            alert("Please select a location or choose a different storage action.");
+        // FIXED: Validate storage action selections
+        if (bulkData.storageAction === 'set' && !bulkData.storage.locationId) {
+            alert("Please select a storage location or choose a different storage action.");
             return;
-        }
-
-        if (bulkData.storageAction === 'drawer') {
-            if (!bulkData.storageInfo.locationId) {
-                alert("Please select a storage location or choose a different storage action.");
-                return;
-            }
-            // Validate drawer selection
-            if (bulkData.storageInfo.drawerId && bulkData.storageInfo.cells.length === 0) {
-                alert("Please select at least one cell in the drawer or clear the drawer selection.");
-                return;
-            }
         }
 
         // Apply sanitization to the entire bulk data object
         const sanitizedData = window.App.utils.sanitize.object(bulkData);
         onApply(sanitizedData);
     };
+
+    // Debug logging
+    useEffect(() => {
+        console.log("BulkEditForm - Current bulkData:", bulkData);
+    }, [bulkData]);
 
     // --- Main Render ---
     return (
@@ -335,52 +424,29 @@ window.App.components.BulkEditForm = ({
                                     onChange: (e) => handleStorageActionChange(e.target.value)
                                 },
                                     React.createElement('option', { value: "keep" }, "Keep existing location"),
-                                    React.createElement('option', { value: "location" }, "Set general location"),
-                                    React.createElement('option', { value: "drawer" }, "Set drawer storage"),
+                                    React.createElement('option', { value: "set" }, "Set new storage location"),
                                     React.createElement('option', { value: "clear" }, "Clear all storage")
                                 ),
                                 React.createElement('p', { className: UI.forms.hint },
-                                    "Choose how to update component storage: keep current, set general location, assign to drawer cells, or clear all storage information."
+                                    "Choose how to update component storage: keep current, set new location, or clear all storage information."
                                 )
                             ),
 
-                            // Show Location Selector for General Location
-                            bulkData.storageAction === 'location' && React.createElement('div', { className: "mt-4" },
+                            // FIXED: Show LocationSelector when action is 'set'
+                            bulkData.storageAction === 'set' && React.createElement('div', { className: "mt-4" },
                                 React.createElement(window.App.components.shared.LocationSelector, {
-                                    locationInfo: bulkData.locationInfo,
-                                    storageInfo: { locationId: '', drawerId: '', cells: [] }, // Empty storage for location-only
-                                    locations: locations,
-                                    drawers: [],
-                                    cells: [],
-                                    onLocationChange: handleLocationChange,
-                                    onStorageChange: () => { }, // No-op for location-only mode
-                                    showDrawerSelector: false, // Never show drawer selector in location mode
-                                    showLocationDetails: true,
-                                    allowMultipleCells: false,
-                                    showCellGrid: false,
-                                    expandedByDefault: false,
-                                    hideToggle: true,
-                                    label: "General Location Assignment"
-                                })
-                            ),
-
-                            // Show Drawer Selector for Drawer Storage
-                            bulkData.storageAction === 'drawer' && React.createElement('div', { className: "mt-4" },
-                                React.createElement(window.App.components.shared.LocationSelector, {
-                                    locationInfo: { locationId: '', details: '' }, // Empty location for drawer-only
-                                    storageInfo: bulkData.storageInfo,
+                                    storage: bulkData.storage,
                                     locations: locations,
                                     drawers: drawers,
                                     cells: cells,
-                                    onLocationChange: () => {}, // No-op for drawer-only mode
                                     onStorageChange: handleStorageChange,
-                                    showDrawerSelector: true, // Always show drawer selector in drawer mode
-                                    showLocationDetails: false, // Never show location details in drawer mode
+                                    showDrawerSelector: true,
+                                    showLocationDetails: true,
                                     allowMultipleCells: true,
                                     showCellGrid: true,
-                                    expandedByDefault: true, // Always expanded for drawer selection
+                                    expandedByDefault: false,
                                     hideToggle: true,
-                                    label: "Drawer Selector"
+                                    label: "Bulk Storage Assignment"
                                 })
                             ),
 
@@ -526,5 +592,3 @@ window.App.components.BulkEditForm = ({
         ) // End Modal Backdrop
     );
 };
-
-console.log("BulkEditForm component updated with unified Physical Storage Location system.");

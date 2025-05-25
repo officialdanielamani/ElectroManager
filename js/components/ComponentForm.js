@@ -31,7 +31,7 @@ window.App.components.ComponentForm = ({
 
     // Internal state to manage form inputs, initialized from props
     const [formData, setFormData] = useState(componentData || {});
-    
+
     // Add state for managing location/drawer mode
     const [storageMode, setStorageMode] = useState('location'); // 'location' or 'drawer'
 
@@ -42,62 +42,55 @@ window.App.components.ComponentForm = ({
     });
 
     // Initialize with proper structure for missing fields
-    useEffect(() => {
-        if (!componentData) return;
+    // In ComponentForm.js, update the formData initialization:
+useEffect(() => {
+    if (!componentData) return;
+    
+    // Ensure storage is properly formatted
+    const storage = componentData.storage || { locationId: '', details: '', drawerId: '', cells: [] };
+    
+    // Format parameters for editing
+    const parametersText = componentData.ap ?
+        window.App.utils.helpers.formatParametersForEdit(componentData) : '';
 
-        // Format storage info using helper
-        const storageInfo = formHelpers.formatStorageInfo(componentData.storageInfo);
-
-        // Format location info using helper
-        const locationInfo = formHelpers.formatLocationInfo(componentData.locationInfo);
-
-        // Handle legacy format - convert single cellId to array of cells
-        if (componentData.storageInfo?.cellId &&
-            !storageInfo.cells.includes(componentData.storageInfo.cellId)) {
-            storageInfo.cells.push(componentData.storageInfo.cellId);
-        }
-
-        // Determine initial storage mode based on existing data
-        let initialMode = 'location';
-if (storageInfo.drawerId) {
-    initialMode = 'drawer';
-} else if (locationInfo.locationId) {
-    initialMode = 'location';
-}
-
-        // Set form data
-        setFormData({
-            ...componentData,
-            locationInfo,
-            storageInfo,
-            favorite: componentData.favorite || false,
-            bookmark: componentData.bookmark || false,
-            star: componentData.star || false
-        });
-
-        setStorageMode(initialMode);
-
-    }, [componentData]);
+    // Determine initial storage mode
+    if (storage.drawerId || (storage.cells && storage.cells.length > 0)) {
+        setStorageMode('drawer');
+    } else {
+        setStorageMode('location');
+    }
+    
+    setFormData({
+        ...componentData,
+        storage: {
+            locationId: storage.locationId || '',
+            details: storage.details || '',
+            drawerId: storage.drawerId || '',
+            cells: Array.isArray(storage.cells) ? storage.cells : []
+        },
+        parameters: parametersText,
+        favorite: componentData.favorite || false,
+        bookmark: componentData.bookmark || false,
+        star: componentData.star || false
+    });
+}, [componentData]);
 
     // Handle storage mode change
     const handleStorageModeChange = (mode) => {
-    setStorageMode(mode);
-    
-    // Clear the opposite data based on mode selection
-    if (mode === 'location') {
-        // Clear drawer data but keep location data
-        setFormData(prev => ({
-            ...prev,
-            storageInfo: { locationId: '', drawerId: '', cells: [] }
-        }));
-    } else if (mode === 'drawer') {
-        // Clear location data but keep drawer data
-        setFormData(prev => ({
-            ...prev,
-            locationInfo: { locationId: '', details: '' }
-        }));
-    }
-};
+        setStorageMode(mode);
+
+        // Clear drawer-related data when switching to location mode
+        if (mode === 'location') {
+            setFormData(prev => ({
+                ...prev,
+                storage: {
+                    ...prev.storage,
+                    drawerId: '',
+                    cells: []
+                }
+            }));
+        }
+    };
 
     // Handle numeric field changes with proper conversion and validation
     const handleNumericChange = (e) => {
@@ -165,14 +158,14 @@ if (storageInfo.drawerId) {
     const handleParametersChange = (e) => {
         if (isViewOnly) return;
 
-        // For parameters, we don't want to restrict characters as much
+        // For parameters, don't filter characters
         const { name, value } = e.target;
-
-        setFormData(prevData => ({
-            ...prevData,
-            [name]: value // Don't filter characters for parameters
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
         }));
     };
+
 
     const handleDatasheetsChange = (e) => {
         if (isViewOnly) return;
@@ -198,66 +191,91 @@ if (storageInfo.drawerId) {
     };
 
     // Handle form submission with validation
-    const handleSubmit = (e) => {
-        e.preventDefault(); // Prevent default form submission
+// In ComponentForm.js, update the handleSubmit function:
 
-        if (!isViewOnly) {
-            // Check for any invalid characters across all fields
-            const fieldsToCheck = {
-                'Name': formData.name || '',
-                'Type/Model': formData.type || '',
-                'Info': formData.info || '',
-                'Category': formData.customCategory || '',
-                'Footprint': formData.customFootprint || ''
-            };
+const handleSubmit = (e) => {
+    e.preventDefault();
 
-            const invalidFieldChars = {};
-            let hasInvalidChars = false;
+    if (!isViewOnly) {
+        // ... validation code ...
 
-            // Check each field for invalid characters
-            for (const [fieldName, fieldValue] of Object.entries(fieldsToCheck)) {
-                const invalidChars = window.App.utils.sanitize.getInvalidChars(fieldValue);
-                if (invalidChars.length > 0) {
-                    invalidFieldChars[fieldName] = invalidChars;
-                    hasInvalidChars = true;
-                }
+        try {
+
+                        // DEBUG: Add logging for parameter parsing
+            console.log("=== Parameter Parsing Debug ===");
+            console.log("Raw parameters text:", formData.parameters);
+            console.log("Parameters text type:", typeof formData.parameters);
+            console.log("Parameters text length:", (formData.parameters || '').length);
+
+            // Get category and footprint values
+            let finalCategory = formData.category;
+            if (formData.category === '__custom__' && formData.customCategory) {
+                finalCategory = formData.customCategory.trim();
             }
 
-            if (hasInvalidChars) {
-                // Format a warning message about invalid characters
-                let warningMessage = "The following fields contain invalid characters that will be removed:\n\n";
-
-                for (const [fieldName, chars] of Object.entries(invalidFieldChars)) {
-                    warningMessage += `${fieldName}: ${chars.join(' ')}\n`;
-                }
-
-                alert(warningMessage);
-
-                // Auto-clean the data
-                const cleanedData = { ...formData };
-                if (cleanedData.name) cleanedData.name = window.App.utils.sanitize.validateAllowedChars(cleanedData.name);
-                if (cleanedData.type) cleanedData.type = window.App.utils.sanitize.validateAllowedChars(cleanedData.type);
-                if (cleanedData.info) cleanedData.info = window.App.utils.sanitize.validateAllowedChars(cleanedData.info);
-                if (cleanedData.customCategory) cleanedData.customCategory = window.App.utils.sanitize.validateAllowedChars(cleanedData.customCategory);
-                if (cleanedData.customFootprint) cleanedData.customFootprint = window.App.utils.sanitize.validateAllowedChars(cleanedData.customFootprint);
-
-                // Update form with cleaned data
-                setFormData(cleanedData);
+            let finalFootprint = formData.footprint;
+            if (formData.footprint === '__custom__' && formData.customFootprint) {
+                finalFootprint = formData.customFootprint.trim();
+            } else if (formData.footprint === '__custom__') {
+                finalFootprint = '';
             }
-
-            // Final sanitization of all data
-            const sanitizedData = window.App.utils.sanitize.component(formData);
 
             // Basic validation
-            if (!sanitizedData.name || !sanitizedData.category) {
-                alert("Component Name and Category are required.");
+            if (!formData.name.trim()) {
+                alert("Component name is required");
                 return;
             }
 
-            onSave(sanitizedData); // Pass the sanitized form data to the parent save handler
-        }
-    };
+            if (!finalCategory) {
+                alert("Category is required");
+                return;
+            }
 
+                        // Parse parameters from text format
+            const additionalParams = formData.parameters ?
+                window.App.utils.helpers.parseParameters(formData.parameters) : { ap: [] };
+
+            console.log("Parsed parameters:", additionalParams);
+            console.log("additionalParams.ap:", additionalParams.ap);
+
+            const finalStorage = {
+                locationId: formData.storage?.locationId || '',
+                details: formData.storage?.details || '',
+                drawerId: formData.storage?.drawerId || '',
+                cells: Array.isArray(formData.storage?.cells) ? formData.storage.cells : []
+            };
+
+            // Create final component object
+            // FIXED: Don't generate ID here - let the parent handle it
+            const finalComponent = {
+                // Only include id if it already exists (editing mode)
+                ...(formData.id && { id: formData.id }),
+                name: formData.name.trim(),
+                favorite: formData.favorite || false,
+                bookmark: formData.bookmark || false,
+                star: formData.star || false,
+                category: finalCategory,
+                type: formData.type ? formData.type.trim() : '',
+                quantity: parseInt(formData.quantity, 10) || 0,
+                price: parseFloat(formData.price) || 0,
+                footprint: finalFootprint,
+                info: formData.info ? formData.info.trim() : '',
+                datasheets: formData.datasheets ? formData.datasheets.trim() : '',
+                image: formData.image ? formData.image.trim() : '',
+                storage: finalStorage,
+                ap: additionalParams.ap
+            };
+
+            console.log("Final component:", finalComponent);
+
+            // Call parent save function
+            onSave(finalComponent);
+        } catch (error) {
+            console.error("Error saving component:", error);
+            alert("An error occurred while saving the component");
+        }
+    }
+};
     // --- Render ---
     return (
         React.createElement('div', { className: UI.modals.backdrop },
@@ -380,74 +398,50 @@ if (storageInfo.drawerId) {
                             React.createElement('h3', { className: `text-lg font-medium mb-3 text-${UI.getThemeColors().textSecondary}` },
                                 "Physical Storage Location"
                             ),
-                            
-                            // Storage Mode Selector (only show if not view-only)
+
                             !isViewOnly && React.createElement('div', { className: "mb-4" },
                                 React.createElement('label', { className: UI.forms.label }, "Storage Assignment Type"),
                                 React.createElement('div', { className: "flex space-x-2" },
-    React.createElement('button', {
-        type: "button",
-        onClick: () => handleStorageModeChange('location'),
-        className: `px-3 py-1 text-sm rounded ${storageMode === 'location' ? 
-            UI.buttons.primary : UI.buttons.secondary}`
-    }, "General Location"),
-    React.createElement('button', {
-        type: "button",
-        onClick: () => handleStorageModeChange('drawer'),
-        className: `px-3 py-1 text-sm rounded ${storageMode === 'drawer' ? 
-            UI.buttons.primary : UI.buttons.secondary}`
-    }, "Drawer Storage")
-),
+                                    React.createElement('button', {
+                                        type: "button",
+                                        onClick: () => handleStorageModeChange('location'),
+                                        className: `px-3 py-1 text-sm rounded ${storageMode === 'location' ?
+                                            UI.buttons.primary : UI.buttons.secondary}`
+                                    }, "General Location"),
+                                    React.createElement('button', {
+                                        type: "button",
+                                        onClick: () => handleStorageModeChange('drawer'),
+                                        className: `px-3 py-1 text-sm rounded ${storageMode === 'drawer' ?
+                                            UI.buttons.primary : UI.buttons.secondary}`
+                                    }, "Drawer Storage")
+                                ),
                                 React.createElement('p', { className: UI.forms.hint },
-    "Choose how to store this component: general location or specific drawer cells."
-)
+                                    "Choose how to store this component: general location or specific drawer cells."
+                                )
                             ),
 
-                            // Location Selector (when mode is 'location' or 'both')
-                            storageMode === 'location' && React.createElement('div', { className: "mb-4" },
-                                React.createElement(window.App.components.shared.LocationSelector, {
-                                    locationInfo: formData.locationInfo,
-                                    storageInfo: { locationId: '', drawerId: '', cells: [] }, // Empty storage for location-only
-                                    locations: locations,
-                                    drawers: [],
-                                    cells: [],
-                                    onLocationChange: (locationInfo) => setFormData(prev => ({ ...prev, locationInfo })),
-                                    onStorageChange: () => {}, // No-op for location-only mode
-                                    readOnly: isViewOnly,
-                                    showDrawerSelector: false, // Never show drawer selector in location mode
-                                    showLocationDetails: true,
-                                    allowMultipleCells: false,
-                                    showCellGrid: false,
-                                    expandedByDefault: false,
-                                    hideToggle: true,
-                                    label: "Physical Location"
-                                })
-                            ),
-
-                            // Drawer Selector (when mode is 'drawer' or 'both')
-                            storageMode === 'drawer' && React.createElement('div', null,
-                                React.createElement(window.App.components.shared.LocationSelector, {
-                                    locationInfo: { locationId: '', details: '' }, // Empty location for drawer-only
-                                    storageInfo: formData.storageInfo,
-                                    locations: locations,
-                                    drawers: drawers,
-                                    cells: cells,
-                                    onLocationChange: () => {}, // No-op for drawer-only mode
-                                    onStorageChange: (storageInfo) => setFormData(prev => ({ ...prev, storageInfo })),
-                                    readOnly: isViewOnly,
-                                    showDrawerSelector: true, // Always show drawer selector in drawer mode
-                                    showLocationDetails: false, // Never show location details in drawer mode
-                                    allowMultipleCells: true,
-                                    showCellGrid: true,
-                                    expandedByDefault: true, // Always expanded for drawer selection
-                                    hideToggle: true,
-                                    label: "Drawer Selector"
-                                })
-                            ),
+                            React.createElement(window.App.components.shared.LocationSelector, {
+                                storage: formData.storage,
+                                locations: locations,
+                                drawers: drawers,
+                                cells: cells,
+                                onStorageChange: (storage) => setFormData(prev => ({ ...prev, storage })),
+                                readOnly: isViewOnly,
+                                // These props control what's shown
+                                showDrawerSelector: storageMode === 'drawer',
+                                showLocationDetails: true,
+                                allowMultipleCells: storageMode === 'drawer',
+                                showCellGrid: storageMode === 'drawer',
+                                expandedByDefault: storageMode === 'drawer',
+                                hideToggle: true,
+                                label: storageMode === 'location' ? "General Location" : "Drawer Storage"
+                            }),
 
                             React.createElement('p', { className: UI.forms.hint },
                                 "Specify where this component is physically stored. Use general location for broad placement and drawer storage for precise cell-level organization."
-                            )
+                            ),
+
+
                         ),
 
                         // Footprint Select/Input with validation
@@ -549,15 +543,15 @@ if (storageInfo.drawerId) {
                                 className: UI.forms.textarea,
                                 rows: "5",
                                 value: formData.parameters || '',
-                                onChange: handleParametersChange, // New handler
-                                // No onKeyDown handler that would block special characters
-                                placeholder: "One per line:\nVoltage: >5V\nTolerance: +- ~5%\nAmp: <3.2A",
+                                onChange: handleParametersChange,
+                                placeholder: "One per line:\nVoltage: 5V\nCurrent: 1A\n...",
                                 readOnly: isViewOnly
                             }),
                             !isViewOnly && React.createElement('p', { className: UI.forms.hint },
-                                "Format: \"Name: Value\"."
+                                "Format: \"Name: Value\" (one per line)."
                             )
                         ),
+
 
                         // --- Favorite, Bookmark, Star Toggles ---
                         React.createElement('div', { className: `md:col-span-2 mt-4 border-t pt-4 border-${UI.getThemeColors().border}` },

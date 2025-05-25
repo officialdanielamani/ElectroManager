@@ -84,27 +84,37 @@ window.App.utils.helpers = {
      * @returns {object} - An object representing the parameters.
      */
     parseParameters: (text) => {
-        if (!text || typeof text !== 'string') return {};
+        if (!text || typeof text !== 'string') return { ap: [] };
+
+        // Create an object to hold key-value pairs
         const params = {};
+        let hasValidParams = false;
+
+        // Split by lines and process each line
         text.split('\n').forEach(line => {
             const separatorIndex = line.indexOf(':');
             if (separatorIndex > 0) { // Ensure colon exists and is not the first character
                 const key = line.substring(0, separatorIndex).trim();
                 const value = line.substring(separatorIndex + 1).trim();
 
-                // Skip special values that should be handled separately
-                if (key === 'locationInfo' || key === 'storageInfo' ||
+                // Skip special system fields
+                if (key === 'storage' ||
                     key === 'favorite' || key === 'bookmark' || key === 'star' ||
-                    key === '<object>' || value === '<object>') {
+                    key === '<object>' || value === '<object>' ||
+                    key === 'ap') { // Skip ap key itself
                     return;
                 }
 
                 if (key) { // Ensure key is not empty
                     params[key] = value;
+                    hasValidParams = true;
                 }
             }
         });
-        return params;
+
+        // Return an object with ap array containing our parameters object
+        // This is the format expected by the component storage
+        return { ap: hasValidParams ? [params] : [] };
     },
 
     /**
@@ -115,18 +125,21 @@ window.App.utils.helpers = {
      */
     formatParametersForEdit: (component) => {
         if (!component || typeof component !== 'object') return '';
-        // List of standard fields managed by specific inputs in the form
-        const standardFields = [
-            'id', 'name', 'category', 'type', 'quantity', 'price',
-            'footprint', 'info', 'datasheets', 'image',
-            'customCategory', 'customFootprint', // Include temporary fields if they exist
-            'favorite', 'bookmark', 'star', // Add flag fields
-            'locationInfo', 'storageInfo', // Add location/storage info fields
-            'cells', 'cellId', 'drawerId' // Add drawer-related fields
-        ];
-        return Object.entries(component)
-            // Filter out standard fields and the 'parameters' field itself if it was added incorrectly
-            .filter(([key]) => !standardFields.includes(key) && key !== 'parameters')
+
+        // Extract parameters from ap array
+        let paramEntries = [];
+
+        // Check if ap exists and is a properly structured array
+        if (component.ap && Array.isArray(component.ap) && component.ap.length > 0) {
+            // Take the first object from the ap array
+            const paramObject = component.ap[0];
+            if (paramObject && typeof paramObject === 'object') {
+                paramEntries = Object.entries(paramObject);
+            }
+        }
+
+        // Format the parameter entries as "key: value" lines
+        return paramEntries
             .map(([key, value]) => {
                 // Ensure values are properly formatted as strings
                 if (typeof value === 'object') {
@@ -185,17 +198,17 @@ window.App.utils.helpers = {
     },
 
     /**
-* Sync the cell grid with a resized drawer.
-* - Adds any NEW coordinates that now fit inside the grid.
-* - Removes cells that fall outside the grid *only if they are empty*.
-*   (If they hold components, they stay but get marked `orphan: true` so the
-*    UI can highlight them and you can drag-move the parts later.)
-*
-* @param {Object} drawer   –– the updated drawer (already has new rows/cols)
-* @param {Array}  allCells –– entire cells array from state / storage
-* @param {Array}  components –– components array so we can check occupancy
-* @return {Array}          –– new cells array (ready for setCells + saveCells)
-*/
+     * Sync the cell grid with a resized drawer.
+     * - Adds any NEW coordinates that now fit inside the grid.
+     * - Removes cells that fall outside the grid *only if they are empty*.
+     *   (If they hold components, they stay but get marked `orphan: true` so the
+     *    UI can highlight them and you can drag-move the parts later.)
+     *
+     * @param {Object} drawer   –– the updated drawer (already has new rows/cols)
+     * @param {Array}  allCells –– entire cells array from state / storage
+     * @param {Array}  components –– components array so we can check occupancy
+     * @return {Array}          –– new cells array (ready for setCells + saveCells)
+     */
     syncCellsWithDrawer: function (drawer, allCells, components) {
         // Properly access the grid dimensions from the drawer object
         const rows = drawer.grid?.rows || 3;
@@ -232,14 +245,7 @@ window.App.utils.helpers = {
 
                 // Check if any components are using this cell
                 const occupied = components.some(comp =>
-                    comp.storageInfo &&
-                    (
-                        // Check new format (cells array)
-                        (Array.isArray(comp.storageInfo.cells) &&
-                            comp.storageInfo.cells.includes(cell.id)) ||
-                        // Check old format (single cellId)
-                        comp.storageInfo.cellId === cell.id
-                    )
+                    comp.storage && comp.storage.cells && comp.storage.cells.includes(cellId)
                 );
 
                 if (occupied) {
@@ -270,12 +276,6 @@ window.App.utils.helpers = {
         // Return combined array of kept and new cells
         return [...keep, ...add];
     },
-
-};
-
-window.App.utils.helpers.parseParameters = (text) => {
-    // Use our central sanitization utility
-    return window.App.utils.sanitize.parseParameters(text);
 };
 
 // Modify formatDatasheets to sanitize URLs

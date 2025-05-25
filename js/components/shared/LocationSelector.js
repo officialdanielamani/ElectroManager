@@ -1,38 +1,35 @@
 // js/components/shared/LocationSelector.js
 
-// Ensure the global namespace exists
 window.App = window.App || {};
 window.App.components = window.App.components || {};
 window.App.components.shared = window.App.components.shared || {};
 
 /**
-* LocationSelector - Comprehensive location and storage assignment component
-* Handles location, drawer, and cell selection in a unified interface
-*/
+ * LocationSelector - Comprehensive location and storage assignment component
+ * Updated to use unified storage object
+ */
 window.App.components.shared.LocationSelector = ({
-   // Storage data
-   locationInfo = {},
-   storageInfo = {},
-   locations = [],
-   drawers = [],
-   cells = [],
-   
-   // Event handlers
-   onLocationChange,
-   onStorageChange,
-   
-   // UI configuration
-   showDrawerSelector = true,
-   showLocationDetails = true,
-   readOnly = false,
-   label = "Storage Location",
-   required = false,
-   hideToggle = false,
-   
-   // Advanced options
-   allowMultipleCells = true,
-   showCellGrid = true,
-   expandedByDefault = false
+    // Storage data
+    storage = {},
+    locations = [],
+    drawers = [],
+    cells = [],
+    
+    // Event handlers
+    onStorageChange,
+    
+    // UI configuration
+    showDrawerSelector = true,
+    showLocationDetails = true,
+    readOnly = false,
+    label = "Storage Location",
+    required = false,
+    hideToggle = false,
+    
+    // Advanced options
+    allowMultipleCells = true,
+    showCellGrid = true,
+    expandedByDefault = false
 }) => {
     const { UI } = window.App.utils;
     const { formHelpers } = window.App.utils;
@@ -42,43 +39,34 @@ window.App.components.shared.LocationSelector = ({
     const [showStorageSection, setShowStorageSection] = useState(expandedByDefault);
     const [filteredDrawers, setFilteredDrawers] = useState([]);
     const [filteredCells, setFilteredCells] = useState([]);
-    const [selectedCells, setSelectedCells] = useState(storageInfo.cells || []);
+    const [selectedCells, setSelectedCells] = useState([]);
 
-    // Memoize normalized objects to prevent recreation on every render
-    const normalizedStorageInfo = useMemo(() =>
-        formHelpers.formatStorageInfo(storageInfo),
-        [storageInfo.locationId, storageInfo.drawerId, storageInfo.cells?.length, storageInfo.cells?.join('')]
+    // Memoize normalized storage object to prevent recreation on every render
+    const normalizedStorage = useMemo(() =>
+        formHelpers.formatStorage(storage),
+        [storage.locationId, storage.drawerId, storage.cells?.length, storage.cells?.join(''), storage.details]
     );
 
-    const normalizedLocationInfo = useMemo(() =>
-        formHelpers.formatLocationInfo(locationInfo),
-        [locationInfo.locationId, locationInfo.details]
-    );
-
-    // Memoize handlers to prevent recreation on every render
-    const handleStorageUpdate = useCallback((newStorageInfo) => {
+    // Memoize handler to prevent recreation on every render
+    const handleStorageUpdate = useCallback((updates) => {
         if (onStorageChange) {
-            onStorageChange(newStorageInfo);
+            onStorageChange({
+                ...normalizedStorage,
+                ...updates
+            });
         }
-    }, [onStorageChange]);
+    }, [normalizedStorage, onStorageChange]);
 
-    const handleLocationUpdate = useCallback((newLocationInfo) => {
-        if (onLocationChange) {
-            onLocationChange(newLocationInfo);
-        }
-    }, [onLocationChange]);
-
-    // Update filtered drawers when storage location changes
+    // Update filtered drawers when location changes
     useEffect(() => {
-        if (normalizedStorageInfo.locationId) {
-            const filtered = formHelpers.getFilteredDrawers(normalizedStorageInfo.locationId, drawers);
+        if (normalizedStorage.locationId) {
+            const filtered = formHelpers.getFilteredDrawers(normalizedStorage.locationId, drawers);
             setFilteredDrawers(filtered);
 
             // Reset drawer if it doesn't belong to new location
-            if (normalizedStorageInfo.drawerId &&
-                !filtered.some(drawer => drawer.id === normalizedStorageInfo.drawerId)) {
+            if (normalizedStorage.drawerId &&
+                !filtered.some(drawer => drawer.id === normalizedStorage.drawerId)) {
                 handleStorageUpdate({
-                    ...normalizedStorageInfo,
                     drawerId: '',
                     cells: []
                 });
@@ -87,57 +75,43 @@ window.App.components.shared.LocationSelector = ({
         } else {
             setFilteredDrawers([]);
         }
-    }, [normalizedStorageInfo.locationId, normalizedStorageInfo.drawerId, handleStorageUpdate]);
+    }, [normalizedStorage.locationId, normalizedStorage.drawerId, drawers, handleStorageUpdate]);
 
     // Update filtered cells when drawer changes
     useEffect(() => {
-        if (normalizedStorageInfo.drawerId) {
-            const filtered = formHelpers.getFilteredCells(normalizedStorageInfo.drawerId, cells);
+        if (normalizedStorage.drawerId) {
+            const filtered = formHelpers.getFilteredCells(normalizedStorage.drawerId, cells);
             setFilteredCells(filtered);
         } else {
             setFilteredCells([]);
             setSelectedCells([]);
         }
-    }, [normalizedStorageInfo.drawerId]);
+    }, [normalizedStorage.drawerId, cells]);
 
-    // Sync selected cells with storage info
+    // Sync selected cells with storage
     useEffect(() => {
-        const cells = normalizedStorageInfo.cells || [];
+        const cells = normalizedStorage.cells || [];
         if (JSON.stringify(selectedCells) !== JSON.stringify(cells)) {
             setSelectedCells(cells);
         }
-    }, [normalizedStorageInfo.cells?.length, normalizedStorageInfo.cells?.join(''), selectedCells]);
+    }, [normalizedStorage.cells?.length, normalizedStorage.cells?.join(''), selectedCells]);
 
-    // Handle basic location change
+    // Handle location change
     const handleLocationChange = useCallback((e) => {
-        const { name, value } = e.target;
-        const sanitizedValue = window.App.utils.sanitize.validateAllowedChars(value);
+        const locationId = window.App.utils.sanitize.validateAllowedChars(e.target.value);
+        
+        handleStorageUpdate({
+            locationId: locationId,
+            drawerId: '',  // Reset drawer when location changes
+            cells: []      // Reset cells when location changes
+        });
+    }, [handleStorageUpdate]);
 
-        if (name === 'locationId') {
-            handleLocationUpdate({
-                ...normalizedLocationInfo,
-                locationId: sanitizedValue
-            });
-        } else if (name === 'details') {
-            handleLocationUpdate({
-                ...normalizedLocationInfo,
-                details: sanitizedValue
-            });
-        }
-    }, [normalizedLocationInfo, handleLocationUpdate]);
-
-    // Handle storage location change
-    const handleStorageLocationChange = useCallback((e) => {
-        const { name, value } = e.target;
-        const sanitizedValue = window.App.utils.sanitize.validateAllowedChars(value);
-
-        if (name === 'locationId') {
-            handleStorageUpdate({
-                locationId: sanitizedValue,
-                drawerId: '',
-                cells: []
-            });
-        }
+    // Handle location details change
+    const handleDetailsChange = useCallback((value) => {
+        handleStorageUpdate({
+            details: value
+        });
     }, [handleStorageUpdate]);
 
     // Handle drawer selection
@@ -145,12 +119,11 @@ window.App.components.shared.LocationSelector = ({
         const drawerId = window.App.utils.sanitize.validateAllowedChars(e.target.value);
 
         handleStorageUpdate({
-            ...normalizedStorageInfo,
             drawerId: drawerId,
-            cells: []
+            cells: []  // Reset cells when drawer changes
         });
         setSelectedCells([]);
-    }, [normalizedStorageInfo, handleStorageUpdate]);
+    }, [handleStorageUpdate]);
 
     // Handle cell toggle
     const handleCellToggle = useCallback((cellId) => {
@@ -176,23 +149,14 @@ window.App.components.shared.LocationSelector = ({
 
         setSelectedCells(updatedCells);
         handleStorageUpdate({
-            ...normalizedStorageInfo,
             cells: updatedCells
         });
-    }, [readOnly, filteredCells, allowMultipleCells, selectedCells, normalizedStorageInfo, handleStorageUpdate]);
-
-    // Handle validated input changes
-    const handleLocationDetailsChange = useCallback((value) => {
-        handleLocationUpdate({
-            ...normalizedLocationInfo,
-            details: value
-        });
-    }, [normalizedLocationInfo, handleLocationUpdate]);
+    }, [readOnly, filteredCells, allowMultipleCells, selectedCells, handleStorageUpdate]);
 
     // Find selected drawer for grid display
     const selectedDrawer = useMemo(() =>
-        filteredDrawers.find(d => d.id === normalizedStorageInfo.drawerId),
-        [filteredDrawers, normalizedStorageInfo.drawerId]
+        filteredDrawers.find(d => d.id === normalizedStorage.drawerId),
+        [filteredDrawers, normalizedStorage.drawerId]
     );
 
     return React.createElement('div', {
@@ -203,27 +167,22 @@ window.App.components.shared.LocationSelector = ({
             React.createElement('h3', {
                 className: `text-md font-medium text-${UI.getThemeColors().textSecondary}`
             }, label),
-            !hideToggle && showDrawerSelector && !readOnly && React.createElement('button', {
-                type: "button",
-                className: `text-${UI.getThemeColors().primary} text-sm hover:underline`,
-                onClick: () => setShowStorageSection(!showStorageSection)
-            }, showStorageSection ? "Hide Drawer Selector" : "Show Drawer Selector")
         ),
 
-        // Basic Location Section - Only show if showLocationDetails is true
-        showLocationDetails && React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-4 mb-4" },
+        // Basic Location Section
+        React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-4 mb-4" },
             // Location dropdown
             React.createElement('div', null,
                 React.createElement('label', { htmlFor: "location-select", className: UI.forms.label }, "Location"),
                 readOnly ?
                     React.createElement('div', {
                         className: `p-2 border border-${UI.getThemeColors().border} rounded bg-${UI.getThemeColors().cardBackground}`
-                    }, formHelpers.getLocationName(normalizedLocationInfo.locationId, locations) || "Not assigned") :
+                    }, formHelpers.getLocationName(normalizedStorage.locationId, locations) || "Not assigned") :
                     React.createElement('select', {
                         id: "location-select",
                         name: "locationId",
                         className: UI.forms.select,
-                        value: normalizedLocationInfo.locationId || '',
+                        value: normalizedStorage.locationId || '',
                         onChange: handleLocationChange,
                         required,
                         disabled: readOnly
@@ -236,11 +195,11 @@ window.App.components.shared.LocationSelector = ({
             ),
 
             // Location details
-            React.createElement('div', null,
+            showLocationDetails && React.createElement('div', null,
                 React.createElement(window.App.components.shared.ValidatedInput, {
                     name: "details",
-                    value: normalizedLocationInfo.details || '',
-                    onChange: handleLocationDetailsChange,
+                    value: normalizedStorage.details || '',
+                    onChange: handleDetailsChange,
                     fieldType: "locationDescription",
                     label: "Location Details (Optional)",
                     placeholder: "e.g., Shelf 3, Box A",
@@ -251,38 +210,17 @@ window.App.components.shared.LocationSelector = ({
         ),
 
         // Drawer Storage Section
-        (showStorageSection || readOnly) && showDrawerSelector && React.createElement('div', {
-            className: `border-t border-${UI.getThemeColors().borderLight} pt-4 mt-4`
-        },
-            React.createElement('h4', {
-                className: `text-sm font-medium mb-3 text-${UI.getThemeColors().textSecondary}`
-            }, readOnly ? "Assigned Drawer Storage" : "Drawer Storage Assignment"),
+        (showDrawerSelector && normalizedStorage.locationId) && 
+React.createElement('div', {
+    className: `border-t border-${UI.getThemeColors().borderLight} pt-4 mt-4`
+},
+    React.createElement('h4', {
+        className: `text-sm font-medium mb-3 text-${UI.getThemeColors().textSecondary}`
+    }, readOnly ? "Assigned Drawer Storage" : "Drawer Storage Assignment"),
 
-            // Storage location dropdown
-            React.createElement('div', { className: "mb-3" },
-                React.createElement('label', { htmlFor: "storage-location", className: UI.forms.label },
-                    "Storage Location"),
-                readOnly ?
-                    React.createElement('div', {
-                        className: `p-2 border border-${UI.getThemeColors().border} rounded bg-${UI.getThemeColors().cardBackground}`
-                    }, formHelpers.getLocationName(normalizedStorageInfo.locationId, locations) || "Not assigned") :
-                    React.createElement('select', {
-                        id: "storage-location",
-                        name: "locationId",
-                        className: UI.forms.select,
-                        value: normalizedStorageInfo.locationId || '',
-                        onChange: handleStorageLocationChange,
-                        disabled: readOnly
-                    },
-                        React.createElement('option', { value: "" }, "-- Select storage location --"),
-                        locations.map(loc =>
-                            React.createElement('option', { key: loc.id, value: loc.id }, loc.name)
-                        )
-                    )
-            ),
 
             // Drawer selection
-            normalizedStorageInfo.locationId && React.createElement('div', { className: "mb-3" },
+            React.createElement('div', { className: "mb-3" },
                 React.createElement('label', { htmlFor: "drawer-select", className: UI.forms.label }, "Drawer"),
                 filteredDrawers.length === 0 ?
                     React.createElement('p', {
@@ -291,12 +229,12 @@ window.App.components.shared.LocationSelector = ({
                     readOnly ?
                         React.createElement('div', {
                             className: `p-2 border border-${UI.getThemeColors().border} rounded bg-${UI.getThemeColors().cardBackground}`
-                        }, formHelpers.getDrawerName(normalizedStorageInfo.drawerId, filteredDrawers) || "Not assigned") :
+                        }, formHelpers.getDrawerName(normalizedStorage.drawerId, filteredDrawers) || "Not assigned") :
                         React.createElement('select', {
                             id: "drawer-select",
                             name: "drawerId",
                             className: UI.forms.select,
-                            value: normalizedStorageInfo.drawerId || '',
+                            value: normalizedStorage.drawerId || '',
                             onChange: handleDrawerChange,
                             disabled: readOnly
                         },
@@ -308,7 +246,7 @@ window.App.components.shared.LocationSelector = ({
             ),
 
             // Cell selection
-            normalizedStorageInfo.drawerId && showCellGrid && React.createElement('div', { className: "mb-3" },
+            normalizedStorage.drawerId && showCellGrid && React.createElement('div', { className: "mb-3" },
                 React.createElement('label', { className: UI.forms.label },
                     readOnly ? "Assigned Cell(s)" : "Select Cell(s)"),
                 filteredCells.length === 0 ?
@@ -366,11 +304,11 @@ window.App.components.shared.LocationSelector = ({
             )
         ),
 
-        // Usage hint - FIXED: Changed hideLocationSection to showLocationDetails
+        // Usage hint
         !readOnly && showLocationDetails && React.createElement('p', { className: UI.forms.hint },
             "Specify where this component is physically stored. Location is for general placement, drawer storage is for precise cell-level organization."
         )
     );
 };
 
-console.log("LocationSelector component loaded with comprehensive location and storage management.");
+console.log("LocationSelector component updated with unified storage management.");

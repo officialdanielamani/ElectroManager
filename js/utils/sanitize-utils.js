@@ -223,62 +223,102 @@ window.App.utils.sanitize = {
      * @param {Object} component - The component object to sanitize
      * @returns {Object} - A sanitized copy of the component
      */
-    component: function (component) {
-        if (!component || typeof component !== 'object') {
-            return {};
+ component: function (component) {
+    if (!component || typeof component !== 'object') {
+        return {};
+    }
+
+    const sanitized = { ...component };
+
+    // Process standard string fields
+    if (typeof sanitized.name === 'string') {
+        sanitized.name = this.componentName(sanitized.name);
+    }
+
+    if (typeof sanitized.type === 'string') {
+        sanitized.type = this.componentModel(sanitized.type);
+    }
+
+    if (typeof sanitized.info === 'string') {
+        sanitized.info = this.componentInfo(sanitized.info);
+    }
+
+    if (typeof sanitized.category === 'string') {
+        sanitized.category = this.category(sanitized.category);
+    }
+
+    if (typeof sanitized.footprint === 'string') {
+        sanitized.footprint = this.footprint(sanitized.footprint);
+    }
+
+    // Other string fields
+    const otherStringFields = [
+        'datasheets', 'image', 'customCategory', 'customFootprint'
+    ];
+
+    otherStringFields.forEach(field => {
+        if (typeof sanitized[field] === 'string') {
+            sanitized[field] = this.value(sanitized[field]);
         }
+    });
 
-        const sanitized = { ...component };
+    // NEW: Sanitize unified storage object
+        if (sanitized.storage && typeof sanitized.storage === 'object') {
+        sanitized.storage = this.storage(sanitized.storage);
+    } else {
+        // Initialize with empty storage if missing
+        sanitized.storage = {
+            locationId: '',
+            details: '',
+            drawerId: '',
+            cells: []
+        };
+    }
 
-        // Use specific validators for each field
-        if (typeof sanitized.name === 'string') {
-            sanitized.name = this.componentName(sanitized.name);
-        }
-
-        if (typeof sanitized.type === 'string') {
-            sanitized.type = this.componentModel(sanitized.type);
-        }
-
-        if (typeof sanitized.info === 'string') {
-            sanitized.info = this.componentInfo(sanitized.info);
-        }
-
-        if (typeof sanitized.category === 'string') {
-            sanitized.category = this.category(sanitized.category);
-        }
-
-        if (typeof sanitized.footprint === 'string') {
-            sanitized.footprint = this.footprint(sanitized.footprint);
-        }
-
-        // Other string fields
-        const otherStringFields = [
-            'datasheets', 'image', 'customCategory', 'customFootprint'
-        ];
-
-        otherStringFields.forEach(field => {
-            if (typeof sanitized[field] === 'string') {
-                sanitized[field] = this.value(sanitized[field]);
+    // Preserve the ap (additional parameters) structure
+    if (sanitized.ap && Array.isArray(sanitized.ap)) {
+        sanitized.ap = sanitized.ap.map(paramObj => {
+            if (paramObj && typeof paramObj === 'object') {
+                const cleanParams = {};
+                for (const key in paramObj) {
+                    if (Object.prototype.hasOwnProperty.call(paramObj, key)) {
+                        cleanParams[key] = typeof paramObj[key] === 'string' 
+                            ? this.value(paramObj[key]) 
+                            : paramObj[key];
+                    }
+                }
+                return cleanParams;
             }
+            return {};
         });
+    } else {
+        sanitized.ap = [];
+    }
 
-        // Sanitize nested objects
-        if (sanitized.locationInfo && typeof sanitized.locationInfo === 'object') {
-            sanitized.locationInfo = this.object(sanitized.locationInfo);
-        }
+    return sanitized;
+},
 
-        if (sanitized.storageInfo && typeof sanitized.storageInfo === 'object') {
-            sanitized.storageInfo = this.object(sanitized.storageInfo);
-        }
 
-        // Handle parameters field specially
-        if (typeof sanitized.parameters === 'string') {
-            sanitized.parameters = this.value(sanitized.parameters);
-        }
-
-        return sanitized;
-    },
-
+// Add new storage sanitization function
+storage: function(storage) {
+    if (!storage || typeof storage !== 'object') {
+        return {
+            locationId: '',
+            details: '',
+            drawerId: '',
+            cells: []
+        };
+    }
+    
+    return {
+        locationId: this.value(storage.locationId || ''),
+        details: this.value(storage.details || ''),
+        drawerId: this.value(storage.drawerId || ''),
+        cells: Array.isArray(storage.cells) 
+            ? storage.cells.map(cell => this.value(cell))
+            : []
+    };
+},
     /**
      * Sanitizes a location object
      * @param {Object} location - Location object to sanitize
@@ -369,35 +409,41 @@ window.App.utils.sanitize = {
      * @returns {Object} - Sanitized parameters object
      */
     parseParameters: function (text) {
-        if (!text || typeof text !== 'string') return {};
+        if (!text || typeof text !== 'string') return { ap: [] };
 
-        const params = {};
-        // Just use basic XSS protection without filtering out special characters
-        const sanitizedText = this.value(text);
+    // Create an object to hold key-value pairs
+    const params = {};
+    let hasValidParams = false;
 
-        sanitizedText.split('\n').forEach(line => {
-            const separatorIndex = line.indexOf(':');
-            if (separatorIndex > 0) { // Ensure colon exists and is not the first character
-                // For key, still restrict to safer characters (needs to be a valid object property)
-                const key = this.validateAllowedChars(line.substring(0, separatorIndex).trim());
-                // For value, allow more special characters
-                const value = line.substring(separatorIndex + 1).trim();
+    // Split by lines and process each line
+    text.split('\n').forEach(line => {
+        // Find the first colon (not any colon) to separate key from value
+        const separatorIndex = line.indexOf(':');
+        
+        if (separatorIndex > 0) { // Ensure colon exists and is not the first character
+            const key = line.substring(0, separatorIndex).trim();
+            // Take everything after the first colon as the value (including any other colons)
+            const value = line.substring(separatorIndex + 1).trim();
 
-                // Skip special values that should be handled separately
-                if (key === 'locationInfo' || key === 'storageInfo' ||
-                    key === 'favorite' || key === 'bookmark' || key === 'star' ||
-                    key === '<object>' || value === '<object>') {
-                    return;
-                }
-
-                if (key) { // Ensure key is not empty
-                    params[key] = value;
-                }
+            // Skip special system fields
+            if (key === 'storage' ||
+                key === 'favorite' || key === 'bookmark' || key === 'star' ||
+                key === '<object>' || value === '<object>' ||
+                key === 'ap') { // Skip ap key itself
+                return;
             }
-        });
 
-        return params;
-    },
+            if (key) { // Ensure key is not empty
+                params[key] = value;
+                hasValidParams = true;
+            }
+        }
+    });
+
+    // Return an object with ap array containing our parameters object
+    // This is the format expected by the component storage
+    return { ap: hasValidParams ? [params] : [] };
+},
 
     /**
      * Creates a safe version of react's setState that sanitizes input

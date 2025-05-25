@@ -130,12 +130,11 @@ window.App.components.InventoryView = ({
 
         // Location filter
         const matchesLocation = selectedLocations.length === 0 ||
-            (component.locationInfo && component.locationInfo.locationId &&
-                locations.some(loc =>
-                    selectedLocations.includes(loc.name) &&
-                    loc.id === component.locationInfo.locationId
-                ));
-
+    (component.storage && component.storage.locationId &&
+        locations.some(loc =>
+            selectedLocations.includes(loc.name) &&
+            loc.id === component.storage.locationId
+        ));
         // Footprint filter
         const matchesFootprint = selectedFootprints.length === 0 ||
             (component.footprint && selectedFootprints.includes(component.footprint));
@@ -750,4 +749,4 @@ window.App.components.InventoryView = ({
     );
 };
 
-console.log("InventoryView component loaded with clean direct UI references."); // For debugging
+console.log("InventoryView component loaded."); // For debugging

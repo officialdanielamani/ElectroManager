@@ -128,11 +128,11 @@ window.App.components.LocationManager = ({
     };
 
     // Get components for a specific location
-    const getComponentsForLocation = (locationId) => {
-        return components.filter(comp => 
-            comp.locationInfo && comp.locationInfo.locationId === locationId
-        );
-    };
+   const getComponentsForLocation = (locationId) => {
+    return components.filter(comp => 
+        comp.storage && comp.storage.locationId === locationId
+    );
+};
 
     // Get drawers for a specific location
     const getDrawersForLocation = (locationId) => {

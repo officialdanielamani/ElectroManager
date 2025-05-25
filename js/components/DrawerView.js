@@ -57,19 +57,18 @@ window.App.components.DrawerView = ({
 
     // Get components for a specific cell
     const getComponentsForCell = (cellId) => {
-        if (!cellId) return [];
-        return components.filter(comp => {
-            if (!comp.storageInfo) return false;
-
-            // Check for the new format (cells array)
-            if (comp.storageInfo.cells && Array.isArray(comp.storageInfo.cells)) {
-                return comp.storageInfo.cells.includes(cellId);
-            }
-
-            // Fallback to old format (single cellId)
-            return comp.storageInfo.cellId === cellId;
-        });
-    };
+    if (!cellId) return [];
+    return components.filter(comp => {
+        if (!comp.storage) return false;
+        
+        // Check if cells array includes this cellId
+        if (comp.storage.cells && Array.isArray(comp.storage.cells)) {
+            return comp.storage.cells.includes(cellId);
+        }
+        
+        return false;
+    });
+};
 
     // Handle editing a cell nickname
     const handleEditCellNickname = (cell) => {
@@ -162,19 +161,19 @@ window.App.components.DrawerView = ({
                     // Make a copy of the component to update
                     const updatedComponent = {...updatedComponents[index]};
                     
-                    // Make sure storageInfo exists and is properly formatted
-                    if (!updatedComponent.storageInfo || typeof updatedComponent.storageInfo === 'string') {
-                        updatedComponent.storageInfo = { locationId: '', drawerId: '', cells: [] };
+                    // Make sure storage exists and is properly formatted
+                    if (!updatedComponent.storage || typeof updatedComponent.storage === 'string') {
+                        updatedComponent.storage = { locationId: '', drawerId: '', cells: [] };
                     }
                     
                     // Handle new format (cells array)
-                    if (updatedComponent.storageInfo.cells && Array.isArray(updatedComponent.storageInfo.cells)) {
-                        updatedComponent.storageInfo.cells = updatedComponent.storageInfo.cells.filter(id => id !== sanitizedCellId);
+                    if (updatedComponent.storage.cells && Array.isArray(updatedComponent.storage.cells)) {
+                        updatedComponent.storage.cells = updatedComponent.storage.cells.filter(id => id !== sanitizedCellId);
                     }
                     
                     // Handle legacy format (cellId)
-                    if (updatedComponent.storageInfo.cellId === sanitizedCellId) {
-                        updatedComponent.storageInfo.cellId = '';
+                    if (updatedComponent.storage.cellId === sanitizedCellId) {
+                        updatedComponent.storage.cellId = '';
                     }
                     
                     // Sanitize the updated component
@@ -375,7 +374,7 @@ window.App.components.DrawerView = ({
             ),
             React.createElement('div', { className: `text-sm text-${UI.getThemeColors().textSecondary} mt-1` },
                 React.createElement('span', { className: "font-medium" }, "Total Components: "),
-                components.filter(comp => comp.storageInfo && comp.storageInfo.drawerId === drawer.id).length
+                components.filter(comp => comp.storage && comp.storage.drawerId === drawerId).length
             )
         ),
 

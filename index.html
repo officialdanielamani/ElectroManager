@@ -398,7 +398,6 @@
                 console.log(`Theme applied: ${theme}`);
             }, [theme]);
 
-
             // --- Helper Functions / Callbacks for Child Components ---
             // Get Theme
             const getThemeColors = () => {
@@ -422,49 +421,47 @@
 
             // --- Component CRUD Callbacks ---
             const handleAddComponent = () => {
-                //clearStatusMessages();
                 // Prepare initial data for the form (empty component)
+                // FIXED: Don't generate ID here - let handleSaveComponent do it
                 setEditComponentData({
-                    id: '', name: '', category: '', customCategory: '', type: '', quantity: 0, price: 0,
-                    footprint: '', customFootprint: '', parameters: '', info: '', datasheets: '', image: ''
+                    // Remove the id field completely for new components
+                    name: '',
+                    category: '',
+                    customCategory: '',
+                    type: '',
+                    quantity: 0,
+                    price: 0,
+                    footprint: '',
+                    customFootprint: '',
+                    parameters: '',
+                    info: '',
+                    datasheets: '',
+                    image: '',
+                    storage: { locationId: '', details: '', drawerId: '', cells: [] },
+                    favorite: false,
+                    bookmark: false,
+                    star: false
                 });
                 setShowForm(true);
             };
-
             const handleEditComponent = (componentToEdit) => {
                 //clearStatusMessages();
 
                 // Create a deep copy of the component
                 const cleanComponent = { ...componentToEdit };
-
-                // Ensure locationInfo is a proper object
-                if (!cleanComponent.locationInfo ||
-                    typeof cleanComponent.locationInfo === 'string' ||
-                    cleanComponent.locationInfo === '[object Object]') {
-                    cleanComponent.locationInfo = { locationId: '', details: '' };
+                // Ensure storage is properly formatted
+                if (!cleanComponent.storage || typeof cleanComponent.storage !== 'object') {
+                    cleanComponent.storage = { locationId: '', details: '', drawerId: '', cells: [] };
                 }
 
-                // Ensure storageInfo is a proper object
-                if (!cleanComponent.storageInfo ||
-                    typeof cleanComponent.storageInfo === 'string' ||
-                    cleanComponent.storageInfo === '[object Object]') {
-                    cleanComponent.storageInfo = { locationId: '', drawerId: '', cells: [] };
-                } else {
-                    // Handle partial storageInfo objects that might be missing the cells array
-                    cleanComponent.storageInfo = {
-                        locationId: cleanComponent.storageInfo.locationId || '',
-                        drawerId: cleanComponent.storageInfo.drawerId || '',
-                        cells: Array.isArray(cleanComponent.storageInfo.cells)
-                            ? cleanComponent.storageInfo.cells
-                            : []
-                    };
+                // Ensure storage has all required fields
+                cleanComponent.storage = {
+                    locationId: cleanComponent.storage.locationId || '',
+                    details: cleanComponent.storage.details || '',
+                    drawerId: cleanComponent.storage.drawerId || '',
+                    cells: Array.isArray(cleanComponent.storage.cells) ? cleanComponent.storage.cells : []
+                };
 
-                    // Handle backward compatibility - if cellId exists but cells array doesn't include it
-                    if (cleanComponent.storageInfo.cellId &&
-                        !cleanComponent.storageInfo.cells.includes(cleanComponent.storageInfo.cellId)) {
-                        cleanComponent.storageInfo.cells.push(cleanComponent.storageInfo.cellId);
-                    }
-                }
 
                 // Ensure flag fields exist
                 cleanComponent.favorite = cleanComponent.favorite || false;
@@ -475,24 +472,24 @@
                 const isCustomFootprint = cleanComponent.footprint &&
                     !footprints.includes(cleanComponent.footprint);
 
-                // Prepare data for the form, formatting parameters
+                // Prepare data for the form
                 setEditComponentData({
                     ...cleanComponent,
-                    price: Number(cleanComponent.price) || 0, // Ensure price is number
-                    quantity: Number(cleanComponent.quantity) || 0, // Ensure quantity is number
-                    customCategory: '', // Reset custom field initially
-                    // Set footprint dropdown value and custom input value
+                    customCategory: '',
                     footprint: isCustomFootprint ? '__custom__' : (cleanComponent.footprint || ''),
                     customFootprint: isCustomFootprint ? cleanComponent.footprint : '',
-                    // Format additional parameters for the textarea
                     parameters: helpers.formatParametersForEdit(cleanComponent)
                 });
                 setShowForm(true);
             };
 
-            // Update to handleSaveComponent
+            // In index.html, update your handleSaveComponent function:
+
             const handleSaveComponent = (componentDataFromForm) => {
-                //clearStatusMessages();
+                console.log("=== handleSaveComponent called ===");
+                console.log("componentDataFromForm:", componentDataFromForm);
+                console.log("componentDataFromForm.ap:", componentDataFromForm.ap);
+
                 let categoryToSave = componentDataFromForm.category;
                 let footprintToSave = componentDataFromForm.footprint;
                 let newCategoryAdded = false;
@@ -500,13 +497,19 @@
                 // Handle custom category
                 if (componentDataFromForm.category === '__custom__' && componentDataFromForm.customCategory) {
                     categoryToSave = componentDataFromForm.customCategory.trim();
+                    console.log("Custom category detected:", categoryToSave);
+
                     if (categoryToSave && !categories.includes(categoryToSave)) {
-                        setCategories(prev => [...prev, categoryToSave].sort());
-                        newCategoryAdded = true; // Mark that we might need to revert if save fails
+                        console.log("Adding new category:", categoryToSave);
+                        setCategories(prev => {
+                            const newCategories = [...prev, categoryToSave].sort();
+                            console.log("New categories array:", newCategories);
+                            return newCategories;
+                        });
+                        newCategoryAdded = true;
                     } else if (!categoryToSave) {
-                        // Handle case where custom is selected but input is empty
                         alert("New category name cannot be empty.");
-                        return; // Prevent saving
+                        return;
                     }
                 }
 
@@ -515,94 +518,80 @@
                     footprintToSave = componentDataFromForm.customFootprint.trim();
                     if (!footprintToSave) {
                         alert("Custom footprint name cannot be empty.");
-                        if (newCategoryAdded) setCategories(cats => cats.filter(c => c !== categoryToSave)); // Revert category add if needed
-                        return; // Prevent saving
+                        if (newCategoryAdded) setCategories(cats => cats.filter(c => c !== categoryToSave));
+                        return;
                     }
                 } else if (componentDataFromForm.footprint === '__custom__') {
-                    // Custom selected but input empty - treat as no footprint selected
                     footprintToSave = '';
                 }
 
                 // Basic validation
                 if (!componentDataFromForm.name || !categoryToSave) {
                     alert("Component Name and Category are required.");
-                    // Revert category addition if validation fails
                     if (newCategoryAdded) setCategories(cats => cats.filter(c => c !== categoryToSave));
                     return;
                 }
 
-                // Ensure locationInfo is properly formatted
-                let locationInfo = componentDataFromForm.locationInfo;
-                if (!locationInfo || typeof locationInfo === 'string' || locationInfo === '[object Object]') {
-                    locationInfo = { locationId: '', details: '' };
-                }
+                // FIXED: Determine if this is truly a new component or an edit
+                const isEditing = editComponentData && editComponentData.id &&
+                    components.some(comp => comp.id === editComponentData.id);
 
-                // Process the storage information
-                let storageInfo = componentDataFromForm.storageInfo;
-                if (!storageInfo || typeof storageInfo === 'string' || storageInfo === '[object Object]') {
-                    storageInfo = { locationId: '', drawerId: '', cells: [] };
-                }
-
-                // Ensure we store storage information properly
-                const finalStorageInfo = {
-                    locationId: storageInfo.locationId || '',
-                    drawerId: storageInfo.drawerId || '',
-                    cells: Array.isArray(storageInfo.cells) ? storageInfo.cells : []
-                };
-
-                // For backward compatibility with older components
-                if (storageInfo.cellId && !finalStorageInfo.cells.includes(storageInfo.cellId)) {
-                    finalStorageInfo.cells.push(storageInfo.cellId);
-                }
+                console.log("Is editing existing component?", isEditing);
+                console.log("Original editComponentData:", editComponentData);
 
                 // Prepare the final component object
                 const finalComponent = {
-                    // Core fields
-                    id: componentDataFromForm.id || helpers.generateId(), // Generate ID if new
+                    // FIXED: Only use existing ID if we're actually editing, otherwise generate new
+                    id: isEditing ? editComponentData.id : helpers.generateId(),
                     name: componentDataFromForm.name.trim(),
                     favorite: componentDataFromForm.favorite || false,
                     bookmark: componentDataFromForm.bookmark || false,
                     star: componentDataFromForm.star || false,
                     category: categoryToSave,
-                    type: componentDataFromForm.type.trim(),
+                    type: componentDataFromForm.type ? componentDataFromForm.type.trim() : '',
                     quantity: parseInt(componentDataFromForm.quantity, 10) || 0,
                     price: parseFloat(componentDataFromForm.price) || 0,
                     footprint: footprintToSave,
                     info: (componentDataFromForm.info || '').trim(),
-                    datasheets: componentDataFromForm.datasheets.trim(),
-                    image: componentDataFromForm.image.trim(),
-                    // Add location and storage information
-                    locationInfo: locationInfo,
-                    storageInfo: finalStorageInfo
+                    datasheets: componentDataFromForm.datasheets ? componentDataFromForm.datasheets.trim() : '',
+                    image: componentDataFromForm.image ? componentDataFromForm.image.trim() : '',
+                    // Storage field
+                    storage: componentDataFromForm.storage || { locationId: '', details: '', drawerId: '', cells: [] },
+                    // Add the parsed additional parameters
+                    ap: componentDataFromForm.ap || []
                 };
 
-                // Add additional parameters, but filter out any special fields that might have been incorrectly included
-                const additionalParams = helpers.parseParameters(componentDataFromForm.parameters);
-                // Remove any properties that would conflict with core properties
-                Object.keys(additionalParams).forEach(key => {
-                    if (finalComponent.hasOwnProperty(key)) {
-                        console.warn(`Parameter '${key}' conflicts with a core property and will be ignored.`);
-                        delete additionalParams[key];
-                    }
-                });
-                // Now add the filtered parameters
-                Object.assign(finalComponent, additionalParams);
+                console.log("Final component to save:", finalComponent);
+                console.log("Current components array length:", components.length);
+                console.log("Final component ap field:", finalComponent.ap);
 
                 // Update state: either replace existing or add new
-                if (componentDataFromForm.id) { // Editing existing component
-                    setComponents(prev => prev.map(comp =>
-                        comp.id === componentDataFromForm.id ? finalComponent : comp
-                    ));
+                if (isEditing) { // Editing existing component
+                    console.log("Editing existing component:", finalComponent.id);
+                    setComponents(prev => {
+                        const updated = prev.map(comp =>
+                            comp.id === finalComponent.id ? finalComponent : comp
+                        );
+                        console.log("Updated components array:", updated);
+                        return updated;
+                    });
                 } else { // Adding new component
-                    setComponents(prev => [...prev, finalComponent]);
+                    console.log("Adding new component");
+                    setComponents(prev => {
+                        const newArray = [...prev, finalComponent];
+                        console.log("New components array:", newArray);
+                        console.log("New components array length:", newArray.length);
+                        return newArray;
+                    });
                 }
 
                 // Close form and reset edit state
                 setShowForm(false);
                 setEditComponentData(null);
-                setExportMessage(componentDataFromForm.id ? 'Component updated.' : 'Component added.');
-            };
+                setExportMessage(isEditing ? 'Component updated.' : 'Component added.');
 
+                console.log("=== handleSaveComponent completed ===");
+            };
             const handleDeleteComponent = (idToDelete) => {
                 //clearStatusMessages();
                 if (window.confirm('Are you sure you want to delete this component? This action cannot be undone.')) {
@@ -681,36 +670,46 @@
                 setShowBulkEditForm(true); // Open the bulk edit modal
             };
 
+            // In index.html, replace the handleApplyBulkEdit function with this:
+
             const handleApplyBulkEdit = (bulkEditData) => {
-                //clearStatusMessages();
+                console.log("=== handleApplyBulkEdit called ===");
+                console.log("bulkEditData:", bulkEditData);
+                console.log("selectedComponents:", selectedComponents);
+
+                // Apply bulk edit logic directly here instead of using external function
                 let categoryToApply = bulkEditData.category;
                 let footprintToApply = bulkEditData.footprint;
                 let newCategoryAdded = false;
+                let newCategory = null;
 
                 // Handle custom category from bulk edit
                 if (bulkEditData.category === '__custom__' && bulkEditData.customCategory) {
                     categoryToApply = bulkEditData.customCategory.trim();
                     if (categoryToApply && !categories.includes(categoryToApply)) {
-                        setCategories(prev => [...prev, categoryToApply].sort());
+                        newCategory = categoryToApply;
                         newCategoryAdded = true;
+                        console.log("Adding new category:", newCategory);
                     } else if (!categoryToApply) {
-                        // Don't apply if custom is selected but name is empty
-                        categoryToApply = ''; // Effectively means "keep existing"
+                        categoryToApply = '';
                     }
                 }
 
                 // Handle custom footprint from bulk edit
                 if (bulkEditData.footprint === '__custom__' && bulkEditData.customFootprint) {
                     footprintToApply = bulkEditData.customFootprint.trim();
-                    if (!footprintToApply) footprintToApply = ''; // Treat empty custom as no change
+                    if (!footprintToApply) footprintToApply = '';
                 } else if (bulkEditData.footprint === '__custom__') {
-                    footprintToApply = ''; // Treat empty custom as no change
+                    footprintToApply = '';
                 }
 
-                setComponents(prevComponents => prevComponents.map(comp => {
+                // Apply changes to components
+                const updatedComponents = components.map(comp => {
                     // Apply changes only to selected components
                     if (selectedComponents.includes(comp.id)) {
                         const updates = {};
+
+                        console.log("Updating component:", comp.id);
 
                         // Apply Category (if specified and valid)
                         if (categoryToApply && categoryToApply !== '__custom__') {
@@ -718,7 +717,7 @@
                         }
 
                         // Apply Type (if specified)
-                        if (bulkEditData.type.trim()) {
+                        if (bulkEditData.type && bulkEditData.type.trim()) {
                             updates.type = bulkEditData.type.trim();
                         }
 
@@ -745,7 +744,7 @@
                             const priceChangeValue = parseFloat(bulkEditData.price) || 0;
                             const currentPrice = Number(comp.price) || 0;
                             if (bulkEditData.priceAction === 'set') {
-                                updates.price = Math.max(0, priceChangeValue); // Ensure non-negative
+                                updates.price = Math.max(0, priceChangeValue);
                             } else if (bulkEditData.priceAction === 'increase') {
                                 updates.price = Math.max(0, currentPrice + priceChangeValue);
                             } else if (bulkEditData.priceAction === 'decrease') {
@@ -768,66 +767,52 @@
                             updates.star = bulkEditData.star;
                         }
 
-                        // --- Apply Location Updates ---
-
-                        // Initialize locationInfo if needed
-                        if (!comp.locationInfo || typeof comp.locationInfo === 'string' || comp.locationInfo === '[object Object]') {
-                            comp.locationInfo = { locationId: '', details: '' };
-                        }
-
-                        // Handle location changes
-                        if (bulkEditData.locationAction === 'clear') {
-                            // Clear location information
-                            updates.locationInfo = { locationId: '', details: '' };
-                        } else if (bulkEditData.locationAction === 'set' && bulkEditData.locationId) {
-                            // Set to a new location
-                            updates.locationInfo = {
-                                locationId: bulkEditData.locationId,
-                                details: bulkEditData.locationDetails || ''
-                            };
-                        }
-
-                        // --- Apply Storage/Drawer/Cell Updates ---
-
-                        // Initialize storageInfo if needed
-                        if (!comp.storageInfo || typeof comp.storageInfo === 'string' || comp.storageInfo === '[object Object]') {
-                            comp.storageInfo = { locationId: '', drawerId: '', cells: [] };
-                        } else if (!Array.isArray(comp.storageInfo.cells)) {
-                            comp.storageInfo.cells = [];
-                        }
-
-                        // Handle storage actions
+                        // FIXED: Apply Storage Updates with unified system
                         if (bulkEditData.storageAction === 'clear') {
-                            // Clear drawer assignment
-                            updates.storageInfo = {
-                                locationId: '',
-                                drawerId: '',
-                                cells: []
-                            };
-                        } else if (bulkEditData.storageAction === 'set') {
-                            // Set to new drawer and cells
-                            if (bulkEditData.storageLocationId) {
-                                const newStorageInfo = {
-                                    locationId: bulkEditData.storageLocationId,
-                                    drawerId: bulkEditData.drawerId || '',
-                                    cells: bulkEditData.drawerId ? bulkEditData.selectedCells : []
+                            updates.storage = { locationId: '', details: '', drawerId: '', cells: [] };
+                            console.log("Clearing storage for component:", comp.id);
+                        } else if (bulkEditData.storageAction === 'set' && bulkEditData.storage) {
+                            // Only update if there's actually storage data
+                            if (bulkEditData.storage.locationId || bulkEditData.storage.drawerId) {
+                                updates.storage = {
+                                    locationId: bulkEditData.storage.locationId || '',
+                                    details: bulkEditData.storage.details || '',
+                                    drawerId: bulkEditData.storage.drawerId || '',
+                                    cells: Array.isArray(bulkEditData.storage.cells) ? bulkEditData.storage.cells : []
                                 };
-                                updates.storageInfo = newStorageInfo;
+                                console.log("Setting storage for component:", comp.id, updates.storage);
                             }
                         }
+
+                        console.log("Applied updates:", updates);
 
                         // Return the component with applied updates
                         return { ...comp, ...updates };
                     }
                     // Return unchanged component if not selected
                     return comp;
-                }));
+                });
+
+                console.log("Updated components:", updatedComponents);
+
+                // Update components state
+                setComponents(updatedComponents);
+
+                // If a new category was added, update categories list
+                if (newCategory) {
+                    setCategories(prev => [...prev, newCategory].sort());
+                    console.log("Added new category:", newCategory);
+                }
 
                 // Close the bulk edit form and clear selection
                 setShowBulkEditForm(false);
                 setSelectedComponents([]);
                 setExportMessage(`${selectedComponents.length} component(s) updated.`);
+
+                console.log("=== handleApplyBulkEdit completed ===");
             };
+
+
             const handleBulkDelete = () => {
                 //clearStatusMessages();
                 if (selectedComponents.length === 0) return;
@@ -930,7 +915,7 @@
 
                 // Check if any components are assigned to this drawer
                 const assignedComponents = components.filter(comp =>
-                    comp.storageInfo && comp.storageInfo.drawerId === drawerId
+                    ccomp.storage && comp.storage.drawerId === drawerId
                 );
 
                 // Confirm deletion with warning if components are assigned
@@ -942,11 +927,11 @@
                     // Clear drawer from components if needed
                     if (assignedComponents.length > 0) {
                         setComponents(prev => prev.map(comp => {
-                            if (comp.storageInfo && comp.storageInfo.drawerId === drawerId) {
+                            if (comp.storage && comp.storage.drawerId === drawerId) {
                                 return {
                                     ...comp,
-                                    storageInfo: {
-                                        ...comp.storageInfo,
+                                    storage: {
+                                        ...comp.storage,
                                         drawerId: '',
                                         cellId: ''  // Also clear cell if drawer is deleted
                                     }
@@ -986,7 +971,7 @@
 
                 // Check if any components are assigned to this cell
                 const assignedComponents = components.filter(comp =>
-                    comp.storageInfo && comp.storageInfo.cellId === cellId
+                    comp.storage && comp.storage.cells && comp.storage.cells.includes(cellId)
                 );
 
                 // Confirm deletion with warning if components are assigned
@@ -998,11 +983,11 @@
                     // Clear cell from components if needed
                     if (assignedComponents.length > 0) {
                         setComponents(prev => prev.map(comp => {
-                            if (comp.storageInfo && comp.storageInfo.cellId === cellId) {
+                            if (comp.storage && comp.storage.cells && comp.storage.cells.includes(cellId)) {
                                 return {
                                     ...comp,
-                                    storageInfo: {
-                                        ...comp.storageInfo,
+                                    storage: {
+                                        ...comp.storage,
                                         cellId: ''  // Clear cell but keep drawer
                                     }
                                 };
@@ -1084,7 +1069,7 @@
                     }, "Electro Manager"),
                     React.createElement('h4', {
                         className: `text font mb-6 text-center text-${themeColors.textSecondary}`
-                    }, "an Electronics Inventory System | DANP-EDNA V0.1.7beta"),
+                    }, "an Electronics Inventory System | DANP-EDNA V0.2.5beta"),
                     // Navigation Tabs
                     React.createElement('div', {
                         className: `flex justify-center mb-6 border-b border-${themeColors.border} overflow-x-auto`
@@ -1250,8 +1235,6 @@
                         onCancel: () => { setShowForm(false); setEditComponentData(null); },
                         isEditMode: !!editComponentData?.id
                     }),
-
-                    // Update this code in the render part of index.html where BulkEditForm is used
 
                     showBulkEditForm && React.createElement(BulkEditForm, {
                         categories: categories,

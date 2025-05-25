@@ -159,11 +159,10 @@ window.App.components.DrawerManager = ({
 
     // Get components for a specific drawer (regardless of cell)
     const getComponentsForDrawer = (drawerId) => {
-        return components.filter(comp =>
-            comp.storageInfo &&
-            comp.storageInfo.drawerId === drawerId
-        );
-    };
+    return components.filter(comp =>
+        comp.storage && comp.storage.drawerId === drawerId
+    );
+};
 
     // Filter drawers by location
     const filteredDrawers = selectedLocationId

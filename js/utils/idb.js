@@ -1,290 +1,330 @@
-// js/utils/idb.js - Fixed version for ultra-compact storage
-
+// js/utils/idb.js - Bare minimum implementation
 console.log("Loading idb.js...");
 
+// Create a global namespace if it doesn't exist
 window.App = window.App || {};
 window.App.utils = window.App.utils || {};
 
+// Create a very simple IDB implementation
 window.App.utils.idb = {
   db: null,
   dbName: 'electronicsInventory',
-  dbVersion: 2, // Increased version for new compact format
+  dbVersion: 1, // Increase version number to trigger upgrade
   stores: ['components', 'locations', 'drawers', 'cells', 'categories', 'footprints', 'lowStockConfig'],
 
-  init() {
+  // Initialize the database
+  init: function () {
     console.log("Initializing IndexedDB...");
 
+    // If already initialized, return existing connection
     if (this.db) {
       console.log("DB already initialized");
       return Promise.resolve(true);
     }
 
+    // Check for IndexedDB support
     if (!window.indexedDB) {
-      console.log("IndexedDB not supported");
+      console.log("IndexedDB not supported in this browser");
       return Promise.resolve(false);
     }
 
-    const self = this;
+    var self = this;
 
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(self.dbName, self.dbVersion);
+    // Return a promise for the database connection
+    return new Promise(function (resolve, reject) {
+      try {
+        var request = indexedDB.open(self.dbName, self.dbVersion);
 
-      request.onupgradeneeded = function(event) {
-        console.log(`Upgrading database from version ${event.oldVersion} to ${event.newVersion}`);
-        const db = event.target.result;
+        // Handle database upgrades
+        request.onupgradeneeded = function (event) {
+          console.log("Upgrading database from version", event.oldVersion, "to", event.newVersion);
+          var db = event.target.result;
 
-        // Create stores if they don't exist
-        self.stores.forEach(storeName => {
-          if (!db.objectStoreNames.contains(storeName)) {
-            console.log(`Creating store: ${storeName}`);
-            db.createObjectStore(storeName, { keyPath: 'id' });
-          }
-        });
-      };
-
-      request.onsuccess = function(event) {
-        self.db = event.target.result;
-        console.log("IndexedDB initialized successfully");
-        resolve(true);
-      };
-
-      request.onerror = function(event) {
-        console.error("IndexedDB initialization error:", event.target.error);
-        resolve(false);
-      };
-
-      request.onblocked = function(event) {
-        console.warn("IndexedDB blocked - close other tabs");
-        resolve(false);
-      };
-    });
-  },
-
-  // Generic load method
-  _loadFromStore(storeName) {
-    const self = this;
-
-    return this.init().then(initialized => {
-      if (!initialized || !self.db) {
-        console.log(`IndexedDB not available for loading ${storeName}`);
-        return [];
-      }
-
-      return new Promise((resolve, reject) => {
-        const transaction = self.db.transaction(storeName, 'readonly');
-        const store = transaction.objectStore(storeName);
-        const request = store.getAll();
-
-        request.onsuccess = function() {
-          const result = request.result || [];
-          console.log(`Loaded ${result.length} items from ${storeName}:`, result);
-
-          // Handle special stores
-          if (storeName === 'categories' || storeName === 'footprints') {
-            const names = result.map(item => item.name).filter(Boolean);
-            console.log(`Converted ${storeName} to names:`, names);
-            resolve(names);
-          } else {
-            resolve(result);
-          }
-        };
-
-        request.onerror = function(event) {
-          console.error(`Error loading from ${storeName}:`, event.target.error);
-          resolve([]);
-        };
-
-        transaction.onerror = function(event) {
-          console.error(`Transaction error loading ${storeName}:`, event.target.error);
-          resolve([]);
-        };
-      });
-    });
-  },
-
-  // Generic save method
-  _saveToStore(storeName, items) {
-    const self = this;
-
-    return this.init().then(initialized => {
-      if (!initialized || !self.db) {
-        console.log(`IndexedDB not available for saving ${storeName}`);
-        return false;
-      }
-
-      if (!Array.isArray(items)) {
-        console.error(`Items must be an array for ${storeName}`);
-        return false;
-      }
-
-      console.log(`Saving ${items.length} items to ${storeName}:`, items);
-
-      return new Promise((resolve, reject) => {
-        const transaction = self.db.transaction(storeName, 'readwrite');
-        const store = transaction.objectStore(storeName);
-
-        // Clear existing data first
-        const clearRequest = store.clear();
-
-        clearRequest.onsuccess = function() {
-          console.log(`Cleared ${storeName}, now adding ${items.length} items`);
-          
-          // Add all items
-          let addedCount = 0;
-          const errors = [];
-
-          if (items.length === 0) {
-            resolve(true);
-            return;
-          }
-
-          items.forEach((item, index) => {
-            // Handle compact format - components have 'i' instead of 'id'
-            let processedItem = item;
-            
-            // For components store, if item has 'i' but no 'id', create a proper keyPath
-            if (storeName === 'components' && item.i && !item.id) {
-              processedItem = { ...item, id: item.i };
+          // Create object stores if they don't exist
+          self.stores.forEach(function (storeName) {
+            if (!db.objectStoreNames.contains(storeName)) {
+              console.log("Creating store:", storeName);
+              db.createObjectStore(storeName, { keyPath: 'id' });
             }
-            
-            if (!processedItem || (typeof processedItem === 'object' && !processedItem.id && storeName !== 'categories' && storeName !== 'footprints')) {
-              console.warn(`Skipping invalid item at index ${index}:`, item);
-              addedCount++;
-              checkComplete();
-              return;
-            }
-
-            const addRequest = store.put(processedItem);
-            
-            addRequest.onsuccess = function() {
-              addedCount++;
-              checkComplete();
-            };
-
-            addRequest.onerror = function(event) {
-              console.error(`Error adding item to ${storeName}:`, event.target.error, processedItem);
-              errors.push(event.target.error);
-              addedCount++;
-              checkComplete();
-            };
           });
-
-          function checkComplete() {
-            if (addedCount === items.length) {
-              if (errors.length > 0) {
-                console.warn(`Completed ${storeName} save with ${errors.length} errors`);
-              } else {
-                console.log(`Successfully saved ${items.length} items to ${storeName}`);
-              }
-              resolve(errors.length === 0);
-            }
-          }
         };
 
-        clearRequest.onerror = function(event) {
-          console.error(`Error clearing ${storeName}:`, event.target.error);
-          resolve(false);
-        };
-
-        transaction.onerror = function(event) {
-          console.error(`Transaction error saving ${storeName}:`, event.target.error);
-          resolve(false);
-        };
-      });
-    });
-  },
-
-  // Public API methods
-  loadComponents() { return this._loadFromStore('components'); },
-  saveComponents(components) { return this._saveToStore('components', components); },
-
-  loadLocations() { return this._loadFromStore('locations'); },
-  saveLocations(locations) { return this._saveToStore('locations', locations); },
-
-  loadDrawers() { return this._loadFromStore('drawers'); },
-  saveDrawers(drawers) { return this._saveToStore('drawers', drawers); },
-
-  loadCells() { return this._loadFromStore('cells'); },
-  saveCells(cells) { return this._saveToStore('cells', cells); },
-
-  loadCategories() { return this._loadFromStore('categories'); },
-  saveCategories(categories) {
-    // Convert array of strings to objects with id and name
-    const categoryObjects = categories.map((name, index) => ({
-      id: `cat-${index}`,
-      name: name
-    }));
-    return this._saveToStore('categories', categoryObjects);
-  },
-
-  loadFootprints() { return this._loadFromStore('footprints'); },
-  saveFootprints(footprints) {
-    // Convert array of strings to objects with id and name
-    const footprintObjects = footprints.map((name, index) => ({
-      id: `fp-${index}`,
-      name: name
-    }));
-    return this._saveToStore('footprints', footprintObjects);
-  },
-
-  loadLowStockConfig() {
-    return this._loadFromStore('lowStockConfig').then(configItems => {
-      // Convert array back to config object
-      const config = {};
-      configItems.forEach(item => {
-        if (item.category && item.threshold !== undefined) {
-          config[item.category] = item.threshold;
-        }
-      });
-      return config;
-    });
-  },
-
-  saveLowStockConfig(config) {
-    // Convert config object to array
-    const configArray = Object.entries(config).map(([category, threshold]) => ({
-      id: `lowstock-${category.replace(/[^a-zA-Z0-9-_]/g, '_')}`,
-      category,
-      threshold
-    }));
-    return this._saveToStore('lowStockConfig', configArray);
-  },
-
-  // Clear single store
-  clearStore(storeName) {
-    const self = this;
-
-    return this.init().then(initialized => {
-      if (!initialized || !self.db) {
-        console.log(`IndexedDB not available for clearing ${storeName}`);
-        return false;
-      }
-
-      return new Promise((resolve, reject) => {
-        const transaction = self.db.transaction(storeName, 'readwrite');
-        const store = transaction.objectStore(storeName);
-        const request = store.clear();
-
-        transaction.oncomplete = function() {
-          console.log(`Cleared ${storeName}`);
+        // Handle successful connection
+        request.onsuccess = function (event) {
+          self.db = event.target.result;
+          console.log("IndexedDB initialized successfully");
           resolve(true);
         };
 
-        transaction.onerror = function(event) {
-          console.error(`Error clearing ${storeName}:`, event.target.error);
+        // Handle connection errors
+        request.onerror = function (event) {
+          console.error("IndexedDB initialization error:", event.target.error);
           resolve(false);
         };
-      });
+      } catch (err) {
+        console.error("Error in IndexedDB initialization:", err);
+        resolve(false);
+      }
     });
   },
 
+  // Load components from IndexedDB
+  loadComponents: function () {
+    return this._loadFromStore('components');
+  },
+
+  // Save components to IndexedDB
+  saveComponents: function (components) {
+    return this._saveToStore('components', components);
+  },
+
+  // Load locations from IndexedDB
+  loadLocations: function () {
+    return this._loadFromStore('locations');
+  },
+
+  // Save locations to IndexedDB
+  saveLocations: function (locations) {
+    return this._saveToStore('locations', locations);
+  },
+
+  // Load drawers from IndexedDB
+  loadDrawers: function () {
+    return this._loadFromStore('drawers');
+  },
+
+  // Save drawers to IndexedDB
+  saveDrawers: function (drawers) {
+    return this._saveToStore('drawers', drawers);
+  },
+
+  // Load cells from IndexedDB
+  loadCells: function () {
+    return this._loadFromStore('cells');
+  },
+
+  // Save cells to IndexedDB
+  saveCells: function (cells) {
+    return this._saveToStore('cells', cells);
+  },
+
+  // Load categories from IndexedDB
+  loadCategories: function () {
+    return this._loadFromStore('categories');
+  },
+
+
+  // Save categories to IndexedDB
+  saveCategories: function (categories) {
+    // Convert array of strings to array of objects with id property
+    var categoryObjects = Array.isArray(categories) ? categories.map(function (name, index) {
+      return { id: 'cat-' + index, name: name };
+    }) : [];
+
+    return this._saveToStore('categories', categoryObjects);
+  },
+
+
+  loadLowStockConfig: function () {
+    return this._loadFromStore('lowStockConfig')
+      .then(function (configItems) {
+        // Convert array of items to configuration object
+        var config = {};
+        if (configItems && configItems.length > 0) {
+          configItems.forEach(function (item) {
+            if (item.category && item.threshold !== undefined) {
+              config[item.category] = item.threshold;
+            }
+          });
+        }
+        return config;
+      });
+  },
+
+  saveLowStockConfig: function (config) {
+    // Convert object to array of entries with IDs for IndexedDB
+    var configArray = [];
+
+    for (var category in config) {
+      if (config.hasOwnProperty(category) && category) {
+        configArray.push({
+          id: 'lowstock-' + category.replace(/[^a-zA-Z0-9-_]/g, '_'),  // Create a unique ID for each entry
+          category: category,
+          threshold: config[category]
+        });
+      }
+    }
+
+    return this._saveToStore('lowStockConfig', configArray);
+  },
+
+
+  // Load footprints from IndexedDB
+  loadFootprints: function () {
+    return this._loadFromStore('footprints');
+  },
+
+  // Save footprints to IndexedDB
+  saveFootprints: function (footprints) {
+    // Convert array of strings to array of objects with id property
+    var footprintObjects = Array.isArray(footprints) ? footprints.map(function (name, index) {
+      return { id: 'fp-' + index, name: name };
+    }) : [];
+
+    return this._saveToStore('footprints', footprintObjects);
+  },
+
+  // Generic method to load data from a store
+  _loadFromStore: function (storeName) {
+    var self = this;
+
+    // Make sure DB is initialized
+    return this.init()
+      .then(function (initialized) {
+        if (!initialized || !self.db) {
+          console.log("IndexedDB not available for loading", storeName);
+          return Promise.resolve([]);
+        }
+
+        return new Promise(function (resolve, reject) {
+          try {
+            var transaction = self.db.transaction(storeName, 'readonly');
+            var store = transaction.objectStore(storeName);
+            var request = store.getAll();
+
+            request.onsuccess = function () {
+              console.log("Loaded", request.result.length, "items from", storeName);
+
+              // For categories and footprints, convert objects to strings array
+              if (storeName === 'categories' || storeName === 'footprints') {
+                var result = request.result.map(function (item) {
+                  return item.name;
+                });
+                resolve(result);
+              } else {
+                resolve(request.result);
+              }
+            };
+
+            request.onerror = function (event) {
+              console.error("Error loading from", storeName, event.target.error);
+              resolve([]);
+            };
+
+            transaction.onerror = function (event) {
+              console.error("Transaction error when loading", storeName, event.target.error);
+              resolve([]);
+            };
+          } catch (err) {
+            console.error("Error in _loadFromStore for", storeName, err);
+            resolve([]);
+          }
+        });
+      });
+  },
+
+  // Generic method to save data to a store
+  _saveToStore: function (storeName, items) {
+    var self = this;
+
+    // Make sure DB is initialized
+    return this.init()
+      .then(function (initialized) {
+        if (!initialized || !self.db) {
+          console.log("IndexedDB not available for saving", storeName);
+          return Promise.resolve(false);
+        }
+
+        if (!Array.isArray(items)) {
+          console.error("Items must be an array for", storeName);
+          return Promise.resolve(false);
+        }
+
+        return new Promise(function (resolve, reject) {
+          try {
+            var transaction = self.db.transaction(storeName, 'readwrite');
+            var store = transaction.objectStore(storeName);
+
+            // Clear existing items
+            var clearRequest = store.clear();
+
+            clearRequest.onsuccess = function () {
+              // Add all items
+              items.forEach(function (item) {
+                if (item && (item.id || storeName === 'categories' || storeName === 'footprints')) {
+                  store.put(item);
+                }
+              });
+            };
+
+            transaction.oncomplete = function () {
+              console.log("Saved", items.length, "items to", storeName);
+              resolve(true);
+            };
+
+            transaction.onerror = function (event) {
+              console.error("Transaction error when saving", storeName, event.target.error);
+              resolve(false);
+            };
+          } catch (err) {
+            console.error("Error in _saveToStore for", storeName, err);
+            resolve(false);
+          }
+        });
+      });
+  },
+
+  // Clear all data from a store
+  clearStore: function (storeName) {
+    var self = this;
+
+    // Make sure DB is initialized
+    return this.init()
+      .then(function (initialized) {
+        if (!initialized || !self.db) {
+          console.log("IndexedDB not available for clearing", storeName);
+          return Promise.resolve(false);
+        }
+
+        return new Promise(function (resolve, reject) {
+          try {
+            var transaction = self.db.transaction(storeName, 'readwrite');
+            var store = transaction.objectStore(storeName);
+            var request = store.clear();
+
+            transaction.oncomplete = function () {
+              console.log("Cleared", storeName);
+              resolve(true);
+            };
+
+            transaction.onerror = function (event) {
+              console.error("Error clearing", storeName, event.target.error);
+              resolve(false);
+            };
+          } catch (err) {
+            console.error("Error in clearStore for", storeName, err);
+            resolve(false);
+          }
+        });
+      });
+  },
+
   // Clear all stores
-  clearAll() {
-    const promises = this.stores.map(storeName => this.clearStore(storeName));
-    return Promise.all(promises).then(results => 
-      results.every(result => result === true)
-    );
+  clearAll: function () {
+    var self = this;
+    var promises = [];
+
+    // Clear each store
+    this.stores.forEach(function (storeName) {
+      promises.push(self.clearStore(storeName));
+    });
+
+    // Return a promise that resolves when all stores are cleared
+    return Promise.all(promises)
+      .then(function (results) {
+        return results.every(function (result) { return result; });
+      });
   }
 };
 
-console.log("idb.js loaded successfully with enhanced logging");
+console.log("idb.js loaded successfully");

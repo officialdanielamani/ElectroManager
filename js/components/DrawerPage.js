@@ -46,7 +46,7 @@ window.App.components.DrawerPage = ({
     const handleDeleteDrawer = (drawerId) => {
         // Check if any components are assigned to this drawer
         const assignedComponents = components.filter(comp => 
-            comp.storageInfo && comp.storageInfo.drawerId === drawerId
+            comp.storage && comp.storage.drawerId === drawerId
         );
 
         // Confirm deletion with warning if components are assigned
@@ -66,7 +66,7 @@ window.App.components.DrawerPage = ({
     const handleDeleteCell = (cellId) => {
         // Check if any components are assigned to this cell
         const assignedComponents = components.filter(comp => 
-            comp.storageInfo && comp.storageInfo.cellId === cellId
+            comp.storage && comp.storage.cells && comp.storage.cells.includes(cellId)
         );
 
         // Confirm deletion with warning if components are assigned
