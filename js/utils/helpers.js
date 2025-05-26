@@ -296,4 +296,4 @@ window.App.utils.helpers.generateId = () => {
     return window.App.utils.sanitize.value(id);
 };
 
-console.log("InventoryHelpers loaded."); // For debugging
+console.log("helpers loaded."); // For debugging

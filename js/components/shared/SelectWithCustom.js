@@ -173,4 +173,4 @@ window.App.components.shared.SelectWithCustom = ({
     );
 };
 
-console.log("SelectWithCustom component loaded with integration to ValidatedInput.");
+console.log("SelectWithCustom loaded");

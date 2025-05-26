@@ -201,7 +201,7 @@ const handleSubmit = (e) => {
 
         try {
 
-                        // DEBUG: Add logging for parameter parsing
+                // DEBUG: Add logging for parameter parsing
             console.log("=== Parameter Parsing Debug ===");
             console.log("Raw parameters text:", formData.parameters);
             console.log("Parameters text type:", typeof formData.parameters);
@@ -357,7 +357,7 @@ const handleSubmit = (e) => {
                                 label: "Type / Model",
                                 placeholder: "e.g., Resistor, LM7805",
                                 readOnly: isViewOnly,
-                                hint: "Component Type/Model . A-Z a-z 0-9 . , - _"
+                                hint: "Component Type/Model . (A-Z a-z 0-9 . , - _ space @ /)"
                             })
                         ),
 
@@ -672,4 +672,4 @@ const handleSubmit = (e) => {
     );
 }; // End ComponentForm
 
-console.log("ComponentForm component loaded with separated location and drawer selector modes.");
+console.log("ComponentForm loaded");

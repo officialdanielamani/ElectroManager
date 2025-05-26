@@ -738,4 +738,4 @@ window.App.utils.storage = {
     }
 };
 
-console.log("storage.js loaded successfully with unified backup and restore functionality");
+console.log("storage.js loaded");

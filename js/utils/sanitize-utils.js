@@ -32,7 +32,7 @@ window.App.utils.sanitize = {
     },
 
     // Add regex pattern for allowed characters: A-Z, a-z, 0-9, comma, dot, dash, underscore, space
-    ALLOWED_CHARS_PATTERN: /^[A-Za-z0-9,.\-_ ]*$/,
+    ALLOWED_CHARS_PATTERN: /^[A-Za-z0-9,.\-_@\/ ]*$/,
 
     /**
      * Sanitizes a string value using DOMPurify

@@ -401,4 +401,4 @@ window.App.utils.formHelpers = {
     }
 };
 
-console.log("Form helpers updated with unified storage system.");
+console.log("Form Helpers loaded");

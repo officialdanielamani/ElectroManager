@@ -57,18 +57,18 @@ window.App.components.DrawerView = ({
 
     // Get components for a specific cell
     const getComponentsForCell = (cellId) => {
-    if (!cellId) return [];
-    return components.filter(comp => {
-        if (!comp.storage) return false;
-        
-        // Check if cells array includes this cellId
-        if (comp.storage.cells && Array.isArray(comp.storage.cells)) {
-            return comp.storage.cells.includes(cellId);
-        }
-        
-        return false;
-    });
-};
+        if (!cellId) return [];
+        return components.filter(comp => {
+            if (!comp.storage) return false;
+            
+            // Check if cells array includes this cellId
+            if (comp.storage.cells && Array.isArray(comp.storage.cells)) {
+                return comp.storage.cells.includes(cellId);
+            }
+            
+            return false;
+        });
+    };
 
     // Handle editing a cell nickname
     const handleEditCellNickname = (cell) => {
@@ -374,7 +374,7 @@ window.App.components.DrawerView = ({
             ),
             React.createElement('div', { className: `text-sm text-${UI.getThemeColors().textSecondary} mt-1` },
                 React.createElement('span', { className: "font-medium" }, "Total Components: "),
-                components.filter(comp => comp.storage && comp.storage.drawerId === drawerId).length
+                components.filter(comp => comp.storage && comp.storage.drawerId === drawer.id).length
             )
         ),
 
@@ -454,4 +454,4 @@ window.App.components.DrawerView = ({
     );
 };
 
-console.log("DrawerView component loaded with theme-aware styling."); // For debugging
+console.log("DrawerView loaded"); // For debugging

@@ -45,3 +45,4 @@ window.App.components.ThemeSwitcher = ({ currentTheme, onThemeChange }) => {
         )})
       )
     )};
+console.log("ThemeSwitcher loaded");

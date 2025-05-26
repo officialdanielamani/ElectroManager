@@ -778,4 +778,4 @@ window.App.components.AdvancedFilters = ({
     );
 };
 
-console.log("AdvancedFilters done load.");
+console.log("AdvancedFilters loaded");

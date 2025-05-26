@@ -191,7 +191,7 @@ window.App.components.LocationManager = ({
                             required: true
                         }),
                         React.createElement('p', { className: UI.forms.hint },
-                            `Location name. A-Z a-z 0-9 . , - _ (max ${window.App.utils.sanitize.LIMITS.LOCATION_NAME} chars)`
+                            `Location name. (A-Z a-z 0-9 . , - _ space @ /) (max ${window.App.utils.sanitize.LIMITS.LOCATION_NAME} chars)`
                         ),
                         // Character counter
                         React.createElement('div', {
@@ -220,7 +220,7 @@ window.App.components.LocationManager = ({
                             className: UI.forms.input
                         }),
                         React.createElement('p', { className: UI.forms.hint },
-                            `Location description. A-Z a-z 0-9 . , - _ (max ${window.App.utils.sanitize.LIMITS.LOCATION_DESCRIPTION} chars)`
+                            `Location description. (A-Z a-z 0-9 . , - _ space @ /) (max ${window.App.utils.sanitize.LIMITS.LOCATION_DESCRIPTION} chars)`
                         ),
                         // Character counter
                         React.createElement('div', {
@@ -429,4 +429,4 @@ window.App.components.LocationManager = ({
     );
 };
 
-console.log("LocationManager component loaded with input sanitization!"); // For debugging
+console.log("LocationManager loaded"); // For debugging

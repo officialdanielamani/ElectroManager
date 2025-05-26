@@ -14,8 +14,8 @@
 -->
     </script>
 
-    <script src="js/utils/sanitize-utils.js"></script>
     <script src="js/utils/ui-constants.js"></script>
+    <script src="js/utils/sanitize-utils.js"></script>
     <script src="js/utils/helpers.js"></script>
     <script src="js/utils/idb.js"></script>
     <script src="js/utils/storage.js"></script>
@@ -106,7 +106,6 @@
                         console.log("Storage system initialized");
 
                         // Load all data from IndexedDB
-                        // Load all data from IndexedDB
                         Promise.all([
                             storage.loadComponents(),
                             storage.loadLocations(),
@@ -126,16 +125,6 @@
                                     loadedFootprints,
                                     loadedLowStockConfig
                                 ] = results;
-
-                                console.log("Loaded all data:", {
-                                    components: loadedComponents.length,
-                                    locations: loadedLocations.length,
-                                    drawers: loadedDrawers.length,
-                                    cells: loadedCells.length,
-                                    categories: loadedCategories.length,
-                                    footprints: loadedFootprints.length,
-                                    lowStockConfig: Object.keys(loadedLowStockConfig).length + " categories"
-                                });
 
                                 // Set state - THIS WAS MISSING!
                                 setComponents(loadedComponents);
@@ -159,13 +148,6 @@
                             });
                     });
             }, []);// Only run once
-
-            setTimeout(() => {
-                console.log("=== FINAL STATE CHECK ===");
-                console.log("Components:", components.length);
-                console.log("Locations:", locations.length);
-                console.log("Categories:", categories.length);
-            }, 100);
 
             // --- FOR COMPONENTS ---
             useEffect(() => {

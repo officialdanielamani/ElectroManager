@@ -500,4 +500,4 @@ window.App.components.DrawerManager = ({
     );
 };
 
-console.log("DrawerManager component loaded with theme-aware styling."); // For debugging
+console.log("DrawerManager loaded"); // For debugging

@@ -133,4 +133,4 @@ window.App.components.DrawerPage = ({
     );
 };
 
-console.log("DrawerPage component loaded with theme-aware styling."); // For debugging
+console.log("DrawerPage loaded"); // For debugging

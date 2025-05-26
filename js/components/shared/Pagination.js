@@ -208,4 +208,4 @@ window.App.components.shared.Pagination = ({
    );
 };
 
-console.log("Pagination component loaded with comprehensive pagination controls.");
+console.log("Pagination loaded");

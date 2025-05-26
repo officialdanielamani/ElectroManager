@@ -268,7 +268,7 @@ window.App.components.FootprintManager = ({
                     }, "Add")
                 ),
                 React.createElement('p', { className: UI.forms.hint },
-                    "Footprint name (A-Z a-z 0-9 . , - _ space) - Max 32 characters"
+                    "Footprint name (A-Z a-z 0-9 . , - _ space @ /) - Max 32 characters"
                 )
             ),
 
@@ -370,4 +370,4 @@ window.App.components.FootprintManager = ({
     );
 };
 
-console.log("FootprintManager component loaded with enhanced input sanitization!");
+console.log("FootprintManager loaded");

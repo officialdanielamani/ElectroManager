@@ -319,4 +319,4 @@ window.App.components.shared.ValidatedInput = ({
     );
 };
 
-console.log("ValidatedInput component loaded with comprehensive validation support.");
+console.log("ValidatedInput loaded");

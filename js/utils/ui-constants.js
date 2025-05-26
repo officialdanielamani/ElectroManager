@@ -35,6 +35,8 @@ window.App.utils.UI = {
                 background: 'gray-100',
                 cardBackground: 'white',
                 headerBackground: 'white',
+                tableHeaderBackground: 'white', // or maybe 'purple-900' for stylization
+                tableCellBackground: 'grey',  
 
                 // Borders
                 border: 'gray-200',
@@ -73,6 +75,8 @@ window.App.utils.UI = {
                 background: 'gray-900',
                 cardBackground: 'gray-800',
                 headerBackground: 'gray-800',
+                tableHeaderBackground: 'gray-800', 
+                tableCellBackground: 'gray-800',  
 
                 // Borders
                 border: 'gray-700',
@@ -91,8 +95,7 @@ window.App.utils.UI = {
 
     // Current theme (default to light)
     currentTheme: 'light',
-
-    // NEW HELPER: Get a style with fallback
+    
     getStyle: function (path, defaultValue = '') {
         // Handle direct paths like 'typography.small'
         if (typeof path === 'string') {
@@ -246,6 +249,8 @@ window.App.utils.UI = {
                 }
             },
 
+            
+
             // Cards styling
             cards: {
                 container: `bg-${colors.cardBackground} rounded-lg shadow border border-${colors.border} hover:shadow-md transition-shadow duration-150`,
@@ -298,9 +303,9 @@ window.App.utils.UI = {
                 },
                 body: {
                     // Updated row styling with proper theme background colors and selection highlighting
-                    row: `hover:bg-${colors.background} border-b border-${colors.borderLight} bg-${colors.cardBackground}`,
+                    row: `hover:bg-${colors.background} border-b border-${colors.borderLight} bg-${colors.tableCellBackground}`,
                     rowSelected: `bg-${colors.primary.replace('500', '50').replace('400', '950')} hover:bg-${colors.primary.replace('500', '100').replace('400', '900')} border-b border-${colors.borderLight}`,
-                    cell: `px-4 py-2 whitespace-nowrap text-${colors.textSecondary}`,
+                    cell: `px-4 py-2 whitespace-nowrap text-${colors.textSecondary} bg-${colors.tableCellBackground}`,
                     cellAction: `px-4 py-2 whitespace-nowrap text-center text-sm font-medium`
                 },
             },
@@ -491,4 +496,4 @@ if (document.readyState === 'loading') {
     window.App.utils.UI.initialize();
 }
 
-console.log("UI constants loaded with improved theme support.");
+console.log("UI constants loaded");

@@ -311,4 +311,4 @@ React.createElement('div', {
     );
 };
 
-console.log("LocationSelector component updated with unified storage management.");
+console.log("LocationSelector loaded");

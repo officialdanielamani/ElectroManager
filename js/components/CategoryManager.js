@@ -393,4 +393,4 @@ window.App.components.CategoryManager = ({
     );
 };
 
-console.log("CategoryManager component loaded with enhanced input sanitization!");
+console.log("CategoryManager loaded");

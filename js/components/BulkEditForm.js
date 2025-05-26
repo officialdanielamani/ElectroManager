@@ -592,3 +592,5 @@ window.App.components.BulkEditForm = ({
         ) // End Modal Backdrop
     );
 };
+
+console.log("BulkEditForm loaded");

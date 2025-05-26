@@ -164,10 +164,6 @@ window.App.components.SettingsView = ({
             });
     };
 
-    // --- Category Management Functions ---
-
-    // --- Footprint Management Functions ---
-
     // --- Low Stock Configuration Functions ---
     const handleLowStockCategoryChange = (e) => {
         const category = e.target.value;
@@ -623,4 +619,4 @@ window.App.components.SettingsView = ({
     )
 };
 
-console.log("SettingsView component fully refactored and loaded!");
+console.log("SettingsView loaded");

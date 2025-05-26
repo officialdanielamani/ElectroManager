@@ -14,13 +14,6 @@ window.App.utils.idb = {
 
   // Initialize the database
   init: function () {
-    console.log("Initializing IndexedDB...");
-
-    // If already initialized, return existing connection
-    if (this.db) {
-      console.log("DB already initialized");
-      return Promise.resolve(true);
-    }
 
     // Check for IndexedDB support
     if (!window.indexedDB) {
@@ -52,7 +45,6 @@ window.App.utils.idb = {
         // Handle successful connection
         request.onsuccess = function (event) {
           self.db = event.target.result;
-          console.log("IndexedDB initialized successfully");
           resolve(true);
         };
 
@@ -327,4 +319,4 @@ window.App.utils.idb = {
   }
 };
 
-console.log("idb.js loaded successfully");
+console.log("idb loaded");
