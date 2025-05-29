@@ -12,90 +12,106 @@ window.App.utils.UI = {
     // Theme definitions
     themes: {
         // ─── LIGHT MODE ────────────────────────────────────────────────
-        light: {
-            name: 'Light',
-            colors: {
-                // Core theme colors
-                primary: 'blue-500',
-                primaryHover: 'blue-600',
-                secondary: 'gray-300',
-                secondaryHover: 'gray-400',
-                danger: 'red-500',
-                dangerHover: 'red-600',
-                success: 'green-500',
-                successHover: 'green-600',
-                warning: 'yellow-500',
-                warningHover: 'yellow-600',
-                info: 'indigo-500',
-                infoHover: 'indigo-600',
-                accent: 'purple-500',
-                accentHover: 'purple-600',
-
-                // Page & component backgrounds
-                background: 'gray-100',
-                cardBackground: 'white',
-                headerBackground: 'white',
-                tableHeaderBackground: 'white', // or maybe 'purple-900' for stylization
-                tableCellBackground: 'grey',  
-
-                // Borders
-                border: 'gray-200',
-                borderLight: 'gray-100',
-                borderDark: 'gray-300',
-
-                // Text colors
-                textPrimary: 'gray-900',
-                textSecondary: 'gray-700',
-                textMuted: 'gray-500',
-                textLight: 'white'
-            }
-        },
+light: {
+    name: 'Light',
+    colors: {
+        // Core theme colors
+        primary: 'blue-500',
+        primaryHover: 'blue-600',
+        secondary: 'gray-300',
+        secondaryHover: 'gray-400',
+        danger: 'red-500',
+        dangerHover: 'red-600',
+        success: 'green-500',
+        successHover: 'green-600',
+        warning: 'yellow-500',
+        warningHover: 'yellow-600',
+        info: 'indigo-500',
+        infoHover: 'indigo-600',
+        accent: 'purple-500',
+        accentHover: 'purple-600',
+        
+        // Page & component backgrounds
+        background: 'gray-100',
+        cardBackground: 'white',
+        headerBackground: 'white',
+        
+        // TABLE COLORS - FIXED
+        tableHeaderBackground: 'gray-600',        // Header background (dark gray)
+        tableHeaderText: 'white',                 // Header text (white on dark gray)
+        tableCellBackground: 'gray-50',           // FIXED: Was 'black-100' (invalid), now light gray
+        tableCellText: 'gray-900',                // FIXED: Was 'white', now dark text for light background
+        tableCellHover: 'gray-200',               // Light gray hover
+        tableCellSelected: 'blue-100',            // FIXED: Was 'black-200' (invalid), now light blue
+        tableCellSelectedHover: 'blue-200',       // FIXED: Was 'gray-200', now blue hover for selected
+        tableCellSelectedText: 'gray-900',        // Dark text for selected (good)
+        
+        // Borders
+        border: 'gray-200',
+        borderLight: 'gray-100',
+        borderDark: 'gray-300',
+        
+        // Text colors
+        textPrimary: 'gray-900',
+        textSecondary: 'gray-700',
+        textMuted: 'gray-500',
+        textLight: 'white'
+    }
+},
 
         // ─── DARK MODE ─────────────────────────────────────────────────
         dark: {
-            name: 'Dark',
-            colors: {
-                // Core theme colors
-                primary: 'blue-400',
-                primaryHover: 'blue-300',
-                secondary: 'gray-600',
-                secondaryHover: 'gray-500',
-                danger: 'red-400',
-                dangerHover: 'red-300',
-                success: 'green-400',
-                successHover: 'green-300',
-                warning: 'yellow-400',
-                warningHover: 'yellow-300',
-                info: 'indigo-400',
-                infoHover: 'indigo-300',
-                accent: 'purple-400',
-                accentHover: 'purple-300',
-
-                // Page & component backgrounds
-                background: 'gray-900',
-                cardBackground: 'gray-800',
-                headerBackground: 'gray-800',
-                tableHeaderBackground: 'gray-800', 
-                tableCellBackground: 'gray-800',  
-
-                // Borders
-                border: 'gray-700',
-                borderLight: 'gray-600',
-                borderDark: 'gray-600',
-
-                // Text colors
-                textPrimary: 'gray-100',
-                textSecondary: 'gray-300',
-                textMuted: 'gray-400',
-                textLight: 'gray-100'
-            }
-        }
+    name: 'Dark',
+    colors: {
+        // Core theme colors
+        primary: 'blue-400',
+        primaryHover: 'blue-300',
+        secondary: 'gray-600',
+        secondaryHover: 'gray-500',
+        danger: 'red-400',
+        dangerHover: 'red-300',
+        success: 'green-400',
+        successHover: 'green-300',
+        warning: 'yellow-400',
+        warningHover: 'yellow-300',
+        info: 'indigo-400',
+        infoHover: 'indigo-300',
+        accent: 'purple-400',
+        accentHover: 'purple-300',
+        
+        // Page & component backgrounds
+        background: 'gray-900',
+        cardBackground: 'gray-800',
+        headerBackground: 'gray-800',
+        
+        // TABLE COLORS - FIXED for Dark Theme
+        tableHeaderBackground: 'gray-700',        // FIXED: Darker header (was gray-600)
+        tableHeaderText: 'gray-100',              // FIXED: Light gray text (was white - too harsh)
+        tableCellBackground: 'gray-800',          // FIXED: Was 'black-100' (invalid), now dark gray
+        tableCellText: 'gray-200',                // FIXED: Light gray text for readability
+        tableCellHover: 'gray-700',               // FIXED: Darker hover (was gray-500 - too light)
+        tableCellSelected: 'blue-900',            // FIXED: Was 'black-200' (invalid), now dark blue
+        tableCellSelectedHover: 'blue-800',       // FIXED: Was 'gray-200' (too light), now blue hover
+        tableCellSelectedText: 'blue-100',        // FIXED: Was 'gray-900' (too dark), now light blue text
+        
+        // Borders
+        border: 'gray-700',
+        borderLight: 'gray-600',
+        borderDark: 'gray-600',
+        
+        // Text colors
+        textPrimary: 'gray-100',
+        textSecondary: 'gray-300',
+        textMuted: 'gray-400',
+        textLight: 'gray-100'
+    }
+}
 
     },
 
     // Current theme (default to light)
     currentTheme: 'light',
-    
+
     getStyle: function (path, defaultValue = '') {
         // Handle direct paths like 'typography.small'
         if (typeof path === 'string') {
@@ -249,7 +265,7 @@ window.App.utils.UI = {
                 }
             },
 
-            
+
 
             // Cards styling
             cards: {
@@ -298,14 +314,15 @@ window.App.utils.UI = {
             tables: {
                 container: `min-w-full bg-${colors.cardBackground} divide-y divide-${colors.border} rounded-lg shadow`,
                 header: {
-                    row: `bg-${colors.headerBackground}`,
-                    cell: `py-3 px-4 text-center text-xs font-medium text-${colors.textMuted} uppercase tracking-wider`
+                    // Uses the new table header variables
+                    row: `bg-${colors.tableHeaderBackground}`,
+                    cell: `py-3 px-4 text-center text-xs font-medium text-${colors.tableHeaderText} uppercase tracking-wider`
                 },
                 body: {
-                    // Updated row styling with proper theme background colors and selection highlighting
-                    row: `hover:bg-${colors.background} border-b border-${colors.borderLight} bg-${colors.tableCellBackground}`,
-                    rowSelected: `bg-${colors.primary.replace('500', '50').replace('400', '950')} hover:bg-${colors.primary.replace('500', '100').replace('400', '900')} border-b border-${colors.borderLight}`,
-                    cell: `px-4 py-2 whitespace-nowrap text-${colors.textSecondary} bg-${colors.tableCellBackground}`,
+                    // Uses the new table cell variables
+                    row: `hover:bg-${colors.tableCellHover} border-b border-${colors.borderLight} bg-${colors.tableCellBackground} text-${colors.tableCellText} transition-colors duration-150`,
+                    rowSelected: `bg-${colors.tableCellSelected} hover:bg-${colors.tableCellSelectedHover} border-b border-${colors.borderLight} transition-colors duration-150 text-${colors.tableCellSelectedText}`,
+                    cell: `px-4 py-2 whitespace-nowrap`,
                     cellAction: `px-4 py-2 whitespace-nowrap text-center text-sm font-medium`
                 },
             },

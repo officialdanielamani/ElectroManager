@@ -282,7 +282,7 @@ window.App.components.FootprintManager = ({
                             React.createElement('th', { className: UI.tables.header.cell }, "Actions")
                         )
                     ),
-                    React.createElement('tbody', { className: "bg-white divide-y divide-gray-200" },
+                    React.createElement('tbody', { className: `divide-y divide-${UI.getThemeColors().border}` },
                         footprints.length === 0 ?
                             React.createElement('tr', null,
                                 React.createElement('td', { colSpan: "3", className: "py-3 px-3 text-center text-gray-500 italic" }, // Reduced padding and adjusted colspan

@@ -490,7 +490,7 @@ window.App.components.SettingsView = ({
                                             )
                                         ),
                                         React.createElement('tbody', {
-                                            className: `divide-y divide-${UI.getThemeColors().border} bg-${UI.getThemeColors().cardBackground}`
+                                            className: `divide-y divide-${UI.getThemeColors().border}`
                                         },
                                             Object.entries(lowStockConfig).sort(([catA], [catB]) => catA.localeCompare(catB)).map(([category, threshold]) =>
                                                 React.createElement('tr', { key: category, className: UI.tables.body.row },

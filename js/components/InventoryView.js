@@ -130,11 +130,11 @@ window.App.components.InventoryView = ({
 
         // Location filter
         const matchesLocation = selectedLocations.length === 0 ||
-    (component.storage && component.storage.locationId &&
-        locations.some(loc =>
-            selectedLocations.includes(loc.name) &&
-            loc.id === component.storage.locationId
-        ));
+            (component.storage && component.storage.locationId &&
+                locations.some(loc =>
+                    selectedLocations.includes(loc.name) &&
+                    loc.id === component.storage.locationId
+                ));
         // Footprint filter
         const matchesFootprint = selectedFootprints.length === 0 ||
             (component.footprint && selectedFootprints.includes(component.footprint));
@@ -222,181 +222,181 @@ window.App.components.InventoryView = ({
 
     // --- Render Functions for Table and Card Views ---
 
-// Renders a single row in the table view - Refactored with unified UI constants
-const renderTableRow = (component) => {
-    const isSelected = selectedComponents.includes(component.id);
-    const lowStock = helpers.isLowStock(component, lowStockConfig);
-    const formattedPrice = helpers.formatCurrency(component.price, currencySymbol);
-    const datasheetLinks = helpers.formatDatasheets(component.datasheets);
+    // Renders a single row in the table view - Refactored with unified UI constants
+    const renderTableRow = (component) => {
+        const isSelected = selectedComponents.includes(component.id);
+        const lowStock = helpers.isLowStock(component, lowStockConfig);
+        const formattedPrice = helpers.formatCurrency(component.price, currencySymbol);
+        const datasheetLinks = helpers.formatDatasheets(component.datasheets);
 
-    return React.createElement('tr', {
-        key: component.id,
-        className: `${isSelected ? UI.tables.body.rowSelected : UI.tables.body.row} ${lowStock ? `bg-${UI.getThemeColors().danger.replace('500', '50').replace('400', '950')} hover:bg-${UI.getThemeColors().danger.replace('500', '100').replace('400', '900')}` : ''}`
-    },
-        // Checkbox
-        React.createElement('td', { className: `px-3 py-2 text-center` },
-            React.createElement('input', {
-                type: "checkbox",
-                className: UI.forms.checkbox,
-                checked: isSelected,
-                onChange: () => onToggleSelect(component.id),
-                title: "Select component"
-            })
-        ),
-        
-        // Component Name/Category/Datasheet
-        React.createElement('td', { className: UI.tables.body.cell },
-            React.createElement('div', { 
-                className: `${UI.typography.heading.h5} text-${UI.getThemeColors().textPrimary}` 
-            }, component.name),
-            React.createElement('div', { 
-                className: `${UI.typography.small} text-${UI.getThemeColors().textMuted}` 
-            }, component.category),
-            React.createElement('div', { className: "mt-1" },
-                datasheetLinks.map((url, index) =>
-                    React.createElement('a', {
-                        key: index,
-                        href: url,
-                        target: "_blank",
-                        rel: "noopener noreferrer",
-                        className: `${UI.typography.small} text-${UI.getThemeColors().info} hover:text-${UI.getThemeColors().infoHover} hover:underline mr-2`
-                    }, `Datasheet ${datasheetLinks.length > 1 ? index + 1 : ''}`)
-                )
-            )
-        ),
-        
-        // Type
-        React.createElement('td', { 
-            className: `${UI.tables.body.cell} text-${UI.getThemeColors().textSecondary}` 
-        }, component.type || '-'),
-
-        // Bookmark/Favorite/Star column
-        React.createElement('td', { className: "px-2 py-2 whitespace-nowrap" },
-            React.createElement('div', { className: "flex items-center space-x-1" },
-                // Favorite Icon/Button
-                React.createElement('button', {
-                    onClick: () => onToggleFavorite(component.id, 'favorite'),
-                    className: `p-1 rounded-full transition-colors ${component.favorite ? 
-                        `text-${UI.getThemeColors().danger} hover:text-${UI.getThemeColors().dangerHover}` : 
-                        `text-${UI.getThemeColors().textMuted} hover:text-${UI.getThemeColors().danger}`}`,
-                    title: component.favorite ? "Remove from favorites" : "Add to favorites"
-                },
-                    React.createElement('svg', {
-                        xmlns: "http://www.w3.org/2000/svg",
-                        className: "h-5 w-5",
-                        viewBox: "0 0 20 20",
-                        fill: "currentColor"
-                    },
-                        React.createElement('path', {
-                            fillRule: "evenodd",
-                            d: "M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z",
-                            clipRule: "evenodd"
-                        })
-                    )
-                ),
-
-                // Bookmark Icon/Button
-                React.createElement('button', {
-                    onClick: () => onToggleFavorite(component.id, 'bookmark'),
-                    className: `p-1 rounded-full transition-colors ${component.bookmark ? 
-                        `text-${UI.getThemeColors().info} hover:text-${UI.getThemeColors().infoHover}` : 
-                        `text-${UI.getThemeColors().textMuted} hover:text-${UI.getThemeColors().info}`}`,
-                    title: component.bookmark ? "Remove bookmark" : "Add bookmark"
-                },
-                    React.createElement('svg', {
-                        xmlns: "http://www.w3.org/2000/svg",
-                        className: "h-5 w-5",
-                        viewBox: "0 0 20 20",
-                        fill: "currentColor"
-                    },
-                        React.createElement('path', {
-                            d: "M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"
-                        })
-                    )
-                ),
-
-                // Star Icon/Button
-                React.createElement('button', {
-                    onClick: () => onToggleFavorite(component.id, 'star'),
-                    className: `p-1 rounded-full transition-colors ${component.star ? 
-                        `text-${UI.getThemeColors().warning} hover:text-${UI.getThemeColors().warningHover}` : 
-                        `text-${UI.getThemeColors().textMuted} hover:text-${UI.getThemeColors().warning}`}`,
-                    title: component.star ? "Remove star" : "Add star"
-                },
-                    React.createElement('svg', {
-                        xmlns: "http://www.w3.org/2000/svg",
-                        className: "h-5 w-5",
-                        viewBox: "0 0 20 20",
-                        fill: "currentColor"
-                    },
-                        React.createElement('path', {
-                            d: "M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
-                        })
-                    )
-                )
-            )
-        ),
-        
-        // Footprint
-        React.createElement('td', { 
-            className: `${UI.tables.body.cell} text-${UI.getThemeColors().textSecondary}` 
-        }, component.footprint || '-'),
-        
-        React.createElement('td', { 
-            className: `${UI.tables.body.cell} text-${UI.getThemeColors().textSecondary} max-w-xs truncate`,
-            title: window.App.utils.formHelpers.formatStorageDisplay(component.storage, locations, drawers, cells)
-        }, 
-            window.App.utils.formHelpers.formatStorageDisplay(component.storage, locations, drawers, cells)
-        ),
-        
-        // Quantity
-        React.createElement('td', { className: "px-4 py-2 whitespace-nowrap text-center" },
-            React.createElement('div', { className: "flex items-center justify-center space-x-1" },
-                React.createElement('button', {
-                    onClick: () => onUpdateQuantity(component.id, -1),
-                    className: UI.buttons.icon.danger,
-                    title: "Decrease Quantity"
-                }, "-"),
-                React.createElement('span', { 
-                    className: `${UI.tables.body.cell} ${lowStock ? `text-${UI.getThemeColors().danger} ${UI.typography.weight.semibold}` : `text-${UI.getThemeColors().textPrimary}`}` 
-                }, component.quantity || 0),
-                React.createElement('button', {
-                    onClick: () => onUpdateQuantity(component.id, 1),
-                    className: UI.buttons.icon.success,
-                    title: "Increase Quantity"
-                }, "+")
+        return React.createElement('tr', {
+            key: component.id,
+            className: `${isSelected ? UI.tables.body.rowSelected : UI.tables.body.row} ${lowStock ? `bg-${UI.getThemeColors().danger.replace('500', '50').replace('400', '950')} hover:bg-${UI.getThemeColors().danger.replace('500', '100').replace('400', '900')}` : ''}`
+        },
+            // Checkbox
+            React.createElement('td', { className: `px-3 py-2 text-center` },
+                React.createElement('input', {
+                    type: "checkbox",
+                    className: UI.forms.checkbox,
+                    checked: isSelected,
+                    onChange: () => onToggleSelect(component.id),
+                    title: "Select component"
+                })
             ),
-            lowStock && React.createElement('div', {
-                className: `${UI.tags.base} ${UI.tags.red} mt-1`,
-            }, "Low Stock")
-        ),
-        
-        // Price
-        React.createElement('td', { 
-            className: `${UI.tables.body.cell} text-right text-${UI.getThemeColors().success} ${UI.typography.weight.medium}` 
-        }, formattedPrice),
-        
-        // Info
-        React.createElement('td', { 
-            className: `${UI.tables.body.cell} text-${UI.getThemeColors().textSecondary} max-w-xs truncate`, 
-            title: component.info 
-        }, component.info || '-'),
-        
-        // Actions
-        React.createElement('td', { className: UI.tables.body.cellAction },
-            React.createElement('button', {
-                onClick: () => onEditComponent(component),
-                className: `text-${UI.getThemeColors().info} hover:text-${UI.getThemeColors().infoHover} mr-3 transition-colors`,
-                title: "Edit Component"
-            }, "Edit"),
-            React.createElement('button', {
-                onClick: () => onDeleteComponent(component.id),
-                className: `text-${UI.getThemeColors().danger} hover:text-${UI.getThemeColors().dangerHover} transition-colors`,
-                title: "Delete Component"
-            }, "Delete")
-        )
-    );
-};
+
+            // Component Name/Category/Datasheet
+            React.createElement('td', { className: UI.tables.body.cell },
+                React.createElement('div', {
+                    className: `${UI.typography.heading.h5} text-${UI.getThemeColors().textPrimary}`
+                }, component.name),
+                React.createElement('div', {
+                    className: `${UI.typography.small} text-${UI.getThemeColors().textMuted}`
+                }, component.category),
+                React.createElement('div', { className: "mt-1" },
+                    datasheetLinks.map((url, index) =>
+                        React.createElement('a', {
+                            key: index,
+                            href: url,
+                            target: "_blank",
+                            rel: "noopener noreferrer",
+                            className: `${UI.typography.small} text-${UI.getThemeColors().info} hover:text-${UI.getThemeColors().infoHover} hover:underline mr-2`
+                        }, `Datasheet ${datasheetLinks.length > 1 ? index + 1 : ''}`)
+                    )
+                )
+            ),
+
+            // Type
+            React.createElement('td', {
+                className: `${UI.tables.body.cell} text-${UI.getThemeColors().textSecondary}`
+            }, component.type || '-'),
+
+            // Bookmark/Favorite/Star column
+            React.createElement('td', { className: "px-2 py-2 whitespace-nowrap" },
+                React.createElement('div', { className: "flex items-center space-x-1" },
+                    // Favorite Icon/Button
+                    React.createElement('button', {
+                        onClick: () => onToggleFavorite(component.id, 'favorite'),
+                        className: `p-1 rounded-full transition-colors ${component.favorite ?
+                            `text-${UI.getThemeColors().danger} hover:text-${UI.getThemeColors().dangerHover}` :
+                            `text-${UI.getThemeColors().textMuted} hover:text-${UI.getThemeColors().danger}`}`,
+                        title: component.favorite ? "Remove from favorites" : "Add to favorites"
+                    },
+                        React.createElement('svg', {
+                            xmlns: "http://www.w3.org/2000/svg",
+                            className: "h-5 w-5",
+                            viewBox: "0 0 20 20",
+                            fill: "currentColor"
+                        },
+                            React.createElement('path', {
+                                fillRule: "evenodd",
+                                d: "M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z",
+                                clipRule: "evenodd"
+                            })
+                        )
+                    ),
+
+                    // Bookmark Icon/Button
+                    React.createElement('button', {
+                        onClick: () => onToggleFavorite(component.id, 'bookmark'),
+                        className: `p-1 rounded-full transition-colors ${component.bookmark ?
+                            `text-${UI.getThemeColors().info} hover:text-${UI.getThemeColors().infoHover}` :
+                            `text-${UI.getThemeColors().textMuted} hover:text-${UI.getThemeColors().info}`}`,
+                        title: component.bookmark ? "Remove bookmark" : "Add bookmark"
+                    },
+                        React.createElement('svg', {
+                            xmlns: "http://www.w3.org/2000/svg",
+                            className: "h-5 w-5",
+                            viewBox: "0 0 20 20",
+                            fill: "currentColor"
+                        },
+                            React.createElement('path', {
+                                d: "M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"
+                            })
+                        )
+                    ),
+
+                    // Star Icon/Button
+                    React.createElement('button', {
+                        onClick: () => onToggleFavorite(component.id, 'star'),
+                        className: `p-1 rounded-full transition-colors ${component.star ?
+                            `text-${UI.getThemeColors().warning} hover:text-${UI.getThemeColors().warningHover}` :
+                            `text-${UI.getThemeColors().textMuted} hover:text-${UI.getThemeColors().warning}`}`,
+                        title: component.star ? "Remove star" : "Add star"
+                    },
+                        React.createElement('svg', {
+                            xmlns: "http://www.w3.org/2000/svg",
+                            className: "h-5 w-5",
+                            viewBox: "0 0 20 20",
+                            fill: "currentColor"
+                        },
+                            React.createElement('path', {
+                                d: "M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
+                            })
+                        )
+                    )
+                )
+            ),
+
+            // Footprint
+            React.createElement('td', {
+                className: `${UI.tables.body.cell} text-${UI.getThemeColors().textSecondary}`
+            }, component.footprint || '-'),
+
+            React.createElement('td', {
+                className: `${UI.tables.body.cell} text-${UI.getThemeColors().textSecondary} max-w-xs truncate`,
+                title: window.App.utils.formHelpers.formatStorageDisplay(component.storage, locations, drawers, cells)
+            },
+                window.App.utils.formHelpers.formatStorageDisplay(component.storage, locations, drawers, cells)
+            ),
+
+            // Quantity
+            React.createElement('td', { className: "px-4 py-2 whitespace-nowrap text-center" },
+                React.createElement('div', { className: "flex items-center justify-center space-x-1" },
+                    React.createElement('button', {
+                        onClick: () => onUpdateQuantity(component.id, -1),
+                        className: UI.buttons.icon.danger,
+                        title: "Decrease Quantity"
+                    }, "-"),
+                    React.createElement('span', {
+                        className: `${UI.tables.body.cell} ${lowStock ? `text-${UI.getThemeColors().danger} ${UI.typography.weight.semibold}` : `text-${UI.getThemeColors().textPrimary}`}`
+                    }, component.quantity || 0),
+                    React.createElement('button', {
+                        onClick: () => onUpdateQuantity(component.id, 1),
+                        className: UI.buttons.icon.success,
+                        title: "Increase Quantity"
+                    }, "+")
+                ),
+                lowStock && React.createElement('div', {
+                    className: `${UI.tags.base} ${UI.tags.red} mt-1`,
+                }, "Low Stock")
+            ),
+
+            // Price
+            React.createElement('td', {
+                className: `${UI.tables.body.cell} text-right text-${UI.getThemeColors().success} ${UI.typography.weight.medium}`
+            }, formattedPrice),
+
+            // Info
+            React.createElement('td', {
+                className: `${UI.tables.body.cell} text-${UI.getThemeColors().textSecondary} max-w-xs truncate`,
+                title: component.info
+            }, component.info || '-'),
+
+            // Actions
+            React.createElement('td', { className: UI.tables.body.cellAction },
+                React.createElement('button', {
+                    onClick: () => onEditComponent(component),
+                    className: `text-${UI.getThemeColors().info} hover:text-${UI.getThemeColors().infoHover} mr-3 transition-colors`,
+                    title: "Edit Component"
+                }, "Edit"),
+                React.createElement('button', {
+                    onClick: () => onDeleteComponent(component.id),
+                    className: `text-${UI.getThemeColors().danger} hover:text-${UI.getThemeColors().dangerHover} transition-colors`,
+                    title: "Delete Component"
+                }, "Delete")
+            )
+        );
+    };
     // Pagination component
     const renderPagination = () => {
         if (itemsPerPage === 'all' || totalPages <= 1) {
@@ -486,248 +486,248 @@ const renderTableRow = (component) => {
         );
     };
 
-// Renders a single card in the card view - Refactored with unified UI constants
-const renderCard = (component) => {
-    const isSelected = selectedComponents.includes(component.id);
-    const lowStock = helpers.isLowStock(component, lowStockConfig);
-    const formattedPrice = helpers.formatCurrency(component.price, currencySymbol);
-    const datasheetLinks = helpers.formatDatasheets(component.datasheets);
+    // Renders a single card in the card view - Refactored with unified UI constants
+    const renderCard = (component) => {
+        const isSelected = selectedComponents.includes(component.id);
+        const lowStock = helpers.isLowStock(component, lowStockConfig);
+        const formattedPrice = helpers.formatCurrency(component.price, currencySymbol);
+        const datasheetLinks = helpers.formatDatasheets(component.datasheets);
 
-    return React.createElement('div', {
-        key: component.id,
-        className: `${UI.cards.container} ${isSelected ? `ring-2 ring-offset-1 ring-${UI.getThemeColors().primary}` : ''} ${lowStock ? `border-l-4 border-${UI.getThemeColors().danger}` : ''}`
-    },
-        // Select Checkbox
-        React.createElement('div', { className: "absolute top-2 left-2 z-10" },
-            React.createElement('input', {
-                type: "checkbox",
-                checked: isSelected,
-                onChange: () => onToggleSelect(component.id),
-                className: UI.forms.checkbox + ` bg-${UI.getThemeColors().cardBackground} bg-opacity-75`,
-                title: "Select component"
-            })
-        ),
-        
-        // Image Area
-        React.createElement('div', { 
-            className: `relative h-40 bg-${UI.getThemeColors().background} rounded-t-lg flex items-center justify-center overflow-hidden` 
+        return React.createElement('div', {
+            key: component.id,
+            className: `${UI.cards.container} ${isSelected ? `ring-2 ring-offset-1 ring-${UI.getThemeColors().primary}` : ''} ${lowStock ? `border-l-4 border-${UI.getThemeColors().danger}` : ''}`
         },
-            React.createElement('img', {
-                src: component.image || '',
-                alt: component.name || 'Component Image',
-                className: "w-full h-full object-contain p-2"
-            }),
-            lowStock && React.createElement('span', {
-                className: `${UI.tags.base} ${UI.tags.red} absolute bottom-1 right-1`
-            }, "LOW")
-        ),
-        
-        // Card Content
-        React.createElement('div', { className: UI.cards.body },
-            // Name & Type
-            React.createElement('div', { className: "flex justify-between items-start mb-2" },
-                React.createElement('h3', {
-                    className: `${UI.typography.heading.h4} truncate mr-2 text-${UI.getThemeColors().textPrimary}`,
-                    title: component.name
-                }, component.name),
-                component.type && React.createElement('span', {
-                    className: `${UI.tags.base} ${UI.tags.gray}`
-                }, component.type)
+            // Select Checkbox
+            React.createElement('div', { className: "absolute top-2 left-2 z-10" },
+                React.createElement('input', {
+                    type: "checkbox",
+                    checked: isSelected,
+                    onChange: () => onToggleSelect(component.id),
+                    className: UI.forms.checkbox + ` bg-${UI.getThemeColors().cardBackground} bg-opacity-75`,
+                    title: "Select component"
+                })
             ),
-            
-            // Footprint
-            React.createElement('div', { 
-                className: `${UI.typography.small} text-${UI.getThemeColors().textSecondary} mb-1 flex justify-between` 
-            },
-                React.createElement('span', { 
-                    className: UI.typography.weight.medium 
-                }, "Footprint:"),
-                component.footprint ?
-                    React.createElement('span', {
-                        className: `${UI.tags.base} ${UI.tags.gray}`
-                    }, component.footprint)
-                    : React.createElement('span', { 
-                        className: `text-${UI.getThemeColors().textMuted}` 
-                    }, "-")
-            ),
-            
-            // Category
+
+            // Image Area
             React.createElement('div', {
-                className: `${UI.typography.small} text-${UI.getThemeColors().textSecondary} mb-1`
-            }, component.category),
-            
-            // Price
-            React.createElement('div', { 
-                className: `text-md ${UI.typography.weight.semibold} text-${UI.getThemeColors().success} mb-3` 
-            }, formattedPrice),
-            
-            // Quantity Controls
-            React.createElement('div', { 
-                className: `flex items-center justify-center space-x-2 mb-3 border-t border-b py-2 border-${UI.getThemeColors().borderLight}` 
+                className: `relative h-40 bg-${UI.getThemeColors().background} rounded-t-lg flex items-center justify-center overflow-hidden`
             },
-                React.createElement('button', {
-                    onClick: () => onUpdateQuantity(component.id, -1),
-                    className: UI.buttons.icon.danger,
-                    title: "Decrease Quantity"
+                React.createElement('img', {
+                    src: component.image || '',
+                    alt: component.name || 'Component Image',
+                    className: "w-full h-full object-contain p-2"
+                }),
+                lowStock && React.createElement('span', {
+                    className: `${UI.tags.base} ${UI.tags.red} absolute bottom-1 right-1`
+                }, "LOW")
+            ),
+
+            // Card Content
+            React.createElement('div', { className: UI.cards.body },
+                // Name & Type
+                React.createElement('div', { className: "flex justify-between items-start mb-2" },
+                    React.createElement('h3', {
+                        className: `${UI.typography.heading.h4} truncate mr-2 text-${UI.getThemeColors().textPrimary}`,
+                        title: component.name
+                    }, component.name),
+                    component.type && React.createElement('span', {
+                        className: `${UI.tags.base} ${UI.tags.gray}`
+                    }, component.type)
+                ),
+
+                // Footprint
+                React.createElement('div', {
+                    className: `${UI.typography.small} text-${UI.getThemeColors().textSecondary} mb-1 flex justify-between`
                 },
-                    React.createElement('svg', { 
-                        xmlns: "http://www.w3.org/2000/svg", 
-                        className: "h-5 w-5", 
-                        viewBox: "0 0 20 20", 
-                        fill: "currentColor" 
+                    React.createElement('span', {
+                        className: UI.typography.weight.medium
+                    }, "Footprint:"),
+                    component.footprint ?
+                        React.createElement('span', {
+                            className: `${UI.tags.base} ${UI.tags.gray}`
+                        }, component.footprint)
+                        : React.createElement('span', {
+                            className: `text-${UI.getThemeColors().textMuted}`
+                        }, "-")
+                ),
+
+                // Category
+                React.createElement('div', {
+                    className: `${UI.typography.small} text-${UI.getThemeColors().textSecondary} mb-1`
+                }, component.category),
+
+                // Price
+                React.createElement('div', {
+                    className: `text-md ${UI.typography.weight.semibold} text-${UI.getThemeColors().success} mb-3`
+                }, formattedPrice),
+
+                // Quantity Controls
+                React.createElement('div', {
+                    className: `flex items-center justify-center space-x-2 mb-3 border-t border-b py-2 border-${UI.getThemeColors().borderLight}`
+                },
+                    React.createElement('button', {
+                        onClick: () => onUpdateQuantity(component.id, -1),
+                        className: UI.buttons.icon.danger,
+                        title: "Decrease Quantity"
                     },
-                        React.createElement('path', { 
-                            fillRule: "evenodd", 
-                            d: "M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z", 
-                            clipRule: "evenodd" 
-                        })
+                        React.createElement('svg', {
+                            xmlns: "http://www.w3.org/2000/svg",
+                            className: "h-5 w-5",
+                            viewBox: "0 0 20 20",
+                            fill: "currentColor"
+                        },
+                            React.createElement('path', {
+                                fillRule: "evenodd",
+                                d: "M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z",
+                                clipRule: "evenodd"
+                            })
+                        )
+                    ),
+
+                    React.createElement('span', {
+                        className: `text-lg ${UI.typography.weight.semibold} ${lowStock ? `text-${UI.getThemeColors().danger}` : `text-${UI.getThemeColors().textPrimary}`}`
+                    }, component.quantity || 0),
+
+                    React.createElement('button', {
+                        onClick: () => onUpdateQuantity(component.id, 1),
+                        className: UI.buttons.icon.success,
+                        title: "Increase Quantity"
+                    },
+                        React.createElement('svg', {
+                            xmlns: "http://www.w3.org/2000/svg",
+                            className: "h-5 w-5",
+                            viewBox: "0 0 20 20",
+                            fill: "currentColor"
+                        },
+                            React.createElement('path', {
+                                fillRule: "evenodd",
+                                d: "M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z",
+                                clipRule: "evenodd"
+                            })
+                        )
                     )
                 ),
 
-                React.createElement('span', { 
-                    className: `text-lg ${UI.typography.weight.semibold} ${lowStock ? `text-${UI.getThemeColors().danger}` : `text-${UI.getThemeColors().textPrimary}`}` 
-                }, component.quantity || 0),
+                // Info
+                component.info && React.createElement('p', {
+                    className: `${UI.typography.small} text-${UI.getThemeColors().textSecondary} mb-2 truncate`,
+                    title: component.info
+                },
+                    React.createElement('span', {
+                        className: UI.typography.weight.medium
+                    }, "Uses: "),
+                    component.info
+                ),
 
-                React.createElement('button', {
-                    onClick: () => onUpdateQuantity(component.id, 1),
-                    className: UI.buttons.icon.success,
-                    title: "Increase Quantity"
-                },
-                    React.createElement('svg', { 
-                        xmlns: "http://www.w3.org/2000/svg", 
-                        className: "h-5 w-5", 
-                        viewBox: "0 0 20 20", 
-                        fill: "currentColor" 
-                    },
-                        React.createElement('path', { 
-                            fillRule: "evenodd", 
-                            d: "M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z", 
-                            clipRule: "evenodd" 
-                        })
+                // Datasheets
+                React.createElement('div', { className: "mb-3" },
+                    datasheetLinks.map((url, index) =>
+                        React.createElement('a', {
+                            key: index,
+                            href: url,
+                            target: "_blank",
+                            rel: "noopener noreferrer",
+                            className: `${UI.typography.small} text-${UI.getThemeColors().info} hover:text-${UI.getThemeColors().infoHover} hover:underline mr-2 inline-block`
+                        }, `Datasheet ${datasheetLinks.length > 1 ? index + 1 : ''}`)
                     )
-                )
-            ),
-            
-            // Info
-            component.info && React.createElement('p', {
-                className: `${UI.typography.small} text-${UI.getThemeColors().textSecondary} mb-2 truncate`,
-                title: component.info
-            },
-                React.createElement('span', { 
-                    className: UI.typography.weight.medium 
-                }, "Uses: "), 
-                component.info
-            ),
-            
-            // Datasheets
-            React.createElement('div', { className: "mb-3" },
-                datasheetLinks.map((url, index) =>
-                    React.createElement('a', {
-                        key: index,
-                        href: url,
-                        target: "_blank",
-                        rel: "noopener noreferrer",
-                        className: `${UI.typography.small} text-${UI.getThemeColors().info} hover:text-${UI.getThemeColors().infoHover} hover:underline mr-2 inline-block`
-                    }, `Datasheet ${datasheetLinks.length > 1 ? index + 1 : ''}`)
-                )
-            ),
-            
-            // Storage Location Display (NEW ADDITION)
-            React.createElement('div', { 
-                className: `mb-3 p-2 bg-${UI.getThemeColors().background} rounded border border-${UI.getThemeColors().borderLight}` 
-            },
-                React.createElement('div', { 
-                    className: `${UI.typography.small} text-${UI.getThemeColors().textMuted} mb-1` 
-                }, "Storage:"),
-                React.createElement('div', { 
-                    className: `${UI.typography.small} text-${UI.getThemeColors().textSecondary}` 
-                }, 
-                    window.App.utils.formHelpers.formatStorageDisplay(
-                        component.storage, 
-                        locations, 
-                        drawers, 
-                        cells
+                ),
+
+                // Storage Location Display (NEW ADDITION)
+                React.createElement('div', {
+                    className: `mb-3 p-2 bg-${UI.getThemeColors().background} rounded border border-${UI.getThemeColors().borderLight}`
+                },
+                    React.createElement('div', {
+                        className: `${UI.typography.small} text-${UI.getThemeColors().textMuted} mb-1`
+                    }, "Storage:"),
+                    React.createElement('div', {
+                        className: `${UI.typography.small} text-${UI.getThemeColors().textSecondary}`
+                    },
+                        window.App.utils.formHelpers.formatStorageDisplay(
+                            component.storage,
+                            locations,
+                            drawers,
+                            cells
+                        )
                     )
-                )
-            ),
-            
-            // Component Marks (Favorite, Bookmark, Star) - NEW ADDITION
-            (component.favorite || component.bookmark || component.star) && 
-            React.createElement('div', { 
-                className: `flex space-x-1 mb-3` 
-            },
-                component.favorite && React.createElement('span', {
-                    className: `${UI.tags.base} ${UI.tags.red}`,
-                    title: "Favorite"
-                },
-                    React.createElement('svg', {
-                        xmlns: "http://www.w3.org/2000/svg",
-                        className: "h-4 w-4 inline mr-1",
-                        viewBox: "0 0 20 20",
-                        fill: "currentColor"
-                    },
-                        React.createElement('path', {
-                            fillRule: "evenodd",
-                            d: "M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z",
-                            clipRule: "evenodd"
-                        })
-                    ),
-                    "Fav"
                 ),
-                
-                component.bookmark && React.createElement('span', {
-                    className: `${UI.tags.base} ${UI.tags.indigo}`,
-                    title: "Bookmark"
+
+                // Component Marks (Favorite, Bookmark, Star) - NEW ADDITION
+                (component.favorite || component.bookmark || component.star) &&
+                React.createElement('div', {
+                    className: `flex space-x-1 mb-3`
                 },
-                    React.createElement('svg', {
-                        xmlns: "http://www.w3.org/2000/svg",
-                        className: "h-4 w-4 inline mr-1",
-                        viewBox: "0 0 20 20",
-                        fill: "currentColor"
+                    component.favorite && React.createElement('span', {
+                        className: `${UI.tags.base} ${UI.tags.red}`,
+                        title: "Favorite"
                     },
-                        React.createElement('path', {
-                            d: "M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"
-                        })
+                        React.createElement('svg', {
+                            xmlns: "http://www.w3.org/2000/svg",
+                            className: "h-4 w-4 inline mr-1",
+                            viewBox: "0 0 20 20",
+                            fill: "currentColor"
+                        },
+                            React.createElement('path', {
+                                fillRule: "evenodd",
+                                d: "M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z",
+                                clipRule: "evenodd"
+                            })
+                        ),
+                        "Fav"
                     ),
-                    "Book"
+
+                    component.bookmark && React.createElement('span', {
+                        className: `${UI.tags.base} ${UI.tags.indigo}`,
+                        title: "Bookmark"
+                    },
+                        React.createElement('svg', {
+                            xmlns: "http://www.w3.org/2000/svg",
+                            className: "h-4 w-4 inline mr-1",
+                            viewBox: "0 0 20 20",
+                            fill: "currentColor"
+                        },
+                            React.createElement('path', {
+                                d: "M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"
+                            })
+                        ),
+                        "Book"
+                    ),
+
+                    component.star && React.createElement('span', {
+                        className: `${UI.tags.base} ${UI.tags.yellow}`,
+                        title: "Star"
+                    },
+                        React.createElement('svg', {
+                            xmlns: "http://www.w3.org/2000/svg",
+                            className: "h-4 w-4 inline mr-1",
+                            viewBox: "0 0 20 20",
+                            fill: "currentColor"
+                        },
+                            React.createElement('path', {
+                                d: "M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
+                            })
+                        ),
+                        "Star"
+                    )
                 ),
-                
-                component.star && React.createElement('span', {
-                    className: `${UI.tags.base} ${UI.tags.yellow}`,
-                    title: "Star"
+
+                // Action Buttons
+                React.createElement('div', {
+                    className: `flex justify-end space-x-2 border-t border-${UI.getThemeColors().borderLight} pt-3`
                 },
-                    React.createElement('svg', {
-                        xmlns: "http://www.w3.org/2000/svg",
-                        className: "h-4 w-4 inline mr-1",
-                        viewBox: "0 0 20 20",
-                        fill: "currentColor"
-                    },
-                        React.createElement('path', {
-                            d: "M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
-                        })
-                    ),
-                    "Star"
+                    React.createElement('button', {
+                        onClick: () => onEditComponent(component),
+                        className: UI.buttons.small.info,
+                        title: "Edit Component"
+                    }, "Edit"),
+                    React.createElement('button', {
+                        onClick: () => onDeleteComponent(component.id),
+                        className: UI.buttons.small.danger,
+                        title: "Delete Component"
+                    }, "Delete")
                 )
-            ),
-            
-            // Action Buttons
-            React.createElement('div', { 
-                className: `flex justify-end space-x-2 border-t border-${UI.getThemeColors().borderLight} pt-3` 
-            },
-                React.createElement('button', {
-                    onClick: () => onEditComponent(component),
-                    className: UI.buttons.small.info,
-                    title: "Edit Component"
-                }, "Edit"),
-                React.createElement('button', {
-                    onClick: () => onDeleteComponent(component.id),
-                    className: UI.buttons.small.danger,
-                    title: "Delete Component"
-                }, "Delete")
             )
-        )
-    );
-};
+        );
+    };
     // --- Main Render ---
     return (
         React.createElement('div', null,
@@ -845,36 +845,36 @@ const renderCard = (component) => {
                     React.createElement('div', { className: "min-w-full" }, // Ensure minimum width fits content
                         React.createElement('table', { className: "w-full divide-y divide-gray-200" },
                             React.createElement('thead', { className: UI.tables.header.row },
-    React.createElement('tr', null,
-        // Select All Header Checkbox
-        React.createElement('th', { className: "w-10 px-3 py-3 text-center" },
-            React.createElement('input', {
-                type: "checkbox",
-                className: UI.forms.checkbox,
-                checked: selectedComponents.length === filteredComponents.length && filteredComponents.length > 0,
-                onChange: onToggleSelectAll,
-                disabled: filteredComponents.length === 0,
-                title: selectedComponents.length === filteredComponents.length ? "Deselect All Visible" : "Select All Visible"
-            })
-        ),
+                                React.createElement('tr', null,
+                                    // Select All Header Checkbox
+                                    React.createElement('th', { className: `w-10 px-3 py-3 text-center text-${UI.getThemeColors().tableHeaderText}` },
+                                        React.createElement('input', {
+                                            type: "checkbox",
+                                            className: UI.forms.checkbox,
+                                            checked: selectedComponents.length === filteredComponents.length && filteredComponents.length > 0,
+                                            onChange: onToggleSelectAll,
+                                            disabled: filteredComponents.length === 0,
+                                            title: selectedComponents.length === filteredComponents.length ? "Deselect All Visible" : "Select All Visible"
+                                        })
+                                    ),
 
-        // Other Headers
-        React.createElement('th', { className: UI.tables.header.cell }, "Component"),
-        React.createElement('th', { className: UI.tables.header.cell }, "Type"),
-        React.createElement('th', { className: UI.tables.header.cell }, "Marks"),
-        React.createElement('th', { className: UI.tables.header.cell }, "Footprint"),
-        React.createElement('th', { className: UI.tables.header.cell }, "Storage"), // NEW COLUMN
-        React.createElement('th', { className: UI.tables.header.cell }, "Quantity"),
-        React.createElement('th', { className: UI.tables.header.cell }, "Price"),
-        React.createElement('th', { className: UI.tables.header.cell }, "Info"),
-        React.createElement('th', { className: UI.tables.header.cell }, "Actions")
-    )
-),
-                            React.createElement('tbody', { className: `bg-${UI.getThemeColors().cardBackground} divide-y divide-${UI.getThemeColors().border}` },
+                                    // Other Headers
+                                    React.createElement('th', { className: UI.tables.header.cell }, "Component"),
+                                    React.createElement('th', { className: UI.tables.header.cell }, "Type"),
+                                    React.createElement('th', { className: UI.tables.header.cell }, "Marks"),
+                                    React.createElement('th', { className: UI.tables.header.cell }, "Footprint"),
+                                    React.createElement('th', { className: UI.tables.header.cell }, "Storage"), // NEW COLUMN
+                                    React.createElement('th', { className: UI.tables.header.cell }, "Quantity"),
+                                    React.createElement('th', { className: UI.tables.header.cell }, "Price"),
+                                    React.createElement('th', { className: UI.tables.header.cell }, "Info"),
+                                    React.createElement('th', { className: UI.tables.header.cell }, "Actions")
+                                )
+                            ),
+                            React.createElement('tbody', { className: `divide-y divide-${UI.getThemeColors().border}` },
                                 filteredComponents.length > 0 ? paginatedComponents.map(renderTableRow) : null,
                                 // Empty/No Match Messages
-                                filteredComponents.length === 0 && totalComponents > 0 && React.createElement('tr', null,
-                                    React.createElement('td', { colSpan: "10", className: "px-4 py-8 text-center text-gray-500 italic" },
+                                filteredComponents.length === 0 && totalComponents > 0 && React.createElement('tr', { className: UI.tables.body.row },
+                                    React.createElement('td', { colSpan: "10", className: `px-4 py-8 text-center text-${UI.getThemeColors().textMuted} italic` },
                                         "No components match filters."
                                     )
                                 ),
