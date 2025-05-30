@@ -296,16 +296,17 @@ window.App.components.SettingsView = ({
                 React.createElement('div', { className: UI.cards.body },
                     React.createElement('h3', { className: UI.typography.heading.h3 }, "Electro Manager"),
                     React.createElement('div', { className: "flex items-center mb-3" },
-                        React.createElement('span', { className: `${UI.typography.weight.semibold} ${UI.colors.primary.text}` }, "Version 0.2.5beta"),
+                        React.createElement('span', { className: `${UI.typography.weight.semibold} ${UI.colors.primary.text}` }, "Version 0.2.7beta"),
                         React.createElement('span', { className: `ml-2 px-2 py-1 ${UI.colors.success.bg} text-white text-xs rounded-full` }, "Latest Update")
                     ),
                     // Update date
-                    "Updated: 16 May 2025",
+                    "Updated: 30 May 2025",
 
                     // Changes in this version 
                     React.createElement('div', { className: "mb-4 mt-4" },
                         React.createElement('h4', { className: UI.typography.sectionTitle }, "Changes in this version:"),
                         React.createElement('ul', { className: "list-disc list-inside text-sm space-y-1 ml-2" },
+                            React.createElement('li', null, "TableUI and better component system"),
                             React.createElement('li', null, "Fixed error in import export"),
                             React.createElement('li', null, "Unified Storage configuration"),
                             React.createElement('li', null, "Re-structuring the export to all in one file"),
