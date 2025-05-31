@@ -48,24 +48,83 @@ window.App.components.InventoryView = ({
     const [selectedFootprints, setSelectedFootprints] = useState([]);
     const [quantityRange, setQuantityRange] = useState(null);
     const [priceRange, setPriceRange] = useState(null);
+    const [selectedApFilters, setSelectedApFilters] = useState([]);
 
     // Clear advanced filters callback
-    const handleClearAdvancedFilters = useCallback(() => {
-        setSelectedCategories([]);
-        setSelectedTypes([]);
-        setSelectedMarks([]);
-        setSelectedLocations([]);
-        setSelectedFootprints([]);
-        setQuantityRange(null);
-        setPriceRange(null);
-        setCurrentPage(1);
-    }, []);
+const handleClearAdvancedFilters = useCallback(() => {
+    setSelectedCategories([]);
+    setSelectedTypes([]);
+    setSelectedMarks([]);
+    setSelectedLocations([]);
+    setSelectedFootprints([]);
+    setSelectedApFilters([]); // Add this line
+    setQuantityRange(null);
+    setPriceRange(null);
+    setCurrentPage(1);
+}, []);
 
     // Reset pagination when filters change
     useEffect(() => {
-        setCurrentPage(1);
-    }, [selectedCategories, selectedTypes, selectedMarks, selectedLocations,
-        selectedFootprints, quantityRange, priceRange, searchTerm, selectedCategory]);
+    setCurrentPage(1);
+}, [selectedCategories, selectedTypes, selectedMarks, selectedLocations,
+    selectedFootprints, selectedApFilters, quantityRange, priceRange, searchTerm, selectedCategory]); // Add selectedApFilters
+
+    const matchesApFilters = (component, apFilters) => {
+        if (!apFilters || apFilters.length === 0) return true;
+        if (!component.ap || !Array.isArray(component.ap) || component.ap.length === 0) return false;
+
+        // Get all key-value pairs from component's ap array
+        const componentParams = {};
+        component.ap.forEach(paramObj => {
+            if (paramObj && typeof paramObj === 'object') {
+                Object.entries(paramObj).forEach(([key, value]) => {
+                    componentParams[key] = value;
+                });
+            }
+        });
+
+        // Check if all AP filters match
+        return apFilters.every(filter => {
+            const { key, value, caseSensitive, ignoreWhitespace } = filter;
+
+            // Find matching key in component params (case-sensitive key matching)
+            const componentValue = componentParams[key];
+            if (componentValue === undefined) return false;
+
+            let searchValue = value;
+            let targetValue = String(componentValue);
+
+            // Apply whitespace handling
+            if (ignoreWhitespace) {
+                searchValue = searchValue.replace(/\s+/g, '');
+                targetValue = targetValue.replace(/\s+/g, '');
+            }
+
+            // Apply case sensitivity
+            if (!caseSensitive) {
+                searchValue = searchValue.toLowerCase();
+                targetValue = targetValue.toLowerCase();
+            }
+
+            // Check if value is a regex pattern (wrapped in {})
+            if (searchValue.startsWith('{') && searchValue.endsWith('}')) {
+                try {
+                    const regexPattern = searchValue.slice(1, -1); // Remove { and }
+                    const flags = caseSensitive ? 'g' : 'gi';
+                    const regex = new RegExp(regexPattern, flags);
+                    return regex.test(targetValue);
+                } catch (e) {
+                    console.warn('Invalid regex pattern:', searchValue, e);
+                    return false;
+                }
+            } else {
+                // Exact match or contains
+                return targetValue.includes(searchValue);
+            }
+        });
+    };
+
+
 
     // --- Filtering Logic ---
     const filteredComponents = components.filter(component => {
@@ -120,10 +179,14 @@ window.App.components.InventoryView = ({
                 )
         );
 
+        // Additional Parameters filter (ADD THIS)
+        const matchesAp = matchesApFilters(component, selectedApFilters);
+
         return matchesCategory && matchesSearch &&
             matchesAdvancedCategory && matchesType &&
             matchesMarks && matchesLocation &&
-            matchesFootprint && matchesQuantity && matchesPrice;
+            matchesFootprint && matchesQuantity && matchesPrice &&
+            matchesAp; // Add this to the return condition
     });
 
     // --- Pagination Logic ---
@@ -223,6 +286,8 @@ window.App.components.InventoryView = ({
             onFootprintsChange: setSelectedFootprints,
             onQuantityRangeChange: setQuantityRange,
             onPriceRangeChange: setPriceRange,
+            selectedApFilters: selectedApFilters,
+            onApFiltersChange: setSelectedApFilters,
             onItemsPerPageChange,
             onClearFilters: handleClearAdvancedFilters,
             onChangeViewMode: handleViewChange,
@@ -235,8 +300,8 @@ window.App.components.InventoryView = ({
         renderPagination(),
 
         // --- Selection Controls Bar (Always shown when components exist) ---
-        filteredComponents.length > 0 && React.createElement('div', { 
-            className: `mb-4 p-3 bg-${UI.getThemeColors().background} rounded-lg border border-${UI.getThemeColors().border} flex flex-wrap justify-between items-center gap-2` 
+        filteredComponents.length > 0 && React.createElement('div', {
+            className: `mb-4 p-3 bg-${UI.getThemeColors().background} rounded-lg border border-${UI.getThemeColors().border} flex flex-wrap justify-between items-center gap-2`
         },
             // Select All Checkbox & Count
             React.createElement('div', { className: "flex items-center" },
@@ -249,11 +314,11 @@ window.App.components.InventoryView = ({
                     title: selectedComponents.length === filteredComponents.length ? "Deselect All Visible" : "Select All Visible",
                     disabled: filteredComponents.length === 0
                 }),
-                React.createElement('label', { 
-                    htmlFor: "select-all-filtered-bulk", 
+                React.createElement('label', {
+                    htmlFor: "select-all-filtered-bulk",
                     className: UI.forms.label + " cursor-pointer"
-                }, selectedComponents.length > 0 
-                    ? `${selectedComponents.length} component(s) selected` 
+                }, selectedComponents.length > 0
+                    ? `${selectedComponents.length} component(s) selected`
                     : `Select all ${filteredComponents.length} component(s)`
                 )
             ),
@@ -271,7 +336,7 @@ window.App.components.InventoryView = ({
         ),
 
         // --- Components List (Table or Cards) ---
-        viewMode === 'table' ? 
+        viewMode === 'table' ?
             React.createElement(window.App.components.ViewTableInventory, {
                 components: paginatedComponents,
                 locations,

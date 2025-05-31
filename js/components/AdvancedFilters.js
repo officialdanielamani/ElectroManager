@@ -27,6 +27,8 @@ window.App.components.AdvancedFilters = ({
     priceRange, // Object: {min, max} for price filter
     itemsPerPage, // Number: Items to show per page
     onChangeViewMode, // Function(mode): Called to change view mode ('table'/'card')
+    selectedApFilters = [], // Array: Currently applied AP filters
+    onApFiltersChange, // Function(filters): Update AP filters
 
     // Callbacks
     onCategoriesChange, // Function(categories): Update selected categories
@@ -66,6 +68,10 @@ window.App.components.AdvancedFilters = ({
     // Get min/max values for range filters
     const [priceStats, setPriceStats] = useState({ min: 0, max: 100 });
     const [quantityStats, setQuantityStats] = useState({ min: 0, max: 100 });
+
+    const [apSearchText, setApSearchText] = useState('');
+    const [apCaseSensitive, setApCaseSensitive] = useState(false);
+    const [apIgnoreWhitespace, setApIgnoreWhitespace] = useState(true);
 
     // Items per page options
     const pageOptions = [5, 10, 25, 50, 100, 'all'];
@@ -456,6 +462,59 @@ window.App.components.AdvancedFilters = ({
         );
     };
 
+
+    const parseApSearchText = (text) => {
+    if (!text.trim()) return [];
+    
+    const filters = [];
+    const lines = text.split(/[;\n]/).filter(line => line.trim());
+    
+    for (const line of lines) {
+        const colonIndex = line.indexOf(':');
+        if (colonIndex > 0) {
+            const key = line.substring(0, colonIndex).trim();
+            const value = line.substring(colonIndex + 1).trim();
+            
+            if (key && value) {
+                filters.push({ key, value });
+            }
+        }
+    }
+    
+    return filters;
+};
+
+const handleApSearchAdd = () => {
+    const newFilters = parseApSearchText(apSearchText);
+    if (newFilters.length > 0) {
+        const updatedFilters = [...selectedApFilters];
+        
+        newFilters.forEach(newFilter => {
+            // Check if this key-value combination already exists
+            const exists = updatedFilters.some(existing => 
+                existing.key === newFilter.key && existing.value === newFilter.value
+            );
+            
+            if (!exists) {
+                updatedFilters.push({
+                    ...newFilter,
+                    caseSensitive: apCaseSensitive,
+                    ignoreWhitespace: apIgnoreWhitespace,
+                    id: Date.now() + Math.random() // Simple unique ID
+                });
+            }
+        });
+        
+        onApFiltersChange(updatedFilters);
+        setApSearchText(''); // Clear the input after adding
+    }
+};
+
+const handleApFilterRemove = (filterId) => {
+    const updatedFilters = selectedApFilters.filter(filter => filter.id !== filterId);
+    onApFiltersChange(updatedFilters);
+};
+
     // Special render method for marks (with icons)
     const renderMarksCheckboxes = () => {
         return React.createElement('div', { className: "mb-4" },
@@ -530,26 +589,130 @@ window.App.components.AdvancedFilters = ({
 
     // Count active filters
     const getActiveFilterCount = () => {
-        let count = 0;
-        if (selectedCategories?.length) count++;
-        if (selectedTypes?.length) count++;
-        if (selectedMarks?.length) count++;
-        if (selectedLocations?.length) count++;
-        if (selectedFootprints?.length) count++;
+    let count = 0;
+    if (selectedCategories?.length) count++;
+    if (selectedTypes?.length) count++;
+    if (selectedMarks?.length) count++;
+    if (selectedLocations?.length) count++;
+    if (selectedFootprints?.length) count++;
+    if (selectedApFilters?.length) count++; // Add this line
 
-        // Count range filters only if they're not at min/max
-        if (quantityRange && (
-            quantityRange.min > quantityStats.min ||
-            quantityRange.max < quantityStats.max
-        )) count++;
+    // Count range filters only if they're not at min/max
+    if (quantityRange && (
+        quantityRange.min > quantityStats.min ||
+        quantityRange.max < quantityStats.max
+    )) count++;
 
-        if (priceRange && (
-            priceRange.min > priceStats.min ||
-            priceRange.max < priceStats.max
-        )) count++;
+    if (priceRange && (
+        priceRange.min > priceStats.min ||
+        priceRange.max < priceStats.max
+    )) count++;
 
-        return count;
-    };
+    return count;
+};
+
+    const renderApParameterSearch = () => {
+    return React.createElement('div', { className: "mb-4" },
+        React.createElement('h4', { className: UI.typography.sectionTitle + " mb-2" }, "Additional Parameters Search"),
+        
+        // Search input area
+        React.createElement('div', { 
+            className: `p-3 border border-${UI.getThemeColors().border} rounded bg-${UI.getThemeColors().cardBackground} mb-3` 
+        },
+            // Input textarea
+            React.createElement('textarea', {
+                value: apSearchText,
+                onChange: (e) => setApSearchText(e.target.value),
+                placeholder: "Enter search criteria:\nMaxVr: 50V\nIf: {regex pattern}\nVf: 0.7V",
+                className: UI.forms.textarea + " mb-2 h-20 text-sm",
+                rows: 3
+            }),
+            
+            // Options row
+            React.createElement('div', { className: "flex items-center justify-between mb-2" },
+                React.createElement('div', { className: "flex items-center space-x-4" },
+                    // Case sensitive checkbox
+                    React.createElement('label', { 
+                        className: `flex items-center text-sm cursor-pointer text-${UI.getThemeColors().textSecondary}` 
+                    },
+                        React.createElement('input', {
+                            type: "checkbox",
+                            className: UI.forms.checkbox + " mr-1",
+                            checked: apCaseSensitive,
+                            onChange: (e) => setApCaseSensitive(e.target.checked)
+                        }),
+                        "Case Sensitive"
+                    ),
+                    
+                    // Ignore whitespace checkbox
+                    React.createElement('label', { 
+                        className: `flex items-center text-sm cursor-pointer text-${UI.getThemeColors().textSecondary}` 
+                    },
+                        React.createElement('input', {
+                            type: "checkbox",
+                            className: UI.forms.checkbox + " mr-1",
+                            checked: apIgnoreWhitespace,
+                            onChange: (e) => setApIgnoreWhitespace(e.target.checked)
+                        }),
+                        "Ignore Whitespace"
+                    )
+                ),
+                
+                // Add button
+                React.createElement('button', {
+                    onClick: handleApSearchAdd,
+                    disabled: !apSearchText.trim(),
+                    className: UI.buttons.small.primary + " min-w-16"
+                }, "Add")
+            ),
+            
+            // Help text
+            React.createElement('div', { 
+                className: `text-xs text-${UI.getThemeColors().textMuted}` 
+            },
+                "Format: Key: Value (one per line). Supports regex patterns in {braces}. Separate multiple with semicolons or new lines."
+            )
+        ),
+        
+        // Active filters display
+        selectedApFilters.length > 0 && React.createElement('div', { 
+            className: `border border-${UI.getThemeColors().border} rounded bg-${UI.getThemeColors().background} p-2` 
+        },
+            React.createElement('div', { 
+                className: `text-sm font-medium text-${UI.getThemeColors().textSecondary} mb-2` 
+            }, "Active AP Filters:"),
+            
+            React.createElement('div', { className: "flex flex-wrap gap-1" },
+                selectedApFilters.map(filter =>
+                    React.createElement('div', {
+                        key: filter.id,
+                        className: `inline-flex items-center ${UI.tags.base} ${UI.tags.indigo} text-xs`
+                    },
+                        React.createElement('span', { className: "mr-1" }, 
+                            `${filter.key}: ${filter.value}`
+                        ),
+                        
+                        // Options indicators
+                        (filter.caseSensitive || !filter.ignoreWhitespace) && 
+                        React.createElement('span', { 
+                            className: `text-xs opacity-75 mr-1`,
+                            title: `${filter.caseSensitive ? 'Case Sensitive' : ''}${filter.caseSensitive && !filter.ignoreWhitespace ? ', ' : ''}${!filter.ignoreWhitespace ? 'Whitespace Sensitive' : ''}`
+                        }, 
+                            `(${filter.caseSensitive ? 'CS' : ''}${filter.caseSensitive && !filter.ignoreWhitespace ? ',' : ''}${!filter.ignoreWhitespace ? 'WS' : ''})`
+                        ),
+                        
+                        // Remove button
+                        React.createElement('button', {
+                            onClick: () => handleApFilterRemove(filter.id),
+                            className: `ml-1 text-current hover:text-red-300 transition-colors`,
+                            title: "Remove filter"
+                        }, "×")
+                    )
+                )
+            )
+        )
+    );
+};
 
     const activeFilterCount = getActiveFilterCount();
 
@@ -717,6 +880,8 @@ window.App.components.AdvancedFilters = ({
                     renderMarksCheckboxes()
                 ),
 
+                
+
                 // Location filter
                 React.createElement('div', null,
                     locations && locations.length > 4
@@ -754,6 +919,11 @@ window.App.components.AdvancedFilters = ({
                     renderPageSizeSelector()
                 ),
 
+                                                React.createElement('div', null, // Span 2 columns for more space
+    renderApParameterSearch()
+),
+
+
                 // Quantity range filter
                 React.createElement('div', null,
                     renderRangeSlider("Filter by Quantity", quantityRange, quantityStats, onQuantityRangeChange)
@@ -763,6 +933,7 @@ window.App.components.AdvancedFilters = ({
                 React.createElement('div', null,
                     renderRangeSlider("Filter by Price", priceRange, priceStats, onPriceRangeChange)
                 ),
+
 
                 // Clear filters button
                 React.createElement('div', { className: "flex items-end" },
