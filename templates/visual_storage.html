@@ -1,0 +1,540 @@
+{% extends "base.html" %}
+
+{% block title %}Visual Storage - Inventory Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2><i class="bi bi-grid-3x3"></i> Visual Storage System</h2>
+            <div>
+                {% if current_user.is_admin() %}
+                <a href="{{ url_for('location_management') }}" class="btn btn-secondary">
+                    <i class="bi bi-gear"></i> Manage Racks
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        <p class="text-muted">Click on any drawer to see what's stored there</p>
+    </div>
+</div>
+
+<!-- Rack Filter -->
+{% if locations|length > 0 or all_racks|length > 1 %}
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="row g-2 align-items-end">
+                    <div class="col-auto">
+                        <label class="form-label mb-0">Location:</label>
+                        <select id="locationFilter" class="form-select form-select-sm" onchange="filterByLocation(this.value)" style="min-width: 200px;">
+                            <option value="">All Locations</option>
+                            {% for loc in locations %}
+                            <option value="{{ loc.id }}" {% if current_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label mb-0">View Rack:</label>
+                        <select id="rackFilter" class="form-select form-select-sm" onchange="filterRack(this.value)" style="min-width: 200px;">
+                            <option value="">All Racks</option>
+                            {% for r in all_racks %}
+                            <option value="{{ r.id }}" {% if current_rack_id == r.id %}selected{% endif %}>{{ r.name }}{% if r.physical_location %} - {{ r.physical_location.name }}{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Visual Rack System -->
+<div id="rackContainer">
+    {% for rack in racks %}
+    <div class="rack-section mb-4" data-rack-id="{{ rack.id }}">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="flex-grow-1">
+                        <h5 class="mb-1">
+                            <i class="bi bi-box-seam"></i> {{ rack.name }}
+                            <span class="badge bg-info">{{ rack.item_count }} items</span>
+                        </h5>
+                        {% if rack.description %}
+                        <small>{{ rack.description }}</small>
+                        {% endif %}
+                        {% if rack.physical_location %}
+                        <div><small><i class="bi bi-geo-alt"></i> <span class="badge" style="background-color: {{ rack.physical_location.color }};">{{ rack.physical_location.name }}</span></small></div>
+                        {% elif rack.location %}
+                        <div><small><i class="bi bi-geo-alt"></i> {{ rack.location }}</small></div>
+                        {% endif %}
+                    </div>
+                    <a href="{{ url_for('rack_detail', id=rack.id) }}" class="btn btn-sm btn-info" title="View Rack Details">
+                        <i class="bi bi-eye"></i> View
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="drawer-grid">
+                    {% for row in range(rack.rows) %}
+                    <div class="drawer-row">
+                        {% for col in range(rack.cols) %}
+                        {% set drawer_id = "R%d-C%d"|format(row + 1, col + 1) %}
+                        {% set drawer_data = rack.drawers.get(drawer_id) %}
+                        {% set is_unavailable = drawer_id in rack.unavailable_drawers %}
+                        <div class="drawer-cell {% if is_unavailable %}unavailable{% elif drawer_data %}has-items{% else %}empty{% endif %}" 
+                             data-drawer="{{ drawer_id }}"
+                             data-rack="{{ rack.id }}"
+                             onclick="openDrawer('{{ rack.name }}', '{{ drawer_id }}', {{ rack.id }})">
+                            <div class="drawer-label">{{ drawer_id }}</div>
+                            <div class="drawer-count">
+                                {% if is_unavailable %}
+                                <span class="badge bg-secondary">Unavailable</span>
+                                {% elif drawer_data %}
+                                <span class="badge bg-success">{{ drawer_data['items']|length }}</span>
+                                {% else %}
+                                <span class="text-muted">Empty</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-md-12">
+        <div class="alert alert-info">
+            <h5><i class="bi bi-info-circle"></i> No Racks Created Yet</h5>
+            <p>Create your first rack to start organizing your inventory visually.</p>
+            {% if current_user.is_admin() %}
+            <a href="{{ url_for('location_management') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Create First Rack
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Drawer Detail Modal -->
+<div class="modal fade" id="drawerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="drawerModalTitle">Drawer Contents</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="drawerModalBody">
+                <!-- Content loaded dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Move Items Modal -->
+<div class="modal fade" id="moveItemsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Move All Items</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">Choose where to move all items from this drawer:</p>
+                
+                <!-- Location Type Toggle -->
+                <div class="btn-group btn-group-sm w-100 mb-3" role="group">
+                    <input type="radio" class="btn-check" name="move_location_type" id="move_type_general" value="general" checked>
+                    <label class="btn btn-outline-primary" for="move_type_general">General Location</label>
+                    
+                    <input type="radio" class="btn-check" name="move_location_type" id="move_type_drawer" value="drawer">
+                    <label class="btn btn-outline-primary" for="move_type_drawer">Drawer Storage</label>
+                </div>
+                
+                <!-- General Location Section -->
+                <div id="move_general_section">
+                    <label class="form-label">General Location</label>
+                    <select id="move_location_id" class="form-select">
+                        <option value="0">-- Select Location --</option>
+                        {% for location in locations %}
+                        <option value="{{ location.id }}">{{ location.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Drawer Storage Section -->
+                <div id="move_drawer_section" style="display: none;">
+                    <div class="mb-2">
+                        <label class="form-label">Rack</label>
+                        <select id="move_rack_id" class="form-select" onchange="updateMoveDrawerGrid()">
+                            <option value="0">-- Select Rack --</option>
+                            {% for rack in all_racks %}
+                            <option value="{{ rack.id }}" data-rows="{{ rack.rows }}" data-cols="{{ rack.cols }}">{{ rack.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Drawer</label>
+                        <input type="text" id="move_drawer" class="form-control" placeholder="Click grid below" readonly>
+                    </div>
+                    <div id="move_drawer_grid_container"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="moveAllItems()">Move Items</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.drawer-grid {
+    display: table;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 5px;
+}
+
+.drawer-row {
+    display: table-row;
+}
+
+.drawer-cell {
+    display: table-cell;
+    width: 120px;
+    height: 120px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    text-align: center;
+    padding: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    background: linear-gradient(145deg, #f8f9fa, #e9ecef);
+    vertical-align: top;
+}
+
+.drawer-cell:hover {
+    border-color: #0d6efd;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.drawer-cell.has-items {
+    background: linear-gradient(145deg, #d1e7dd, #badbcc);
+    border-color: #198754;
+}
+
+.drawer-cell.empty {
+    background: linear-gradient(145deg, #f8f9fa, #dee2e6);
+}
+
+.drawer-cell.unavailable {
+    background: linear-gradient(145deg, #6c757d, #5a6268);
+    border-color: #495057;
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.drawer-cell.unavailable .drawer-label {
+    color: #fff;
+}
+
+.move-drawer-cell {
+    width: 35px;
+    height: 35px;
+    border: 1px solid #dee2e6;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: white;
+    transition: all 0.2s;
+    font-size: 0.65rem;
+    font-weight: bold;
+}
+
+.move-drawer-cell:hover {
+    border-color: #0d6efd;
+    background: #e7f3ff;
+}
+
+.move-drawer-cell.selected {
+    background: #0d6efd;
+    color: white;
+    border-color: #0d6efd;
+}
+
+.drawer-label {
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: #666;
+    margin-bottom: 4px;
+}
+
+.drawer-count {
+    font-size: 0.9rem;
+    margin-top: 4px;
+}
+
+.rack-section {
+    margin-bottom: 30px;
+}
+
+@media (max-width: 768px) {
+    .drawer-cell {
+        width: 80px;
+        height: 80px;
+        padding: 4px;
+    }
+    
+    .drawer-label {
+        font-size: 0.65rem;
+    }
+}
+</style>
+
+<script>
+let currentRackId = null;
+let currentDrawerId = null;
+
+function openDrawer(rackName, drawerId, rackId) {
+    currentRackId = rackId;
+    currentDrawerId = drawerId;
+    
+    const modal = new bootstrap.Modal(document.getElementById('drawerModal'));
+    document.getElementById('drawerModalTitle').textContent = `${rackName} - Drawer ${drawerId}`;
+    document.getElementById('drawerModalBody').innerHTML = '<div class="text-center"><div class="spinner-border"></div><p>Loading...</p></div>';
+    
+    fetch(`/api/drawer/${rackId}/${encodeURIComponent(drawerId)}`)
+        .then(response => response.json())
+        .then(data => {
+            let html = '';
+            
+            {% if current_user.is_editor() %}
+            // Controls section
+            html += '<div class="mb-3 p-2 bg-light rounded">';
+            html += '<div class="d-flex justify-content-between align-items-center">';
+            html += '<div class="form-check">';
+            html += `<input class="form-check-input" type="checkbox" id="drawerUnavailable" ${data.is_unavailable ? 'checked' : ''} onchange="toggleDrawerAvailability()">`;
+            html += '<label class="form-check-label" for="drawerUnavailable">Make this Drawer Unavailable</label>';
+            html += '</div>';
+            if (data.items && data.items.length > 0) {
+                html += '<button class="btn btn-sm btn-warning" onclick="showMoveItemsModal()"><i class="bi bi-arrow-right"></i> Move All Items</button>';
+            }
+            html += '</div>';
+            html += '</div>';
+            {% endif %}
+            
+            if (data.items && data.items.length > 0) {
+                html += '<table class="table table-hover">';
+                html += '<thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Available</th></tr></thead>';
+                html += '<tbody>';
+                data.items.forEach(item => {
+                    html += `
+                        <tr onclick="window.location='/item/${item.uuid}'" style="cursor: pointer;">
+                            <td>
+                                <strong>${item.name}</strong><br>
+                                <small class="text-muted">${item.uuid}</small>
+                            </td>
+                            <td>${item.sku}</td>
+                            <td><span class="badge bg-primary">${item.quantity}</span></td>
+                            <td><span class="badge bg-success">${item.available}</span></td>
+                        </tr>
+                    `;
+                });
+                html += '</tbody></table>';
+            } else {
+                html += '<div class="alert alert-info">This drawer is empty.</div>';
+            }
+            
+            {% if current_user.is_editor() %}
+            html += `
+                <div class="mt-3">
+                    <a href="/item/new?rack_id=${rackId}&drawer=${encodeURIComponent(drawerId)}" class="btn btn-success">
+                        <i class="bi bi-plus-circle"></i> Add Item Here
+                    </a>
+                </div>
+            `;
+            {% endif %}
+            
+            document.getElementById('drawerModalBody').innerHTML = html;
+        })
+        .catch(error => {
+            document.getElementById('drawerModalBody').innerHTML = '<div class="alert alert-danger">Error loading drawer contents.</div>';
+        });
+    
+    modal.show();
+}
+
+function toggleDrawerAvailability() {
+    const isUnavailable = document.getElementById('drawerUnavailable').checked;
+    
+    fetch('/api/drawer/toggle-availability', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            rack_id: currentRackId,
+            drawer_id: currentDrawerId,
+            is_unavailable: isUnavailable
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Reload page to update visual
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to update drawer availability'));
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error);
+    });
+}
+
+function showMoveItemsModal() {
+    // Close drawer modal
+    const drawerModal = bootstrap.Modal.getInstance(document.getElementById('drawerModal'));
+    drawerModal.hide();
+    
+    // Show move items modal
+    const moveModal = new bootstrap.Modal(document.getElementById('moveItemsModal'));
+    moveModal.show();
+}
+
+function moveAllItems() {
+    const locationType = document.querySelector('input[name="move_location_type"]:checked').value;
+    
+    let requestData = {
+        rack_id: currentRackId,
+        drawer_id: currentDrawerId,
+        location_type: locationType
+    };
+    
+    if (locationType === 'general') {
+        const locationId = document.getElementById('move_location_id').value;
+        if (!locationId || locationId === '0') {
+            alert('Please select a general location');
+            return;
+        }
+        requestData.location_id = locationId;
+    } else {
+        const rackId = document.getElementById('move_rack_id').value;
+        const drawer = document.getElementById('move_drawer').value;
+        if (!rackId || rackId === '0' || !drawer) {
+            alert('Please select a rack and drawer');
+            return;
+        }
+        requestData.new_rack_id = rackId;
+        requestData.new_drawer = drawer;
+    }
+    
+    fetch('/api/drawer/move-items', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(requestData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`Successfully moved ${data.items_moved} items`);
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to move items'));
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error);
+    });
+}
+
+function filterByLocation(locationId) {
+    // Update URL and reload to get racks from backend filtered by location
+    const url = new URL(window.location);
+    if (locationId) {
+        url.searchParams.set('location', locationId);
+    } else {
+        url.searchParams.delete('location');
+    }
+    url.searchParams.delete('rack');
+    window.location = url;
+}
+
+function filterRack(rackId) {
+    // Update URL with rack parameter
+    const url = new URL(window.location);
+    if (rackId) {
+        url.searchParams.set('rack', rackId);
+    } else {
+        url.searchParams.delete('rack');
+    }
+    window.location = url;
+}
+
+// Toggle move location type
+document.addEventListener('DOMContentLoaded', function() {
+    const typeGeneral = document.getElementById('move_type_general');
+    const typeDrawer = document.getElementById('move_type_drawer');
+    
+    if (typeGeneral && typeDrawer) {
+        typeGeneral.addEventListener('change', toggleMoveLocationType);
+        typeDrawer.addEventListener('change', toggleMoveLocationType);
+    }
+});
+
+function toggleMoveLocationType() {
+    const typeGeneral = document.getElementById('move_type_general');
+    const generalSection = document.getElementById('move_general_section');
+    const drawerSection = document.getElementById('move_drawer_section');
+    
+    if (typeGeneral.checked) {
+        generalSection.style.display = 'block';
+        drawerSection.style.display = 'none';
+    } else {
+        generalSection.style.display = 'none';
+        drawerSection.style.display = 'block';
+    }
+}
+
+function updateMoveDrawerGrid() {
+    const select = document.getElementById('move_rack_id');
+    const selected = select.options[select.selectedIndex];
+    const rows = parseInt(selected.dataset.rows || 0);
+    const cols = parseInt(selected.dataset.cols || 0);
+    const container = document.getElementById('move_drawer_grid_container');
+    
+    if (!rows || !cols) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    let html = '<div style="display: inline-grid; gap: 3px; grid-template-columns: repeat(' + cols + ', 35px);">';
+    for (let r = 1; r <= rows; r++) {
+        for (let c = 1; c <= cols; c++) {
+            const drawerId = 'R' + r + '-C' + c;
+            html += `<div class="move-drawer-cell" onclick="selectMoveDrawer('${drawerId}')">${drawerId}</div>`;
+        }
+    }
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function selectMoveDrawer(drawerId) {
+    document.getElementById('move_drawer').value = drawerId;
+    // Highlight selected
+    document.querySelectorAll('.move-drawer-cell').forEach(cell => {
+        cell.classList.remove('selected');
+    });
+    event.target.classList.add('selected');
+}
+</script>
+{% endblock %}

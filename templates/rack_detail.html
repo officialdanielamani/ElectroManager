@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}{{ rack.name }} - Inventory Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2><i class="bi bi-grid-3x3"></i> {{ rack.name }}</h2>
+            <div>
+                <a href="{{ url_for('visual_storage', rack=rack.id) }}" class="btn btn-info">
+                    <i class="bi bi-eye"></i> Visual View
+                </a>
+                <a href="{{ url_for('location_management') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Back
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Rack Information</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Name:</strong> {{ rack.name }}</p>
+                <p><strong>Description:</strong> {{ rack.description or 'N/A' }}</p>
+                <p><strong>Color:</strong> 
+                    <span style="display: inline-block; width: 20px; height: 20px; background-color: {{ rack.color }}; border: 1px solid #dee2e6; border-radius: 4px; vertical-align: middle;"></span>
+                    {{ rack.color }}
+                </p>
+                <p><strong>Location:</strong> 
+                    {% if rack.physical_location %}
+                    <span class="badge" style="background-color: {{ rack.physical_location.color }};">
+                        {{ rack.physical_location.name }}
+                    </span>
+                    {% else %}
+                    {{ rack.location or 'N/A' }}
+                    {% endif %}
+                </p>
+                <p><strong>Grid Size:</strong> {{ rack.rows }} × {{ rack.cols }}</p>
+                <p><strong>Total Items:</strong> {{ items|length }}</p>
+                <p><strong>Drawers Used:</strong> {{ drawers|length }}</p>
+                
+                {% if rack.picture %}
+                <hr>
+                <div>
+                    <p><strong>Picture:</strong></p>
+                    <img src="{{ url_for('rack_picture', filename=rack.picture) }}" 
+                         alt="{{ rack.name }}" 
+                         style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 8px; border: 2px solid #dee2e6; cursor: pointer;"
+                         onclick="showImageModal('{{ url_for('rack_picture', filename=rack.picture) }}', '{{ rack.name }}')">
+                    <small class="text-muted d-block mt-2">Click to enlarge</small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Items in this Rack</h5>
+            </div>
+            <div class="card-body">
+                {% if items %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Drawer</th>
+                                <th>Item</th>
+                                <th>Quantity</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in items %}
+                            <tr>
+                                <td>{{ item.drawer or 'N/A' }}</td>
+                                <td>{{ item.name }}</td>
+                                <td>{{ item.quantity }}</td>
+                                <td>
+                                    <a href="{{ url_for('item_detail', uuid=item.uuid) }}" class="btn btn-sm btn-info">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-center text-muted">No items in this rack yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Image Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imageModalLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="modalImage" src="" alt="" style="max-width: 100%; max-height: 70vh; object-fit: contain;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showImageModal(imageSrc, rackName) {
+    document.getElementById('modalImage').src = imageSrc;
+    document.getElementById('imageModalLabel').textContent = rackName;
+    const modal = new bootstrap.Modal(document.getElementById('imageModal'));
+    modal.show();
+}
+</script>
+{% endblock %}

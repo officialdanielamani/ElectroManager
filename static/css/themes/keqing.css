@@ -1,0 +1,276 @@
+/* Keqing Theme - Dark Purple & Gold (Simplified) */
+body {
+    background: linear-gradient(135deg, #1a0d2e 0%, #2d1b4e 100%);
+    background-attachment: fixed;
+    color: #d4af37;
+}
+
+/* Fix text-secondary and text-muted contrast for keqing theme */
+.text-secondary {
+    color: #c0c0c0 !important;
+}
+
+.text-muted {
+    color: #a8a8a8 !important;
+}
+
+.navbar {
+    background: linear-gradient(135deg, #2d1b4e 0%, #4a2c6b 100%) !important;
+    box-shadow: none;
+}
+
+.navbar-brand, .nav-link {
+    color: #d4af37 !important;
+}
+
+.nav-link:hover {
+    color: #ffd700 !important;
+}
+
+.card {
+    background: #2d1b4e;
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    box-shadow: none;
+    color: #e8e8e8;
+}
+
+.card-header {
+    background: #3d2a5c;
+    color: #d4af37;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+/* Table styling for keqing theme */
+.table {
+    background-color: #2d1b4e !important;
+    color: #e8e8e8 !important;
+    border-color: rgba(212, 175, 55, 0.2) !important;
+}
+
+.table thead th {
+    background: #3d2a5c !important;
+    color: #d4af37 !important;
+    border-color: rgba(212, 175, 55, 0.3) !important;
+}
+
+.table tbody tr {
+    background-color: #2d1b4e !important;
+    color: #e8e8e8 !important;
+    border-color: rgba(212, 175, 55, 0.1) !important;
+}
+
+.table tbody td {
+    background-color: #2d1b4e !important;
+    border-color: rgba(212, 175, 55, 0.1) !important;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #3d2a5c !important;
+}
+
+/* Modal styling for keqing theme */
+.modal-content {
+    background: #2d1b4e !important;
+    color: #e8e8e8 !important;
+    border: 1px solid rgba(212, 175, 55, 0.3) !important;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5) !important;
+}
+
+.modal-header {
+    background: #3d2a5c !important;
+    color: #d4af37 !important;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.3) !important;
+}
+
+.modal-body {
+    background: #2d1b4e !important;
+    color: #e8e8e8 !important;
+}
+
+.modal-footer {
+    background: #2d1b4e !important;
+    border-color: rgba(212, 175, 55, 0.2) !important;
+}
+
+.modal-header .btn-close {
+    filter: brightness(1.5);
+}
+
+.form-control, .form-select {
+    background-color: #3d2a5c !important;
+    border-color: rgba(212, 175, 55, 0.3) !important;
+    color: #e8e8e8 !important;
+}
+
+.form-control::placeholder {
+    color: #a8a8a8 !important;
+    opacity: 1 !important;
+}
+
+.form-control:focus, .form-select:focus {
+    background-color: #3d2a5c !important;
+    border-color: #d4af37 !important;
+    color: #e8e8e8 !important;
+    box-shadow: 0 0 0 0.2rem rgba(212, 175, 55, 0.25) !important;
+}
+
+/* Button styling */
+.btn-primary {
+    background: #d4af37;
+    border: none;
+    color: #2d1b4e;
+    font-weight: 600;
+}
+
+.btn-primary:hover {
+    background: #ffd700;
+    color: #1a0d2e;
+}
+
+.btn-success {
+    background: #6b3fa0;
+    border: none;
+}
+
+.btn-success:hover {
+    background: #7d4fb8;
+}
+
+.btn-danger {
+    background: #c41e3a;
+    border: none;
+}
+
+.btn-danger:hover {
+    background: #e32636;
+}
+
+.btn-secondary {
+    background: #5a5a5a;
+    border: none;
+}
+
+.btn-secondary:hover {
+    background: #6a6a6a;
+}
+
+.badge.bg-primary {
+    background: #d4af37 !important;
+    color: #2d1b4e;
+}
+
+/* Dropdown styling */
+.dropdown-menu {
+    background: #2d1b4e !important;
+    border-color: rgba(212, 175, 55, 0.3) !important;
+    box-shadow: none;
+}
+
+.dropdown-item {
+    color: #e8e8e8 !important;
+}
+
+.dropdown-item:hover {
+    background: #3d2a5c !important;
+    color: #d4af37 !important;
+}
+
+.dropdown-divider {
+    border-color: rgba(212, 175, 55, 0.2) !important;
+}
+
+.alert {
+    background-color: #3d2a5c !important;
+    border-color: rgba(212, 175, 55, 0.3) !important;
+    color: #d4af37 !important;
+    box-shadow: none;
+}
+
+.bg-light {
+    background: #2d1b4e !important;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: #d4af37;
+}
+
+a {
+    color: #ffd700;
+}
+
+a:hover {
+    color: #ffed4e;
+}
+
+/* List items */
+.list-group-item {
+    background-color: #2d1b4e !important;
+    border-color: rgba(212, 175, 55, 0.2) !important;
+    color: #e8e8e8 !important;
+}
+
+.list-group-item.active {
+    background: #d4af37 !important;
+    color: #2d1b4e !important;
+    border-color: #d4af37 !important;
+}
+
+/* Markdown content in keqing theme */
+.markdown-content {
+    color: #e8e8e8 !important;
+}
+
+/* Settings page - column customization */
+.columns-container {
+    background-color: #2d1b4e !important;
+    border-color: rgba(212, 175, 55, 0.3) !important;
+}
+
+.column-item {
+    background-color: #3d2a5c !important;
+    color: #e8e8e8 !important;
+    border-color: rgba(212, 175, 55, 0.3) !important;
+}
+
+.column-item:hover {
+    background-color: #4a3370 !important;
+}
+
+.column-header-info {
+    background-color: #3d2a5c !important;
+    color: #e8e8e8 !important;
+    border-color: rgba(212, 175, 55, 0.3) !important;
+}
+
+.column-header-info .text-muted {
+    color: #a8a8a8 !important;
+}
+
+.markdown-content code {
+    background-color: #3d2a5c !important;
+    color: #e8e8e8 !important;
+}
+
+.markdown-content pre {
+    background-color: #3d2a5c !important;
+    color: #e8e8e8 !important;
+}
+
+.markdown-content blockquote {
+    border-left-color: #d4af37 !important;
+    color: #d4af37 !important;
+}
+
+.markdown-content table thead {
+    background-color: #3d2a5c !important;
+    color: #d4af37 !important;
+}
+
+.markdown-content table th,
+.markdown-content table td {
+    border-color: rgba(212, 175, 55, 0.2) !important;
+}
+
+.markdown-content table tbody tr:hover {
+    background-color: #3d2a5c !important;
+}

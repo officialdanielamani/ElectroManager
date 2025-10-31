@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block title %}{{ item.name }} - Inventory Manager{% endblock %}
+
+{% block content %}
+<style>
+/* Image grid styling */
+.image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.image-grid-item {
+    position: relative;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 2px solid #e0e0e0;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.image-grid-item:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.image-grid-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.image-delete-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    z-index: 10;
+}
+
+/* Responsive grid */
+@media (max-width: 576px) {
+    .image-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 577px) and (max-width: 768px) {
+    .image-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (min-width: 769px) and (max-width: 992px) {
+    .image-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (min-width: 993px) {
+    .image-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+/* Modal styling */
+.modal-dialog-centered img {
+    max-height: 80vh;
+    width: auto;
+    max-width: 100%;
+}
+</style>
+
+<div class="row mb-3">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li>
+                <li class="breadcrumb-item active">{{ item.name }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <!-- Item Details -->
+    <div class="col-md-8">
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4><i class="bi bi-box"></i> {{ item.name }}</h4>
+                {% if current_user.is_editor() %}
+                <div>
+                    <a href="{{ url_for('item_edit', uuid=item.uuid) }}" class="btn btn-warning btn-sm">
+                        <i class="bi bi-pencil"></i> Edit
+                    </a>
+                    <form method="POST" action="{{ url_for('item_delete', uuid=item.uuid) }}" style="display:inline">
+                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Delete this item?')">
+                            <i class="bi bi-trash"></i> Delete
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>UUID:</strong> <code>{{ item.uuid }}</code>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>SKU:</strong> {{ item.sku or 'N/A' }}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Type / Model:</strong> {{ item.info or 'N/A' }}
+                    </div>
+                </div>
+
+                {% if item.description %}
+                <div class="mb-3">
+                    <strong>Description:</strong>
+                    <div class="markdown-content p-3 bg-light rounded" style="border-left: 4px solid #0dcaf0;">
+                        {{ item.description|markdown }}
+                    </div>
+                </div>
+                {% endif %}
+
+                <hr>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Category:</strong> {{ item.category.name if item.category else 'None' }}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Footprint:</strong> {{ item.footprint.name if item.footprint else 'None' }}
+                    </div>
+                </div>
+
+                {% if item.get_tags_list() %}
+                <div class="mb-3">
+                    <strong>Tags:</strong>
+                    {% for tag in item.get_tags_list() %}
+                    <span class="badge" style="background-color: {{ tag.color }}">{{ tag.name }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="mb-3">
+                    <strong>Location:</strong> {{ item.get_full_location() }}
+                </div>
+
+                <hr>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <strong>Total Quantity:</strong>
+                        <h3 class="text-primary">{{ item.quantity }}</h3>
+                    </div>
+                    {% if item.lend_to %}
+                    <div class="col-md-4">
+                        <strong>Lent:</strong>
+                        <h3 class="text-warning">{{ item.lend_quantity }}</h3>
+                        <small>to {{ item.lend_to }}</small>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Available:</strong>
+                        <h3 class="text-success">{{ item.get_available_quantity() }}</h3>
+                    </div>
+                    {% else %}
+                    <div class="col-md-4">
+                        <strong>Available:</strong>
+                        <h3 class="text-success">{{ item.quantity }}</h3>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if item.is_no_stock() %}
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-circle-fill"></i> No Stock!
+                </div>
+                {% elif item.is_low_stock() %}
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i> Low Stock! (Min: {{ item.min_quantity }})
+                </div>
+                {% endif %}
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <strong>Min Quantity:</strong> {{ item.min_quantity }}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Price per Qty:</strong> {{ currency_symbol }}{{ "%.2f"|format(item.price) }}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Total Price:</strong> 
+                        <span class="text-success fw-bold">{{ currency_symbol }}{{ "%.2f"|format(item.get_total_price()) }}</span>
+                    </div>
+                </div>
+
+                <!-- Image Grid Preview (above Magic Parameters) -->
+                {% set images = item.attachments | selectattr('file_type', 'in', ['png', 'jpg', 'jpeg', 'gif', 'webp']) | list %}
+                {% if images %}
+                <hr>
+                <div class="mb-3">
+                    <strong><i class="bi bi-images"></i> Images ({{ images|length }})</strong>
+                    <div class="image-grid mt-2">
+                        {% for att in images %}
+                        <div class="image-grid-item" onclick="openImageModal('{{ url_for('uploaded_file', filename=att.filename) }}', '{{ att.original_filename }}')">
+                            <img src="{{ url_for('uploaded_file', filename=att.filename) }}" alt="{{ att.original_filename }}">
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if item.magic_parameters %}
+                <hr>
+                <div class="mb-3">
+                    <strong><i class="bi bi-magic"></i> Magic Parameters:</strong>
+                    <div class="list-group mt-2">
+                        {% for param in item.magic_parameters %}
+                        <div class="list-group-item p-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <small class="text-muted">
+                                        {% if param.parameter.param_type == 'number' %}
+                                            {% if param.operation == 'min' %}MIN{% elif param.operation == 'max' %}MAX{% elif param.operation == 'range' %}RANGE{% elif param.operation == 'value' %}VALUE{% endif %}:
+                                        {% elif param.parameter.param_type == 'date' %}
+                                            {% if param.operation == 'start' %}START{% elif param.operation == 'end' %}END{% elif param.operation == 'duration' %}DURATION{% endif %}{% if param.operation == 'value' %}{% endif %}
+                                        {% endif %}
+                                        <strong>{{ param.parameter.name }}</strong>
+                                        {% if param.parameter.param_type == 'number' %}
+                                            {{ param.value }} {% if param.operation == 'range' %}- {{ param.value2 }}{% endif %} {{ param.unit }}
+                                        {% elif param.parameter.param_type == 'date' %}
+                                            {% if param.operation != 'value' %}on {% endif %}{{ param.value }} {% if param.operation == 'duration' %}to {{ param.value2 }}{% endif %}
+                                        {% elif param.parameter.param_type == 'string' %}
+                                            {{ param.string_option }}
+                                        {% endif %}
+                                        {% if param.description %}{{ param.description }}{% endif %}
+                                        {% if param.parameter.param_type == 'date' and param.parameter.notify_enabled %}
+                                        <i class="bi bi-bell-fill text-warning" title="Notifications enabled"></i>
+                                        {% endif %}
+                                        {% if param.check_notification() %}
+                                        <span class="badge bg-danger">{{ param.check_notification() }}</span>
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Datasheet URLs -->
+                {% if item.datasheet_urls %}
+                <hr>
+                <div class="mb-3">
+                    <strong>📄 Datasheets:</strong>
+                    <div id="datasheet-display" class="mt-2"></div>
+                </div>
+                {% endif %}
+
+<script>
+{% if item.datasheet_urls %}
+// Initialize datasheets
+let datasheets = [];
+try {
+    datasheets = JSON.parse(`{{ item.datasheet_urls|safe }}`);
+} catch(e) {
+    // Fallback: old format (plain URLs)
+    const oldUrls = `{{ item.datasheet_urls|safe }}`.split('\n').filter(u => u.trim());
+    datasheets = oldUrls.map(url => ({url: url.trim(), title: '', info: ''}));
+}
+
+function renderDatasheets() {
+    const container = document.getElementById('datasheet-display');
+    if (!container) return;
+    
+    if (datasheets.length === 0) {
+        container.innerHTML = '<p class="text-muted small">No datasheets available.</p>';
+        return;
+    }
+    
+    let html = '<div class="list-group">';
+    datasheets.forEach((ds, index) => {
+        const displayTitle = ds.title || ds.url;
+        
+        html += `<div class="list-group-item list-group-item-action p-2">`;
+        html += `<i class="bi bi-link-45deg text-primary"></i> `;
+        html += `<a href="${ds.url}" target="_blank" class="text-decoration-none"><strong>${displayTitle}</strong></a>`;
+        if (ds.info) {
+            html += ` <span class="text-muted">- ${ds.info}</span>`;
+        }
+        html += `</div>`;
+    });
+    html += '</div>';
+    
+    container.innerHTML = html;
+}
+
+// Initial render
+document.addEventListener('DOMContentLoaded', function() {
+    renderDatasheets();
+});
+{% endif %}
+</script>
+
+                <!-- Other Files (non-images) -->
+                {% set other_files = item.attachments | rejectattr('file_type', 'in', ['png', 'jpg', 'jpeg', 'gif', 'webp']) | list %}
+                {% if other_files %}
+                <hr>
+                <div class="mb-3">
+                    <strong>📎 Other Files ({{ other_files|length }}):</strong>
+                    <div class="list-group mt-2">
+                        {% for att in other_files %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center p-2">
+                            <div>
+                                <i class="bi bi-file-earmark"></i>
+                                <a href="{{ url_for('uploaded_file', filename=att.filename) }}" target="_blank" class="text-decoration-none">
+                                    {{ att.original_filename }}
+                                </a>
+                                <small class="text-muted">({{ "%.2f"|format(att.file_size / 1024 / 1024) }} MB)</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <hr>
+                <small class="text-muted">
+                    Created: {{ item.created_at.strftime('%Y-%m-%d %H:%M') }}{% if item.creator %} - by {{ item.creator.username }}{% endif %}<br>
+                    Updated: {{ item.updated_at.strftime('%Y-%m-%d %H:%M') }}{% if item.updater %} - by {{ item.updater.username }}{% endif %}
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Image Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imageModalLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="modalImage" src="" class="img-fluid" alt="">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function openImageModal(src, title) {
+    document.getElementById('modalImage').src = src;
+    document.getElementById('imageModalLabel').textContent = title;
+    new bootstrap.Modal(document.getElementById('imageModal')).show();
+}
+</script>
+{% endblock %}

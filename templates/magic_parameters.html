@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+
+{% block title %}Magic Parameters - Inventory Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2><i class="bi bi-magic"></i> Magic Parameters</h2>
+        <p class="text-muted">Manage parameter definitions and templates</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Parameter Templates Section -->
+    <div class="col-lg-6 col-md-12 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-primary">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-white"><i class="bi bi-collection"></i> Parameter Templates <span class="badge bg-dark">{{ templates|length }}</span></h5>
+                    {% if current_user.is_editor() %}
+                    <a href="{{ url_for('parameter_template_new') }}" class="btn btn-dark btn-sm">
+                        <i class="bi bi-plus-circle"></i> Add Template
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                {% if templates %}
+                    {% for template in templates %}
+                    <div class="card mb-2 border">
+                        <div class="card-body p-2">
+                            <h6 class="card-title mb-1">{{ template.name }}</h6>
+                            <p class="card-text text-muted small mb-1">{{ template.description or 'No description' }}</p>
+                            <small class="text-muted"><i class="bi bi-list"></i> {{ template.template_parameters|length }} parameters</small>
+                            <div class="mt-2">
+                                {% if current_user.is_editor() %}
+                                <a href="{{ url_for('parameter_template_manage', id=template.id) }}" class="btn btn-sm btn-primary" title="Manage">
+                                    <i class="bi bi-gear"></i> Manage
+                                </a>
+                                {% if current_user.is_admin() %}
+                                <form method="POST" action="{{ url_for('parameter_template_delete', id=template.id) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this template?')" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <p class="text-center text-muted">No parameter templates</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Number Parameters Section -->
+    <div class="col-lg-6 col-md-12 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-info">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-white"><i class="bi bi-123"></i> Number Parameters <span class="badge bg-dark">{{ number_params|length }}</span></h5>
+                    {% if current_user.is_editor() %}
+                    <button class="btn btn-dark btn-sm" onclick="showNewParameterModal('number')">
+                        <i class="bi bi-plus-circle"></i> Add
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                {% if number_params %}
+                    {% for param in number_params %}
+                    <div class="card mb-2 border">
+                        <div class="card-body p-2">
+                            <h6 class="card-title mb-1">{{ param.name }}</h6>
+                            <p class="card-text text-muted small mb-1">{{ param.description or 'No description' }}</p>
+                            {% if param.units %}
+                            <small class="text-muted">Units: {{ param.get_units_list()|join(', ') }}</small>
+                            {% endif %}
+                            <div class="mt-2">
+                                {% if current_user.is_editor() %}
+                                <a href="{{ url_for('magic_parameter_manage', id=param.id) }}" class="btn btn-sm btn-primary" title="Manage">
+                                    <i class="bi bi-gear"></i>
+                                </a>
+                                {% if current_user.is_admin() %}
+                                <form method="POST" action="{{ url_for('magic_parameter_delete', id=param.id) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this parameter?')" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <p class="text-center text-muted">No number parameters</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Date Parameters Section -->
+    <div class="col-lg-6 col-md-12 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-warning">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-calendar"></i> Date Parameters <span class="badge bg-dark">{{ date_params|length }}</span></h5>
+                    {% if current_user.is_editor() %}
+                    <button class="btn btn-dark btn-sm" onclick="showNewParameterModal('date')">
+                        <i class="bi bi-plus-circle"></i> Add
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                {% if date_params %}
+                    {% for param in date_params %}
+                    <div class="card mb-2 border">
+                        <div class="card-body p-2">
+                            <h6 class="card-title mb-1">
+                                {{ param.name }}
+                                {% if param.notify_enabled %}
+                                <i class="bi bi-bell-fill text-warning" title="Notifications enabled"></i>
+                                {% endif %}
+                            </h6>
+                            <p class="card-text text-muted small mb-1">{{ param.description or 'No description' }}</p>
+                            <div class="mt-2">
+                                {% if current_user.is_editor() %}
+                                <a href="{{ url_for('magic_parameter_manage', id=param.id) }}" class="btn btn-sm btn-primary" title="Manage">
+                                    <i class="bi bi-gear"></i>
+                                </a>
+                                {% if current_user.is_admin() %}
+                                <form method="POST" action="{{ url_for('magic_parameter_delete', id=param.id) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this parameter?')" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <p class="text-center text-muted">No date parameters</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- String Parameters Section -->
+    <div class="col-lg-6 col-md-12 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-secondary">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-white"><i class="bi bi-fonts"></i> String Parameters <span class="badge bg-dark">{{ string_params|length }}</span></h5>
+                    {% if current_user.is_editor() %}
+                    <button class="btn btn-dark btn-sm" onclick="showNewParameterModal('string')">
+                        <i class="bi bi-plus-circle"></i> Add
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                {% if string_params %}
+                    {% for param in string_params %}
+                    <div class="card mb-2 border">
+                        <div class="card-body p-2">
+                            <h6 class="card-title mb-1">{{ param.name }}</h6>
+                            <p class="card-text text-muted small mb-1">{{ param.description or 'No description' }}</p>
+                            {% if param.string_options %}
+                            <small class="text-muted">Options: {{ param.get_string_options_list()|join(', ') }}</small>
+                            {% endif %}
+                            <div class="mt-2">
+                                {% if current_user.is_editor() %}
+                                <a href="{{ url_for('magic_parameter_manage', id=param.id) }}" class="btn btn-sm btn-primary" title="Manage">
+                                    <i class="bi bi-gear"></i>
+                                </a>
+                                {% if current_user.is_admin() %}
+                                <form method="POST" action="{{ url_for('magic_parameter_delete', id=param.id) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this parameter?')" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <p class="text-center text-muted">No string parameters</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Parameter Modal -->
+<div class="modal fade" id="newParameterModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="newParameterForm" method="POST" action="{{ url_for('magic_parameter_new') }}">
+                <div class="modal-header">
+                    <h5 class="modal-title">New <span id="paramTypeTitle"></span> Parameter</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Error Alert -->
+                    <div id="formErrors" class="alert alert-danger" style="display: none;"></div>
+                    
+                    <input type="hidden" name="param_type" id="modalParamType">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Parameter Name</label>
+                        <input type="text" name="name" id="paramName" class="form-control" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="description" id="paramDesc" class="form-control" rows="3"></textarea>
+                    </div>
+                    
+                    <!-- Number Type Fields -->
+                    <div id="numberFields" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label">Initial Unit</label>
+                            <input type="text" name="unit" id="paramUnit" class="form-control" placeholder="e.g., V, mA, °C">
+                            <small class="text-muted">You can add more units later</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Date Type Fields -->
+                    <div id="dateFields" style="display: none;">
+                        <div class="form-check mb-3">
+                            <input type="checkbox" name="notify_enabled" id="notifyCheck" class="form-check-input">
+                            <label class="form-check-label" for="notifyCheck">Enable notifications</label>
+                        </div>
+                    </div>
+                    
+                    <!-- String Type Fields -->
+                    <div id="stringFields" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label">Initial Option</label>
+                            <input type="text" name="string_option" id="paramOption" class="form-control" placeholder="e.g., Option 1">
+                            <small class="text-muted">You can add more options later</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">Create Parameter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Form submission handler
+document.getElementById('newParameterForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const submitBtn = document.getElementById('submitBtn');
+    const errorDiv = document.getElementById('formErrors');
+    
+    // Reset error display
+    errorDiv.style.display = 'none';
+    errorDiv.innerHTML = '';
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating...';
+    
+    try {
+        const formData = new FormData(this);
+        const response = await fetch(this.action, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Close modal and redirect
+            const modal = bootstrap.Modal.getInstance(document.getElementById('newParameterModal'));
+            modal.hide();
+            
+            // Show success message
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show';
+            alertDiv.innerHTML = `Parameter created successfully! Redirecting...<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+            document.body.insertAdjacentElement('afterbegin', alertDiv);
+            
+            // Redirect after short delay
+            setTimeout(() => {
+                window.location.href = data.redirect_url;
+            }, 500);
+        } else {
+            // Show errors
+            errorDiv.innerHTML = data.errors.map(err => `<strong>Error:</strong> ${err}`).join('<br>');
+            errorDiv.style.display = 'block';
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = 'Create Parameter';
+        }
+    } catch (error) {
+        errorDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+        errorDiv.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Create Parameter';
+    }
+});
+
+function showNewParameterModal(type) {
+    const modal = new bootstrap.Modal(document.getElementById('newParameterModal'));
+    document.getElementById('modalParamType').value = type;
+    document.getElementById('paramTypeTitle').textContent = type.charAt(0).toUpperCase() + type.slice(1);
+    
+    // Reset form
+    document.getElementById('newParameterForm').reset();
+    document.getElementById('formErrors').style.display = 'none';
+    
+    // Reset button
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = 'Create Parameter';
+    
+    // Hide all fields first
+    document.getElementById('numberFields').style.display = 'none';
+    document.getElementById('dateFields').style.display = 'none';
+    document.getElementById('stringFields').style.display = 'none';
+    
+    // Show relevant fields
+    if (type === 'number') {
+        document.getElementById('numberFields').style.display = 'block';
+    } else if (type === 'date') {
+        document.getElementById('dateFields').style.display = 'block';
+    } else if (type === 'string') {
+        document.getElementById('stringFields').style.display = 'block';
+    }
+    
+    modal.show();
+}
+</script>
+
+{% endblock %}

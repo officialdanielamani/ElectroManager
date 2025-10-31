@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if rack else 'Add' }} Rack - Inventory Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2><i class="bi bi-grid-3x3"></i> {{ 'Edit' if rack else 'Add' }} Rack</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Rack Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="name" name="name" value="{{ rack.name if rack else '' }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3">{{ rack.description if rack else '' }}</textarea>
+                    </div>
+
+                    <!-- Color Picker -->
+                    <div class="mb-3">
+                        <label for="color" class="form-label">Color</label>
+                        <div class="input-group">
+                            <input type="color" class="form-control form-control-color" id="color" name="color" 
+                                   value="{{ rack.color if rack and rack.color else '#6c757d' }}" style="width: 100px;">
+                            <input type="text" class="form-control" id="color_text" readonly 
+                                   value="{{ rack.color if rack and rack.color else '#6c757d' }}" style="flex: 1;">
+                        </div>
+                        <small class="text-muted">Choose a color to identify this rack</small>
+                    </div>
+
+                    <!-- Picture Upload -->
+                    <div class="mb-3">
+                        <label for="picture" class="form-label">Picture</label>
+                        {% if rack and rack.picture %}
+                        <div class="mb-2">
+                            <img src="{{ url_for('rack_picture', filename=rack.picture) }}" 
+                                 alt="{{ rack.name }}" style="max-width: 200px; max-height: 200px; border-radius: 4px;">
+                            <div class="mt-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="delete_picture" name="delete_picture" value="1">
+                                    <label class="form-check-label" for="delete_picture">
+                                        Delete this picture
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <hr>
+                        {% endif %}
+                        <input type="file" class="form-control" id="picture" name="picture" accept="image/png,image/jpeg">
+                        <small class="text-muted">PNG or JPEG (recommended max {{ max_file_size_mb }}MB)</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="location_id" class="form-label">Physical Location</label>
+                        <select class="form-select" id="location_id" name="location_id">
+                            <option value="0">-- No Location --</option>
+                            {% for location in locations %}
+                            <option value="{{ location.id }}" 
+                                    {% if rack and rack.location_id == location.id %}selected{% endif %}>
+                                {{ location.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">
+                            Select a location or 
+                            <a href="{{ url_for('location_new') }}" target="_blank">create a new one</a>
+                        </small>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="rows" class="form-label">Rows <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="rows" name="rows" 
+                                   value="{{ rack.rows if rack else 5 }}" min="1" max="{{ max_drawer_rows }}" required>
+                            <small class="text-muted">Max: {{ max_drawer_rows }} rows (set by admin)</small>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="cols" class="form-label">Columns <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="cols" name="cols" 
+                                   value="{{ rack.cols if rack else 5 }}" min="1" max="{{ max_drawer_cols }}" required>
+                            <small class="text-muted">Max: {{ max_drawer_cols }} columns (set by admin)</small>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Save Rack
+                        </button>
+                        <a href="{{ url_for('location_management') }}" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card bg-light">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Help</h5>
+            </div>
+            <div class="card-body">
+                <h6>Rack Name</h6>
+                <p class="small">Give this rack a unique name (e.g., "Electronics Rack A", "Component Storage 01")</p>
+                
+                <h6 class="mt-3">Color</h6>
+                <p class="small">Choose a color to visually identify this rack in lists and displays.</p>
+                
+                <h6 class="mt-3">Picture</h6>
+                <p class="small">Upload a picture of the rack for easy visual reference. Only PNG and JPEG formats supported.</p>
+                
+                <h6 class="mt-3">Physical Location</h6>
+                <p class="small">Select where this rack is physically located. This helps organize and find items.</p>
+                
+                <h6 class="mt-3">Rows & Columns</h6>
+                <p class="small">Define the grid size for this rack. Each cell can hold multiple items in drawers.</p>
+                
+                <h6 class="mt-3">Size Limits</h6>
+                <p class="small">Maximum drawer size is set to <strong>{{ max_drawer_rows }} × {{ max_drawer_cols }}</strong> by the admin in System Settings.</p>
+                
+                {% if rack %}
+                <div class="alert alert-warning small mt-3 mb-0">
+                    <i class="bi bi-exclamation-triangle"></i> <strong>Note:</strong> If you reduce the rack size, items in drawers outside the new bounds will have their location cleared.
+                </div>
+                <hr>
+                <h6>Current Usage</h6>
+                <p class="small mb-1"><i class="bi bi-box"></i> <strong>{{ rack.items|length }}</strong> items stored</p>
+                <p class="small mb-1"><i class="bi bi-grid"></i> <strong>{{ rack.rows }}x{{ rack.cols }}</strong> grid</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Sync color input with text display
+const colorInput = document.getElementById('color');
+const colorText = document.getElementById('color_text');
+
+if (colorInput && colorText) {
+    colorInput.addEventListener('input', function() {
+        colorText.value = this.value;
+    });
+}
+</script>
+{% endblock %}

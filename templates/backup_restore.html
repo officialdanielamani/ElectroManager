@@ -1,0 +1,393 @@
+{% extends "base.html" %}
+{% block title %}Backup & Restore{% endblock %}
+{% block content %}
+<div class="row mb-3">
+    <div class="col-md-12">
+        <h2><i class="bi bi-database"></i> Backup & Restore</h2>
+    </div>
+</div>
+
+<!-- Full Database Backup/Restore -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5><i class="bi bi-download"></i> Backup Database</h5>
+            </div>
+            <div class="card-body">
+                <p>Download a copy of your database</p>
+                <a href="{{ url_for('backup_download') }}" class="btn btn-success">
+                    <i class="bi bi-download"></i> Download Backup
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-warning">
+                <h5><i class="bi bi-upload"></i> Restore Database</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-danger"><strong>Warning:</strong> This will replace all current data!</p>
+                <form method="POST" action="{{ url_for('backup_restore_upload') }}" enctype="multipart/form-data">
+                    <input type="file" name="backup" class="form-control mb-2" accept=".db" required>
+                    <button type="submit" class="btn btn-warning" onclick="return confirm('Replace all data?')">
+                        <i class="bi bi-upload"></i> Restore
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<hr class="my-4">
+
+<!-- Export/Import Config -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5><i class="bi bi-download"></i> Export Config</h5>
+            </div>
+            <div class="card-body">
+                <p>Export selected configurations</p>
+                <form method="POST" action="{{ url_for('export_selective') }}" enctype="multipart/form-data" id="exportForm">
+                    
+                    <!-- Item Parameters Checkbox -->
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="include_item_values" name="include_item_values">
+                            <label class="form-check-label" for="include_item_values">
+                                <strong>Include Item Parameter Values</strong>
+                            </label>
+                        </div>
+                        <small class="text-muted d-block">If checked, item parameter values will be included</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label mb-0"><strong>Select Data Types to Export:</strong></label>
+                            <div class="form-check mb-0">
+                                <input class="form-check-input" type="checkbox" id="export_select_all" onchange="exportSelectAll()">
+                                <label class="form-check-label" for="export_select_all">
+                                    Select All
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- Magic Parameters Section -->
+                        <div class="mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="export_mp" name="magic_parameters" onchange="toggleMPOptions();updateExportSelectAll()">
+                                <label class="form-check-label" for="export_mp">
+                                    <strong>Magic Parameters</strong>
+                                </label>
+                            </div>
+                            <div id="mp_options" style="display:none; margin-left: 20px; padding: 10px; background-color: #f8f9fa; border-left: 3px solid #17a2b8; border-radius: 3px;">
+                                <small class="text-muted d-block mb-2">Select which Magic Parameter components to export:</small>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="mp_parameters" name="mp_parameters" checked>
+                                    <label class="form-check-label" for="mp_parameters">
+                                        Parameters
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="mp_templates" name="mp_templates" checked>
+                                    <label class="form-check-label" for="mp_templates">
+                                        Templates
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="mp_units" name="mp_units" checked>
+                                    <label class="form-check-label" for="mp_units">
+                                        Units
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="mp_options" name="mp_options" checked>
+                                    <label class="form-check-label" for="mp_options">
+                                        Options
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Other Data Types -->
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="export_loc" name="locations" onchange="updateExportSelectAll()">
+                            <label class="form-check-label" for="export_loc">
+                                Locations & Racks
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="export_racks" name="racks" style="display:none;">
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="export_cat" name="categories" onchange="updateExportSelectAll()">
+                            <label class="form-check-label" for="export_cat">
+                                Categories
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="export_fp" name="footprints" onchange="updateExportSelectAll()">
+                            <label class="form-check-label" for="export_fp">
+                                Footprints
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="export_tags" name="tags" onchange="updateExportSelectAll()">
+                            <label class="form-check-label" for="export_tags">
+                                Tags
+                            </label>
+                        </div>
+                    </div>
+
+                    <small class="text-muted d-block mb-3">
+                        Example: Select Magic Parameters (with Units, Options), Locations & Racks, and Tags to export only those
+                    </small>
+
+                    <button type="submit" class="btn btn-info" onclick="return validateExportSelection()">
+                        <i class="bi bi-download"></i> Export
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-info">
+                <h5><i class="bi bi-upload"></i> Import Config</h5>
+            </div>
+            <div class="card-body">
+                <p>Import configurations from JSON file</p>
+                <form method="POST" action="{{ url_for('import_selective') }}" enctype="multipart/form-data" id="importForm">
+                    
+                    <!-- File Upload -->
+                    <div class="mb-3">
+                        <label for="config" class="form-label">Select JSON File:</label>
+                        <input type="file" name="config" id="config" class="form-control" accept=".json" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label mb-0"><strong>Select Data Types to Import:</strong></label>
+                            <div class="form-check mb-0">
+                                <input class="form-check-input" type="checkbox" id="import_select_all" onchange="importSelectAll()">
+                                <label class="form-check-label" for="import_select_all">
+                                    Select All
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- Magic Parameters Section -->
+                        <div class="mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="import_mp" name="magic_parameters" onchange="toggleImportMPOptions();updateImportSelectAll()">
+                                <label class="form-check-label" for="import_mp">
+                                    <strong>Magic Parameters</strong>
+                                </label>
+                            </div>
+                            <div id="import_mp_options" style="display:none; margin-left: 20px; padding: 10px; background-color: #f8f9fa; border-left: 3px solid #17a2b8; border-radius: 3px;">
+                                <small class="text-muted d-block mb-2">Select which Magic Parameter components to import:</small>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="import_mp_parameters" name="mp_parameters" checked>
+                                    <label class="form-check-label" for="import_mp_parameters">
+                                        Parameters
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="import_mp_templates" name="mp_templates" checked>
+                                    <label class="form-check-label" for="import_mp_templates">
+                                        Templates
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="import_mp_units" name="mp_units" checked>
+                                    <label class="form-check-label" for="import_mp_units">
+                                        Units
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="import_mp_options" name="mp_options" checked>
+                                    <label class="form-check-label" for="import_mp_options">
+                                        Options
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Other Data Types -->
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="import_loc" name="locations" onchange="updateImportSelectAll()">
+                            <label class="form-check-label" for="import_loc">
+                                Locations & Racks
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="import_racks" name="racks" style="display:none;">
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="import_cat" name="categories" onchange="updateImportSelectAll()">
+                            <label class="form-check-label" for="import_cat">
+                                Categories
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="import_fp" name="footprints" onchange="updateImportSelectAll()">
+                            <label class="form-check-label" for="import_fp">
+                                Footprints
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="import_tags" name="tags" onchange="updateImportSelectAll()">
+                            <label class="form-check-label" for="import_tags">
+                                Tags
+                            </label>
+                        </div>
+                    </div>
+
+                    <small class="text-muted d-block mb-3">
+                        Only selected components will be imported. Results show imported, skipped, and failed items.
+                    </small>
+
+                    <button type="submit" class="btn btn-info" onclick="return validateImportSelection()">
+                        <i class="bi bi-upload"></i> Import
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleMPOptions() {
+    const checkbox = document.getElementById('export_mp');
+    const options = document.getElementById('mp_options');
+    options.style.display = checkbox.checked ? 'block' : 'none';
+}
+
+function toggleImportMPOptions() {
+    const checkbox = document.getElementById('import_mp');
+    const options = document.getElementById('import_mp_options');
+    options.style.display = checkbox.checked ? 'block' : 'none';
+}
+
+function exportSelectAll() {
+    const selectAll = document.getElementById('export_select_all').checked;
+    document.getElementById('export_mp').checked = selectAll;
+    document.getElementById('export_loc').checked = selectAll;
+    document.getElementById('export_cat').checked = selectAll;
+    document.getElementById('export_fp').checked = selectAll;
+    document.getElementById('export_tags').checked = selectAll;
+    
+    if (selectAll) {
+        document.getElementById('mp_options').style.display = 'block';
+    }
+}
+
+function importSelectAll() {
+    const selectAll = document.getElementById('import_select_all').checked;
+    document.getElementById('import_mp').checked = selectAll;
+    document.getElementById('import_loc').checked = selectAll;
+    document.getElementById('import_cat').checked = selectAll;
+    document.getElementById('import_fp').checked = selectAll;
+    document.getElementById('import_tags').checked = selectAll;
+    
+    if (selectAll) {
+        document.getElementById('import_mp_options').style.display = 'block';
+    }
+}
+
+function updateExportSelectAll() {
+    const allChecked = 
+        document.getElementById('export_mp').checked &&
+        document.getElementById('export_loc').checked &&
+        document.getElementById('export_cat').checked &&
+        document.getElementById('export_fp').checked &&
+        document.getElementById('export_tags').checked;
+    
+    document.getElementById('export_select_all').checked = allChecked;
+}
+
+function updateImportSelectAll() {
+    const allChecked = 
+        document.getElementById('import_mp').checked &&
+        document.getElementById('import_loc').checked &&
+        document.getElementById('import_cat').checked &&
+        document.getElementById('import_fp').checked &&
+        document.getElementById('import_tags').checked;
+    
+    document.getElementById('import_select_all').checked = allChecked;
+}
+
+function validateExportSelection() {
+    const selections = [
+        document.getElementById('export_mp').checked,
+        document.getElementById('export_loc').checked,
+        document.getElementById('export_cat').checked,
+        document.getElementById('export_fp').checked,
+        document.getElementById('export_tags').checked
+    ];
+    
+    if (!selections.some(s => s)) {
+        alert('Please select at least one data type to export');
+        return false;
+    }
+    
+    // When Locations is checked, also check Racks
+    if (document.getElementById('export_loc').checked) {
+        document.getElementById('export_racks').checked = true;
+    } else {
+        document.getElementById('export_racks').checked = false;
+    }
+    
+    return true;
+}
+
+function validateImportSelection() {
+    const selections = [
+        document.getElementById('import_mp').checked,
+        document.getElementById('import_loc').checked,
+        document.getElementById('import_cat').checked,
+        document.getElementById('import_fp').checked,
+        document.getElementById('import_tags').checked
+    ];
+    
+    if (!selections.some(s => s)) {
+        alert('Please select at least one data type to import');
+        return false;
+    }
+    
+    // When Locations is checked, also check Racks
+    if (document.getElementById('import_loc').checked) {
+        document.getElementById('import_racks').checked = true;
+    } else {
+        document.getElementById('import_racks').checked = false;
+    }
+    
+    return true;
+}
+
+// Helper functions for location and racks auto-linking
+document.addEventListener('DOMContentLoaded', function() {
+    const exportLoc = document.getElementById('export_loc');
+    const exportRacks = document.getElementById('export_racks');
+    const importLoc = document.getElementById('import_loc');
+    const importRacks = document.getElementById('import_racks');
+    
+    if (exportLoc) {
+        exportLoc.addEventListener('change', function() {
+            exportRacks.checked = this.checked;
+        });
+    }
+    
+    if (importLoc) {
+        importLoc.addEventListener('change', function() {
+            importRacks.checked = this.checked;
+        });
+    }
+});
+</script>
+{% endblock %}

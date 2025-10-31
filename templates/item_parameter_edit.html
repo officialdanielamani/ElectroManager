@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Parameter - {{ item.name }} - Inventory Manager{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <h2>Edit Parameter for: {{ item.name }}</h2>
+        
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title">
+                    {{ item_param.parameter.name }}
+                    {% if item_param.parameter.param_type == 'number' %}
+                    <span class="badge bg-primary">Number</span>
+                    {% elif item_param.parameter.param_type == 'date' %}
+                    <span class="badge bg-info">Date</span>
+                    {% else %}
+                    <span class="badge bg-secondary">String</span>
+                    {% endif %}
+                </h5>
+                <p class="card-text">Current: {{ item_param.get_display_text() }}</p>
+            </div>
+        </div>
+        
+        <form method="POST">
+            {% if item_param.parameter.param_type == 'number' %}
+            <!-- Number Type Fields -->
+            <div class="mb-3">
+                <label class="form-label">Operation</label>
+                <select name="operation" id="operation" class="form-select" onchange="updateFields()">
+                    <option value="min" {% if item_param.operation == 'min' %}selected{% endif %}>Min</option>
+                    <option value="max" {% if item_param.operation == 'max' %}selected{% endif %}>Max</option>
+                    <option value="value" {% if item_param.operation == 'value' %}selected{% endif %}>Value</option>
+                    <option value="range" {% if item_param.operation == 'range' %}selected{% endif %}>Range</option>
+                </select>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label" id="value1_label">Value</label>
+                        <input type="text" name="value" class="form-control" value="{{ item_param.value or '' }}">
+                    </div>
+                </div>
+                <div class="col-md-6" id="value2_group" style="{% if item_param.operation != 'range' %}display: none;{% endif %}">
+                    <div class="mb-3">
+                        <label class="form-label">Max Value</label>
+                        <input type="text" name="value2" class="form-control" value="{{ item_param.value2 or '' }}">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Unit</label>
+                <select name="unit" class="form-select">
+                    {% for unit in item_param.parameter.units %}
+                    <option value="{{ unit.unit }}" {% if item_param.unit == unit.unit %}selected{% endif %}>{{ unit.unit }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            {% elif item_param.parameter.param_type == 'date' %}
+            <!-- Date Type Fields -->
+            <div class="mb-3">
+                <label class="form-label">Operation</label>
+                <select name="operation" id="operation" class="form-select" onchange="updateFields()">
+                    <option value="start" {% if item_param.operation == 'start' %}selected{% endif %}>Start</option>
+                    <option value="end" {% if item_param.operation == 'end' %}selected{% endif %}>End</option>
+                    <option value="value" {% if item_param.operation == 'value' %}selected{% endif %}>Value</option>
+                    <option value="duration" {% if item_param.operation == 'duration' %}selected{% endif %}>Duration</option>
+                </select>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label" id="value1_label">Date</label>
+                        <input type="date" name="value" class="form-control" value="{{ item_param.value or '' }}">
+                    </div>
+                </div>
+                <div class="col-md-6" id="value2_group" style="{% if item_param.operation != 'duration' %}display: none;{% endif %}">
+                    <div class="mb-3">
+                        <label class="form-label">End Date</label>
+                        <input type="date" name="value2" class="form-control" value="{{ item_param.value2 or '' }}">
+                    </div>
+                </div>
+            </div>
+            
+            {% elif item_param.parameter.param_type == 'string' %}
+            <!-- String Type Fields -->
+            <div class="mb-3">
+                <label class="form-label">Option</label>
+                <select name="string_option" class="form-select">
+                    {% for option in item_param.parameter.string_options %}
+                    <option value="{{ option.value }}" {% if item_param.string_option == option.value %}selected{% endif %}>{{ option.value }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            
+            <!-- Description -->
+            <div class="mb-3">
+                <label class="form-label">Description (Optional)</label>
+                <textarea name="description" class="form-control" rows="3">{{ item_param.description or '' }}</textarea>
+            </div>
+            
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+                <a href="{{ url_for('item_edit', uuid=item.uuid) }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function updateFields() {
+    const operation = document.getElementById('operation').value;
+    const value2Group = document.getElementById('value2_group');
+    const value1Label = document.getElementById('value1_label');
+    const paramType = '{{ item_param.parameter.param_type }}';
+    
+    if (paramType === 'number') {
+        if (operation === 'range') {
+            value1Label.textContent = 'Min Value';
+            value2Group.style.display = 'block';
+        } else {
+            value1Label.textContent = 'Value';
+            value2Group.style.display = 'none';
+        }
+    } else if (paramType === 'date') {
+        if (operation === 'duration') {
+            value1Label.textContent = 'Start Date';
+            value2Group.style.display = 'block';
+        } else {
+            value1Label.textContent = 'Date';
+            value2Group.style.display = 'none';
+        }
+    }
+}
+</script>
+
+{% endblock %}

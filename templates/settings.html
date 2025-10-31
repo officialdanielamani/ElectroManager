@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Inventory Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2><i class="bi bi-gear"></i> Settings</h2>
+    </div>
+</div>
+
+<div class="row">
+    <!-- General Settings -->
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-palette" style="font-size: 3rem; color: #0d6efd;"></i>
+                <h5 class="card-title mt-3">General</h5>
+                <p class="card-text">UI theme and preferences</p>
+                <a href="{{ url_for('settings_general') }}" class="btn btn-primary">Configure</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Settings (Admin Only) -->
+    {% if current_user.is_admin() %}
+    <div class="col-md-4 mb-3">
+        <div class="card border-danger">
+            <div class="card-body text-center">
+                <i class="bi bi-gear-fill" style="font-size: 3rem; color: #dc3545;"></i>
+                <h5 class="card-title mt-3">System Settings</h5>
+                <p class="card-text">Currency, file uploads (Admin)</p>
+                <a href="{{ url_for('settings_system') }}" class="btn btn-danger">Configure</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Reports -->
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-graph-up" style="font-size: 3rem; color: #198754;"></i>
+                <h5 class="card-title mt-3">Reports</h5>
+                <p class="card-text">Analytics and low stock alerts</p>
+                <a href="{{ url_for('reports') }}" class="btn btn-success">View Reports</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Item Management (Categories, Footprints, Tags) -->
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-boxes" style="font-size: 3rem; color: #fd7e14;"></i>
+                <h5 class="card-title mt-3">Item Management</h5>
+                <p class="card-text">Categories, Footprints, Tags</p>
+                <a href="{{ url_for('item_management') }}" class="btn btn-warning">Manage</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Magic Parameters -->
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-magic" style="font-size: 3rem; color: #6f42c1;"></i>
+                <h5 class="card-title mt-3">Magic Parameters</h5>
+                <p class="card-text">Parameters and Templates</p>
+                <a href="{{ url_for('magic_parameters') }}" class="btn btn-primary">Manage</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Location Management -->
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-geo-alt-fill" style="font-size: 3rem; color: #198754;"></i>
+                <h5 class="card-title mt-3">Location Management</h5>
+                <p class="card-text">Locations and rack storage</p>
+                <a href="{{ url_for('location_management') }}" class="btn btn-success">Manage</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Users -->
+    {% if current_user.is_admin() %}
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-people" style="font-size: 3rem; color: #0dcaf0;"></i>
+                <h5 class="card-title mt-3">Users</h5>
+                <p class="card-text">Manage user accounts</p>
+                <a href="{{ url_for('users') }}" class="btn btn-info">Manage Users</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Backup & Restore -->
+    {% if current_user.is_admin() %}
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-database" style="font-size: 3rem; color: #6c757d;"></i>
+                <h5 class="card-title mt-3">Backup & Restore</h5>
+                <p class="card-text">Database backup and restore</p>
+                <a href="{{ url_for('backup_restore') }}" class="btn btn-secondary">Manage Backups</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

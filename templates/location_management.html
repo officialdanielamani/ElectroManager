@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block title %}Location Management - Inventory Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2><i class="bi bi-geo-alt"></i> Location Management</h2>
+        <p class="text-muted">Manage general locations and rack storage</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- General Locations Section -->
+    <div class="col-lg-6 col-md-12 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-success">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-white"><i class="bi bi-geo-alt-fill"></i> General Locations <span class="badge bg-dark">{{ locations|length }}</span></h5>
+                    {% if current_user.is_editor() %}
+                    <a href="{{ url_for('location_new') }}" class="btn btn-dark btn-sm">
+                        <i class="bi bi-plus-circle"></i> Add
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body" style="max-height: 700px; overflow-y: auto;">
+                {% if locations %}
+                    {% for location in locations %}
+                    <div class="card mb-2 border" style="border-left: 4px solid {{ location.color }} !important;">
+                        <div class="card-body p-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <h6 class="card-title mb-1">
+                                        <span class="badge" style="background-color: {{ location.color }};">{{ location.name }}</span>
+                                    </h6>
+                                    {% if location.info %}
+                                    <p class="card-text text-muted small mb-1">{{ location.info }}</p>
+                                    {% endif %}
+                                    {% if location.description %}
+                                    <p class="card-text text-muted small mb-1">{{ location.description[:100] }}{% if location.description|length > 100 %}...{% endif %}</p>
+                                    {% endif %}
+                                    <small class="text-muted">
+                                        <i class="bi bi-box"></i> {{ location.items|length }} items
+                                        | <i class="bi bi-grid-3x3"></i> {{ location.racks|length }} racks
+                                    </small>
+                                </div>
+                                {% if location.picture %}
+                                <div class="ms-2">
+                                    <img src="{{ url_for('location_picture', filename=location.picture) }}" 
+                                         alt="{{ location.name }}" 
+                                         style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px; border: 2px solid #dee2e6; cursor: pointer;"
+                                         onclick="showImageModal('{{ url_for('location_picture', filename=location.picture) }}', '{{ location.name }}')">
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="mt-2">
+                                <a href="{{ url_for('location_detail', id=location.id) }}" class="btn btn-sm btn-info btn-sm" title="View">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if current_user.is_editor() %}
+                                <a href="{{ url_for('location_edit', id=location.id) }}" class="btn btn-sm btn-warning btn-sm" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                {% if current_user.is_admin() %}
+                                <form method="POST" action="{{ url_for('location_delete', id=location.id) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger btn-sm" onclick="return confirmDeleteLocation({{ location.items|length }}, {{ location.racks|length }})" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <p class="text-center text-muted">No locations. Click "Add" to create one.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Rack Management Section -->
+    <div class="col-lg-6 col-md-12 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-primary">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-white"><i class="bi bi-grid-3x3"></i> Rack Storage <span class="badge bg-dark">{{ racks|length }}</span></h5>
+                    {% if current_user.is_admin() %}
+                    <a href="{{ url_for('rack_new') }}" class="btn btn-dark btn-sm">
+                        <i class="bi bi-plus-circle"></i> Add
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body" style="max-height: 700px; overflow-y: auto;">
+                {% if racks %}
+                    {% for rack in racks %}
+                    <div class="card mb-2 border" style="border-left: 4px solid {{ rack.color }} !important;">
+                        <div class="card-body p-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <h6 class="card-title mb-1">
+                                        <span class="badge" style="background-color: {{ rack.color }};">{{ rack.name }}</span>
+                                    </h6>
+                                    {% if rack.description %}
+                                    <p class="card-text text-muted small mb-1">{{ rack.description[:100] }}{% if rack.description|length > 100 %}...{% endif %}</p>
+                                    {% endif %}
+                                    <small class="text-muted">
+                                        {% if rack.physical_location %}
+                                        <span class="badge" style="background-color: {{ rack.physical_location.color }};">
+                                            <i class="bi bi-geo-alt-fill"></i> {{ rack.physical_location.name }}
+                                        </span>
+                                        {% else %}
+                                        <i class="bi bi-geo-alt"></i> No location
+                                        {% endif %}
+                                        | <i class="bi bi-grid"></i> {{ rack.rows }}x{{ rack.cols }}
+                                        | <i class="bi bi-box"></i> {{ rack.items|length }} items
+                                    </small>
+                                </div>
+                                {% if rack.picture %}
+                                <div class="ms-2">
+                                    <img src="{{ url_for('rack_picture', filename=rack.picture) }}" 
+                                         alt="{{ rack.name }}" 
+                                         style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px; border: 2px solid #dee2e6; cursor: pointer;"
+                                         onclick="showImageModal('{{ url_for('rack_picture', filename=rack.picture) }}', '{{ rack.name }}')">
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="mt-2">
+                                <a href="{{ url_for('rack_detail', id=rack.id) }}" class="btn btn-sm btn-info btn-sm" title="View">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if current_user.is_admin() %}
+                                <a href="{{ url_for('rack_edit', id=rack.id) }}" class="btn btn-sm btn-warning btn-sm" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <form method="POST" action="{{ url_for('rack_delete', id=rack.id) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger btn-sm" onclick="return confirm('Delete this rack?')" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <p class="text-center text-muted">No racks. Click "Add" to create one.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Image Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imageModalLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="modalImage" src="" alt="" style="max-width: 100%; max-height: 70vh; object-fit: contain;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showImageModal(imageSrc, locationName) {
+    document.getElementById('modalImage').src = imageSrc;
+    document.getElementById('imageModalLabel').textContent = locationName;
+    const modal = new bootstrap.Modal(document.getElementById('imageModal'));
+    modal.show();
+}
+
+function confirmDeleteLocation(itemsCount, racksCount) {
+    let message = 'Are you sure you want to delete this location?\n\n';
+    
+    if (itemsCount > 0 || racksCount > 0) {
+        message += '⚠️ WARNING:\n';
+        if (itemsCount > 0) {
+            message += `• ${itemsCount} item(s) will be set to "No Location"\n`;
+        }
+        if (racksCount > 0) {
+            message += `• ${racksCount} rack(s) will be set to "No Location"\n`;
+        }
+        message += '\nThis action cannot be undone.';
+    } else {
+        message += 'This action cannot be undone.';
+    }
+    
+    return confirm(message);
+}
+</script>
+
+{% endblock %}

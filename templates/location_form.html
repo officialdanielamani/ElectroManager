@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if location else 'Add' }} Location - Inventory Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2><i class="bi bi-geo-alt"></i> {{ 'Edit' if location else 'Add' }} Location</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        {{ form.name.label(class="form-label") }}
+                        {{ form.name(class="form-control" + (" is-invalid" if form.name.errors else "")) }}
+                        {% if form.name.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.name.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.info.label(class="form-label") }}
+                        {{ form.info(class="form-control", placeholder="Short description or note") }}
+                        <small class="text-muted">Optional short info (max 500 characters)</small>
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.description.label(class="form-label") }}
+                        {{ form.description(class="form-control", rows=4, placeholder="Detailed description of this location") }}
+                        <small class="text-muted">Optional detailed description</small>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.color.label(class="form-label") }}
+                            <div class="input-group">
+                                {{ form.color(class="form-control form-control-color", type="color") }}
+                                <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('color').value='#6c757d'">Reset</button>
+                            </div>
+                            <small class="text-muted">Pick a color for this location</small>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            {{ form.picture.label(class="form-label") }}
+                            {{ form.picture(class="form-control") }}
+                            <small class="text-muted">Upload a picture (PNG, JPG, max 5MB)</small>
+                            {% if location and location.picture %}
+                            <div class="mt-2">
+                                <img src="{{ url_for('location_picture', filename=location.picture) }}" 
+                                     alt="{{ location.name }}" 
+                                     style="width: 200px; height: 200px; object-fit: cover; border-radius: 8px; border: 2px solid #dee2e6; cursor: pointer;"
+                                     onclick="showImageModal('{{ url_for('location_picture', filename=location.picture) }}', '{{ location.name }}')">
+                                <div class="form-check mt-2">
+                                    <input type="checkbox" class="form-check-input" id="delete_picture" name="delete_picture">
+                                    <label class="form-check-label small" for="delete_picture">Delete current picture</label>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        {{ form.submit(class="btn btn-primary") }}
+                        <a href="{{ url_for('location_management') }}" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card bg-light">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Help</h5>
+            </div>
+            <div class="card-body">
+                <h6>Location Name</h6>
+                <p class="small">Give this location a clear, unique name (e.g., "Lab Room 101", "Warehouse A")</p>
+                
+                <h6 class="mt-3">Info</h6>
+                <p class="small">Add a short note or description that will be displayed alongside the name.</p>
+                
+                <h6 class="mt-3">Color</h6>
+                <p class="small">Choose a color to help visually identify this location throughout the system.</p>
+                
+                <h6 class="mt-3">Picture</h6>
+                <p class="small">Upload a photo of the location to help identify it visually.</p>
+
+                {% if location %}
+                <hr>
+                <h6>Usage</h6>
+                <p class="small mb-1"><i class="bi bi-box"></i> <strong>{{ location.items|length }}</strong> items</p>
+                <p class="small mb-1"><i class="bi bi-grid-3x3"></i> <strong>{{ location.racks|length }}</strong> racks</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Image Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imageModalLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="modalImage" src="" alt="" style="max-width: 100%; max-height: 70vh; object-fit: contain;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showImageModal(imageSrc, locationName) {
+    document.getElementById('modalImage').src = imageSrc;
+    document.getElementById('imageModalLabel').textContent = locationName;
+    const modal = new bootstrap.Modal(document.getElementById('imageModal'));
+    modal.show();
+}
+</script>
+
+{% endblock %}

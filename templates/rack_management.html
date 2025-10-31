@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block title %}Rack Management - Inventory Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2><i class="bi bi-grid-3x3"></i> Rack Management</h2>
+            {% if current_user.is_admin() %}
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addRackModal">
+                <i class="bi bi-plus-circle"></i> Add Rack
+            </button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    {% for rack in racks %}
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">{{ rack.name }}</h5>
+            </div>
+            <div class="card-body">
+                {% if rack.description %}
+                <p class="text-muted mb-2">{{ rack.description }}</p>
+                {% endif %}
+                
+                <div class="mb-2">
+                    <strong>Physical Location:</strong> {{ rack.location or 'Not specified' }}
+                </div>
+                
+                <div class="mb-2">
+                    <strong>Grid Size:</strong> {{ rack.rows }} rows × {{ rack.cols }} columns
+                </div>
+                
+                <div class="mb-3">
+                    <strong>Items:</strong> 
+                    <span class="badge bg-info">{{ rack.items|length }}</span>
+                </div>
+                
+                <div class="d-flex justify-content-between">
+                    <a href="{{ url_for('visual_storage') }}?rack={{ rack.id }}" class="btn btn-sm btn-info">
+                        <i class="bi bi-eye"></i> View
+                    </a>
+                    {% if current_user.is_admin() %}
+                    <div>
+                        <button class="btn btn-sm btn-warning" onclick="editRack({{ rack.id }}, '{{ rack.name }}', '{{ rack.description or '' }}', '{{ rack.location or '' }}', {{ rack.rows }}, {{ rack.cols }})">
+                            <i class="bi bi-pencil"></i> Edit
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteRack({{ rack.id }}, '{{ rack.name }}', {{ rack.items|length }})">
+                            <i class="bi bi-trash"></i> Delete
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-md-12">
+        <div class="alert alert-info">
+            No racks created yet. Click "Add Rack" to create your first rack!
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Add Rack Modal -->
+<div class="modal fade" id="addRackModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('add_rack') }}">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Rack</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Rack Name *</label>
+                        <input type="text" name="name" class="form-control" required 
+                               placeholder="e.g., Top Shelf, Middle Rack">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="description" class="form-control" rows="2" 
+                                  placeholder="Optional description"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Physical Location *</label>
+                        <input type="text" name="location" class="form-control" required 
+                               placeholder="e.g., Store, Kitchen, Warehouse">
+                        <small class="text-muted">Where is this rack physically located?</small>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Rows *</label>
+                            <input type="number" name="rows" class="form-control" min="1" max="20" value="5" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Columns *</label>
+                            <input type="number" name="cols" class="form-control" min="1" max="20" value="5" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Rack</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Rack Modal -->
+<div class="modal fade" id="editRackModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('edit_rack') }}">
+                <input type="hidden" name="rack_id" id="edit_rack_id">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Rack</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Rack Name *</label>
+                        <input type="text" name="name" id="edit_name" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="description" id="edit_description" class="form-control" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Physical Location *</label>
+                        <input type="text" name="location" id="edit_location" class="form-control" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Rows *</label>
+                            <input type="number" name="rows" id="edit_rows" class="form-control" min="1" max="20" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Columns *</label>
+                            <input type="number" name="cols" id="edit_cols" class="form-control" min="1" max="20" required>
+                        </div>
+                    </div>
+                    <div class="alert alert-warning">
+                        <strong>Note:</strong> Changing grid size may affect existing item locations.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Rack Modal -->
+<div class="modal fade" id="deleteRackModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('delete_rack') }}">
+                <input type="hidden" name="rack_id" id="delete_rack_id">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Delete Rack</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Warning!</strong>
+                    </div>
+                    <p>You are about to delete rack: <strong id="delete_rack_name"></strong></p>
+                    <p id="delete_warning_items"></p>
+                    <div class="alert alert-info">
+                        <strong>What will happen:</strong>
+                        <ul class="mb-0">
+                            <li>The rack will be permanently deleted</li>
+                            <li>Items in this rack will NOT be deleted</li>
+                            <li>Item locations will be cleared (rack_id and drawer will be reset)</li>
+                            <li>You can reassign items to other racks later</li>
+                        </ul>
+                    </div>
+                    <p><strong>Are you sure you want to continue?</strong></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Yes, Delete Rack</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function editRack(id, name, description, location, rows, cols) {
+    document.getElementById('edit_rack_id').value = id;
+    document.getElementById('edit_name').value = name;
+    document.getElementById('edit_description').value = description;
+    document.getElementById('edit_location').value = location;
+    document.getElementById('edit_rows').value = rows;
+    document.getElementById('edit_cols').value = cols;
+    
+    new bootstrap.Modal(document.getElementById('editRackModal')).show();
+}
+
+function deleteRack(id, name, itemCount) {
+    document.getElementById('delete_rack_id').value = id;
+    document.getElementById('delete_rack_name').textContent = name;
+    
+    const warningEl = document.getElementById('delete_warning_items');
+    if (itemCount > 0) {
+        warningEl.innerHTML = `<p class="text-danger"><strong>This rack contains ${itemCount} item(s).</strong> Their locations will be cleared.</p>`;
+    } else {
+        warningEl.innerHTML = '<p class="text-success">This rack is empty.</p>';
+    }
+    
+    new bootstrap.Modal(document.getElementById('deleteRackModal')).show();
+}
+</script>
+{% endblock %}

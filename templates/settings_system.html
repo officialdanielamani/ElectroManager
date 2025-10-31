@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}System Settings - Inventory Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2><i class="bi bi-gear-fill"></i> System Settings</h2>
+        <p class="text-muted">Configure system-wide settings (Admin Only)</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <form method="POST" action="{{ url_for('settings_system') }}">
+            
+            <!-- Currency Settings Card -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-currency-dollar"></i> Currency Settings</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="currency" class="form-label">Currency Symbol <span class="text-danger">*</span></label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="currency" 
+                               name="currency" 
+                               value="{{ currency }}" 
+                               maxlength="7" 
+                               required
+                               placeholder="$">
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i> Maximum 7 characters. Examples: $, USD, RM, €, £
+                        </div>
+                    </div>
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-lightbulb"></i> <strong>Note:</strong> This symbol will be displayed next to all prices throughout the system.
+                    </div>
+                </div>
+            </div>
+
+            <!-- File Upload Settings Card -->
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-cloud-upload"></i> File Upload Settings</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="max_file_size" class="form-label">Maximum File Size (MB) <span class="text-danger">*</span></label>
+                        <input type="number" 
+                               class="form-control" 
+                               id="max_file_size" 
+                               name="max_file_size" 
+                               value="{{ max_file_size }}" 
+                               min="1" 
+                               max="100" 
+                               required>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i> Maximum size per file in megabytes (1-100 MB)
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="allowed_extensions" class="form-label">Allowed File Types <span class="text-danger">*</span></label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="allowed_extensions" 
+                               name="allowed_extensions" 
+                               value="{{ allowed_extensions }}" 
+                               required
+                               placeholder="pdf,png,jpg">
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i> Comma-separated list of allowed file extensions (without dots)
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning mb-0">
+                        <i class="bi bi-exclamation-triangle"></i> <strong>Common file types:</strong><br>
+                        <small>
+                            <strong>Images:</strong> png, jpg, jpeg, gif, webp, bmp<br>
+                            <strong>Documents:</strong> pdf, doc, docx, txt, rtf<br>
+                            <strong>Spreadsheets:</strong> xls, xlsx, csv<br>
+                            <strong>Archives:</strong> zip, rar, 7z<br>
+                            <strong>Example:</strong> pdf,png,jpg (allows only PDF and PNG/JPG images)
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Drawer Size Settings Card -->
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="bi bi-grid-3x3"></i> Max Drawer Size Limits</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="max_drawer_rows" class="form-label">Maximum Rows <span class="text-danger">*</span></label>
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="max_drawer_rows" 
+                                   name="max_drawer_rows" 
+                                   value="{{ max_drawer_rows }}" 
+                                   min="1" 
+                                   max="32" 
+                                   required>
+                            <div class="form-text">
+                                <i class="bi bi-info-circle"></i> Maximum rows allowed (1-32)
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="max_drawer_cols" class="form-label">Maximum Columns <span class="text-danger">*</span></label>
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="max_drawer_cols" 
+                                   name="max_drawer_cols" 
+                                   value="{{ max_drawer_cols }}" 
+                                   min="1" 
+                                   max="32" 
+                                   required>
+                            <div class="form-text">
+                                <i class="bi bi-info-circle"></i> Maximum columns allowed (1-32)
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-lightbulb"></i> <strong>Note:</strong> These limits will be applied when creating or editing racks. Users cannot exceed these values.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="card">
+                <div class="card-body">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Save Settings
+                    </button>
+                    <a href="{{ url_for('settings') }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Settings
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Help Panel -->
+    <div class="col-md-4">
+        <div class="card bg-light">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-question-circle"></i> Help</h5>
+            </div>
+            <div class="card-body">
+                <h6>Currency Symbol</h6>
+                <p class="small">The currency symbol will appear next to all prices in your inventory. You can use standard symbols ($, €, £) or currency codes (USD, RM, MYR).</p>
+                
+                <h6 class="mt-3">File Size Limits</h6>
+                <p class="small">Setting a lower file size limit helps conserve server storage space and improves upload performance.</p>
+                
+                <h6>File Type Restrictions</h6>
+                <p class="small">Restricting file types helps maintain security and organization. Only allow file types you actually need.</p>
+
+                <h6 class="mt-3">Drawer Size Limits</h6>
+                <p class="small">Set maximum rows and columns for rack drawers. This prevents users from creating excessively large grids that could impact performance.</p>
+
+                <div class="alert alert-info small mb-0 mt-3">
+                    <i class="bi bi-shield-check"></i> <strong>Security Tip:</strong> Avoid allowing executable file types (.exe, .bat, .sh) for security reasons.
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Settings Display -->
+        <div class="card bg-light mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Current Settings</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0 small">
+                    <dt class="col-sm-6">Currency:</dt>
+                    <dd class="col-sm-6"><span class="badge bg-primary">{{ currency }}</span></dd>
+                    
+                    <dt class="col-sm-6">Max File Size:</dt>
+                    <dd class="col-sm-6"><span class="badge bg-success">{{ max_file_size }} MB</span></dd>
+                    
+                    <dt class="col-sm-6">Allowed Types:</dt>
+                    <dd class="col-sm-6">
+                        {% set extensions = allowed_extensions.split(',') %}
+                        {% for ext in extensions[:3] %}
+                            <span class="badge bg-secondary">{{ ext.strip() }}</span>
+                        {% endfor %}
+                        {% if extensions|length > 3 %}
+                            <span class="badge bg-secondary">+{{ extensions|length - 3 }} more</span>
+                        {% endif %}
+                    </dd>
+                    
+                    <dt class="col-sm-6">Max Drawer Size:</dt>
+                    <dd class="col-sm-6"><span class="badge bg-warning text-dark">{{ max_drawer_rows }} × {{ max_drawer_cols }}</span></dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

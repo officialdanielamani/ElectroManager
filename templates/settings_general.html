@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+{% block title %}General Settings{% endblock %}
+{% block content %}
+<div class="row mb-3">
+    <div class="col-md-12">
+        <h2><i class="bi bi-palette"></i> General Settings</h2>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-palette-fill"></i> UI Theme (Personal Preference)</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-3">
+                    <i class="bi bi-info-circle"></i> <strong>Note:</strong> Theme is saved per-user. 
+                    Other users will keep their own theme preferences.
+                </div>
+                <form method="POST" action="{{ url_for('save_theme') }}">
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Select Theme</strong></label>
+                        <div class="row g-3">
+                            <!-- Light Theme -->
+                            <div class="col-md-6">
+                                <input type="radio" class="btn-check" name="theme" id="theme-light" value="light" 
+                                       {% if current_theme == 'light' %}checked{% endif %}>
+                                <label class="btn btn-outline-secondary w-100 p-3" for="theme-light">
+                                    <div class="d-flex align-items-center">
+                                        <div class="theme-preview bg-light border" style="width: 50px; height: 50px; border-radius: 8px;"></div>
+                                        <div class="ms-3 text-start">
+                                            <strong>Light</strong>
+                                            <br><small class="text-muted">Default bright theme</small>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <!-- Dark Theme -->
+                            <div class="col-md-6">
+                                <input type="radio" class="btn-check" name="theme" id="theme-dark" value="dark"
+                                       {% if current_theme == 'dark' %}checked{% endif %}>
+                                <label class="btn btn-outline-secondary w-100 p-3" for="theme-dark">
+                                    <div class="d-flex align-items-center">
+                                        <div class="theme-preview bg-dark border" style="width: 50px; height: 50px; border-radius: 8px;"></div>
+                                        <div class="ms-3 text-start">
+                                            <strong>Dark</strong>
+                                            <br><small class="text-muted">Easy on the eyes</small>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <!-- Blue Theme -->
+                            <div class="col-md-6">
+                                <input type="radio" class="btn-check" name="theme" id="theme-blue" value="blue"
+                                       {% if current_theme == 'blue' %}checked{% endif %}>
+                                <label class="btn btn-outline-secondary w-100 p-3" for="theme-blue">
+                                    <div class="d-flex align-items-center">
+                                        <div class="theme-preview border" style="width: 50px; height: 50px; border-radius: 8px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
+                                        <div class="ms-3 text-start">
+                                            <strong>Blue</strong>
+                                            <br><small class="text-muted">Cool blue gradient</small>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <!-- Keqing Theme -->
+                            <div class="col-md-6">
+                                <input type="radio" class="btn-check" name="theme" id="theme-keqing" value="keqing"
+                                       {% if current_theme == 'keqing' %}checked{% endif %}>
+                                <label class="btn btn-outline-secondary w-100 p-3" for="theme-keqing">
+                                    <div class="d-flex align-items-center">
+                                        <div class="theme-preview border" style="width: 50px; height: 50px; border-radius: 8px; background: linear-gradient(135deg, #2d1b4e 0%, #4a2c6b 50%, #d4af37 100%);"></div>
+                                        <div class="ms-3 text-start">
+                                            <strong>Keqing</strong>
+                                            <br><small class="text-muted">Purple & gold elegance</small>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('settings') }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Back
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Save Theme
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Theme Preview -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5><i class="bi bi-eye"></i> Current Theme Preview</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Changes will apply immediately after saving.
+                </div>
+                <div class="p-3 border rounded" id="themePreview">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">Sample Card</h6>
+                        <span class="badge bg-primary">Badge</span>
+                    </div>
+                    <p class="text-muted mb-2">This is how content will look with the selected theme.</p>
+                    <button class="btn btn-primary btn-sm">Primary Button</button>
+                    <button class="btn btn-secondary btn-sm">Secondary Button</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table Columns View Customization -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5><i class="bi bi-table"></i> Item Table View Customization</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-3">
+                    <i class="bi bi-info-circle"></i> <strong>Note:</strong> Customize which columns appear in the item table on the home page.
+                    Checkbox, Name, and Action are always shown. You can rearrange other columns and reset to default.
+                </div>
+                <form method="POST" action="{{ url_for('save_table_columns_view') }}" id="tableColumnsForm">
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Available Columns</strong></label>
+                        <p class="text-muted small mb-2">Drag the handle <i class="bi bi-grip-vertical"></i> to reorder. Checked columns will be visible.</p>
+                        <div id="columnsContainer" class="columns-container">
+                            <!-- Columns will be populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <a href="{{ url_for('settings') }}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Back
+                            </a>
+                            <button type="button" class="btn btn-warning" onclick="resetTableColumns()">
+                                <i class="bi bi-arrow-clockwise"></i> Reset to Default
+                            </button>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Save Columns
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+<style>
+.btn-check:checked + .btn-outline-secondary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: white;
+}
+
+.columns-container {
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+}
+
+.column-item {
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.column-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.column-item.sortable-ghost {
+    opacity: 0.5;
+}
+
+.column-item.sortable-drag {
+    opacity: 1 !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.grip-handle {
+    cursor: grab;
+}
+
+.grip-handle:active {
+    cursor: grabbing;
+}
+
+.column-item.disabled-item {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.column-item.disabled-item .column-checkbox {
+    cursor: not-allowed;
+}
+
+.column-header-info {
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+<script>
+// Live preview of theme selection
+document.querySelectorAll('input[name="theme"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        const preview = document.getElementById('themePreview');
+        const theme = this.value;
+        
+        // Reset classes
+        preview.className = 'p-3 border rounded';
+        
+        // Apply theme-specific styling
+        if (theme === 'dark') {
+            preview.style.background = '#212529';
+            preview.style.color = '#f8f9fa';
+        } else if (theme === 'blue') {
+            preview.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            preview.style.color = 'white';
+        } else if (theme === 'keqing') {
+            preview.style.background = 'linear-gradient(135deg, #2d1b4e 0%, #4a2c6b 100%)';
+            preview.style.color = '#d4af37';
+        } else {
+            preview.style.background = '#ffffff';
+            preview.style.color = '#212529';
+        }
+    });
+});
+
+// Table Columns Customization
+const allColumns = [
+    { id: 'type_model', label: 'Type/Model', required: false },
+    { id: 'sku', label: 'SKU', required: false },
+    { id: 'category', label: 'Category', required: false },
+    { id: 'tags', label: 'Tags', required: false },
+    { id: 'footprint', label: 'Footprint', required: false },
+    { id: 'quantity', label: 'Quantity', required: false },
+    { id: 'total_price', label: 'Total Price', required: false },
+    { id: 'price_per_unit', label: 'Price Per Unit', required: false },
+    { id: 'location', label: 'Location', required: false },
+    { id: 'uuid', label: 'UUID', required: false },
+    { id: 'status', label: 'Status', required: false }
+];
+
+const defaultColumns = ['category', 'tags', 'quantity', 'total_price', 'location', 'status'];
+const requiredColumns = ['name', 'checkbox', 'action']; // These are always shown
+
+// Initialize columns on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const userColumns = {{ current_user.get_table_columns() | tojson }};
+    renderColumnsContainer(userColumns);
+});
+
+function renderColumnsContainer(selectedColumns) {
+    const container = document.getElementById('columnsContainer');
+    
+    if (!selectedColumns) {
+        selectedColumns = defaultColumns;
+    }
+    
+    // Create header info
+    let html = '<div class="mb-2 p-2 rounded border column-header-info"><small class="text-muted"><strong>Always shown:</strong> Checkbox, Name, Action</small></div>';
+    html += '<div id="sortableColumns" style="display: flex; flex-direction: column; gap: 8px;">';
+    
+    // Show selected columns first
+    selectedColumns.forEach(colId => {
+        const col = allColumns.find(c => c.id === colId);
+        if (col) {
+            html += createColumnItem(col, true);
+        }
+    });
+    
+    // Show unselected columns
+    allColumns.forEach(col => {
+        if (!selectedColumns.includes(col.id)) {
+            html += createColumnItem(col, false);
+        }
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+    
+    // Initialize Sortable.js with touch support
+    const sortableContainer = container.querySelector('#sortableColumns');
+    Sortable.create(sortableContainer, {
+        handle: '.grip-handle',
+        ghostClass: 'sortable-ghost',
+        dragClass: 'sortable-drag',
+        animation: 150,
+        delay: 0,
+        delayOnTouchOnly: true,
+        touchStartThreshold: 0,
+        forceFallback: false,
+        onEnd: function() {
+            updateSelectedColumns();
+        }
+    });
+}
+
+function createColumnItem(column, isSelected) {
+    return `
+        <div class="column-item p-2 rounded border-start border-start-4" style="border-left-color: ${isSelected ? '#28a745' : 'var(--bs-border-color, #dee2e6)'};" data-column-id="${column.id}">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-grip-vertical grip-handle text-muted" style="cursor: grab;"></i>
+                <input type="checkbox" class="column-checkbox form-check-input" value="${column.id}" ${isSelected ? 'checked' : ''} onchange="updateSelectedColumns()">
+                <label class="flex-grow-1 mb-0" style="cursor: pointer;">${column.label}</label>
+            </div>
+        </div>
+    `;
+}
+
+function updateSelectedColumns() {
+    const sortableContainer = document.getElementById('sortableColumns');
+    const items = sortableContainer.querySelectorAll('.column-item');
+    
+    const selected = [];
+    items.forEach(item => {
+        const checkbox = item.querySelector('.column-checkbox');
+        if (checkbox && checkbox.checked) {
+            selected.push(checkbox.value);
+        }
+    });
+    
+    // Update hidden input for form submission
+    let input = document.getElementById('tableColumnsInput');
+    if (!input) {
+        input = document.createElement('input');
+        input.type = 'hidden';
+        input.id = 'tableColumnsInput';
+        input.name = 'columns';
+        document.getElementById('tableColumnsForm').appendChild(input);
+    }
+    input.value = JSON.stringify(selected);
+}
+
+function resetTableColumns() {
+    if (confirm('Reset table columns to default view?')) {
+        renderColumnsContainer(defaultColumns);
+        updateSelectedColumns();
+    }
+}
+
+// On form submit, make sure hidden input is set
+document.getElementById('tableColumnsForm').addEventListener('submit', function(e) {
+    updateSelectedColumns();
+});
+
+// Theme form submit - reload page after save to apply theme
+document.querySelector("form[action=\"{{ url_for('save_theme') }}\"]")?.addEventListener('submit', function(e) {
+    // Form will submit normally, but we ensure page reloads after response
+    setTimeout(function() {
+        location.reload();
+    }, 500);
+});
+
+// Alternative: Listen for theme changes and update immediately with page reload
+document.querySelectorAll('input[name="theme"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        // Don't submit here, let the form button handle it
+        // But show visual feedback
+        console.log('Theme selected: ' + this.value);
+    });
+});
+</script>
+{% endblock %}

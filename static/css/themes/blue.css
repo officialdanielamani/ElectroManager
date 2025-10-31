@@ -1,0 +1,134 @@
+/* Blue Theme */
+body {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background-attachment: fixed;
+    color: #ffffff;
+}
+
+/* Fix text-secondary and text-muted contrast for blue theme */
+.text-secondary {
+    color: #2d2d2d !important;
+}
+
+.text-muted {
+    color: #4d4d4d !important;
+}
+
+.navbar {
+    background: rgba(102, 126, 234, 0.95) !important;
+    backdrop-filter: blur(10px);
+}
+
+.card {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+}
+
+/* Table styling for blue theme */
+.table {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    color: #000 !important;
+}
+
+.table thead th {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: #fff !important;
+}
+
+.table tbody tr {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    color: #000 !important;
+}
+
+/* Modal styling for blue theme */
+.modal-content {
+    background: rgba(255, 255, 255, 0.95) !important;
+    color: #000 !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: #fff !important;
+    border: none !important;
+}
+
+.modal-body {
+    background: rgba(255, 255, 255, 0.95) !important;
+    color: #000 !important;
+}
+
+.modal-footer {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-color: rgba(102, 126, 234, 0.3) !important;
+}
+
+/* Form controls */
+.form-control, .form-select {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    border-color: rgba(102, 126, 234, 0.3) !important;
+    color: #000 !important;
+}
+
+.form-control::placeholder {
+    color: #6c757d !important;
+    opacity: 1 !important;
+}
+
+.form-control:focus, .form-select:focus {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    border-color: #667eea !important;
+    color: #000 !important;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #5568d3 0%, #6239a0 100%);
+}
+
+/* Dropdown styling */
+.dropdown-menu {
+    background: rgba(255, 255, 255, 0.95) !important;
+}
+
+.dropdown-item {
+    color: #000 !important;
+}
+
+.dropdown-item:hover {
+    background: rgba(102, 126, 234, 0.1) !important;
+}
+
+/* Settings page - column customization */
+.columns-container {
+    background-color: rgba(255, 255, 255, 0.85) !important;
+    border-color: rgba(102, 126, 234, 0.3) !important;
+}
+
+.column-item {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    color: #000 !important;
+    border-color: rgba(102, 126, 234, 0.3) !important;
+}
+
+.column-item:hover {
+    background-color: rgba(255, 255, 255, 1) !important;
+}
+
+.column-header-info {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    color: #000 !important;
+    border-color: rgba(102, 126, 234, 0.3) !important;
+}

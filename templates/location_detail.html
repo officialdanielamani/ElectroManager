@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}{{ location.name }} - Inventory Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2><i class="bi bi-geo-alt-fill"></i> {{ location.name }}</h2>
+            <div>
+                <a href="{{ url_for('location_management') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Back
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">Location Information</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Name:</strong> {{ location.name }}</p>
+                <p><strong>Info:</strong> {{ location.info or 'N/A' }}</p>
+                <p><strong>Description:</strong> {{ location.description or 'N/A' }}</p>
+                <p><strong>Color:</strong> 
+                    <span style="display: inline-block; width: 20px; height: 20px; background-color: {{ location.color }}; border: 1px solid #dee2e6; border-radius: 4px; vertical-align: middle;"></span>
+                    {{ location.color }}
+                </p>
+                <p><strong>Total Items:</strong> {{ items|length }}</p>
+                <p><strong>Racks Inside:</strong> {{ racks|length }}</p>
+                
+                {% if location.picture %}
+                <hr>
+                <div>
+                    <p><strong>Picture:</strong></p>
+                    <img src="{{ url_for('location_picture', filename=location.picture) }}" 
+                         alt="{{ location.name }}" 
+                         style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 8px; border: 2px solid #dee2e6; cursor: pointer;"
+                         onclick="showImageModal('{{ url_for('location_picture', filename=location.picture) }}', '{{ location.name }}')">
+                    <small class="text-muted d-block mt-2">Click to enlarge</small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Items in this Location</h5>
+            </div>
+            <div class="card-body">
+                {% if items %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Quantity</th>
+                                <th>Category</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in items %}
+                            <tr>
+                                <td>{{ item.name }}</td>
+                                <td>{{ item.quantity }}</td>
+                                <td>
+                                    {% if item.category %}
+                                    <span class="badge" style="background-color: {{ item.category.color }};">{{ item.category.name }}</span>
+                                    {% else %}
+                                    <span class="text-muted">N/A</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('item_detail', uuid=item.uuid) }}" class="btn btn-sm btn-info">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-center text-muted">No items in this location yet.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Racks in this Location</h5>
+            </div>
+            <div class="card-body">
+                {% if racks %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Rack Name</th>
+                                <th>Grid Size</th>
+                                <th>Items</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for rack in racks %}
+                            <tr>
+                                <td>
+                                    <span class="badge" style="background-color: {{ rack.color }};">{{ rack.name }}</span>
+                                </td>
+                                <td>{{ rack.rows }} × {{ rack.cols }}</td>
+                                <td>{{ rack.items|length }}</td>
+                                <td>
+                                    <a href="{{ url_for('rack_detail', id=rack.id) }}" class="btn btn-sm btn-info">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-center text-muted">No racks in this location yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Image Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imageModalLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="modalImage" src="" alt="" style="max-width: 100%; max-height: 70vh; object-fit: contain;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showImageModal(imageSrc, locationName) {
+    document.getElementById('modalImage').src = imageSrc;
+    document.getElementById('imageModalLabel').textContent = locationName;
+    const modal = new bootstrap.Modal(document.getElementById('imageModal'));
+    modal.show();
+}
+</script>
+{% endblock %}

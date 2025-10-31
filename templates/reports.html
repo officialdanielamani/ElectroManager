@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Reports - Inventory Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2><i class="bi bi-bar-chart"></i> Reports & Analytics</h2>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="text-primary">{{ total_items }}</h3>
+                <p class="mb-0">Total Items</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="text-success">{{ currency_symbol }}{{ "%.2f"|format(total_value) }}</h3>
+                <p class="mb-0">Total Inventory Value</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="text-warning">{{ low_stock_count }}</h3>
+                <p class="mb-0">Low Stock Items</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-pie-chart"></i> Items by Category</h5>
+            </div>
+            <div class="card-body">
+                {% if category_stats %}
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Number of Items</th>
+                                <th>Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for category_name, count in category_stats %}
+                            <tr>
+                                <td>{{ category_name }}</td>
+                                <td>{{ count }}</td>
+                                <td>
+                                    <div class="progress">
+                                        <div class="progress-bar" role="progressbar" 
+                                             style="width: {{ (count / total_items * 100)|round(1) }}%"
+                                             aria-valuenow="{{ count }}" aria-valuemin="0" aria-valuemax="{{ total_items }}">
+                                            {{ (count / total_items * 100)|round(1) }}%
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-center text-muted">No data available</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
