@@ -73,17 +73,6 @@
 }
 </style>
 
-<div class="row mb-3">
-    <div class="col-md-12">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li>
-                <li class="breadcrumb-item active">{{ item.name }}</li>
-            </ol>
-        </nav>
-    </div>
-</div>
-
 <div class="row justify-content-center">
     <!-- Item Details -->
     <div class="col-md-8">
@@ -104,29 +93,20 @@
                 {% endif %}
             </div>
             <div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <strong>UUID:</strong> <code>{{ item.uuid }}</code>
-                    </div>
-                    <div class="col-md-6">
-                        <strong>SKU:</strong> {{ item.sku or 'N/A' }}
-                    </div>
-                    <div class="col-md-6">
-                        <strong>Type / Model:</strong> {{ item.info or 'N/A' }}
-                    </div>
+                <!-- Header with Name, UUID, SKU -->
+                <div class="mb-3">
+                    <strong>UUID:</strong> <code>{{ item.uuid }}</code>
+                    &nbsp;&nbsp;
+                    <strong>SKU:</strong> {{ item.sku or 'N/A' }}
                 </div>
 
-                {% if item.description %}
                 <div class="mb-3">
-                    <strong>Description:</strong>
-                    <div class="markdown-content p-3 bg-light rounded" style="border-left: 4px solid #0dcaf0;">
-                        {{ item.description|markdown }}
-                    </div>
+                    <strong>Type / Model:</strong> {{ item.info or 'N/A' }}
                 </div>
-                {% endif %}
 
                 <hr>
 
+                <!-- Category, Footprint, Location, Tags -->
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <strong>Category:</strong> {{ item.category.name if item.category else 'None' }}
@@ -136,21 +116,38 @@
                     </div>
                 </div>
 
-                {% if item.get_tags_list() %}
-                <div class="mb-3">
-                    <strong>Tags:</strong>
-                    {% for tag in item.get_tags_list() %}
-                    <span class="badge" style="background-color: {{ tag.color }}">{{ tag.name }}</span>
-                    {% endfor %}
-                </div>
-                {% endif %}
-
-                <div class="mb-3">
-                    <strong>Location:</strong> {{ item.get_full_location() }}
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Location:</strong> {{ item.get_full_location() }}
+                    </div>
+                    <div class="col-md-6">
+                        {% if item.get_tags_list() %}
+                        <strong>Tags:</strong>
+                        {% for tag in item.get_tags_list() %}
+                        <span class="badge" style="background-color: {{ tag.color }}">{{ tag.name }}</span>
+                        {% endfor %}
+                        {% endif %}
+                    </div>
                 </div>
 
                 <hr>
 
+                <!-- Description (Collapsible) -->
+                {% if item.description %}
+                <div class="mb-3">
+                    <button class="btn btn-link p-0" type="button" data-bs-toggle="collapse" data-bs-target="#descriptionCollapse" aria-expanded="false" aria-controls="descriptionCollapse">
+                        <strong><i class="bi bi-chevron-down"></i> Description</strong>
+                    </button>
+                    <div class="collapse" id="descriptionCollapse">
+                        <div class="markdown-content p-3 bg-light rounded mt-2" style="border-left: 4px solid #0dcaf0;">
+                            {{ item.description|markdown }}
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                {% endif %}
+
+                <!-- Quantity and Price Section -->
                 <div class="row mb-3">
                     <div class="col-md-4">
                         <strong>Total Quantity:</strong>
@@ -197,24 +194,10 @@
                     </div>
                 </div>
 
-                <!-- Image Grid Preview (above Magic Parameters) -->
-                {% set images = item.attachments | selectattr('file_type', 'in', ['png', 'jpg', 'jpeg', 'gif', 'webp']) | list %}
-                {% if images %}
                 <hr>
-                <div class="mb-3">
-                    <strong><i class="bi bi-images"></i> Images ({{ images|length }})</strong>
-                    <div class="image-grid mt-2">
-                        {% for att in images %}
-                        <div class="image-grid-item" onclick="openImageModal('{{ url_for('uploaded_file', filename=att.filename) }}', '{{ att.original_filename }}')">
-                            <img src="{{ url_for('uploaded_file', filename=att.filename) }}" alt="{{ att.original_filename }}">
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
 
+                <!-- Magic Parameters -->
                 {% if item.magic_parameters %}
-                <hr>
                 <div class="mb-3">
                     <strong><i class="bi bi-magic"></i> Magic Parameters:</strong>
                     <div class="list-group mt-2">
@@ -250,15 +233,32 @@
                         {% endfor %}
                     </div>
                 </div>
+                <hr>
+                {% endif %}
+
+                <!-- Images -->
+                {% set images = item.attachments | selectattr('file_type', 'in', ['png', 'jpg', 'jpeg', 'gif', 'webp']) | list %}
+                {% if images %}
+                <div class="mb-3">
+                    <strong><i class="bi bi-images"></i> Images ({{ images|length }})</strong>
+                    <div class="image-grid mt-2">
+                        {% for att in images %}
+                        <div class="image-grid-item" onclick="openImageModal('{{ url_for('uploaded_file', filename=att.filename) }}', '{{ att.original_filename }}')">
+                            <img src="{{ url_for('uploaded_file', filename=att.filename) }}" alt="{{ att.original_filename }}">
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <hr>
                 {% endif %}
 
                 <!-- Datasheet URLs -->
                 {% if item.datasheet_urls %}
-                <hr>
                 <div class="mb-3">
                     <strong>📄 Datasheets:</strong>
                     <div id="datasheet-display" class="mt-2"></div>
                 </div>
+                <hr>
                 {% endif %}
 
 <script>
@@ -306,33 +306,13 @@ document.addEventListener('DOMContentLoaded', function() {
 {% endif %}
 </script>
 
-                <!-- Other Files (non-images) -->
-                {% set other_files = item.attachments | rejectattr('file_type', 'in', ['png', 'jpg', 'jpeg', 'gif', 'webp']) | list %}
-                {% if other_files %}
-                <hr>
+                <!-- Info (Created & Updated) -->
                 <div class="mb-3">
-                    <strong>📎 Other Files ({{ other_files|length }}):</strong>
-                    <div class="list-group mt-2">
-                        {% for att in other_files %}
-                        <div class="list-group-item d-flex justify-content-between align-items-center p-2">
-                            <div>
-                                <i class="bi bi-file-earmark"></i>
-                                <a href="{{ url_for('uploaded_file', filename=att.filename) }}" target="_blank" class="text-decoration-none">
-                                    {{ att.original_filename }}
-                                </a>
-                                <small class="text-muted">({{ "%.2f"|format(att.file_size / 1024 / 1024) }} MB)</small>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
+                    <small class="text-muted">
+                        Created: {{ item.created_at.strftime('%Y-%m-%d %H:%M') }}{% if item.creator %} - by {{ item.creator.username }}{% endif %}<br>
+                        Updated: {{ item.updated_at.strftime('%Y-%m-%d %H:%M') }}{% if item.updater %} - by {{ item.updater.username }}{% endif %}
+                    </small>
                 </div>
-                {% endif %}
-
-                <hr>
-                <small class="text-muted">
-                    Created: {{ item.created_at.strftime('%Y-%m-%d %H:%M') }}{% if item.creator %} - by {{ item.creator.username }}{% endif %}<br>
-                    Updated: {{ item.updated_at.strftime('%Y-%m-%d %H:%M') }}{% if item.updater %} - by {{ item.updater.username }}{% endif %}
-                </small>
             </div>
         </div>
     </div>

@@ -3,16 +3,6 @@
 {% block title %}{{ title }} - Inventory Manager{% endblock %}
 
 {% block content %}
-<div class="row mb-3">
-    <div class="col-md-12">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li>
-                <li class="breadcrumb-item active">{{ title }}</li>
-            </ol>
-        </nav>
-    </div>
-</div>
 
 <div class="row justify-content-center">
     <div class="col-md-8">
@@ -23,12 +13,13 @@
             <div class="card-body">
                 <form method="POST" id="itemForm">
                     {{ form.hidden_tag() }}
-                    
+
                     <!-- Row 1: Name and SKU -->
                     <div class="row mb-2">
                         <div class="col-8">
                             <label class="form-label form-label-sm">Component Name *</label>
-                            {{ form.name(class="form-control form-control-sm" + (" is-invalid" if form.name.errors else "")) }}
+                            {{ form.name(class="form-control form-control-sm" + (" is-invalid" if form.name.errors else
+                            "")) }}
                         </div>
                         <div class="col-4">
                             <label class="form-label form-label-sm">SKU</label>
@@ -40,13 +31,15 @@
                     <div class="row mb-2">
                         <div class="col-6">
                             <label class="form-label form-label-sm">Type / Model</label>
-                            {{ form.info(class="form-control form-control-sm", placeholder="e.g., 1N4001, MD124, Standard") }}
+                            {{ form.info(class="form-control form-control-sm", placeholder="e.g., 1N4001, MD124,
+                            Standard") }}
                         </div>
                     </div>
-                    
+
                     <div class="mb-2">
                         <label class="form-label form-label-sm">Description</label>
-                        {{ form.description(class="form-control form-control-sm", placeholder="Detailed description of the item", rows=4) }}
+                        {{ form.description(class="form-control form-control-sm", placeholder="Detailed description of
+                        the item", rows=4) }}
                     </div>
 
                     <!-- Row 3: Category and Quantity -->
@@ -55,14 +48,16 @@
                             <label class="form-label form-label-sm">Category</label>
                             <div class="input-group input-group-sm">
                                 {{ form.category_id(class="form-select form-select-sm") }}
-                                <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
+                                <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
+                                    data-bs-target="#addCategoryModal">
                                     <i class="bi bi-plus-circle"></i>
                                 </button>
                             </div>
                         </div>
                         <div class="col-4">
                             <label class="form-label form-label-sm">Quantity *</label>
-                            <input type="number" id="quantity" name="quantity" class="form-control form-control-sm" value="{{ form.quantity.data or 0 }}" min="0" step="1" required>
+                            <input type="number" id="quantity" name="quantity" class="form-control form-control-sm"
+                                value="{{ form.quantity.data or 0 }}" min="0" step="1" required>
                         </div>
                     </div>
 
@@ -70,28 +65,46 @@
                     <div class="row mb-2">
                         <div class="col-6">
                             <label class="form-label form-label-sm">Price per Qty ({{ currency }})</label>
-                            {{ form.price(class="form-control form-control-sm", placeholder="0.00", id="price_per_qty") }}
+                            {{ form.price(class="form-control form-control-sm", placeholder="0.00", id="price_per_qty")
+                            }}
                         </div>
                         <div class="col-6">
                             <label class="form-label form-label-sm">Total Price ({{ currency }})</label>
-                            <input type="text" class="form-control form-control-sm" id="total_price" readonly 
-                                   style="background-color: #e9ecef; font-weight: bold;" value="0.00">
+                            <input type="text" class="form-control form-control-sm" id="total_price" readonly
+                                style="background-color: #e9ecef; font-weight: bold;" value="0.00">
+                        </div>
+                    </div>
+
+                    <!-- Row 4b: No Stock Warning -->
+                    <div class="row mb-2">
+                        <div class="col-12">
+                            <div class="form-check">
+                                {% if item %}
+                                    <input type="checkbox" class="form-check-input" id="no_stock_warning" name="no_stock_warning" value="y" {% if item.no_stock_warning %}checked{% endif %}>
+                                {% else %}
+                                    <input type="checkbox" class="form-check-input" id="no_stock_warning" name="no_stock_warning" value="y" checked>
+                                {% endif %}
+                                <label class="form-check-label" for="no_stock_warning">
+                                    Enable No Stock Warning
+                                </label>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Physical Storage Location -->
                     <div class="card bg-light mb-2">
                         <div class="card-body p-2">
-                            <label class="form-label form-label-sm mb-2"><strong>Physical Storage Location</strong></label>
-                            
+                            <label class="form-label form-label-sm mb-2"><strong>Physical Storage
+                                    Location</strong></label>
+
                             <!-- Storage Type -->
                             <div class="btn-group btn-group-sm w-100 mb-2" role="group">
-                                <input type="radio" class="btn-check" name="location_type" id="type_general" value="general" 
-                                    {% if not item or (item and not item.rack_id) %}checked{% endif %}>
+                                <input type="radio" class="btn-check" name="location_type" id="type_general"
+                                    value="general" {% if not item or (item and not item.rack_id) %}checked{% endif %}>
                                 <label class="btn btn-outline-primary" for="type_general">General Location</label>
-                                
-                                <input type="radio" class="btn-check" name="location_type" id="type_drawer" value="drawer"
-                                    {% if item and item.rack_id %}checked{% endif %}>
+
+                                <input type="radio" class="btn-check" name="location_type" id="type_drawer"
+                                    value="drawer" {% if item and item.rack_id %}checked{% endif %}>
                                 <label class="btn btn-outline-primary" for="type_drawer">Drawer Storage</label>
                             </div>
 
@@ -100,7 +113,8 @@
                                 <label class="form-label form-label-sm">General Location</label>
                                 <div class="input-group input-group-sm mb-2">
                                     {{ form.location_id(class="form-select form-select-sm") }}
-                                    <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#addLocationModal">
+                                    <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
+                                        data-bs-target="#addLocationModal">
                                         <i class="bi bi-plus-circle"></i>
                                     </button>
                                 </div>
@@ -115,10 +129,9 @@
                                         <select name="rack_id" id="rack_select" class="form-select form-select-sm">
                                             <option value="">Select Rack</option>
                                             {% for rack in racks %}
-                                            <option value="{{ rack.id }}" 
-                                                    data-rows="{{ rack.rows }}" 
-                                                    data-cols="{{ rack.cols }}"
-                                                    {% if item and item.rack_id == rack.id %}selected{% endif %}>
+                                            <option value="{{ rack.id }}" data-rows="{{ rack.rows }}"
+                                                data-cols="{{ rack.cols }}" {% if item and item.rack_id==rack.id
+                                                %}selected{% endif %}>
                                                 {{ rack.name }}
                                             </option>
                                             {% endfor %}
@@ -126,9 +139,9 @@
                                     </div>
                                     <div class="col-6">
                                         <label class="form-label form-label-sm">Drawer</label>
-                                        <input type="text" name="drawer" id="drawer_input" 
-                                               class="form-control form-control-sm" placeholder="Click grid" readonly
-                                               value="{{ item.drawer if item else '' }}">
+                                        <input type="text" name="drawer" id="drawer_input"
+                                            class="form-control form-control-sm" placeholder="Click grid" readonly
+                                            value="{{ item.drawer if item else '' }}">
                                     </div>
                                 </div>
 
@@ -136,8 +149,9 @@
                                 <div id="drawer_picker" style="display: none;">
                                     <div id="drawer_grid" class="drawer-picker-grid"></div>
                                 </div>
-                                
-                                <small class="text-muted d-block">Precise cell-level organization for drawer storage</small>
+
+                                <small class="text-muted d-block">Precise cell-level organization for drawer
+                                    storage</small>
                             </div>
                         </div>
                     </div>
@@ -147,7 +161,8 @@
                         <label class="form-label form-label-sm">Footprint</label>
                         <div class="input-group input-group-sm">
                             {{ form.footprint_id(class="form-select form-select-sm") }}
-                            <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#addFootprintModal">
+                            <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
+                                data-bs-target="#addFootprintModal">
                                 <i class="bi bi-plus-circle"></i>
                             </button>
                         </div>
@@ -157,18 +172,22 @@
                     <div class="mb-2">
                         <div class="d-flex justify-content-between align-items-center">
                             <label class="form-label form-label-sm mb-0">Tags</label>
-                            <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#addTagModal">
+                            <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
+                                data-bs-target="#addTagModal">
                                 <i class="bi bi-plus-circle"></i> Add Tag
                             </button>
                         </div>
-                        <div class="border rounded p-2 mt-1" style="max-height: 120px; overflow-y: auto;" id="tagsContainer">
+                        <div class="border rounded p-2 mt-1" style="max-height: 120px; overflow-y: auto;"
+                            id="tagsContainer">
                             {% for tag in all_tags %}
                             <div class="form-check form-check-inline" style="min-width: 150px;">
-                                <input class="form-check-input" type="checkbox" name="tags[]" 
-                                       value="{{ tag.id }}" id="tag{{ tag.id }}"
-                                       {% if item and tag.id in item.get_tags_list()|map(attribute='id')|list %}checked{% endif %}>
+                                <input class="form-check-input" type="checkbox" name="tags[]" value="{{ tag.id }}"
+                                    id="tag{{ tag.id }}" {% if item and tag.id in
+                                    item.get_tags_list()|map(attribute='id' )|list %}checked{% endif %}>
                                 <label class="form-check-label" for="tag{{ tag.id }}">
-                                    <span class="badge" style="background-color: {{ tag.color }}; font-size: 0.75rem;">{{ tag.name }}</span>
+                                    <span class="badge"
+                                        style="background-color: {{ tag.color }}; font-size: 0.75rem;">{{ tag.name
+                                        }}</span>
                                 </label>
                             </div>
                             {% endfor %}
@@ -181,15 +200,17 @@
                         <label class="form-label form-label-sm">
                             <i class="bi bi-upload"></i> Upload Files / Pictures
                         </label>
-                        
+
                         <!-- Existing Files Preview -->
-                        {% set images = item.attachments | selectattr('file_type', 'in', ['png', 'jpg', 'jpeg', 'gif', 'webp']) | list %}
-                        {% set other_files = item.attachments | rejectattr('file_type', 'in', ['png', 'jpg', 'jpeg', 'gif', 'webp']) | list %}
-                        
+                        {% set images = item.attachments | selectattr('file_type', 'in', ['png', 'jpg', 'jpeg', 'gif',
+                        'webp']) | list %}
+                        {% set other_files = item.attachments | rejectattr('file_type', 'in', ['png', 'jpg', 'jpeg',
+                        'gif', 'webp']) | list %}
+
                         {% if images or other_files %}
                         <div class="mb-2">
                             <small class="text-muted">Current Files:</small>
-                            
+
                             <!-- Image Previews -->
                             {% if images %}
                             <div class="mt-2 mb-2">
@@ -197,18 +218,17 @@
                                 <div class="d-flex flex-wrap gap-2 mt-1">
                                     {% for att in images %}
                                     <div class="position-relative" style="width: 100px; height: 100px;">
-                                        <img src="{{ url_for('uploaded_file', filename=att.filename) }}" 
-                                             class="img-thumbnail" 
-                                             style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;"
-                                             alt="{{ att.original_filename }}"
-                                             title="Click to view"
-                                             onclick="openImageEditModal('{{ url_for('uploaded_file', filename=att.filename) }}', '{{ att.original_filename }}', {{ att.id }})">
+                                        <img src="{{ url_for('uploaded_file', filename=att.filename) }}"
+                                            class="img-thumbnail"
+                                            style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;"
+                                            alt="{{ att.original_filename }}" title="Click to view"
+                                            onclick="openImageEditModal('{{ url_for('uploaded_file', filename=att.filename) }}', '{{ att.original_filename }}', {{ att.id }})">
                                     </div>
                                     {% endfor %}
                                 </div>
                             </div>
                             {% endif %}
-                            
+
                             <!-- Other Files List -->
                             {% if other_files %}
                             <div class="mt-2">
@@ -218,17 +238,18 @@
                                     <div class="list-group-item p-2 d-flex justify-content-between align-items-center">
                                         <small>
                                             <i class="bi bi-file-earmark"></i> {{ att.original_filename }}
-                                            <span class="text-muted">({{ "%.2f"|format(att.file_size / 1024 / 1024) }} MB)</span>
+                                            <span class="text-muted">({{ "%.2f"|format(att.file_size / 1024 / 1024) }}
+                                                MB)</span>
                                         </small>
                                         <div>
-                                            <button type="button" class="btn btn-warning btn-sm" 
-                                                    style="padding: 0.1rem 0.4rem; font-size: 0.75rem;"
-                                                    onclick="openFileRenameModal({{ att.id }}, '{{ att.original_filename }}')">
+                                            <button type="button" class="btn btn-warning btn-sm"
+                                                style="padding: 0.1rem 0.4rem; font-size: 0.75rem;"
+                                                onclick="openFileRenameModal({{ att.id }}, '{{ att.original_filename }}')">
                                                 <i class="bi bi-pencil"></i>
                                             </button>
-                                            <button type="button" class="btn btn-danger btn-sm" 
-                                                    style="padding: 0.1rem 0.4rem; font-size: 0.75rem;"
-                                                    onclick="deleteFile({{ att.id }})">
+                                            <button type="button" class="btn btn-danger btn-sm"
+                                                style="padding: 0.1rem 0.4rem; font-size: 0.75rem;"
+                                                onclick="deleteFile({{ att.id }})">
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </div>
@@ -239,15 +260,17 @@
                             {% endif %}
                         </div>
                         {% endif %}
-                        
+
                         <!-- Upload New Files Form -->
                         <div class="card bg-light">
                             <div class="card-body p-2">
                                 <div id="uploadFormContainer">
                                     <div class="mb-2">
                                         <label class="form-label form-label-sm">Select Files to Upload:</label>
-                                        <input type="file" id="fileUploadInput" class="form-control form-control-sm" multiple>
-                                        <small class="text-muted">Allowed: {{ allowed_file_types }} | Max: {{ max_file_size_mb }}MB per file</small>
+                                        <input type="file" id="fileUploadInput" class="form-control form-control-sm"
+                                            multiple>
+                                        <small class="text-muted">Allowed: {{ allowed_file_types }} | Max: {{
+                                            max_file_size_mb }}MB per file</small>
                                     </div>
                                     <button type="button" class="btn btn-primary btn-sm" onclick="uploadFiles()">
                                         <i class="bi bi-upload"></i> Upload Files
@@ -270,15 +293,17 @@
                                 <i class="bi bi-magic"></i> Magic Parameters
                             </label>
                             <div>
-                                <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addParameterModal">
+                                <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal"
+                                    data-bs-target="#addParameterModal">
                                     <i class="bi bi-plus-circle"></i> Add Parameter
                                 </button>
-                                <button type="button" class="btn btn-sm btn-success ms-1" data-bs-toggle="modal" data-bs-target="#useTemplateModal">
+                                <button type="button" class="btn btn-sm btn-success ms-1" data-bs-toggle="modal"
+                                    data-bs-target="#useTemplateModal">
                                     <i class="bi bi-collection"></i> Use Template
                                 </button>
                             </div>
                         </div>
-                        
+
                         <div id="magic-parameters-list">
                             {% if item.magic_parameters %}
                             <div class="list-group mt-2">
@@ -288,32 +313,40 @@
                                         <div class="flex-grow-1">
                                             <small class="text-muted">
                                                 {% if param.parameter.param_type == 'number' %}
-                                                    {% if param.operation == 'min' %}MIN{% elif param.operation == 'max' %}MAX{% elif param.operation == 'range' %}RANGE{% elif param.operation == 'value' %}VALUE{% endif %}:
+                                                {% if param.operation == 'min' %}MIN{% elif param.operation == 'max'
+                                                %}MAX{% elif param.operation == 'range' %}RANGE{% elif param.operation
+                                                == 'value' %}VALUE{% endif %}:
                                                 {% elif param.parameter.param_type == 'date' %}
-                                                    {% if param.operation == 'start' %}START{% elif param.operation == 'end' %}END{% elif param.operation == 'duration' %}DURATION{% endif %}{% if param.operation == 'value' %}{% endif %}
+                                                {% if param.operation == 'start' %}START{% elif param.operation == 'end'
+                                                %}END{% elif param.operation == 'duration' %}DURATION{% endif %}{% if
+                                                param.operation == 'value' %}{% endif %}
                                                 {% endif %}
                                                 <strong>{{ param.parameter.name }}</strong>
                                                 {% if param.parameter.param_type == 'number' %}
-                                                    {{ param.value }} {% if param.operation == 'range' %}- {{ param.value2 }}{% endif %} {{ param.unit }}
+                                                {{ param.value }} {% if param.operation == 'range' %}- {{ param.value2
+                                                }}{% endif %} {{ param.unit }}
                                                 {% elif param.parameter.param_type == 'date' %}
-                                                    {% if param.operation != 'value' %}on {% endif %}{{ param.value }} {% if param.operation == 'duration' %}to {{ param.value2 }}{% endif %}
+                                                {% if param.operation != 'value' %}on {% endif %}{{ param.value }} {% if
+                                                param.operation == 'duration' %}to {{ param.value2 }}{% endif %}
                                                 {% elif param.parameter.param_type == 'string' %}
-                                                    {{ param.string_option }}
+                                                {{ param.string_option }}
                                                 {% endif %}
                                                 {% if param.description %}{{ param.description }}{% endif %}
-                                                {% if param.parameter.param_type == 'date' and param.parameter.notify_enabled %}
-                                                <i class="bi bi-bell-fill text-warning" title="Notifications enabled"></i>
+                                                {% if param.parameter.param_type == 'date' and
+                                                param.parameter.notify_enabled %}
+                                                <i class="bi bi-bell-fill text-warning"
+                                                    title="Notifications enabled"></i>
                                                 {% endif %}
                                             </small>
                                         </div>
                                         <div>
-                                            <a href="{{ url_for('item_edit_parameter', item_id=item.id, param_id=param.id) }}" 
-                                               class="btn btn-sm btn-warning btn-sm" title="Edit">
+                                            <a href="{{ url_for('item_edit_parameter', item_id=item.id, param_id=param.id) }}"
+                                                class="btn btn-sm btn-warning btn-sm" title="Edit">
                                                 <i class="bi bi-pencil"></i>
                                             </a>
                                             <button type="button" class="btn btn-sm btn-danger btn-sm"
-                                                    onclick="submitDeleteParameterForm({{ item.id }}, {{ param.id }}, event)"
-                                                    title="Delete">
+                                                onclick="submitDeleteParameterForm({{ item.id }}, {{ param.id }}, event)"
+                                                title="Delete">
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </div>
@@ -322,7 +355,8 @@
                                 {% endfor %}
                             </div>
                             {% else %}
-                            <p class="text-muted small mt-2">No parameters added. Click 'Add Parameter' or 'Use Template' to add parameters.</p>
+                            <p class="text-muted small mt-2">No parameters added. Click 'Add Parameter' or 'Use
+                                Template' to add parameters.</p>
                             {% endif %}
                         </div>
                     </div>
@@ -341,190 +375,190 @@
                         {{ form.datasheet_urls(id="datasheet_urls_hidden", style="display:none;") }}
                     </div>
 
-<script>
-// Ensure datasheet URLs are updated before the main form is submitted
-document.getElementById('itemForm').addEventListener('submit', function(e) {
-    updateHiddenField(); // Call the function to ensure the hidden field is current
-    // Optional: Log the value being submitted for debugging
-    // console.log("Submitting datasheet URLs:", document.getElementById('datasheet_urls_hidden').value);
-});
+                    <script>
+                        // Ensure datasheet URLs are updated before the main form is submitted
+                        document.getElementById('itemForm').addEventListener('submit', function (e) {
+                            updateHiddenField(); // Call the function to ensure the hidden field is current
+                            // Optional: Log the value being submitted for debugging
+                            // console.log("Submitting datasheet URLs:", document.getElementById('datasheet_urls_hidden').value);
+                        });
 
-// Store datasheet data for form
-let formDatasheets = [];
+                        // Store datasheet data for form
+                        let formDatasheets = [];
 
-// Load existing datasheets
-{% if form.datasheet_urls.data %}
-try {
-    formDatasheets = JSON.parse('{{ form.datasheet_urls.data|safe }}');
-} catch(e) {
-    // Handle old format (plain URLs)
-    const oldUrls = `{{ form.datasheet_urls.data|safe }}`.split('\n').filter(u => u.trim());
-    formDatasheets = oldUrls.map(url => ({url: url.trim(), title: '', info: ''}));
-}
-{% endif %}
+                        // Load existing datasheets
+                        {% if form.datasheet_urls.data %}
+                        try {
+                            formDatasheets = JSON.parse('{{ form.datasheet_urls.data|safe }}');
+                        } catch (e) {
+                            // Handle old format (plain URLs)
+                            const oldUrls = `{{ form.datasheet_urls.data|safe }}`.split('\n').filter(u => u.trim());
+                            formDatasheets = oldUrls.map(url => ({ url: url.trim(), title: '', info: '' }));
+                        }
+                        {% endif %}
 
-function renderFormDatasheets() {
-    const container = document.getElementById('datasheet-list');
-    if (!container) return;
-    
-    if (formDatasheets.length === 0) {
-        container.innerHTML = '<p class="text-muted small mb-0">No datasheets added. Click "Add URL" to add one.</p>';
-        return;
-    }
-    
-    let html = '';
-    formDatasheets.forEach((ds, index) => {
-        const displayTitle = ds.title || ds.url;
-        
-        html += `<div class="border rounded p-2 mb-2 bg-light" id="form-ds-${index}">`;
-        
-        // Display mode
-        html += `<div class="form-ds-display-${index}">`;
-        html += `<i class="bi bi-link-45deg text-primary"></i> `;
-        html += `<strong>${displayTitle}</strong>`;
-        if (ds.info) {
-            html += ` <span class="text-muted">- ${ds.info}</span>`;
-        }
-        html += ` <button type="button" class="btn btn-sm btn-outline-primary btn-sm ms-2" onclick="editFormDatasheet(${index})">Edit</button>`;
-        html += ` <button type="button" class="btn btn-sm btn-outline-danger btn-sm" onclick="deleteFormDatasheet(${index})">Delete</button>`;
-        html += `</div>`;
-        
-        // Edit mode
-        html += `<div class="form-ds-edit-${index}" style="display:none;">`;
-        html += `<div class="row g-2">`;
-        html += `<div class="col-md-4">`;
-        html += `<input type="text" class="form-control form-control-sm" id="form-url-${index}" value="${ds.url}" placeholder="URL (required)">`;
-        html += `<small class="text-muted">e.g., example.com</small>`;
-        html += `</div>`;
-        html += `<div class="col-md-4">`;
-        html += `<input type="text" class="form-control form-control-sm" id="form-title-${index}" value="${ds.title}" placeholder="Title (optional)">`;
-        html += `<small class="text-muted">Display name</small>`;
-        html += `</div>`;
-        html += `<div class="col-md-4">`;
-        html += `<input type="text" class="form-control form-control-sm" id="form-info-${index}" value="${ds.info}" placeholder="Info (optional)">`;
-        html += `<small class="text-muted">Additional info</small>`;
-        html += `</div>`;
-        html += `</div>`;
-        html += `<div class="mt-2">`;
-        html += `<button type="button" class="btn btn-sm btn-success" onclick="saveFormDatasheet(${index})"><i class="bi bi-check"></i> Save</button> `;
-        html += `<button type="button" class="btn btn-sm btn-secondary" onclick="cancelFormEdit(${index})"><i class="bi bi-x"></i> Cancel</button>`;
-        html += `</div>`;
-        html += `</div>`;
-        
-        html += `</div>`;
-    });
-    
-    container.innerHTML = html;
-    
-    // Update hidden field
-    updateHiddenField();
-}
+                        function renderFormDatasheets() {
+                            const container = document.getElementById('datasheet-list');
+                            if (!container) return;
 
-function updateHiddenField() {
-    const hiddenField = document.getElementById('datasheet_urls_hidden');
-    if (hiddenField) {
-        hiddenField.value = JSON.stringify(formDatasheets);
-    }
-}
+                            if (formDatasheets.length === 0) {
+                                container.innerHTML = '<p class="text-muted small mb-0">No datasheets added. Click "Add URL" to add one.</p>';
+                                return;
+                            }
 
-function addDatasheetRow() {
-    formDatasheets.push({url: '', title: '', info: ''});
-    renderFormDatasheets();
-    const newIndex = formDatasheets.length - 1;
-    editFormDatasheet(newIndex);
-}
+                            let html = '';
+                            formDatasheets.forEach((ds, index) => {
+                                const displayTitle = ds.title || ds.url;
 
-function editFormDatasheet(index) {
-    document.querySelector(`.form-ds-display-${index}`).style.display = 'none';
-    document.querySelector(`.form-ds-edit-${index}`).style.display = 'block';
-}
+                                html += `<div class="border rounded p-2 mb-2 bg-light" id="form-ds-${index}">`;
 
-function cancelFormEdit(index) {
-    // If it's a new empty entry, remove it
-    if (!formDatasheets[index].url && !formDatasheets[index].title) {
-        formDatasheets.splice(index, 1);
-        renderFormDatasheets();
-        return;
-    }
-    
-    document.querySelector(`.form-ds-display-${index}`).style.display = 'block';
-    document.querySelector(`.form-ds-edit-${index}`).style.display = 'none';
-}
+                                // Display mode
+                                html += `<div class="form-ds-display-${index}">`;
+                                html += `<i class="bi bi-link-45deg text-primary"></i> `;
+                                html += `<strong>${displayTitle}</strong>`;
+                                if (ds.info) {
+                                    html += ` <span class="text-muted">- ${ds.info}</span>`;
+                                }
+                                html += ` <button type="button" class="btn btn-sm btn-outline-primary btn-sm ms-2" onclick="editFormDatasheet(${index})">Edit</button>`;
+                                html += ` <button type="button" class="btn btn-sm btn-outline-danger btn-sm" onclick="deleteFormDatasheet(${index})">Delete</button>`;
+                                html += `</div>`;
 
-function saveFormDatasheet(index) {
-    const url = document.getElementById(`form-url-${index}`).value.trim();
-    const title = document.getElementById(`form-title-${index}`).value.trim();
-    const info = document.getElementById(`form-info-${index}`).value.trim();
-    
-    if (!url) {
-        alert('URL is required!');
-        return;
-    }
-    
-    // Add protocol if missing
-    let finalUrl = url;
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        finalUrl = 'https://' + url;
-    }
-    
-    formDatasheets[index] = {url: finalUrl, title: title, info: info};
-    renderFormDatasheets();
-}
+                                // Edit mode
+                                html += `<div class="form-ds-edit-${index}" style="display:none;">`;
+                                html += `<div class="row g-2">`;
+                                html += `<div class="col-md-4">`;
+                                html += `<input type="text" class="form-control form-control-sm" id="form-url-${index}" value="${ds.url}" placeholder="URL (required)">`;
+                                html += `<small class="text-muted">e.g., example.com</small>`;
+                                html += `</div>`;
+                                html += `<div class="col-md-4">`;
+                                html += `<input type="text" class="form-control form-control-sm" id="form-title-${index}" value="${ds.title}" placeholder="Title (optional)">`;
+                                html += `<small class="text-muted">Display name</small>`;
+                                html += `</div>`;
+                                html += `<div class="col-md-4">`;
+                                html += `<input type="text" class="form-control form-control-sm" id="form-info-${index}" value="${ds.info}" placeholder="Info (optional)">`;
+                                html += `<small class="text-muted">Additional info</small>`;
+                                html += `</div>`;
+                                html += `</div>`;
+                                html += `<div class="mt-2">`;
+                                html += `<button type="button" class="btn btn-sm btn-success" onclick="saveFormDatasheet(${index})"><i class="bi bi-check"></i> Save</button> `;
+                                html += `<button type="button" class="btn btn-sm btn-secondary" onclick="cancelFormEdit(${index})"><i class="bi bi-x"></i> Cancel</button>`;
+                                html += `</div>`;
+                                html += `</div>`;
 
-function deleteFormDatasheet(index) {
-    if (!confirm('Delete this datasheet URL?')) return;
-    formDatasheets.splice(index, 1);
-    renderFormDatasheets();
-}
+                                html += `</div>`;
+                            });
 
-function submitDeleteParameterForm(itemId, paramId, event){
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    
-    if (!confirm('Remove this parameter?')) return;
-    
-    // Create a temporary form to submit the delete request
-    const tempForm = document.createElement('form');
-    tempForm.method = 'POST';
-    tempForm.action = `/item/${itemId}/delete-parameter/${paramId}`;
-    
-    // Add CSRF token if it exists
-    const csrfToken = document.querySelector('input[name="csrf_token"]');
-    if (csrfToken) {
-        const tokenInput = document.createElement('input');
-        tokenInput.type = 'hidden';
-        tokenInput.name = 'csrf_token';
-        tokenInput.value = csrfToken.value;
-        tempForm.appendChild(tokenInput);
-    }
-    
-    document.body.appendChild(tempForm);
-    tempForm.submit();
-}
+                            container.innerHTML = html;
 
-// Initial render
-document.addEventListener('DOMContentLoaded', function() {
-    renderFormDatasheets();
-    
-    // Main form submit handler - just update the hidden field before submit
-    const mainForm = document.getElementById('itemForm');
-    if (mainForm) {
-        mainForm.addEventListener('submit', function(e) {
-            // Update datasheet JSON before form submission
-            updateHiddenField();
-            // Allow form to submit normally
-            return true;
-        });
-    }
-});
-</script>
+                            // Update hidden field
+                            updateHiddenField();
+                        }
+
+                        function updateHiddenField() {
+                            const hiddenField = document.getElementById('datasheet_urls_hidden');
+                            if (hiddenField) {
+                                hiddenField.value = JSON.stringify(formDatasheets);
+                            }
+                        }
+
+                        function addDatasheetRow() {
+                            formDatasheets.push({ url: '', title: '', info: '' });
+                            renderFormDatasheets();
+                            const newIndex = formDatasheets.length - 1;
+                            editFormDatasheet(newIndex);
+                        }
+
+                        function editFormDatasheet(index) {
+                            document.querySelector(`.form-ds-display-${index}`).style.display = 'none';
+                            document.querySelector(`.form-ds-edit-${index}`).style.display = 'block';
+                        }
+
+                        function cancelFormEdit(index) {
+                            // If it's a new empty entry, remove it
+                            if (!formDatasheets[index].url && !formDatasheets[index].title) {
+                                formDatasheets.splice(index, 1);
+                                renderFormDatasheets();
+                                return;
+                            }
+
+                            document.querySelector(`.form-ds-display-${index}`).style.display = 'block';
+                            document.querySelector(`.form-ds-edit-${index}`).style.display = 'none';
+                        }
+
+                        function saveFormDatasheet(index) {
+                            const url = document.getElementById(`form-url-${index}`).value.trim();
+                            const title = document.getElementById(`form-title-${index}`).value.trim();
+                            const info = document.getElementById(`form-info-${index}`).value.trim();
+
+                            if (!url) {
+                                alert('URL is required!');
+                                return;
+                            }
+
+                            // Add protocol if missing
+                            let finalUrl = url;
+                            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                                finalUrl = 'https://' + url;
+                            }
+
+                            formDatasheets[index] = { url: finalUrl, title: title, info: info };
+                            renderFormDatasheets();
+                        }
+
+                        function deleteFormDatasheet(index) {
+                            if (!confirm('Delete this datasheet URL?')) return;
+                            formDatasheets.splice(index, 1);
+                            renderFormDatasheets();
+                        }
+
+                        function submitDeleteParameterForm(itemId, paramId, event) {
+                            event.preventDefault();
+                            event.stopImmediatePropagation();
+
+                            if (!confirm('Remove this parameter?')) return;
+
+                            // Create a temporary form to submit the delete request
+                            const tempForm = document.createElement('form');
+                            tempForm.method = 'POST';
+                            tempForm.action = `/item/${itemId}/delete-parameter/${paramId}`;
+
+                            // Add CSRF token if it exists
+                            const csrfToken = document.querySelector('input[name="csrf_token"]');
+                            if (csrfToken) {
+                                const tokenInput = document.createElement('input');
+                                tokenInput.type = 'hidden';
+                                tokenInput.name = 'csrf_token';
+                                tokenInput.value = csrfToken.value;
+                                tempForm.appendChild(tokenInput);
+                            }
+
+                            document.body.appendChild(tempForm);
+                            tempForm.submit();
+                        }
+
+                        // Initial render
+                        document.addEventListener('DOMContentLoaded', function () {
+                            renderFormDatasheets();
+
+                            // Main form submit handler - just update the hidden field before submit
+                            const mainForm = document.getElementById('itemForm');
+                            if (mainForm) {
+                                mainForm.addEventListener('submit', function (e) {
+                                    // Update datasheet JSON before form submission
+                                    updateHiddenField();
+                                    // Allow form to submit normally
+                                    return true;
+                                });
+                            }
+                        });
+                    </script>
 
                     <!-- UUID and Min Quantity -->
                     <div class="row mb-2">
                         <div class="col-6">
                             <label class="form-label form-label-sm">UUID</label>
-                            <input type="text" class="form-control form-control-sm" 
-                                   value="{{ item.uuid if item else 'Auto-generated' }}" readonly>
+                            <input type="text" class="form-control form-control-sm"
+                                value="{{ item.uuid if item else 'Auto-generated' }}" readonly>
                         </div>
                         <div class="col-6">
                             <label class="form-label form-label-sm">Min Quantity</label>
@@ -618,342 +652,342 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <script>
-// File management functions
-let currentAttachmentId = null;
-let imageEditModalInstance = null;
-let fileRenameModalInstance = null;
+    // File management functions
+    let currentAttachmentId = null;
+    let imageEditModalInstance = null;
+    let fileRenameModalInstance = null;
 
-// Initialize modals
-document.addEventListener('DOMContentLoaded', function() {
-    const imageEditModalEl = document.getElementById('imageEditModal');
-    const fileRenameModalEl = document.getElementById('fileRenameModal');
-    if (imageEditModalEl) imageEditModalInstance = new bootstrap.Modal(imageEditModalEl);
-    if (fileRenameModalEl) fileRenameModalInstance = new bootstrap.Modal(fileRenameModalEl);
-});
-
-function openImageEditModal(src, filename, attachmentId) {
-    currentAttachmentId = attachmentId;
-    document.getElementById('modalImagePreview').src = src;
-    document.getElementById('imageFileName').value = filename;
-    imageEditModalInstance.show();
-}
-
-function openFileRenameModal(attachmentId, filename) {
-    currentAttachmentId = attachmentId;
-    document.getElementById('fileNameInput').value = filename;
-    fileRenameModalInstance.show();
-}
-
-function saveImageName() {
-    const newName = document.getElementById('imageFileName').value.trim();
-    if (!newName) {
-        alert('File name cannot be empty!');
-        return;
-    }
-    renameAttachment(currentAttachmentId, newName);
-}
-
-function saveFileName() {
-    const newName = document.getElementById('fileNameInput').value.trim();
-    if (!newName) {
-        alert('File name cannot be empty!');
-        return;
-    }
-    renameAttachment(currentAttachmentId, newName);
-}
-
-function renameAttachment(attachmentId, newName) {
-    fetch(`/attachment/${attachmentId}/rename`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ new_name: newName })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('File renamed successfully!');
-            location.reload();
-        } else {
-            alert('Error: ' + (data.error || 'Failed to rename file'));
-        }
-    })
-    .catch(error => {
-        alert('Error: ' + error);
+    // Initialize modals
+    document.addEventListener('DOMContentLoaded', function () {
+        const imageEditModalEl = document.getElementById('imageEditModal');
+        const fileRenameModalEl = document.getElementById('fileRenameModal');
+        if (imageEditModalEl) imageEditModalInstance = new bootstrap.Modal(imageEditModalEl);
+        if (fileRenameModalEl) fileRenameModalInstance = new bootstrap.Modal(fileRenameModalEl);
     });
-}
 
-function deleteImageFromModal() {
-    if (confirm('Delete this image?')) {
-        deleteFile(currentAttachmentId);
+    function openImageEditModal(src, filename, attachmentId) {
+        currentAttachmentId = attachmentId;
+        document.getElementById('modalImagePreview').src = src;
+        document.getElementById('imageFileName').value = filename;
+        imageEditModalInstance.show();
     }
-}
 
-function deleteFile(attachmentId) {
-    if (confirm('Delete this file?')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `/attachment/${attachmentId}/delete`;
-        
-        const csrfToken = document.querySelector('input[name="csrf_token"]');
-        if (csrfToken) {
-            const tokenInput = document.createElement('input');
-            tokenInput.type = 'hidden';
-            tokenInput.name = 'csrf_token';
-            tokenInput.value = csrfToken.value;
-            form.appendChild(tokenInput);
+    function openFileRenameModal(attachmentId, filename) {
+        currentAttachmentId = attachmentId;
+        document.getElementById('fileNameInput').value = filename;
+        fileRenameModalInstance.show();
+    }
+
+    function saveImageName() {
+        const newName = document.getElementById('imageFileName').value.trim();
+        if (!newName) {
+            alert('File name cannot be empty!');
+            return;
         }
-        
-        document.body.appendChild(form);
-        form.submit();
+        renameAttachment(currentAttachmentId, newName);
     }
-}
 
-{% if item %}
-function uploadFiles() {
-    const fileInput = document.getElementById('fileUploadInput');
-    const files = fileInput.files;
-    
-    if (files.length === 0) {
-        alert('Please select files to upload');
-        return;
+    function saveFileName() {
+        const newName = document.getElementById('fileNameInput').value.trim();
+        if (!newName) {
+            alert('File name cannot be empty!');
+            return;
+        }
+        renameAttachment(currentAttachmentId, newName);
     }
-    
-    const formData = new FormData();
-    for (let i = 0; i < files.length; i++) {
-        formData.append('files', files[i]);
-    }
-    
-    // Add CSRF token to form data
-    const csrfToken = document.querySelector('input[name="csrf_token"]').value;
-    formData.append('csrf_token', csrfToken);
-    
-    fetch('{{ url_for("upload_attachment", item_id=item.id) }}', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => {
-        if (response.ok) {
-            alert('Files uploaded successfully!');
-            location.reload();
-        } else {
-            return response.text().then(text => {
-                alert('Error uploading files: ' + text);
+
+    function renameAttachment(attachmentId, newName) {
+        fetch(`/attachment/${attachmentId}/rename`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ new_name: newName })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('File renamed successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to rename file'));
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error);
             });
+    }
+
+    function deleteImageFromModal() {
+        if (confirm('Delete this image?')) {
+            deleteFile(currentAttachmentId);
         }
-    })
-    .catch(error => {
-        alert('Error: ' + error);
-    });
-}
-{% endif %}
+    }
+
+    function deleteFile(attachmentId) {
+        if (confirm('Delete this file?')) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/attachment/${attachmentId}/delete`;
+
+            const csrfToken = document.querySelector('input[name="csrf_token"]');
+            if (csrfToken) {
+                const tokenInput = document.createElement('input');
+                tokenInput.type = 'hidden';
+                tokenInput.name = 'csrf_token';
+                tokenInput.value = csrfToken.value;
+                form.appendChild(tokenInput);
+            }
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+
+    {% if item %}
+    function uploadFiles() {
+        const fileInput = document.getElementById('fileUploadInput');
+        const files = fileInput.files;
+
+        if (files.length === 0) {
+            alert('Please select files to upload');
+            return;
+        }
+
+        const formData = new FormData();
+        for (let i = 0; i < files.length; i++) {
+            formData.append('files', files[i]);
+        }
+
+        // Add CSRF token to form data
+        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+        formData.append('csrf_token', csrfToken);
+
+        fetch('{{ url_for("upload_attachment", item_id=item.id) }}', {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => {
+                if (response.ok) {
+                    alert('Files uploaded successfully!');
+                    location.reload();
+                } else {
+                    return response.text().then(text => {
+                        alert('Error uploading files: ' + text);
+                    });
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error);
+            });
+    }
+    {% endif %}
 </script>
 
 <style>
-.form-label-sm {
-    margin-bottom: 0.25rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-}
+    .form-label-sm {
+        margin-bottom: 0.25rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
 
-.drawer-picker-grid {
-    display: inline-grid;
-    gap: 3px;
-    padding: 8px;
-    background: #f8f9fa;
-    border-radius: 4px;
-}
+    .drawer-picker-grid {
+        display: inline-grid;
+        gap: 3px;
+        padding: 8px;
+        background: #f8f9fa;
+        border-radius: 4px;
+    }
 
-.drawer-cell-picker {
-    width: 35px;
-    height: 35px;
-    border: 1px solid #dee2e6;
-    border-radius: 3px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    background: white;
-    transition: all 0.2s;
-    font-size: 0.65rem;
-    font-weight: bold;
-}
+    .drawer-cell-picker {
+        width: 35px;
+        height: 35px;
+        border: 1px solid #dee2e6;
+        border-radius: 3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        background: white;
+        transition: all 0.2s;
+        font-size: 0.65rem;
+        font-weight: bold;
+    }
 
-.drawer-cell-picker:hover {
-    border-color: #0d6efd;
-    background: #e7f3ff;
-    transform: scale(1.1);
-}
+    .drawer-cell-picker:hover {
+        border-color: #0d6efd;
+        background: #e7f3ff;
+        transform: scale(1.1);
+    }
 
-.drawer-cell-picker.selected {
-    background: #0d6efd;
-    color: white;
-    border-color: #0d6efd;
-}
+    .drawer-cell-picker.selected {
+        background: #0d6efd;
+        color: white;
+        border-color: #0d6efd;
+    }
 
-.drawer-cell-picker.unavailable {
-    background: linear-gradient(145deg, #6c757d, #5a6268);
-    color: #fff;
-    opacity: 0.6;
-    cursor: not-allowed;
-}
+    .drawer-cell-picker.unavailable {
+        background: linear-gradient(145deg, #6c757d, #5a6268);
+        color: #fff;
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
 
-.drawer-cell-picker.unavailable:hover {
-    transform: none;
-    border-color: #495057;
-}
+    .drawer-cell-picker.unavailable:hover {
+        transform: none;
+        border-color: #495057;
+    }
 </style>
 
 <script>
-// Racks data with unavailable drawers
-const racksData = {{ racks_data|tojson|safe }};
+    // Racks data with unavailable drawers
+    const racksData = {{ racks_data| tojson | safe }};
 
-// Location type toggle
-const typeGeneral = document.getElementById('type_general');
-const typeDrawer = document.getElementById('type_drawer');
-const generalSection = document.getElementById('general_location_section');
-const drawerSection = document.getElementById('drawer_storage_section');
-const locationSelect = document.getElementById('location_id');
-const rackSelect = document.getElementById('rack_select');
-const drawerInput = document.getElementById('drawer_input');
+    // Location type toggle
+    const typeGeneral = document.getElementById('type_general');
+    const typeDrawer = document.getElementById('type_drawer');
+    const generalSection = document.getElementById('general_location_section');
+    const drawerSection = document.getElementById('drawer_storage_section');
+    const locationSelect = document.getElementById('location_id');
+    const rackSelect = document.getElementById('rack_select');
+    const drawerInput = document.getElementById('drawer_input');
 
-typeGeneral.addEventListener('change', toggleLocationType);
-typeDrawer.addEventListener('change', toggleLocationType);
+    typeGeneral.addEventListener('change', toggleLocationType);
+    typeDrawer.addEventListener('change', toggleLocationType);
 
-function toggleLocationType() {
-    if (typeGeneral.checked) {
-        generalSection.style.display = 'block';
-        drawerSection.style.display = 'none';
-        if (locationSelect) {
-            locationSelect.disabled = false;
-            // Restore previously selected location if available
-        }
-        rackSelect.value = '';
-        drawerInput.value = '';
-    } else {
-        generalSection.style.display = 'none';
-        drawerSection.style.display = 'block';
-        if (locationSelect) {
-            locationSelect.value = '0'; // Set to 0 but don't disable so it submits
-            locationSelect.disabled = false; // Keep enabled so form value is submitted
+    function toggleLocationType() {
+        if (typeGeneral.checked) {
+            generalSection.style.display = 'block';
+            drawerSection.style.display = 'none';
+            if (locationSelect) {
+                locationSelect.disabled = false;
+                // Restore previously selected location if available
+            }
+            rackSelect.value = '';
+            drawerInput.value = '';
+        } else {
+            generalSection.style.display = 'none';
+            drawerSection.style.display = 'block';
+            if (locationSelect) {
+                locationSelect.value = '0'; // Set to 0 but don't disable so it submits
+                locationSelect.disabled = false; // Keep enabled so form value is submitted
+            }
         }
     }
-}
 
-// Rack selection
-rackSelect.addEventListener('change', function() {
-    const selected = this.options[this.selectedIndex];
-    const drawerPicker = document.getElementById('drawer_picker');
-    
-    if (this.value) {
-        const rows = parseInt(selected.dataset.rows);
-        const cols = parseInt(selected.dataset.cols);
-        const rackId = parseInt(this.value);
-        
-        generateDrawerGrid(rows, cols, rackId);
-        drawerPicker.style.display = 'block';
-    } else {
-        drawerPicker.style.display = 'none';
-        drawerInput.value = '';
-    }
-});
+    // Rack selection
+    rackSelect.addEventListener('change', function () {
+        const selected = this.options[this.selectedIndex];
+        const drawerPicker = document.getElementById('drawer_picker');
 
-function generateDrawerGrid(rows, cols, rackId) {
-    const grid = document.getElementById('drawer_grid');
-    grid.innerHTML = '';
-    grid.style.gridTemplateColumns = `repeat(${cols}, 35px)`;
-    
-    // Find rack data to get unavailable drawers
-    const rackData = racksData.find(r => r.id === rackId);
-    const unavailableDrawers = rackData ? rackData.unavailable_drawers : [];
-    
-    for (let r = 1; r <= rows; r++) {
-        for (let c = 1; c <= cols; c++) {
-            const cell = document.createElement('div');
-            const drawerId = `R${r}-C${c}`;
-            const isUnavailable = unavailableDrawers.includes(drawerId);
-            
-            cell.className = 'drawer-cell-picker';
-            if (isUnavailable) {
-                cell.classList.add('unavailable');
-                cell.title = 'This drawer is unavailable';
-            }
-            cell.textContent = drawerId;
-            cell.dataset.drawer = drawerId;
-            
-            if (drawerInput.value === drawerId) {
-                cell.classList.add('selected');
-            }
-            
-            if (!isUnavailable) {
-                cell.addEventListener('click', function() {
-                    grid.querySelectorAll('.drawer-cell-picker').forEach(d => {
-                        d.classList.remove('selected');
+        if (this.value) {
+            const rows = parseInt(selected.dataset.rows);
+            const cols = parseInt(selected.dataset.cols);
+            const rackId = parseInt(this.value);
+
+            generateDrawerGrid(rows, cols, rackId);
+            drawerPicker.style.display = 'block';
+        } else {
+            drawerPicker.style.display = 'none';
+            drawerInput.value = '';
+        }
+    });
+
+    function generateDrawerGrid(rows, cols, rackId) {
+        const grid = document.getElementById('drawer_grid');
+        grid.innerHTML = '';
+        grid.style.gridTemplateColumns = `repeat(${cols}, 35px)`;
+
+        // Find rack data to get unavailable drawers
+        const rackData = racksData.find(r => r.id === rackId);
+        const unavailableDrawers = rackData ? rackData.unavailable_drawers : [];
+
+        for (let r = 1; r <= rows; r++) {
+            for (let c = 1; c <= cols; c++) {
+                const cell = document.createElement('div');
+                const drawerId = `R${r}-C${c}`;
+                const isUnavailable = unavailableDrawers.includes(drawerId);
+
+                cell.className = 'drawer-cell-picker';
+                if (isUnavailable) {
+                    cell.classList.add('unavailable');
+                    cell.title = 'This drawer is unavailable';
+                }
+                cell.textContent = drawerId;
+                cell.dataset.drawer = drawerId;
+
+                if (drawerInput.value === drawerId) {
+                    cell.classList.add('selected');
+                }
+
+                if (!isUnavailable) {
+                    cell.addEventListener('click', function () {
+                        grid.querySelectorAll('.drawer-cell-picker').forEach(d => {
+                            d.classList.remove('selected');
+                        });
+                        this.classList.add('selected');
+                        drawerInput.value = this.dataset.drawer;
                     });
-                    this.classList.add('selected');
-                    drawerInput.value = this.dataset.drawer;
-                });
+                }
+
+                grid.appendChild(cell);
             }
-            
-            grid.appendChild(cell);
         }
     }
-}
 
-// Lending validation
-const lendToInput = document.getElementById('lend_to_input');
-const lendQtySection = document.getElementById('lend_qty_section');
-const lendQtyInput = document.getElementById('lend_qty_input');
-const lendError = document.getElementById('lend_error');
-const qtyInput = document.getElementById('quantity');
+    // Lending validation
+    const lendToInput = document.getElementById('lend_to_input');
+    const lendQtySection = document.getElementById('lend_qty_section');
+    const lendQtyInput = document.getElementById('lend_qty_input');
+    const lendError = document.getElementById('lend_error');
+    const qtyInput = document.getElementById('quantity');
 
-lendToInput.addEventListener('input', function() {
-    if (this.value.trim()) {
+    lendToInput.addEventListener('input', function () {
+        if (this.value.trim()) {
+            lendQtySection.style.display = 'block';
+        } else {
+            lendQtySection.style.display = 'none';
+            lendQtyInput.value = 0;
+        }
+    });
+
+    lendQtyInput.addEventListener('input', function () {
+        const total = parseInt(qtyInput.value) || 0;
+        const lent = parseInt(this.value) || 0;
+
+        if (lent > total) {
+            lendError.textContent = `Cannot lend more than ${total}`;
+            this.value = total;
+        } else {
+            lendError.textContent = '';
+        }
+    });
+
+    // Trigger on page load
+    toggleLocationType();
+    if (rackSelect.value) {
+        rackSelect.dispatchEvent(new Event('change'));
+    }
+    if (lendToInput.value && lendToInput.value.trim()) {
         lendQtySection.style.display = 'block';
-    } else {
-        lendQtySection.style.display = 'none';
-        lendQtyInput.value = 0;
     }
-});
 
-lendQtyInput.addEventListener('input', function() {
-    const total = parseInt(qtyInput.value) || 0;
-    const lent = parseInt(this.value) || 0;
-    
-    if (lent > total) {
-        lendError.textContent = `Cannot lend more than ${total}`;
-        this.value = total;
-    } else {
-        lendError.textContent = '';
+    // Calculate Total Price
+    const pricePerQtyInput = document.getElementById('price_per_qty');
+    const totalPriceInput = document.getElementById('total_price');
+
+    function calculateTotalPrice() {
+        const pricePerQty = parseFloat(pricePerQtyInput.value) || 0;
+        const quantity = parseInt(qtyInput.value) || 0;
+        const totalPrice = pricePerQty * quantity;
+        totalPriceInput.value = totalPrice.toFixed(2);
     }
-});
 
-// Trigger on page load
-toggleLocationType();
-if (rackSelect.value) {
-    rackSelect.dispatchEvent(new Event('change'));
-}
-if (lendToInput.value && lendToInput.value.trim()) {
-    lendQtySection.style.display = 'block';
-}
+    pricePerQtyInput.addEventListener('input', calculateTotalPrice);
+    qtyInput.addEventListener('input', calculateTotalPrice);
 
-// Calculate Total Price
-const pricePerQtyInput = document.getElementById('price_per_qty');
-const totalPriceInput = document.getElementById('total_price');
-
-function calculateTotalPrice() {
-    const pricePerQty = parseFloat(pricePerQtyInput.value) || 0;
-    const quantity = parseInt(qtyInput.value) || 0;
-    const totalPrice = pricePerQty * quantity;
-    totalPriceInput.value = totalPrice.toFixed(2);
-}
-
-pricePerQtyInput.addEventListener('input', calculateTotalPrice);
-qtyInput.addEventListener('input', calculateTotalPrice);
-
-// Calculate on page load
-calculateTotalPrice();
+    // Calculate on page load
+    calculateTotalPrice();
 </script>
 
 <!-- Add Category Modal -->
@@ -1073,141 +1107,141 @@ calculateTotalPrice();
 </div>
 
 <script>
-// Add Category
-function addCategory() {
-    const name = document.getElementById('newCategoryName').value.trim();
-    const description = document.getElementById('newCategoryDesc').value.trim();
-    
-    if (!name) {
-        showError('categoryError', 'Category name is required');
-        return;
-    }
-    
-    fetch('/api/category/add', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name: name, description: description})
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Add to dropdown using ID
-            const select = document.getElementById('category_id');
-            if (select) {
-                const option = new Option(data.category.name, data.category.id, true, true);
-                select.add(option);
-            }
-            
-            // Close modal and reset
-            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addCategoryModal'));
-            modal.hide();
-            document.getElementById('newCategoryName').value = '';
-            document.getElementById('newCategoryDesc').value = '';
-            hideError('categoryError');
-        } else {
-            showError('categoryError', data.error || 'Failed to add category');
-        }
-    })
-    .catch(error => showError('categoryError', 'Error: ' + error));
-}
+    // Add Category
+    function addCategory() {
+        const name = document.getElementById('newCategoryName').value.trim();
+        const description = document.getElementById('newCategoryDesc').value.trim();
 
-// Add Footprint
-function addFootprint() {
-    const name = document.getElementById('newFootprintName').value.trim();
-    const description = document.getElementById('newFootprintDesc').value.trim();
-    
-    console.log('Adding footprint:', name);
-    
-    if (!name) {
-        showError('footprintError', 'Footprint name is required');
-        return;
-    }
-    
-    fetch('/api/footprint/add', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name: name, description: description})
-    })
-    .then(response => {
-        console.log('Response status:', response.status);
-        return response.json();
-    })
-    .then(data => {
-        console.log('Response data:', data);
-        
-        if (data.success) {
-            // Add to dropdown using ID
-            const select = document.getElementById('footprint_id');
-            console.log('Footprint select element:', select);
-            
-            if (select) {
-                const option = new Option(data.footprint.name, data.footprint.id, true, true);
-                select.add(option);
-                console.log('Added footprint to dropdown:', data.footprint.name);
-            } else {
-                console.error('Footprint select element not found!');
-            }
-            
-            // Close modal and reset
-            const modalEl = document.getElementById('addFootprintModal');
-            console.log('Modal element:', modalEl);
-            
-            if (modalEl) {
-                const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-                modal.hide();
-                console.log('Modal closed');
-            }
-            
-            document.getElementById('newFootprintName').value = '';
-            document.getElementById('newFootprintDesc').value = '';
-            hideError('footprintError');
-        } else {
-            console.error('API returned error:', data.error);
-            showError('footprintError', data.error || 'Failed to add footprint');
+        if (!name) {
+            showError('categoryError', 'Category name is required');
+            return;
         }
-    })
-    .catch(error => {
-        console.error('Fetch error:', error);
-        showError('footprintError', 'Error: ' + error);
-    });
-}
 
-// Add Tag
-function addTag() {
-    const name = document.getElementById('newTagName').value.trim();
-    const color = document.getElementById('newTagColor').value;
-    
-    console.log('Adding tag:', name, 'with color:', color);
-    
-    if (!name) {
-        showError('tagError', 'Tag name is required');
-        return;
+        fetch('/api/category/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, description: description })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Add to dropdown using ID
+                    const select = document.getElementById('category_id');
+                    if (select) {
+                        const option = new Option(data.category.name, data.category.id, true, true);
+                        select.add(option);
+                    }
+
+                    // Close modal and reset
+                    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addCategoryModal'));
+                    modal.hide();
+                    document.getElementById('newCategoryName').value = '';
+                    document.getElementById('newCategoryDesc').value = '';
+                    hideError('categoryError');
+                } else {
+                    showError('categoryError', data.error || 'Failed to add category');
+                }
+            })
+            .catch(error => showError('categoryError', 'Error: ' + error));
     }
-    
-    fetch('/api/tag/add', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name: name, color: color})
-    })
-    .then(response => {
-        console.log('Tag response status:', response.status);
-        return response.json();
-    })
-    .then(data => {
-        console.log('Tag response data:', data);
-        
-        if (data.success) {
-            // Add to tags container
-            const container = document.getElementById('tagsContainer');
-            console.log('Tags container element:', container);
-            
-            if (!container) {
-                console.error('Tags container not found!');
-                showError('tagError', 'Tags container not found');
-                return;
-            }
-            
-            const newTag = `
+
+    // Add Footprint
+    function addFootprint() {
+        const name = document.getElementById('newFootprintName').value.trim();
+        const description = document.getElementById('newFootprintDesc').value.trim();
+
+        console.log('Adding footprint:', name);
+
+        if (!name) {
+            showError('footprintError', 'Footprint name is required');
+            return;
+        }
+
+        fetch('/api/footprint/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, description: description })
+        })
+            .then(response => {
+                console.log('Response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('Response data:', data);
+
+                if (data.success) {
+                    // Add to dropdown using ID
+                    const select = document.getElementById('footprint_id');
+                    console.log('Footprint select element:', select);
+
+                    if (select) {
+                        const option = new Option(data.footprint.name, data.footprint.id, true, true);
+                        select.add(option);
+                        console.log('Added footprint to dropdown:', data.footprint.name);
+                    } else {
+                        console.error('Footprint select element not found!');
+                    }
+
+                    // Close modal and reset
+                    const modalEl = document.getElementById('addFootprintModal');
+                    console.log('Modal element:', modalEl);
+
+                    if (modalEl) {
+                        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                        modal.hide();
+                        console.log('Modal closed');
+                    }
+
+                    document.getElementById('newFootprintName').value = '';
+                    document.getElementById('newFootprintDesc').value = '';
+                    hideError('footprintError');
+                } else {
+                    console.error('API returned error:', data.error);
+                    showError('footprintError', data.error || 'Failed to add footprint');
+                }
+            })
+            .catch(error => {
+                console.error('Fetch error:', error);
+                showError('footprintError', 'Error: ' + error);
+            });
+    }
+
+    // Add Tag
+    function addTag() {
+        const name = document.getElementById('newTagName').value.trim();
+        const color = document.getElementById('newTagColor').value;
+
+        console.log('Adding tag:', name, 'with color:', color);
+
+        if (!name) {
+            showError('tagError', 'Tag name is required');
+            return;
+        }
+
+        fetch('/api/tag/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, color: color })
+        })
+            .then(response => {
+                console.log('Tag response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('Tag response data:', data);
+
+                if (data.success) {
+                    // Add to tags container
+                    const container = document.getElementById('tagsContainer');
+                    console.log('Tags container element:', container);
+
+                    if (!container) {
+                        console.error('Tags container not found!');
+                        showError('tagError', 'Tags container not found');
+                        return;
+                    }
+
+                    const newTag = `
                 <div class="form-check form-check-inline" style="min-width: 150px;">
                     <input class="form-check-input" type="checkbox" name="tags[]" 
                            value="${data.tag.id}" id="tag${data.tag.id}" checked>
@@ -1216,94 +1250,94 @@ function addTag() {
                     </label>
                 </div>
             `;
-            container.insertAdjacentHTML('beforeend', newTag);
-            console.log('Added tag to container:', data.tag.name);
-            
-            // Close modal and reset
-            const modalEl = document.getElementById('addTagModal');
-            console.log('Tag modal element:', modalEl);
-            
-            if (modalEl) {
-                const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-                modal.hide();
-                console.log('Tag modal closed');
-            }
-            
-            document.getElementById('newTagName').value = '';
-            document.getElementById('newTagColor').value = '#6c757d';
-            hideError('tagError');
-        } else {
-            console.error('Tag API returned error:', data.error);
-            showError('tagError', data.error || 'Failed to add tag');
+                    container.insertAdjacentHTML('beforeend', newTag);
+                    console.log('Added tag to container:', data.tag.name);
+
+                    // Close modal and reset
+                    const modalEl = document.getElementById('addTagModal');
+                    console.log('Tag modal element:', modalEl);
+
+                    if (modalEl) {
+                        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                        modal.hide();
+                        console.log('Tag modal closed');
+                    }
+
+                    document.getElementById('newTagName').value = '';
+                    document.getElementById('newTagColor').value = '#6c757d';
+                    hideError('tagError');
+                } else {
+                    console.error('Tag API returned error:', data.error);
+                    showError('tagError', data.error || 'Failed to add tag');
+                }
+            })
+            .catch(error => {
+                console.error('Tag fetch error:', error);
+                showError('tagError', 'Error: ' + error);
+            });
+    }
+
+    // Add Location
+    function addLocation() {
+        const name = document.getElementById('newLocationName').value.trim();
+        const info = document.getElementById('newLocationInfo').value.trim();
+        const description = document.getElementById('newLocationDesc').value.trim();
+        const color = document.getElementById('newLocationColor').value;
+
+        if (!name) {
+            showError('locationError', 'Location name is required');
+            return;
         }
-    })
-    .catch(error => {
-        console.error('Tag fetch error:', error);
-        showError('tagError', 'Error: ' + error);
-    });
-}
 
-// Add Location
-function addLocation() {
-    const name = document.getElementById('newLocationName').value.trim();
-    const info = document.getElementById('newLocationInfo').value.trim();
-    const description = document.getElementById('newLocationDesc').value.trim();
-    const color = document.getElementById('newLocationColor').value;
-    
-    if (!name) {
-        showError('locationError', 'Location name is required');
-        return;
+        fetch('/api/location/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, info: info, description: description, color: color })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Add to dropdown
+                    const select = document.getElementById('location_id');
+                    if (select) {
+                        const option = new Option(data.location.name, data.location.id, true, true);
+                        select.add(option);
+                    }
+
+                    // Close modal and reset
+                    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addLocationModal'));
+                    modal.hide();
+                    document.getElementById('newLocationName').value = '';
+                    document.getElementById('newLocationInfo').value = '';
+                    document.getElementById('newLocationDesc').value = '';
+                    document.getElementById('newLocationColor').value = '#6c757d';
+                    hideError('locationError');
+                } else {
+                    showError('locationError', data.error || 'Failed to add location');
+                }
+            })
+            .catch(error => {
+                showError('locationError', 'Error: ' + error);
+            });
     }
-    
-    fetch('/api/location/add', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name: name, info: info, description: description, color: color})
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Add to dropdown
-            const select = document.getElementById('location_id');
-            if (select) {
-                const option = new Option(data.location.name, data.location.id, true, true);
-                select.add(option);
-            }
-            
-            // Close modal and reset
-            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addLocationModal'));
-            modal.hide();
-            document.getElementById('newLocationName').value = '';
-            document.getElementById('newLocationInfo').value = '';
-            document.getElementById('newLocationDesc').value = '';
-            document.getElementById('newLocationColor').value = '#6c757d';
-            hideError('locationError');
+
+    function showError(id, message) {
+        const errorDiv = document.getElementById(id);
+        if (errorDiv) {
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('d-none');
         } else {
-            showError('locationError', data.error || 'Failed to add location');
+            console.error('Error element not found:', id);
+            alert(message);
         }
-    })
-    .catch(error => {
-        showError('locationError', 'Error: ' + error);
-    });
-}
-
-function showError(id, message) {
-    const errorDiv = document.getElementById(id);
-    if (errorDiv) {
-        errorDiv.textContent = message;
-        errorDiv.classList.remove('d-none');
-    } else {
-        console.error('Error element not found:', id);
-        alert(message);
     }
-}
 
-function hideError(id) {
-    const errorDiv = document.getElementById(id);
-    if (errorDiv) {
-        errorDiv.classList.add('d-none');
+    function hideError(id) {
+        const errorDiv = document.getElementById(id);
+        if (errorDiv) {
+            errorDiv.classList.add('d-none');
+        }
     }
-}
 </script>
 
 <!-- Add Parameter Modal -->
@@ -1320,30 +1354,33 @@ function hideError(id) {
                     <!-- Parameter Type Selection -->
                     <div class="mb-3">
                         <label class="form-label">Parameter Type</label>
-                        <select name="param_type" id="modal_param_type" class="form-select" onchange="updateParameterFields()">
+                        <select name="param_type" id="modal_param_type" class="form-select"
+                            onchange="updateParameterFields()">
                             <option value="">-- Select Type --</option>
                             <option value="number">Number</option>
                             <option value="date">Date</option>
                             <option value="string">String</option>
                         </select>
                     </div>
-                    
+
                     <!-- Parameter Selection -->
                     <div class="mb-3">
                         <label class="form-label">Parameter</label>
-                        <select name="parameter_id" id="modal_parameter_id" class="form-select" onchange="updateParameterOptions()">
+                        <select name="parameter_id" id="modal_parameter_id" class="form-select"
+                            onchange="updateParameterOptions()">
                             <option value="">-- Select Parameter --</option>
                         </select>
                     </div>
-                    
+
                     <!-- Operation Selection (for Number and Date types) -->
                     <div class="mb-3" id="operation_group" style="display: none;">
                         <label class="form-label">Operation</label>
-                        <select name="operation" id="modal_operation" class="form-select" onchange="updateValueFields()">
+                        <select name="operation" id="modal_operation" class="form-select"
+                            onchange="updateValueFields()">
                             <option value="">-- Select Operation --</option>
                         </select>
                     </div>
-                    
+
                     <!-- Value Fields -->
                     <div class="row" id="value_fields" style="display: none;">
                         <div class="col-md-6">
@@ -1359,7 +1396,7 @@ function hideError(id) {
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Unit Selection (for Number type) -->
                     <div class="mb-3" id="unit_group" style="display: none;">
                         <label class="form-label">Unit</label>
@@ -1367,7 +1404,7 @@ function hideError(id) {
                             <option value="">-- Select Unit --</option>
                         </select>
                     </div>
-                    
+
                     <!-- String Option Selection (for String type) -->
                     <div class="mb-3" id="string_option_group" style="display: none;">
                         <label class="form-label">Option</label>
@@ -1375,7 +1412,7 @@ function hideError(id) {
                             <option value="">-- Select Option --</option>
                         </select>
                     </div>
-                    
+
                     <!-- Description -->
                     <div class="mb-3">
                         <label class="form-label">Description (Optional)</label>
@@ -1393,138 +1430,138 @@ function hideError(id) {
 
 
 <script>
-// Magic Parameters Functions
-function updateParameterFields() {
-    const paramType = document.getElementById('modal_param_type').value;
-    const paramSelect = document.getElementById('modal_parameter_id');
-    
-    // Clear parameter options
-    paramSelect.innerHTML = '<option value="">-- Select Parameter --</option>';
-    
-    // Hide all conditional fields
-    document.getElementById('operation_group').style.display = 'none';
-    document.getElementById('value_fields').style.display = 'none';
-    document.getElementById('unit_group').style.display = 'none';
-    document.getElementById('string_option_group').style.display = 'none';
-    
-    if (paramType) {
-        // Fetch parameters for selected type
-        fetch(`/api/magic-parameters/${paramType}`)
-            .then(response => response.json())
-            .then(data => {
-                data.forEach(param => {
-                    const option = new Option(param.name, param.id);
-                    paramSelect.add(option);
-                });
-            });
-    }
-}
+    // Magic Parameters Functions
+    function updateParameterFields() {
+        const paramType = document.getElementById('modal_param_type').value;
+        const paramSelect = document.getElementById('modal_parameter_id');
 
-function updateParameterOptions() {
-    const paramType = document.getElementById('modal_param_type').value;
-    const parameterId = document.getElementById('modal_parameter_id').value;
-    
-    if (!parameterId) return;
-    
-    // Show relevant fields based on parameter type
-    if (paramType === 'number') {
-        // Show operation and unit fields
-        document.getElementById('operation_group').style.display = 'block';
-        const operationSelect = document.getElementById('modal_operation');
-        operationSelect.innerHTML = `
+        // Clear parameter options
+        paramSelect.innerHTML = '<option value="">-- Select Parameter --</option>';
+
+        // Hide all conditional fields
+        document.getElementById('operation_group').style.display = 'none';
+        document.getElementById('value_fields').style.display = 'none';
+        document.getElementById('unit_group').style.display = 'none';
+        document.getElementById('string_option_group').style.display = 'none';
+
+        if (paramType) {
+            // Fetch parameters for selected type
+            fetch(`/api/magic-parameters/${paramType}`)
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(param => {
+                        const option = new Option(param.name, param.id);
+                        paramSelect.add(option);
+                    });
+                });
+        }
+    }
+
+    function updateParameterOptions() {
+        const paramType = document.getElementById('modal_param_type').value;
+        const parameterId = document.getElementById('modal_parameter_id').value;
+
+        if (!parameterId) return;
+
+        // Show relevant fields based on parameter type
+        if (paramType === 'number') {
+            // Show operation and unit fields
+            document.getElementById('operation_group').style.display = 'block';
+            const operationSelect = document.getElementById('modal_operation');
+            operationSelect.innerHTML = `
             <option value="">-- Select Operation --</option>
             <option value="min">Min</option>
             <option value="max">Max</option>
             <option value="value">Value</option>
             <option value="range">Range</option>
         `;
-        
-        // Fetch and populate units
-        fetch(`/api/magic-parameters/number`)
-            .then(response => response.json())
-            .then(data => {
-                const param = data.find(p => p.id == parameterId);
-                if (param && param.units) {
-                    const unitSelect = document.getElementById('modal_unit');
-                    unitSelect.innerHTML = '<option value="">-- Select Unit --</option>';
-                    param.units.forEach(unit => {
-                        const option = new Option(unit, unit);
-                        unitSelect.add(option);
-                    });
-                    document.getElementById('unit_group').style.display = 'block';
-                }
-            });
-    } else if (paramType === 'date') {
-        // Show operation fields with date-specific labels
-        document.getElementById('operation_group').style.display = 'block';
-        const operationSelect = document.getElementById('modal_operation');
-        operationSelect.innerHTML = `
+
+            // Fetch and populate units
+            fetch(`/api/magic-parameters/number`)
+                .then(response => response.json())
+                .then(data => {
+                    const param = data.find(p => p.id == parameterId);
+                    if (param && param.units) {
+                        const unitSelect = document.getElementById('modal_unit');
+                        unitSelect.innerHTML = '<option value="">-- Select Unit --</option>';
+                        param.units.forEach(unit => {
+                            const option = new Option(unit, unit);
+                            unitSelect.add(option);
+                        });
+                        document.getElementById('unit_group').style.display = 'block';
+                    }
+                });
+        } else if (paramType === 'date') {
+            // Show operation fields with date-specific labels
+            document.getElementById('operation_group').style.display = 'block';
+            const operationSelect = document.getElementById('modal_operation');
+            operationSelect.innerHTML = `
             <option value="">-- Select Operation --</option>
             <option value="start">Start</option>
             <option value="end">End</option>
             <option value="value">Value</option>
             <option value="duration">Duration</option>
         `;
-    } else if (paramType === 'string') {
-        // Show string options
-        fetch(`/api/magic-parameters/string`)
-            .then(response => response.json())
-            .then(data => {
-                const param = data.find(p => p.id == parameterId);
-                if (param && param.options) {
-                    const optionSelect = document.getElementById('modal_string_option');
-                    optionSelect.innerHTML = '<option value="">-- Select Option --</option>';
-                    param.options.forEach(opt => {
-                        const option = new Option(opt, opt);
-                        optionSelect.add(option);
-                    });
-                    document.getElementById('string_option_group').style.display = 'block';
-                }
-            });
+        } else if (paramType === 'string') {
+            // Show string options
+            fetch(`/api/magic-parameters/string`)
+                .then(response => response.json())
+                .then(data => {
+                    const param = data.find(p => p.id == parameterId);
+                    if (param && param.options) {
+                        const optionSelect = document.getElementById('modal_string_option');
+                        optionSelect.innerHTML = '<option value="">-- Select Option --</option>';
+                        param.options.forEach(opt => {
+                            const option = new Option(opt, opt);
+                            optionSelect.add(option);
+                        });
+                        document.getElementById('string_option_group').style.display = 'block';
+                    }
+                });
+        }
     }
-}
 
-function updateValueFields() {
-    const paramType = document.getElementById('modal_param_type').value;
-    const operation = document.getElementById('modal_operation').value;
-    
-    if (!operation) {
-        document.getElementById('value_fields').style.display = 'none';
-        return;
-    }
-    
-    document.getElementById('value_fields').style.display = 'block';
-    
-    if (paramType === 'date') {
-        // Set input type to date
-        document.getElementById('modal_value').type = 'date';
-        document.getElementById('modal_value2').type = 'date';
-        
-        if (operation === 'duration') {
-            document.getElementById('value1_label').textContent = 'Start Date';
-            document.getElementById('value2_label').textContent = 'End Date';
-            document.getElementById('value2_group').style.display = 'block';
-        } else {
-            document.getElementById('value1_label').textContent = 'Date';
-            document.getElementById('value2_group').style.display = 'none';
+    function updateValueFields() {
+        const paramType = document.getElementById('modal_param_type').value;
+        const operation = document.getElementById('modal_operation').value;
+
+        if (!operation) {
+            document.getElementById('value_fields').style.display = 'none';
+            return;
         }
-    } else if (paramType === 'number') {
-        // Set input type to text for numbers
-        document.getElementById('modal_value').type = 'text';
-        document.getElementById('modal_value2').type = 'text';
-        
-        if (operation === 'range') {
-            document.getElementById('value1_label').textContent = 'Min Value';
-            document.getElementById('value2_label').textContent = 'Max Value';
-            document.getElementById('value2_group').style.display = 'block';
-        } else {
-            document.getElementById('value1_label').textContent = 'Value';
-            document.getElementById('value2_group').style.display = 'none';
+
+        document.getElementById('value_fields').style.display = 'block';
+
+        if (paramType === 'date') {
+            // Set input type to date
+            document.getElementById('modal_value').type = 'date';
+            document.getElementById('modal_value2').type = 'date';
+
+            if (operation === 'duration') {
+                document.getElementById('value1_label').textContent = 'Start Date';
+                document.getElementById('value2_label').textContent = 'End Date';
+                document.getElementById('value2_group').style.display = 'block';
+            } else {
+                document.getElementById('value1_label').textContent = 'Date';
+                document.getElementById('value2_group').style.display = 'none';
+            }
+        } else if (paramType === 'number') {
+            // Set input type to text for numbers
+            document.getElementById('modal_value').type = 'text';
+            document.getElementById('modal_value2').type = 'text';
+
+            if (operation === 'range') {
+                document.getElementById('value1_label').textContent = 'Min Value';
+                document.getElementById('value2_label').textContent = 'Max Value';
+                document.getElementById('value2_group').style.display = 'block';
+            } else {
+                document.getElementById('value1_label').textContent = 'Value';
+                document.getElementById('value2_group').style.display = 'none';
+            }
         }
     }
-}
 </script>
-{% endif %} 
+{% endif %}
 
 <!-- Use Template Modal -->
 {% if item %}
@@ -1539,11 +1576,12 @@ function updateValueFields() {
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Select Template</label>
-                        <select name="template_id" id="template_select" class="form-select" onchange="showTemplateDetails()" required>
+                        <select name="template_id" id="template_select" class="form-select"
+                            onchange="showTemplateDetails()" required>
                             <option value="">-- Select Template --</option>
                         </select>
                     </div>
-                    
+
                     <div id="template_details" style="display: none;">
                         <div class="alert alert-info">
                             <h6 class="mb-2">Template Description:</h6>
@@ -1567,47 +1605,47 @@ function updateValueFields() {
 </div>
 
 <script>
-// Load templates when modal opens
-document.getElementById('useTemplateModal').addEventListener('show.bs.modal', function () {
-    fetch('/api/parameter-templates')
-        .then(response => response.json())
-        .then(data => {
-            const select = document.getElementById('template_select');
-            select.innerHTML = '<option value="">-- Select Template --</option>';
-            data.forEach(template => {
-                const option = new Option(template.name, template.id);
-                option.dataset.description = template.description || 'No description';
-                option.dataset.parameters = JSON.stringify(template.parameters);
-                select.add(option);
+    // Load templates when modal opens
+    document.getElementById('useTemplateModal').addEventListener('show.bs.modal', function () {
+        fetch('/api/parameter-templates')
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('template_select');
+                select.innerHTML = '<option value="">-- Select Template --</option>';
+                data.forEach(template => {
+                    const option = new Option(template.name, template.id);
+                    option.dataset.description = template.description || 'No description';
+                    option.dataset.parameters = JSON.stringify(template.parameters);
+                    select.add(option);
+                });
             });
-        });
-});
+    });
 
-function showTemplateDetails() {
-    const select = document.getElementById('template_select');
-    const selectedOption = select.options[select.selectedIndex];
-    
-    if (selectedOption.value) {
-        document.getElementById('template_details').style.display = 'block';
-        document.getElementById('template_description').textContent = selectedOption.dataset.description;
-        
-        const parameters = JSON.parse(selectedOption.dataset.parameters || '[]');
-        const paramList = document.getElementById('template_parameters');
-        paramList.innerHTML = '';
-        
-        if (parameters.length > 0) {
-            parameters.forEach(param => {
-                const li = document.createElement('li');
-                li.innerHTML = '<small class="text-muted">• ' + param.display_text + '</small>';
-                paramList.appendChild(li);
-            });
+    function showTemplateDetails() {
+        const select = document.getElementById('template_select');
+        const selectedOption = select.options[select.selectedIndex];
+
+        if (selectedOption.value) {
+            document.getElementById('template_details').style.display = 'block';
+            document.getElementById('template_description').textContent = selectedOption.dataset.description;
+
+            const parameters = JSON.parse(selectedOption.dataset.parameters || '[]');
+            const paramList = document.getElementById('template_parameters');
+            paramList.innerHTML = '';
+
+            if (parameters.length > 0) {
+                parameters.forEach(param => {
+                    const li = document.createElement('li');
+                    li.innerHTML = '<small class="text-muted">• ' + param.display_text + '</small>';
+                    paramList.appendChild(li);
+                });
+            } else {
+                paramList.innerHTML = '<li class="text-muted">No parameters in this template</li>';
+            }
         } else {
-            paramList.innerHTML = '<li class="text-muted">No parameters in this template</li>';
+            document.getElementById('template_details').style.display = 'none';
         }
-    } else {
-        document.getElementById('template_details').style.display = 'none';
     }
-}
 </script>
 {% endif %}
 

@@ -77,6 +77,7 @@ class User(UserMixin, db.Model):
     table_columns_view = db.Column(db.Text, default='["name", "category", "tags", "quantity", "total_price", "location", "status"]')  # JSON array of column names
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     is_active = db.Column(db.Boolean, default=True)
+    is_demo_user = db.Column(db.Boolean, default=False)
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -232,11 +233,27 @@ class Item(db.Model):
     def get_available_quantity(self):
         return self.quantity - (self.lend_quantity or 0)
     
-    def is_low_stock(self):
-        return self.get_available_quantity() <= self.min_quantity
-    
     def is_no_stock(self):
-        return self.no_stock_warning and self.quantity == 0
+        # Show "No Stock" if: available=0, min=0, AND warning enabled
+        available = self.get_available_quantity()
+        if available == 0 and self.min_quantity == 0 and self.no_stock_warning:
+            return True
+        return False
+    
+    def is_low_stock(self):
+        # If it's a "no stock" situation, don't show low stock
+        if self.is_no_stock():
+            return False
+        
+        # If available=0, min=0, but warning disabled - don't show low stock either
+        available = self.get_available_quantity()
+        if available == 0 and self.min_quantity == 0 and not self.no_stock_warning:
+            return False
+        
+        # Normal low stock check
+        if available <= self.min_quantity:
+            return True
+        return False
     
     def get_total_price(self):
         """Calculate total price (price per qty * quantity)"""

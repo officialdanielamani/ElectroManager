@@ -43,6 +43,19 @@ if not exist .env (
     copy .env.example .env >nul 2>&1
 )
 
+REM Ask for demo mode
+echo.
+set /p demo_choice="Set as Demo Mode? (Y/N): "
+if /i "!demo_choice!"=="Y" (
+    setx DEMO_MODE true
+    set DEMO_MODE=true
+    echo [OK] Demo mode enabled
+) else (
+    setx DEMO_MODE false
+    set DEMO_MODE=false
+    echo [OK] Demo mode disabled
+)
+
 REM Database check and init
 if exist instance\inventory.db (
     echo [OK] Database exists, skipping init
@@ -74,6 +87,14 @@ if errorlevel 1 (
 color 0A
 echo.
 echo ===== Setup Complete! =====
+echo.
+if "!DEMO_MODE!"=="true" (
+    echo DEMO MODE: Enabled
+    echo Demo credentials will be shown on login page
+    echo Admin profile is locked for editing
+) else (
+    echo DEMO MODE: Disabled
+)
 echo.
 echo Default Login:
 echo   Username: admin

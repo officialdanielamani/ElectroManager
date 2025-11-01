@@ -12,3 +12,5 @@ class Config:
     UPLOAD_FOLDER = os.path.join(basedir, os.environ.get('UPLOAD_FOLDER') or 'uploads')
     MAX_CONTENT_LENGTH = int(os.environ.get('MAX_CONTENT_LENGTH') or 16 * 1024 * 1024)  # 16MB
     ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'gif', 'txt', 'doc', 'docx'}
+    DEMO_MODE = os.environ.get('DEMO_MODE', 'false').lower() == 'true'
+    DEMO_ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')

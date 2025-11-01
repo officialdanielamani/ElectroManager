@@ -45,6 +45,9 @@ def login():
     
     from models import Setting
     signup_enabled = Setting.get('signup_enabled', True)
+    demo_mode = app.config.get('DEMO_MODE', False)
+    demo_username = app.config.get('DEMO_ADMIN_USERNAME', 'admin')
+    demo_password = os.getenv('ADMIN_PASSWORD', 'admin123')
     
     form = LoginForm()
     if form.validate_on_submit():
@@ -57,7 +60,9 @@ def login():
         else:
             flash('Invalid username or password, or account is inactive.', 'danger')
     
-    return render_template('login.html', form=form, signup_enabled=signup_enabled)
+    return render_template('login.html', form=form, signup_enabled=signup_enabled, 
+                         demo_mode=demo_mode, demo_username=demo_username, 
+                         demo_password=demo_password)
 
 @app.route('/logout')
 @login_required
@@ -246,6 +251,7 @@ def item_new():
             rack_id=rack_id_value,
             drawer=drawer_value,
             min_quantity=form.min_quantity.data or 0,
+            no_stock_warning=form.no_stock_warning.data,
             category_id=form.category_id.data if form.category_id.data > 0 else None,
             footprint_id=form.footprint_id.data if form.footprint_id.data > 0 else None,
             tags=tags_json,
@@ -316,6 +322,7 @@ def item_edit(uuid):
         item.quantity = form.quantity.data
         item.price = form.price.data
         item.min_quantity = form.min_quantity.data
+        item.no_stock_warning = form.no_stock_warning.data
         item.category_id = form.category_id.data if form.category_id.data > 0 else None
         item.footprint_id = form.footprint_id.data if form.footprint_id.data > 0 else None
         item.tags = tags_json
@@ -654,6 +661,11 @@ def user_new():
 @admin_required
 def user_edit(id):
     user = User.query.get_or_404(id)
+    
+    if user.is_demo_user and app.config.get('DEMO_MODE', False):
+        flash('Cannot modify admin user profile in demo mode.', 'warning')
+        return redirect(url_for('users'))
+    
     form = UserForm(obj=user)
     
     if form.validate_on_submit():
@@ -671,7 +683,7 @@ def user_edit(id):
         flash(f'User "{user.username}" updated successfully!', 'success')
         return redirect(url_for('users'))
     
-    return render_template('user_form.html', form=form, user=user, title='Edit User')
+    return render_template('user_form.html', form=form, user=user, title='Edit User', config=app.config)
 
 @app.route('/user/<int:id>/delete', methods=['POST'])
 @login_required
@@ -682,6 +694,10 @@ def user_delete(id):
         return redirect(url_for('users'))
     
     user = User.query.get_or_404(id)
+    
+    if user.is_demo_user and app.config.get('DEMO_MODE', False):
+        flash('Cannot delete admin user in demo mode.', 'warning')
+        return redirect(url_for('users'))
     username = user.username
     
     db.session.delete(user)
