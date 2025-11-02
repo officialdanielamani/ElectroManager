@@ -303,3 +303,62 @@ body {
 .markdown-content a:hover {
     text-decoration: underline;
 }
+
+/* Password Toggle Button */
+.password-input-wrapper {
+    position: relative;
+}
+
+.password-input-wrapper input[type="password"],
+.password-input-wrapper input[type="text"] {
+    padding-right: 2.5rem;
+}
+
+.btn-password-toggle {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    transition: color 0.2s ease;
+}
+
+.btn-password-toggle:hover {
+    color: #495057;
+}
+
+.btn-password-toggle:focus {
+    outline: none;
+    color: #0d6efd;
+}
+
+/* Sortable Table Headers */
+table thead th a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+table thead th a:hover {
+    text-decoration: underline;
+}
+
+table thead th i.bi-sort-up,
+table thead th i.bi-sort-down {
+    opacity: 0.7;
+    font-size: 0.9rem;
+}
+
+table thead th i.sort-default {
+    opacity: 0.7;
+    font-size: 0.9rem;
+}

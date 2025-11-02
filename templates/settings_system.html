@@ -144,6 +144,20 @@
                 </div>
             </div>
         </form>
+
+        <!-- System Information Card -->
+        {% if verinfo_content %}
+        <div class="card mt-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> System Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="markdown-content">
+                    {{ verinfo_content | markdown }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Help Panel -->

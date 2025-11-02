@@ -178,9 +178,11 @@ def index():
     if category_id > 0:
         query = query.filter_by(category_id=category_id)
     
+    # Default sort by updated_at descending
     pagination = query.order_by(Item.updated_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
+    
     items = pagination.items
     
     total_items = Item.query.count()
@@ -211,6 +213,7 @@ def item_new():
     import json
     
     form = ItemForm()
+    locations = Location.query.order_by(Location.name).all()
     racks = Rack.query.order_by(Rack.name).all()
     racks_data = [{'id': r.id, 'name': r.name, 'rows': r.rows, 'cols': r.cols, 
                    'unavailable_drawers': r.get_unavailable_drawers()} for r in racks]
@@ -268,7 +271,7 @@ def item_new():
         flash(f'Item "{item.name}" created successfully!', 'success')
         return redirect(url_for('item_detail', uuid=item.uuid))
     
-    return render_template('item_form.html', form=form, racks=racks, racks_data=racks_data, all_tags=all_tags, title='New Item',
+    return render_template('item_form.html', form=form, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='New Item',
                          prefill_rack_id=prefill_rack_id, prefill_drawer=prefill_drawer, 
                          currency=Setting.get('currency', '$'))
 
@@ -289,6 +292,7 @@ def item_edit(uuid):
     
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     form = ItemForm(obj=item)
+    locations = Location.query.order_by(Location.name).all()
     racks = Rack.query.order_by(Rack.name).all()
     racks_data = [{'id': r.id, 'name': r.name, 'rows': r.rows, 'cols': r.cols, 
                    'unavailable_drawers': r.get_unavailable_drawers()} for r in racks]
@@ -342,7 +346,7 @@ def item_edit(uuid):
     max_size_mb = int(Setting.get('max_file_size_mb', '10'))
     extensions_str = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
     
-    return render_template('item_form.html', form=form, item=item, racks=racks, racks_data=racks_data, all_tags=all_tags, title='Edit Item', currency=Setting.get('currency', '$'), max_file_size_mb=max_size_mb, allowed_file_types=extensions_str)
+    return render_template('item_form.html', form=form, item=item, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='Edit Item', currency=Setting.get('currency', '$'), max_file_size_mb=max_size_mb, allowed_file_types=extensions_str)
 
 @app.route('/item/<string:uuid>/delete', methods=['POST'])
 @login_required
@@ -1678,12 +1682,27 @@ def settings_system():
     max_drawer_rows = Setting.get('max_drawer_rows', '10')
     max_drawer_cols = Setting.get('max_drawer_cols', '10')
     
+    # Read system information from verinfo file
+    verinfo_content = ""
+    verinfo_path = None
+    for filename in ['verinfo.md', 'verinfo.txt']:
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], '..', filename)
+        if os.path.exists(filepath):
+            verinfo_path = filepath
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    verinfo_content = f.read()
+            except:
+                verinfo_content = f"Error reading {filename}"
+            break
+    
     return render_template('settings_system.html', 
                           currency=currency,
                           max_file_size=max_file_size,
                           allowed_extensions=allowed_extensions,
                           max_drawer_rows=max_drawer_rows,
-                          max_drawer_cols=max_drawer_cols)
+                          max_drawer_cols=max_drawer_cols,
+                          verinfo_content=verinfo_content)
 
 
 # ============= FOOTPRINTS =============

@@ -48,6 +48,11 @@ body {
     color: #000 !important;
 }
 
+.table tbody td {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    color: #000 !important;
+}
+
 /* Modal styling for blue theme */
 .modal-content {
     background: rgba(255, 255, 255, 0.95) !important;
@@ -131,4 +136,26 @@ body {
     background-color: rgba(255, 255, 255, 0.95) !important;
     color: #000 !important;
     border-color: rgba(102, 126, 234, 0.3) !important;
+}
+
+/* Sortable table headers for blue theme */
+table thead th a {
+    color: #fff !important;
+    text-decoration: none;
+}
+
+table thead th a:hover {
+    color: #ffed4e !important;
+    text-decoration: underline;
+}
+
+table thead th i.bi-sort-up,
+table thead th i.bi-sort-down {
+    color: #fff;
+    opacity: 0.8;
+}
+
+table thead th i.sort-default {
+    color: #fff;
+    opacity: 0.8;
 }

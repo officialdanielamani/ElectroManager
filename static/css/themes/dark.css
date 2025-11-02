@@ -276,3 +276,25 @@ body {
 .markdown-content table tbody tr:hover {
     background-color: #383838 !important;
 }
+
+/* Sortable table headers for dark theme */
+table thead th a {
+    color: #e0e0e0 !important;
+    text-decoration: none;
+}
+
+table thead th a:hover {
+    color: #fff !important;
+    text-decoration: underline;
+}
+
+table thead th i.bi-sort-up,
+table thead th i.bi-sort-down {
+    color: #e0e0e0;
+    opacity: 0.8;
+}
+
+table thead th i.sort-default {
+    color: #e0e0e0;
+    opacity: 0.8;
+}

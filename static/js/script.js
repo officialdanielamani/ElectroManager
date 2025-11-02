@@ -43,7 +43,47 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    // Password toggle functionality
+    setupPasswordToggle();
 });
+
+// Function to setup password toggle for all password fields
+function setupPasswordToggle() {
+    const passwordInputs = document.querySelectorAll('input[type="password"]');
+    passwordInputs.forEach(function(input) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'password-input-wrapper position-relative';
+        
+        input.parentNode.insertBefore(wrapper, input);
+        wrapper.appendChild(input);
+        
+        // Create toggle button
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'btn-password-toggle';
+        toggleBtn.title = 'Show/Hide password';
+        toggleBtn.innerHTML = '<i class="bi bi-eye"></i>';
+        
+        wrapper.appendChild(toggleBtn);
+        
+        // Toggle password visibility
+        toggleBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const icon = toggleBtn.querySelector('i');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('bi-eye');
+                icon.classList.add('bi-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('bi-eye-slash');
+                icon.classList.add('bi-eye');
+            }
+        });
+    });
+}
 
 // Function to copy text to clipboard
 function copyToClipboard(text) {

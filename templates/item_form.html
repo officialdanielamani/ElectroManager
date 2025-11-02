@@ -123,35 +123,47 @@
 
                             <!-- Drawer Storage -->
                             <div id="drawer_storage_section" style="display: none;">
-                                <div class="row mb-2">
-                                    <div class="col-6">
+                                <!-- Compact Row: Location | Rack | Drawer -->
+                                <div class="row g-2 mb-2" style="position: relative;">
+                                    <div class="col-4" style="overflow: visible;">
+                                        <label class="form-label form-label-sm">Location</label>
+                                        <select name="storage_location_id" id="storage_location_select" class="form-select form-select-sm" onchange="updateStorageRackSelect()" style="position: relative; z-index: 100;">
+                                            <option value="">All</option>
+                                            {% for loc in locations %}
+                                            <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-4" style="overflow: visible;">
                                         <label class="form-label form-label-sm">Rack</label>
-                                        <select name="rack_id" id="rack_select" class="form-select form-select-sm">
-                                            <option value="">Select Rack</option>
+                                        <select name="rack_id" id="rack_select" class="form-select form-select-sm" onchange="updateDrawerGrid()" style="position: relative; z-index: 99;">
+                                            <option value="">Select</option>
                                             {% for rack in racks %}
                                             <option value="{{ rack.id }}" data-rows="{{ rack.rows }}"
-                                                data-cols="{{ rack.cols }}" {% if item and item.rack_id==rack.id
+                                                data-cols="{{ rack.cols }}" data-location="{{ rack.physical_location.id if rack.physical_location else '' }}" {% if item and item.rack_id==rack.id
                                                 %}selected{% endif %}>
                                                 {{ rack.name }}
                                             </option>
                                             {% endfor %}
                                         </select>
                                     </div>
-                                    <div class="col-6">
+                                    <div class="col-4" style="overflow: visible;">
                                         <label class="form-label form-label-sm">Drawer</label>
                                         <input type="text" name="drawer" id="drawer_input"
-                                            class="form-control form-control-sm" placeholder="Click grid" readonly
-                                            value="{{ item.drawer if item else '' }}">
+                                            class="form-control form-control-sm" placeholder="Select" readonly
+                                            value="{{ item.drawer if item else '' }}" style="position: relative; z-index: 98;">
                                     </div>
                                 </div>
 
                                 <!-- Visual Drawer Picker -->
                                 <div id="drawer_picker" style="display: none;">
-                                    <div id="drawer_grid" class="drawer-picker-grid"></div>
+                                    <div class="p-2 border rounded drawer-grid-container">
+                                        <small class="text-muted d-block mb-2">Click to select:</small>
+                                        <div id="drawer_grid" style="display: inline-grid; gap: 4px; background: transparent;"></div>
+                                    </div>
                                 </div>
 
-                                <small class="text-muted d-block">Precise cell-level organization for drawer
-                                    storage</small>
+                                <small class="text-muted d-block">Precise cell-level organization</small>
                             </div>
                         </div>
                     </div>
@@ -793,49 +805,58 @@
 
     .drawer-picker-grid {
         display: inline-grid;
-        gap: 3px;
+        gap: 4px;
         padding: 8px;
-        background: #f8f9fa;
         border-radius: 4px;
     }
 
+    .drawer-grid-container {
+        background: transparent !important;
+        border-color: var(--bs-border-color) !important;
+        border: 1px solid var(--bs-border-color) !important;
+        color: var(--bs-body-color);
+    }
+
     .drawer-cell-picker {
-        width: 35px;
-        height: 35px;
-        border: 1px solid #dee2e6;
-        border-radius: 3px;
+        width: 40px;
+        height: 40px;
+        border: 1px solid var(--bs-border-color);
+        border-radius: 4px;
         display: flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        background: white;
+        background-color: var(--bs-secondary-bg);
+        color: var(--bs-body-color);
         transition: all 0.2s;
-        font-size: 0.65rem;
+        font-size: 0.7rem;
         font-weight: bold;
+        user-select: none;
+        text-align: center;
     }
 
-    .drawer-cell-picker:hover {
-        border-color: #0d6efd;
-        background: #e7f3ff;
+    .drawer-cell-picker:hover:not(.unavailable) {
+        border-color: var(--bs-primary);
+        background-color: var(--bs-primary-bg-subtle);
         transform: scale(1.1);
     }
 
     .drawer-cell-picker.selected {
-        background: #0d6efd;
-        color: white;
-        border-color: #0d6efd;
+        background-color: var(--bs-primary);
+        color: #fff;
+        border-color: var(--bs-primary);
     }
 
     .drawer-cell-picker.unavailable {
-        background: linear-gradient(145deg, #6c757d, #5a6268);
-        color: #fff;
+        background-color: var(--bs-secondary);
+        color: var(--bs-secondary-text-emphasis);
         opacity: 0.6;
         cursor: not-allowed;
     }
 
     .drawer-cell-picker.unavailable:hover {
         transform: none;
-        border-color: #495057;
+        border-color: var(--bs-secondary);
     }
 </style>
 
@@ -876,27 +897,13 @@
     }
 
     // Rack selection
-    rackSelect.addEventListener('change', function () {
-        const selected = this.options[this.selectedIndex];
-        const drawerPicker = document.getElementById('drawer_picker');
-
-        if (this.value) {
-            const rows = parseInt(selected.dataset.rows);
-            const cols = parseInt(selected.dataset.cols);
-            const rackId = parseInt(this.value);
-
-            generateDrawerGrid(rows, cols, rackId);
-            drawerPicker.style.display = 'block';
-        } else {
-            drawerPicker.style.display = 'none';
-            drawerInput.value = '';
-        }
-    });
+    rackSelect.addEventListener('change', updateDrawerGrid);
 
     function generateDrawerGrid(rows, cols, rackId) {
         const grid = document.getElementById('drawer_grid');
         grid.innerHTML = '';
-        grid.style.gridTemplateColumns = `repeat(${cols}, 35px)`;
+        grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+        grid.style.maxWidth = `${cols * 45}px`;
 
         // Find rack data to get unavailable drawers
         const rackData = racksData.find(r => r.id === rackId);
@@ -932,6 +939,59 @@
 
                 grid.appendChild(cell);
             }
+        }
+    }
+
+    // Location filtering for drawer storage
+    function updateStorageRackSelect() {
+        const locationFilter = document.getElementById('storage_location_select');
+        const rackSelect = document.getElementById('rack_select');
+        const selectedLocationId = locationFilter.value;
+        
+        // Reset drawer grid and input
+        document.getElementById('drawer_input').value = '';
+        document.getElementById('drawer_picker').style.display = 'none';
+        
+        // Get all rack options
+        const allOptions = Array.from(rackSelect.querySelectorAll('option'));
+        
+        // Show/hide racks based on location filter
+        allOptions.forEach(option => {
+            if (option.value === '') {
+                option.style.display = 'block';
+            } else {
+                const rackLocation = String(option.dataset.location || '');
+                const filterValue = String(selectedLocationId);
+                
+                if (filterValue === '') {
+                    // Show all racks
+                    option.style.display = 'block';
+                } else {
+                    // Show only racks from selected location
+                    option.style.display = rackLocation === filterValue ? 'block' : 'none';
+                }
+            }
+        });
+        
+        // Reset rack selection
+        rackSelect.value = '';
+    }
+
+    function updateDrawerGrid() {
+        const rackSelect = document.getElementById('rack_select');
+        const selected = rackSelect.options[rackSelect.selectedIndex];
+        const drawerPicker = document.getElementById('drawer_picker');
+
+        if (rackSelect.value) {
+            const rows = parseInt(selected.dataset.rows);
+            const cols = parseInt(selected.dataset.cols);
+            const rackId = parseInt(rackSelect.value);
+
+            generateDrawerGrid(rows, cols, rackId);
+            drawerPicker.style.display = 'block';
+        } else {
+            drawerPicker.style.display = 'none';
+            document.getElementById('drawer_input').value = '';
         }
     }
 

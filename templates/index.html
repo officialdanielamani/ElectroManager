@@ -82,19 +82,95 @@
                                 <th width="30">
                                     <input type="checkbox" id="selectAll" title="Select All">
                                 </th>
-                                <th>Name</th>
+                                <th>
+                                    <a href="#" class="text-decoration-none" title="Sort by Name">
+                                        Name
+                                        <i class="bi bi-arrow-down-up text-muted sort-default"></i>
+                                    </a>
+                                </th>
                                 {% for col in user_columns %}
-                                    {% if col == 'type_model' %}<th>Type/Model</th>{% endif %}
-                                    {% if col == 'sku' %}<th>SKU</th>{% endif %}
-                                    {% if col == 'category' %}<th>Category</th>{% endif %}
+                                    {% if col == 'type_model' %}
+                                        <th>
+                                            <a href="#" class="text-decoration-none" title="Sort by Type/Model">
+                                                Type/Model
+                                                <i class="bi bi-arrow-down-up text-muted sort-default"></i>
+                                            </a>
+                                        </th>
+                                    {% endif %}
+                                    {% if col == 'sku' %}
+                                        <th>
+                                            <a href="#" class="text-decoration-none" title="Sort by SKU">
+                                                SKU
+                                                <i class="bi bi-arrow-down-up text-muted sort-default"></i>
+                                            </a>
+                                        </th>
+                                    {% endif %}
+                                    {% if col == 'category' %}
+                                        <th>
+                                            <a href="#" class="text-decoration-none" title="Sort by Category">
+                                                Category
+                                                <i class="bi bi-arrow-down-up text-muted sort-default"></i>
+                                            </a>
+                                        </th>
+                                    {% endif %}
                                     {% if col == 'tags' %}<th>Tags</th>{% endif %}
-                                    {% if col == 'footprint' %}<th>Footprint</th>{% endif %}
-                                    {% if col == 'quantity' %}<th>Quantity</th>{% endif %}
-                                    {% if col == 'total_price' %}<th>Total Price</th>{% endif %}
-                                    {% if col == 'price_per_unit' %}<th>Price Per Unit</th>{% endif %}
-                                    {% if col == 'location' %}<th>Location</th>{% endif %}
-                                    {% if col == 'uuid' %}<th>UUID</th>{% endif %}
-                                    {% if col == 'status' %}<th>Status</th>{% endif %}
+                                    {% if col == 'footprint' %}
+                                        <th>
+                                            <a href="#" class="text-decoration-none" title="Sort by Footprint">
+                                                Footprint
+                                                <i class="bi bi-arrow-down-up text-muted sort-default"></i>
+                                            </a>
+                                        </th>
+                                    {% endif %}
+                                    {% if col == 'quantity' %}
+                                        <th>
+                                            <a href="#" class="text-decoration-none" title="Sort by Quantity">
+                                                Quantity
+                                                <i class="bi bi-arrow-down-up text-muted sort-default"></i>
+                                            </a>
+                                        </th>
+                                    {% endif %}
+                                    {% if col == 'total_price' %}
+                                        <th>
+                                            <a href="#" class="text-decoration-none" title="Sort by Total Price">
+                                                Total Price
+                                                <i class="bi bi-arrow-down-up text-muted sort-default"></i>
+                                            </a>
+                                        </th>
+                                    {% endif %}
+                                    {% if col == 'price_per_unit' %}
+                                        <th>
+                                            <a href="#" class="text-decoration-none" title="Sort by Price Per Unit">
+                                                Price Per Unit
+                                                <i class="bi bi-arrow-down-up text-muted sort-default"></i>
+                                            </a>
+                                        </th>
+                                    {% endif %}
+                                    {% if col == 'location' %}
+                                        <th>
+                                            <a href="#" class="text-decoration-none" title="Sort by Location">
+                                                Location
+                                                <i class="bi bi-arrow-down-up text-muted sort-default"></i>
+                                            </a>
+                                        </th>
+                                    {% endif %}
+                                    {% if col == 'uuid' %}
+                                        <th>
+                                            <a href="#" class="text-decoration-none" title="Sort by UUID">
+                                                UUID
+                                                <i class="bi bi-arrow-down-up text-muted sort-default"></i>
+                                            </a>
+                                        </th>
+                                    {% endif %}
+                                    {% if col == 'status' %}
+                                        <th>
+                                            <a href="#" class="text-decoration-none" title="Sort by Status">
+                                                Status
+                                                <i class="bi bi-arrow-down-up text-muted sort-default"></i>
+                                            </a>
+                                        </th>
+                                        </th>
+                                    {% endif %}
                                 {% endfor %}
                                 <th>Actions</th>
                             </tr>
@@ -183,11 +259,11 @@
                                     {% if col == 'status' %}
                                     <td>
                                         {% if item.is_no_stock() %}
-                                        <span class="badge bg-danger">No Stock</span>
+                                            <span class="badge bg-danger">No Stock</span>
                                         {% elif item.is_low_stock() %}
-                                        <span class="badge bg-warning text-dark">Low Stock</span>
+                                            <span class="badge bg-warning">Low Stock</span>
                                         {% else %}
-                                        <span class="badge bg-success">OK</span>
+                                            <span class="badge bg-success">OK</span>
                                         {% endif %}
                                     </td>
                                     {% endif %}
@@ -272,4 +348,6 @@ document.querySelectorAll('.item-checkbox').forEach(checkbox => {
     });
 });
 </script>
+
+<script src="{{ url_for('static', filename='js/table-sorter.js') }}"></script>
 {% endblock %}

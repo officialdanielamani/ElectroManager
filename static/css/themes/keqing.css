@@ -61,6 +61,7 @@ body {
 
 .table tbody td {
     background-color: #2d1b4e !important;
+    color: #e8e8e8 !important;
     border-color: rgba(212, 175, 55, 0.1) !important;
 }
 
@@ -273,4 +274,26 @@ a:hover {
 
 .markdown-content table tbody tr:hover {
     background-color: #3d2a5c !important;
+}
+
+/* Sortable table headers for keqing theme */
+table thead th a {
+    color: #d4af37 !important;
+    text-decoration: none;
+}
+
+table thead th a:hover {
+    color: #ffd700 !important;
+    text-decoration: underline;
+}
+
+table thead th i.bi-sort-up,
+table thead th i.bi-sort-down {
+    color: #d4af37;
+    opacity: 0.8;
+}
+
+table thead th i.sort-default {
+    color: #d4af37;
+    opacity: 0.8;
 }
