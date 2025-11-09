@@ -89,7 +89,7 @@ def get_drawer_contents(drawer_id):
 
 @app.route('/add-rack', methods=['POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.location_management", "edit")
 def add_rack():
     """Add a new rack to the storage system"""
     rack_name = request.form.get('rack_name')

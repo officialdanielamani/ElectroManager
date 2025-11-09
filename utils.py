@@ -113,13 +113,45 @@ def admin_required(f):
     return decorated_function
 
 
-def editor_required(f):
-    """Decorator to require editor or admin role"""
+def permission_required(resource, action):
+    """Decorator to check specific permission"""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not current_user.is_authenticated:
+                flash('Please log in to access this page.', 'danger')
+                return redirect(url_for('login'))
+            if not current_user.has_permission(resource, action):
+                flash(f'You do not have permission to {action} {resource}.', 'danger')
+                return redirect(url_for('index'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+
+def item_permission_required(f):
+    """Decorator to check if user can edit items (any granular item edit permission)"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated or not current_user.is_editor():
-            flash('You need editor privileges to access this page.', 'danger')
+        if not current_user.is_authenticated:
+            flash('Please log in to access this page.', 'danger')
+            return redirect(url_for('login'))
+        
+        # Check if user has view permission first
+        if not current_user.has_permission('items', 'view'):
+            flash('You do not have permission to view items.', 'danger')
             return redirect(url_for('index'))
+        
+        # Check if user has ANY item edit permission (not just 'edit')
+        has_any_edit_perm = any([
+            current_user.has_permission('items', action) 
+            for action in ['create', 'edit_name', 'edit_data', 'edit_price', 'edit_quantity', 'edit_location', 'edit_classification', 'edit_parameters', 'delete']
+        ])
+        
+        if not has_any_edit_perm:
+            flash('You do not have permission to edit items.', 'danger')
+            return redirect(url_for('index'))
+        
         return f(*args, **kwargs)
     return decorated_function
 

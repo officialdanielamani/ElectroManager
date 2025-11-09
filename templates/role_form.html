@@ -1,0 +1,563 @@
+{% extends "base.html" %}
+{% block title %}{{ 'New Role' if role is none else 'Edit Role - ' + role.name }}{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-lg-10 offset-lg-1">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0"><i class="bi bi-shield-lock"></i> {{ 'New Role' if role is none else 'Edit Role: ' + role.name }}</h4>
+                    <a href="{{ url_for('users') }}" class="btn btn-sm btn-light">
+                        <i class="bi bi-arrow-left"></i> Back to Users
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+
+                <!-- Role Info Section -->
+                <div class="mb-5">
+                    <h5 class="mb-3"><i class="bi bi-pencil"></i> {{ 'New Role' if role is none else 'Edit Role Info' }}</h5>
+                    <p class="text-muted small">Only saves role name & description</p>
+                    
+                    <form method="POST" action="">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Role Name *</label>
+                            {% if role and role.is_system_role %}
+                                <input type="text" class="form-control" value="{{ role.name }}" disabled>
+                                <small class="text-muted">System roles cannot be renamed</small>
+                            {% else %}
+                                {{ form.name(class="form-control" + (" is-invalid" if form.name.errors else "")) }}
+                                {% if form.name.errors %}
+                                    <div class="invalid-feedback">{{ form.name.errors[0] }}</div>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            {% if role and role.is_system_role %}
+                                <textarea class="form-control" rows="3" disabled>{{ role.description or '' }}</textarea>
+                                <small class="text-muted">System roles cannot be edited</small>
+                            {% else %}
+                                {{ form.description(class="form-control" + (" is-invalid" if form.description.errors else ""), rows=3) }}
+                                {% if form.description.errors %}
+                                    <div class="invalid-feedback">{{ form.description.errors[0] }}</div>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+
+                        {% if not role or not role.is_system_role %}
+                        <button type="submit" name="update_info" class="btn btn-primary">
+                            <i class="bi bi-save"></i> {{ 'Create Role' if role is none else 'Save Role Info' }}
+                        </button>
+                        {% endif %}
+                    </form>
+                </div>
+
+                <hr>
+
+                <!-- Permissions Section -->
+                <div>
+                    <h5 class="mb-3"><i class="bi bi-key"></i> Permissions Configuration</h5>
+                    <p class="text-muted small">Configure what this role can access and modify</p>
+
+                    {% if role and role.is_system_role %}
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> System role permissions are read-only. Clone this role to create a customizable version.
+                    </div>
+                    {% endif %}
+                    
+                    {% if role is none %}
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> After creating the role, you'll be redirected to configure its permissions.
+                    </div>
+                    {% else %}
+
+                    <form method="POST" action="">
+                        {{ form.hidden_tag() }}
+                        {% set perms = role.get_permissions() %}
+
+                        <!-- Items Permissions -->
+                        <div class="card mb-4 border-primary" style="border-left-width: 4px;">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0"><i class="bi bi-box-seam"></i> Item Management</h6>
+                                <small class="text-muted">Granular control over item operations</small>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="items_view" id="items_view" 
+                                                   {% if perms.get('items', {}).get('view') %}checked{% endif %}
+                                                   {% if role.is_system_role %}disabled{% endif %}>
+                                            <label class="form-check-label" for="items_view">
+                                                <strong>View</strong><br><small class="text-muted">View all item details</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="items_create" id="items_create" 
+                                                   {% if perms.get('items', {}).get('create') %}checked{% endif %}
+                                                   {% if role.is_system_role %}disabled{% endif %}>
+                                            <label class="form-check-label" for="items_create">
+                                                <strong>Create</strong><br><small class="text-muted">Create new items</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="items_delete" id="items_delete" 
+                                                   {% if perms.get('items', {}).get('delete') %}checked{% endif %}
+                                                   {% if role.is_system_role %}disabled{% endif %}>
+                                            <label class="form-check-label" for="items_delete">
+                                                <strong>Delete</strong><br><small class="text-muted">Delete items</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="items_edit_name" id="items_edit_name" 
+                                                   {% if perms.get('items', {}).get('edit_name') %}checked{% endif %}
+                                                   {% if role.is_system_role %}disabled{% endif %}>
+                                            <label class="form-check-label" for="items_edit_name">
+                                                <strong>Edit Name</strong><br><small class="text-muted">Modify item name</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row g-3 mt-2">
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="items_edit_sku_type" id="items_edit_sku_type" 
+                                                   {% if perms.get('items', {}).get('edit_sku_type') %}checked{% endif %}
+                                                   {% if role.is_system_role %}disabled{% endif %}>
+                                            <label class="form-check-label" for="items_edit_sku_type">
+                                                <strong>Edit SKU/Type</strong><br><small class="text-muted">Edit SKU and Type</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="items_edit_description" id="items_edit_description" 
+                                                   {% if perms.get('items', {}).get('edit_description') %}checked{% endif %}
+                                                   {% if role.is_system_role %}disabled{% endif %}>
+                                            <label class="form-check-label" for="items_edit_description">
+                                                <strong>Edit Description</strong><br><small class="text-muted">Modify description</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="items_edit_datasheet" id="items_edit_datasheet" 
+                                                   {% if perms.get('items', {}).get('edit_datasheet') %}checked{% endif %}
+                                                   {% if role.is_system_role %}disabled{% endif %}>
+                                            <label class="form-check-label" for="items_edit_datasheet">
+                                                <strong>Edit Datasheet</strong><br><small class="text-muted">Edit datasheet link</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="items_edit_upload" id="items_edit_upload" 
+                                                   {% if perms.get('items', {}).get('edit_upload') %}checked{% endif %}
+                                                   {% if role.is_system_role %}disabled{% endif %}>
+                                            <label class="form-check-label" for="items_edit_upload">
+                                                <strong>Edit Upload</strong><br><small class="text-muted">Upload/delete files</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row g-3 mt-2">
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="items_edit_lending" id="items_edit_lending" 
+                                                   {% if perms.get('items', {}).get('edit_lending') %}checked{% endif %}
+                                                   {% if role.is_system_role %}disabled{% endif %}>
+                                            <label class="form-check-label" for="items_edit_lending">
+                                                <strong>Edit Lending</strong><br><small class="text-muted">Manage lending info</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="items_edit_price" id="items_edit_price" 
+                                                   {% if perms.get('items', {}).get('edit_price') %}checked{% endif %}
+                                                   {% if role.is_system_role %}disabled{% endif %}>
+                                            <label class="form-check-label" for="items_edit_price">
+                                                <strong>Edit Price</strong><br><small class="text-muted">Modify pricing</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="items_edit_quantity" id="items_edit_quantity" 
+                                                   {% if perms.get('items', {}).get('edit_quantity') %}checked{% endif %}
+                                                   {% if role.is_system_role %}disabled{% endif %}>
+                                            <label class="form-check-label" for="items_edit_quantity">
+                                                <strong>Edit Quantity</strong><br><small class="text-muted">Modify quantity</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="items_edit_location" id="items_edit_location" 
+                                                   {% if perms.get('items', {}).get('edit_location') %}checked{% endif %}
+                                                   {% if role.is_system_role %}disabled{% endif %}>
+                                            <label class="form-check-label" for="items_edit_location">
+                                                <strong>Edit Location</strong><br><small class="text-muted">Change location</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row g-3 mt-2">
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="items_edit_category" id="items_edit_category" 
+                                                   {% if perms.get('items', {}).get('edit_category') %}checked{% endif %}
+                                                   {% if role.is_system_role %}disabled{% endif %}>
+                                            <label class="form-check-label" for="items_edit_category">
+                                                <strong>Edit Category</strong><br><small class="text-muted">Change category</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="items_edit_footprint" id="items_edit_footprint" 
+                                                   {% if perms.get('items', {}).get('edit_footprint') %}checked{% endif %}
+                                                   {% if role.is_system_role %}disabled{% endif %}>
+                                            <label class="form-check-label" for="items_edit_footprint">
+                                                <strong>Edit Footprint</strong><br><small class="text-muted">Change footprint</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="items_edit_tags" id="items_edit_tags" 
+                                                   {% if perms.get('items', {}).get('edit_tags') %}checked{% endif %}
+                                                   {% if role.is_system_role %}disabled{% endif %}>
+                                            <label class="form-check-label" for="items_edit_tags">
+                                                <strong>Edit Tags</strong><br><small class="text-muted">Modify tags</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="items_edit_parameters" id="items_edit_parameters" 
+                                                   {% if perms.get('items', {}).get('edit_parameters') %}checked{% endif %}
+                                                   {% if role.is_system_role %}disabled{% endif %}>
+                                            <label class="form-check-label" for="items_edit_parameters">
+                                                <strong>Edit Parameters</strong><br><small class="text-muted">Edit parameters</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Page Permissions -->
+                        <div class="card mb-4 border-success" style="border-left-width: 4px;">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0"><i class="bi bi-file-earmark"></i> Page Permissions</h6>
+                                <small class="text-muted">Control access to specific pages</small>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Page</th>
+                                                <th class="text-center">View</th>
+                                                <th class="text-center">Edit</th>
+                                                <th class="text-muted">URL</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><strong>Visual Storage</strong></td>
+                                                <td class="text-center">
+                                                    <input class="form-check-input" type="checkbox" name="pages_visual_storage_view" 
+                                                           {% if perms.get('pages', {}).get('visual_storage', {}).get('view') %}checked{% endif %}
+                                                           {% if role.is_system_role %}disabled{% endif %}>
+                                                </td>
+                                                <td class="text-center text-muted">
+                                                    <small>Controlled by Settings Sections</small>
+                                                </td>
+                                                <td class="text-muted"><code>/visual-storage</code></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Notifications</strong></td>
+                                                <td class="text-center">
+                                                    <input class="form-check-input" type="checkbox" name="pages_notifications_view" 
+                                                           {% if perms.get('pages', {}).get('notifications', {}).get('view') %}checked{% endif %}
+                                                           {% if role.is_system_role %}disabled{% endif %}>
+                                                </td>
+                                                <td class="text-center text-muted">
+                                                    <small>Controlled by Settings Sections</small>
+                                                </td>
+                                                <td class="text-muted"><code>/notifications</code></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Settings Sections Permissions -->
+                        <div class="card mb-4 border-warning" style="border-left-width: 4px;">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0"><i class="bi bi-gear"></i> Settings Page Sections</h6>
+                                <small class="text-muted">Fine-grained permissions for settings sections</small>
+                            </div>
+                            <div class="card-body">
+                                
+                                <!-- System Settings -->
+                                <div class="mb-4 p-3 bg-light rounded">
+                                    <h6 class="mb-3"><i class="bi bi-sliders"></i> System Settings <code class="text-muted">/settings/system</code></h6>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_system_settings_view" 
+                                                       {% if perms.get('settings_sections', {}).get('system_settings', {}).get('view') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">View</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_system_settings_edit" 
+                                                       {% if perms.get('settings_sections', {}).get('system_settings', {}).get('edit') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">Edit</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Reports -->
+                                <div class="mb-4 p-3 bg-light rounded">
+                                    <h6 class="mb-3"><i class="bi bi-file-earmark-bar-graph"></i> Reports <code class="text-muted">/reports</code></h6>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_reports_view" 
+                                                       {% if perms.get('settings_sections', {}).get('reports', {}).get('view') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">View</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Item Management -->
+                                <div class="mb-4 p-3 bg-light rounded">
+                                    <h6 class="mb-3"><i class="bi bi-box-seam"></i> Item Management <code class="text-muted">/manage</code></h6>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_item_management_view" 
+                                                       {% if perms.get('settings_sections', {}).get('item_management', {}).get('view') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">View</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_item_management_edit" 
+                                                       {% if perms.get('settings_sections', {}).get('item_management', {}).get('edit') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">Edit</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_item_management_delete" 
+                                                       {% if perms.get('settings_sections', {}).get('item_management', {}).get('delete') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">Delete</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Magic Parameters -->
+                                <div class="mb-4 p-3 bg-light rounded">
+                                    <h6 class="mb-3"><i class="bi bi-magic"></i> Magic Parameters <code class="text-muted">/settings/magic-parameters</code></h6>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_magic_parameters_view" 
+                                                       {% if perms.get('settings_sections', {}).get('magic_parameters', {}).get('view') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">View</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_magic_parameters_edit" 
+                                                       {% if perms.get('settings_sections', {}).get('magic_parameters', {}).get('edit') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">Edit</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_magic_parameters_delete" 
+                                                       {% if perms.get('settings_sections', {}).get('magic_parameters', {}).get('delete') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">Delete</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Location Management -->
+                                <div class="mb-4 p-3 bg-light rounded">
+                                    <h6 class="mb-3"><i class="bi bi-geo-alt"></i> Location Management <code class="text-muted">/location-management</code></h6>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_location_management_view" 
+                                                       {% if perms.get('settings_sections', {}).get('location_management', {}).get('view') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">View</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_location_management_edit" 
+                                                       {% if perms.get('settings_sections', {}).get('location_management', {}).get('edit') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">Edit</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_location_management_delete" 
+                                                       {% if perms.get('settings_sections', {}).get('location_management', {}).get('delete') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">Delete</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- User & Role Management -->
+                                <div class="mb-4 p-3 bg-light rounded">
+                                    <h6 class="mb-3"><i class="bi bi-people"></i> User & Role Management <code class="text-muted">/users</code></h6>
+                                    <div class="mb-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="settings_sections_users_roles_view" 
+                                                   {% if perms.get('settings_sections', {}).get('users_roles', {}).get('view') %}checked{% endif %}
+                                                   {% if role.is_system_role %}disabled{% endif %}>
+                                            <label class="form-check-label"><strong>View Page</strong></label>
+                                        </div>
+                                    </div>
+                                    <div class="row mb-3">
+                                        <div class="col-12"><strong class="text-primary">Role Management:</strong></div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_users_roles_roles_create" 
+                                                       {% if perms.get('settings_sections', {}).get('users_roles', {}).get('roles_create') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">Create - New Role</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_users_roles_roles_edit" 
+                                                       {% if perms.get('settings_sections', {}).get('users_roles', {}).get('roles_edit') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">Edit - Edit Role</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_users_roles_roles_delete" 
+                                                       {% if perms.get('settings_sections', {}).get('users_roles', {}).get('roles_delete') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">Delete - Delete Role</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-12"><strong class="text-primary">User Management:</strong></div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_users_roles_users_create" 
+                                                       {% if perms.get('settings_sections', {}).get('users_roles', {}).get('users_create') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">Create - Add User</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_users_roles_users_edit" 
+                                                       {% if perms.get('settings_sections', {}).get('users_roles', {}).get('users_edit') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">Edit - Edit User</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_users_roles_users_delete" 
+                                                       {% if perms.get('settings_sections', {}).get('users_roles', {}).get('users_delete') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">Delete - Delete User</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Backup & Restore -->
+                                <div class="mb-4 p-3 bg-light rounded">
+                                    <h6 class="mb-3"><i class="bi bi-cloud-arrow-up"></i> Backup & Restore <code class="text-muted">/backup-restore</code></h6>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_backup_restore_view" 
+                                                       {% if perms.get('settings_sections', {}).get('backup_restore', {}).get('view') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">View Page</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_backup_restore_upload_export" 
+                                                       {% if perms.get('settings_sections', {}).get('backup_restore', {}).get('upload_export') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">Upload & Export (.db or json)</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_backup_restore_delete" 
+                                                       {% if perms.get('settings_sections', {}).get('backup_restore', {}).get('delete') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">Delete</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        {% if not role.is_system_role %}
+                        <div class="text-center">
+                            <button type="submit" name="update_permissions" class="btn btn-primary btn-lg">
+                                <i class="bi bi-save"></i> Save All Permissions
+                            </button>
+                        </div>
+                        {% endif %}
+                    </form>
+                    {% endif %} <!-- End of role is not none check -->
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

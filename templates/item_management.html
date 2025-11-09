@@ -17,7 +17,7 @@
             <div class="card-header bg-warning">
                 <div class="d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="bi bi-tags"></i> Categories <span class="badge bg-dark">{{ categories|length }}</span></h5>
-                    {% if current_user.is_editor() %}
+                    {% if can_edit %}
                     <a href="{{ url_for('category_new') }}" class="btn btn-dark btn-sm">
                         <i class="bi bi-plus-circle"></i> Add
                     </a>
@@ -37,17 +37,17 @@
                                     <a href="{{ url_for('index', category=category.id) }}" class="btn btn-sm btn-info btn-sm" title="View Items">
                                         <i class="bi bi-eye"></i>
                                     </a>
-                                    {% if current_user.is_editor() %}
+                                    {% if can_edit %}
                                     <a href="{{ url_for('category_edit', id=category.id) }}" class="btn btn-sm btn-warning btn-sm" title="Edit">
                                         <i class="bi bi-pencil"></i>
                                     </a>
-                                    {% if current_user.is_admin() %}
+                                    {% endif %}
+                                    {% if can_delete %}
                                     <form method="POST" action="{{ url_for('category_delete', id=category.id) }}" style="display: inline;">
                                         <button type="submit" class="btn btn-sm btn-danger btn-sm" onclick="return confirm('Delete this category?')" title="Delete">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>
-                                    {% endif %}
                                     {% endif %}
                                 </div>
                             </div>
@@ -67,7 +67,7 @@
             <div class="card-header bg-info">
                 <div class="d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="bi bi-cpu"></i> Footprints <span class="badge bg-dark">{{ footprints|length }}</span></h5>
-                    {% if current_user.is_editor() %}
+                    {% if can_edit %}
                     <a href="{{ url_for('footprint_new') }}" class="btn btn-dark btn-sm">
                         <i class="bi bi-plus-circle"></i> Add
                     </a>
@@ -84,17 +84,17 @@
                             <div class="d-flex justify-content-between align-items-center">
                                 <small class="text-muted"><i class="bi bi-box"></i> {{ footprint.items|length }} items</small>
                                 <div>
-                                    {% if current_user.is_editor() %}
+                                    {% if can_edit %}
                                     <a href="{{ url_for('footprint_edit', id=footprint.id) }}" class="btn btn-sm btn-warning btn-sm" title="Edit">
                                         <i class="bi bi-pencil"></i>
                                     </a>
-                                    {% if current_user.is_admin() and footprint.items|length == 0 %}
+                                    {% endif %}
+                                    {% if can_delete and footprint.items|length == 0 %}
                                     <form method="POST" action="{{ url_for('footprint_delete', id=footprint.id) }}" style="display:inline">
                                         <button type="submit" class="btn btn-sm btn-danger btn-sm" onclick="return confirm('Delete this footprint?')" title="Delete">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>
-                                    {% endif %}
                                     {% endif %}
                                 </div>
                             </div>
@@ -114,7 +114,7 @@
             <div class="card-header" style="background-color: #d63384;">
                 <div class="d-flex justify-content-between align-items-center">
                     <h5 class="mb-0 text-white"><i class="bi bi-tag"></i> Tags <span class="badge bg-dark">{{ tags|length }}</span></h5>
-                    {% if current_user.is_editor() %}
+                    {% if can_edit %}
                     <a href="{{ url_for('tag_new') }}" class="btn btn-dark btn-sm">
                         <i class="bi bi-plus-circle"></i> Add
                     </a>
@@ -127,12 +127,13 @@
                     <div class="card mb-2 border">
                         <div class="card-body p-2 text-center">
                             <span class="badge" style="background-color: {{ tag.color }}; color: white;">{{ tag.name }}</span>
-                            {% if current_user.is_editor() %}
                             <div class="mt-2">
+                                {% if can_edit %}
                                 <a href="{{ url_for('tag_edit', id=tag.id) }}" class="btn btn-sm btn-warning btn-sm" title="Edit">
                                     <i class="bi bi-pencil"></i>
                                 </a>
-                                {% if current_user.is_admin() %}
+                                {% endif %}
+                                {% if can_delete %}
                                 <form method="POST" action="{{ url_for('tag_delete', id=tag.id) }}" style="display:inline">
                                     <button type="submit" class="btn btn-sm btn-danger btn-sm" onclick="return confirm('Delete this tag?')" title="Delete">
                                         <i class="bi bi-trash"></i>
@@ -140,7 +141,6 @@
                                 </form>
                                 {% endif %}
                             </div>
-                            {% endif %}
                         </div>
                     </div>
                     {% endfor %}

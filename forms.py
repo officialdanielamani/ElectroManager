@@ -42,10 +42,15 @@ class RegistrationForm(FlaskForm):
 class UserForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])
     email = StringField('Email', validators=[DataRequired(), Email()])
-    role = SelectField('Role', choices=[('admin', 'Admin'), ('editor', 'Editor'), ('viewer', 'Viewer')], validators=[DataRequired()])
+    role_id = SelectField('Role', coerce=int, validators=[DataRequired()])
     is_active = BooleanField('Active')
     password = PasswordField('Password (leave blank to keep current)', validators=[Optional(), Length(min=6)])
     submit = SubmitField('Save User')
+    
+    def __init__(self, *args, **kwargs):
+        super(UserForm, self).__init__(*args, **kwargs)
+        from models import Role
+        self.role_id.choices = [(r.id, r.name) for r in Role.query.order_by(Role.name).all()]
 
 
 class CategoryForm(FlaskForm):
@@ -54,36 +59,140 @@ class CategoryForm(FlaskForm):
     submit = SubmitField('Save Category')
 
 
-class ItemForm(FlaskForm):
-    name = StringField('Item Name', validators=[DataRequired(), Length(max=200)])
-    sku = StringField('SKU', validators=[Optional(), Length(max=100)])
-    info = StringField('Type / Model', validators=[Optional(), Length(max=500)])
-    description = TextAreaField('Description', validators=[Optional()])
-    quantity = IntegerField('Quantity', validators=[NumberRange(min=0)], default=0)
-    price = FloatField('Price per Qty', validators=[Optional(), NumberRange(min=0)])
+class ItemAddForm(FlaskForm):
+    """Form for adding new items"""
+    name = StringField('Item Name', validators=[DataRequired(), Length(max=200)], render_kw={"class": "form-control form-control-sm"})
+    sku = StringField('SKU', validators=[Optional(), Length(max=100)], render_kw={"class": "form-control form-control-sm"})
+    info = StringField('Type / Model', validators=[Optional(), Length(max=500)], render_kw={"class": "form-control form-control-sm"})
+    description = TextAreaField('Description', validators=[Optional()], render_kw={"class": "form-control form-control-sm", "rows": "4"})
+    quantity = IntegerField('Quantity', validators=[NumberRange(min=0)], default=0, render_kw={"class": "form-control form-control-sm"})
+    price = FloatField('Price per Qty', validators=[Optional(), NumberRange(min=0)], render_kw={"class": "form-control form-control-sm", "placeholder": "0.00"})
     
-    location_id = SelectField('General Location', coerce=int, validators=[Optional()])
-    rack_id = SelectField('Rack', coerce=int, validators=[Optional()])
-    drawer = StringField('Drawer', validators=[Optional(), Length(max=50)])
+    location_id = SelectField('General Location', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
+    rack_id = SelectField('Rack', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
+    drawer = StringField('Drawer', validators=[Optional(), Length(max=50)], render_kw={"class": "form-control form-control-sm"})
     
-    min_quantity = IntegerField('Minimum Quantity', validators=[Optional(), NumberRange(min=0)], default=0)
-    category_id = SelectField('Category', coerce=int, validators=[Optional()])
-    footprint_id = SelectField('Footprint', coerce=int, validators=[Optional()])
+    min_quantity = IntegerField('Minimum Quantity', validators=[Optional(), NumberRange(min=0)], default=0, render_kw={"class": "form-control form-control-sm"})
+    category_id = SelectField('Category', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
+    footprint_id = SelectField('Footprint', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
     
-    lend_to = StringField('Lend To', validators=[Optional(), Length(max=200)])
-    lend_quantity = IntegerField('Lend Quantity', validators=[Optional(), NumberRange(min=0)], default=0)
+    lend_to = StringField('Lend To', validators=[Optional(), Length(max=200)], render_kw={"class": "form-control form-control-sm"})
+    lend_quantity = IntegerField('Lend Quantity', validators=[Optional(), NumberRange(min=0)], default=0, render_kw={"class": "form-control form-control-sm"})
     no_stock_warning = BooleanField('No Stock Warning', default=True)
-    datasheet_urls = TextAreaField('Datasheet URLs', validators=[Optional()])
+    datasheet_urls = TextAreaField('Datasheet URLs', validators=[Optional()], render_kw={"class": "form-control form-control-sm"})
     
-    submit = SubmitField('Save Item')
+    submit = SubmitField('Create Item')
     
-    def __init__(self, *args, **kwargs):
-        super(ItemForm, self).__init__(*args, **kwargs)
+    def __init__(self, *args, perms=None, **kwargs):
+        super(ItemAddForm, self).__init__(*args, **kwargs)
         from models import Rack, Footprint, Location
         self.category_id.choices = [(0, '-- Select Category --')] + [(c.id, c.name) for c in Category.query.order_by(Category.name).all()]
         self.location_id.choices = [(0, '-- Select General Location --')] + [(l.id, l.name) for l in Location.query.order_by(Location.name).all()]
         self.rack_id.choices = [(0, '-- Select Rack --')] + [(r.id, r.name) for r in Rack.query.order_by(Rack.name).all()]
         self.footprint_id.choices = [(0, '-- Select Footprint --')] + [(f.id, f.name) for f in Footprint.query.order_by(Footprint.name).all()]
+        
+        # Apply permission-based field disabling
+        if perms and not perms.get('is_admin'):
+            self._apply_field_permissions(perms)
+    
+    def _apply_field_permissions(self, perms):
+        """Mark fields user doesn't have permission to edit - don't disable to allow data to be sent"""
+        field_perms = {
+            'name': 'can_edit_name',
+            'sku': 'can_edit_sku_type',
+            'info': 'can_edit_sku_type',
+            'description': 'can_edit_description',
+            'datasheet_urls': 'can_edit_datasheet',
+            'lend_to': 'can_edit_lending',
+            'lend_quantity': 'can_edit_lending',
+            'price': 'can_edit_price',
+            'quantity': 'can_edit_quantity',
+            'min_quantity': 'can_edit_quantity',
+            'no_stock_warning': 'can_edit_quantity',
+            'location_id': 'can_edit_location',
+            'rack_id': 'can_edit_location',
+            'drawer': 'can_edit_location',
+            'category_id': 'can_edit_category',
+            'footprint_id': 'can_edit_footprint',
+        }
+        
+        for field_name, perm_name in field_perms.items():
+            if field_name in self._fields:
+                field = self._fields[field_name]
+                has_perm = perms.get(perm_name, False)
+                if not has_perm:
+                    # Add readonly or data attribute for CSS targeting, but don't disable
+                    field.render_kw = field.render_kw or {}
+                    field.render_kw['readonly'] = True if field_name not in ['location_id', 'rack_id', 'category_id', 'footprint_id'] else False
+                    field.render_kw['data-restricted'] = 'true'
+
+
+class ItemEditForm(FlaskForm):
+    """Form for editing existing items"""
+    name = StringField('Item Name', validators=[DataRequired(), Length(max=200)], render_kw={"class": "form-control form-control-sm"})
+    sku = StringField('SKU', validators=[Optional(), Length(max=100)], render_kw={"class": "form-control form-control-sm"})
+    info = StringField('Type / Model', validators=[Optional(), Length(max=500)], render_kw={"class": "form-control form-control-sm"})
+    description = TextAreaField('Description', validators=[Optional()], render_kw={"class": "form-control form-control-sm", "rows": "4"})
+    quantity = IntegerField('Quantity', validators=[NumberRange(min=0)], default=0, render_kw={"class": "form-control form-control-sm"})
+    price = FloatField('Price per Qty', validators=[Optional(), NumberRange(min=0)], render_kw={"class": "form-control form-control-sm", "placeholder": "0.00"})
+    
+    location_id = SelectField('General Location', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
+    rack_id = SelectField('Rack', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
+    drawer = StringField('Drawer', validators=[Optional(), Length(max=50)], render_kw={"class": "form-control form-control-sm"})
+    
+    min_quantity = IntegerField('Minimum Quantity', validators=[Optional(), NumberRange(min=0)], default=0, render_kw={"class": "form-control form-control-sm"})
+    category_id = SelectField('Category', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
+    footprint_id = SelectField('Footprint', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
+    
+    lend_to = StringField('Lend To', validators=[Optional(), Length(max=200)], render_kw={"class": "form-control form-control-sm"})
+    lend_quantity = IntegerField('Lend Quantity', validators=[Optional(), NumberRange(min=0)], default=0, render_kw={"class": "form-control form-control-sm"})
+    no_stock_warning = BooleanField('No Stock Warning', default=True)
+    datasheet_urls = TextAreaField('Datasheet URLs', validators=[Optional()], render_kw={"class": "form-control form-control-sm"})
+    
+    submit = SubmitField('Update Item')
+    
+    def __init__(self, *args, perms=None, **kwargs):
+        super(ItemEditForm, self).__init__(*args, **kwargs)
+        from models import Rack, Footprint, Location
+        self.category_id.choices = [(0, '-- Select Category --')] + [(c.id, c.name) for c in Category.query.order_by(Category.name).all()]
+        self.location_id.choices = [(0, '-- Select General Location --')] + [(l.id, l.name) for l in Location.query.order_by(Location.name).all()]
+        self.rack_id.choices = [(0, '-- Select Rack --')] + [(r.id, r.name) for r in Rack.query.order_by(Rack.name).all()]
+        self.footprint_id.choices = [(0, '-- Select Footprint --')] + [(f.id, f.name) for f in Footprint.query.order_by(Footprint.name).all()]
+        
+        # Apply permission-based field disabling
+        if perms and not perms.get('is_admin'):
+            self._apply_field_permissions(perms)
+    
+    def _apply_field_permissions(self, perms):
+        """Mark fields user doesn't have permission to edit - don't disable to allow data to be sent"""
+        field_perms = {
+            'name': 'can_edit_name',
+            'sku': 'can_edit_sku_type',
+            'info': 'can_edit_sku_type',
+            'description': 'can_edit_description',
+            'datasheet_urls': 'can_edit_datasheet',
+            'lend_to': 'can_edit_lending',
+            'lend_quantity': 'can_edit_lending',
+            'price': 'can_edit_price',
+            'quantity': 'can_edit_quantity',
+            'min_quantity': 'can_edit_quantity',
+            'no_stock_warning': 'can_edit_quantity',
+            'location_id': 'can_edit_location',
+            'rack_id': 'can_edit_location',
+            'drawer': 'can_edit_location',
+            'category_id': 'can_edit_category',
+            'footprint_id': 'can_edit_footprint',
+        }
+        
+        for field_name, perm_name in field_perms.items():
+            if field_name in self._fields:
+                field = self._fields[field_name]
+                has_perm = perms.get(perm_name, False)
+                if not has_perm:
+                    # Add readonly or data attribute for CSS targeting, but don't disable
+                    field.render_kw = field.render_kw or {}
+                    field.render_kw['readonly'] = True if field_name not in ['location_id', 'rack_id', 'category_id', 'footprint_id'] else False
+                    field.render_kw['data-restricted'] = 'true'
 
 
 class AttachmentForm(FlaskForm):
@@ -120,6 +229,12 @@ class MagicParameterForm(FlaskForm):
 class ParameterUnitForm(FlaskForm):
     unit = StringField('Unit', validators=[DataRequired(), Length(max=50)])
     submit = SubmitField('Add Unit')
+
+
+class RoleForm(FlaskForm):
+    name = StringField('Role Name', validators=[DataRequired(), Length(min=2, max=50)])
+    description = TextAreaField('Description', validators=[Optional()])
+    submit = SubmitField('Save Role')
 
 
 class ParameterStringOptionForm(FlaskForm):

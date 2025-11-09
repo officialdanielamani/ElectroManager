@@ -52,7 +52,7 @@
                                     <a href="{{ url_for('item_detail', uuid=item.uuid) }}" class="btn btn-sm btn-info">
                                         <i class="bi bi-eye"></i> View
                                     </a>
-                                    {% if current_user.is_editor() %}
+                                    {% if current_user.has_permission('items', 'edit_name') or current_user.has_permission('items', 'edit_sku_type') or current_user.has_permission('items', 'edit_description') or current_user.has_permission('items', 'edit_quantity') %}
                                     <a href="{{ url_for('item_edit', uuid=item.uuid) }}" class="btn btn-sm btn-warning">
                                         <i class="bi bi-pencil"></i> Edit
                                     </a>

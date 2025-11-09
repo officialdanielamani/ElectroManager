@@ -4,6 +4,27 @@
 
 {% block content %}
 
+{% if item_perms and not (item_perms.can_edit_name and item_perms.can_edit_sku_type and item_perms.can_edit_description and item_perms.can_edit_price and item_perms.can_edit_quantity and item_perms.can_edit_location and item_perms.can_edit_category and item_perms.can_edit_footprint and item_perms.can_edit_tags and item_perms.can_edit_parameters) %}
+<div class="alert alert-info alert-dismissible fade show" role="alert">
+    <strong><i class="bi bi-info-circle"></i> Limited Editing Permissions</strong><br>
+    <small>You can only edit: 
+    {% set editable_sections = [] %}
+    {% if item_perms.can_edit_name %}{{ editable_sections.append('Name') or '' }}{% endif %}
+    {% if item_perms.can_edit_sku_type %}{{ editable_sections.append('SKU & Type') or '' }}{% endif %}
+    {% if item_perms.can_edit_description %}{{ editable_sections.append('Description') or '' }}{% endif %}
+    {% if item_perms.can_edit_price %}{{ editable_sections.append('Price') or '' }}{% endif %}
+    {% if item_perms.can_edit_quantity %}{{ editable_sections.append('Qty & Min Qty') or '' }}{% endif %}
+    {% if item_perms.can_edit_location %}{{ editable_sections.append('Location') or '' }}{% endif %}
+    {% if item_perms.can_edit_category %}{{ editable_sections.append('Category') or '' }}{% endif %}
+    {% if item_perms.can_edit_footprint %}{{ editable_sections.append('Footprint') or '' }}{% endif %}
+    {% if item_perms.can_edit_tags %}{{ editable_sections.append('Tags') or '' }}{% endif %}
+    {% if item_perms.can_edit_parameters %}{{ editable_sections.append('Magic Parameters') or '' }}{% endif %}
+    {{ editable_sections|join(', ') }}
+    </small>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
 <div class="row justify-content-center">
     <div class="col-md-8">
         <div class="card">
@@ -19,11 +40,11 @@
                         <div class="col-8">
                             <label class="form-label form-label-sm">Component Name *</label>
                             {{ form.name(class="form-control form-control-sm" + (" is-invalid" if form.name.errors else
-                            "")) }}
+                            ""), disabled=(item_perms and not item_perms.can_edit_name)) }}
                         </div>
                         <div class="col-4">
                             <label class="form-label form-label-sm">SKU</label>
-                            {{ form.sku(class="form-control form-control-sm") }}
+                            {{ form.sku(class="form-control form-control-sm", disabled=(item_perms and not item_perms.can_edit_sku_type)) }}
                         </div>
                     </div>
 
@@ -32,14 +53,14 @@
                         <div class="col-6">
                             <label class="form-label form-label-sm">Type / Model</label>
                             {{ form.info(class="form-control form-control-sm", placeholder="e.g., 1N4001, MD124,
-                            Standard") }}
+                            Standard", disabled=(item_perms and not item_perms.can_edit_sku_type)) }}
                         </div>
                     </div>
 
                     <div class="mb-2">
                         <label class="form-label form-label-sm">Description</label>
                         {{ form.description(class="form-control form-control-sm", placeholder="Detailed description of
-                        the item", rows=4) }}
+                        the item", rows=4, disabled=(item_perms and not item_perms.can_edit_description)) }}
                     </div>
 
                     <!-- Row 3: Category and Quantity -->
@@ -47,17 +68,17 @@
                         <div class="col-8">
                             <label class="form-label form-label-sm">Category</label>
                             <div class="input-group input-group-sm">
-                                {{ form.category_id(class="form-select form-select-sm") }}
+                                {{ form.category_id(class="form-select form-select-sm", disabled=(item_perms and not item_perms.can_edit_category)) }}
                                 <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
-                                    data-bs-target="#addCategoryModal">
+                                    data-bs-target="#addCategoryModal"
+                                    {% if item_perms and not item_perms.can_edit_category %}disabled{% endif %}>
                                     <i class="bi bi-plus-circle"></i>
                                 </button>
                             </div>
                         </div>
                         <div class="col-4">
                             <label class="form-label form-label-sm">Quantity *</label>
-                            <input type="number" id="quantity" name="quantity" class="form-control form-control-sm"
-                                value="{{ form.quantity.data or 0 }}" min="0" step="1" required>
+                            {{ form.quantity(class="form-control form-control-sm", min="0", step="1", required=True, disabled=(item_perms and not item_perms.can_edit_quantity)) }}
                         </div>
                     </div>
 
@@ -65,7 +86,7 @@
                     <div class="row mb-2">
                         <div class="col-6">
                             <label class="form-label form-label-sm">Price per Qty ({{ currency }})</label>
-                            {{ form.price(class="form-control form-control-sm", placeholder="0.00", id="price_per_qty")
+                            {{ form.price(class="form-control form-control-sm", placeholder="0.00", id="price_per_qty", disabled=(item_perms and not item_perms.can_edit_price))
                             }}
                         </div>
                         <div class="col-6">
@@ -80,9 +101,11 @@
                         <div class="col-12">
                             <div class="form-check">
                                 {% if item %}
-                                    <input type="checkbox" class="form-check-input" id="no_stock_warning" name="no_stock_warning" value="y" {% if item.no_stock_warning %}checked{% endif %}>
+                                    <input type="checkbox" class="form-check-input" id="no_stock_warning" name="no_stock_warning" value="y" {% if item.no_stock_warning %}checked{% endif %}
+                                        {% if item_perms and not item_perms.can_edit_quantity %}disabled{% endif %}>
                                 {% else %}
-                                    <input type="checkbox" class="form-check-input" id="no_stock_warning" name="no_stock_warning" value="y" checked>
+                                    <input type="checkbox" class="form-check-input" id="no_stock_warning" name="no_stock_warning" value="y" checked
+                                        {% if item_perms and not item_perms.can_edit_quantity %}disabled{% endif %}>
                                 {% endif %}
                                 <label class="form-check-label" for="no_stock_warning">
                                     Enable No Stock Warning
@@ -100,11 +123,13 @@
                             <!-- Storage Type -->
                             <div class="btn-group btn-group-sm w-100 mb-2" role="group">
                                 <input type="radio" class="btn-check" name="location_type" id="type_general"
-                                    value="general" {% if not item or (item and not item.rack_id) %}checked{% endif %}>
+                                    value="general" {% if not item or (item and not item.rack_id) %}checked{% endif %}
+                                    {% if item_perms and not item_perms.can_edit_location %}disabled{% endif %}>
                                 <label class="btn btn-outline-primary" for="type_general">General Location</label>
 
                                 <input type="radio" class="btn-check" name="location_type" id="type_drawer"
-                                    value="drawer" {% if item and item.rack_id %}checked{% endif %}>
+                                    value="drawer" {% if item and item.rack_id %}checked{% endif %}
+                                    {% if item_perms and not item_perms.can_edit_location %}disabled{% endif %}>
                                 <label class="btn btn-outline-primary" for="type_drawer">Drawer Storage</label>
                             </div>
 
@@ -112,9 +137,10 @@
                             <div id="general_location_section">
                                 <label class="form-label form-label-sm">General Location</label>
                                 <div class="input-group input-group-sm mb-2">
-                                    {{ form.location_id(class="form-select form-select-sm") }}
+                                    {{ form.location_id(class="form-select form-select-sm", disabled=(item_perms and not item_perms.can_edit_location)) }}
                                     <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
-                                        data-bs-target="#addLocationModal">
+                                        data-bs-target="#addLocationModal"
+                                        {% if item_perms and not item_perms.can_edit_location %}disabled{% endif %}>
                                         <i class="bi bi-plus-circle"></i>
                                     </button>
                                 </div>
@@ -127,7 +153,8 @@
                                 <div class="row g-2 mb-2" style="position: relative;">
                                     <div class="col-4" style="overflow: visible;">
                                         <label class="form-label form-label-sm">Location</label>
-                                        <select name="storage_location_id" id="storage_location_select" class="form-select form-select-sm" onchange="updateStorageRackSelect()" style="position: relative; z-index: 100;">
+                                        <select name="storage_location_id" id="storage_location_select" class="form-select form-select-sm" onchange="updateStorageRackSelect()" style="position: relative; z-index: 100;"
+                                            {% if item_perms and not item_perms.can_edit_location %}disabled{% endif %}>
                                             <option value="">All</option>
                                             {% for loc in locations %}
                                             <option value="{{ loc.id }}">{{ loc.name }}</option>
@@ -136,7 +163,8 @@
                                     </div>
                                     <div class="col-4" style="overflow: visible;">
                                         <label class="form-label form-label-sm">Rack</label>
-                                        <select name="rack_id" id="rack_select" class="form-select form-select-sm" onchange="updateDrawerGrid()" style="position: relative; z-index: 99;">
+                                        <select name="rack_id" id="rack_select" class="form-select form-select-sm" onchange="updateDrawerGrid()" style="position: relative; z-index: 99;"
+                                            {% if item_perms and not item_perms.can_edit_location %}disabled{% endif %}>
                                             <option value="">Select</option>
                                             {% for rack in racks %}
                                             <option value="{{ rack.id }}" data-rows="{{ rack.rows }}"
@@ -149,9 +177,7 @@
                                     </div>
                                     <div class="col-4" style="overflow: visible;">
                                         <label class="form-label form-label-sm">Drawer</label>
-                                        <input type="text" name="drawer" id="drawer_input"
-                                            class="form-control form-control-sm" placeholder="Select" readonly
-                                            value="{{ item.drawer if item else '' }}" style="position: relative; z-index: 98;">
+                                        {{ form.drawer(class="form-control form-control-sm", id="drawer_input", placeholder="Select", readonly=True, disabled=(item_perms and not item_perms.can_edit_location)) }}
                                     </div>
                                 </div>
 
@@ -172,9 +198,10 @@
                     <div class="mb-2">
                         <label class="form-label form-label-sm">Footprint</label>
                         <div class="input-group input-group-sm">
-                            {{ form.footprint_id(class="form-select form-select-sm") }}
+                            {{ form.footprint_id(class="form-select form-select-sm", disabled=(item_perms and not item_perms.can_edit_footprint)) }}
                             <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
-                                data-bs-target="#addFootprintModal">
+                                data-bs-target="#addFootprintModal"
+                                {% if item_perms and not item_perms.can_edit_footprint %}disabled{% endif %}>
                                 <i class="bi bi-plus-circle"></i>
                             </button>
                         </div>
@@ -185,7 +212,7 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <label class="form-label form-label-sm mb-0">Tags</label>
                             <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
-                                data-bs-target="#addTagModal">
+                                data-bs-target="#addTagModal" {% if item_perms and not item_perms.can_edit_tags %}disabled{% endif %}>
                                 <i class="bi bi-plus-circle"></i> Add Tag
                             </button>
                         </div>
@@ -195,7 +222,8 @@
                             <div class="form-check form-check-inline" style="min-width: 150px;">
                                 <input class="form-check-input" type="checkbox" name="tags[]" value="{{ tag.id }}"
                                     id="tag{{ tag.id }}" {% if item and tag.id in
-                                    item.get_tags_list()|map(attribute='id' )|list %}checked{% endif %}>
+                                    item.get_tags_list()|map(attribute='id')|list %}checked{% endif %}
+                                    {% if item_perms and not item_perms.can_edit_tags %}disabled{% endif %}>
                                 <label class="form-check-label" for="tag{{ tag.id }}">
                                     <span class="badge"
                                         style="background-color: {{ tag.color }}; font-size: 0.75rem;">{{ tag.name
@@ -256,12 +284,14 @@
                                         <div>
                                             <button type="button" class="btn btn-warning btn-sm"
                                                 style="padding: 0.1rem 0.4rem; font-size: 0.75rem;"
-                                                onclick="openFileRenameModal({{ att.id }}, '{{ att.original_filename }}')">
+                                                onclick="openFileRenameModal({{ att.id }}, '{{ att.original_filename }}')"
+                                                {% if item_perms and not item_perms.can_edit_upload %}disabled{% endif %}>
                                                 <i class="bi bi-pencil"></i>
                                             </button>
                                             <button type="button" class="btn btn-danger btn-sm"
                                                 style="padding: 0.1rem 0.4rem; font-size: 0.75rem;"
-                                                onclick="deleteFile({{ att.id }})">
+                                                onclick="deleteFile({{ att.id }})"
+                                                {% if item_perms and not item_perms.can_edit_upload %}disabled{% endif %}>
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </div>
@@ -280,11 +310,11 @@
                                     <div class="mb-2">
                                         <label class="form-label form-label-sm">Select Files to Upload:</label>
                                         <input type="file" id="fileUploadInput" class="form-control form-control-sm"
-                                            multiple>
+                                            multiple {% if item_perms and not item_perms.can_edit_upload %}disabled{% endif %}>
                                         <small class="text-muted">Allowed: {{ allowed_file_types }} | Max: {{
                                             max_file_size_mb }}MB per file</small>
                                     </div>
-                                    <button type="button" class="btn btn-primary btn-sm" onclick="uploadFiles()">
+                                    <button type="button" class="btn btn-primary btn-sm" onclick="uploadFiles()" {% if item_perms and not item_perms.can_edit_upload %}disabled{% endif %}>
                                         <i class="bi bi-upload"></i> Upload Files
                                     </button>
                                 </div>
@@ -305,12 +335,12 @@
                                 <i class="bi bi-magic"></i> Magic Parameters
                             </label>
                             <div>
-                                <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal"
-                                    data-bs-target="#addParameterModal">
+                                <button type="button" id="addParameterBtn" class="btn btn-sm btn-success" data-bs-toggle="modal"
+                                    data-bs-target="#addParameterModal" {% if item_perms and not item_perms.can_edit_parameters %}disabled{% endif %}>
                                     <i class="bi bi-plus-circle"></i> Add Parameter
                                 </button>
-                                <button type="button" class="btn btn-sm btn-success ms-1" data-bs-toggle="modal"
-                                    data-bs-target="#useTemplateModal">
+                                <button type="button" id="useTemplateBtn" class="btn btn-sm btn-success ms-1" data-bs-toggle="modal"
+                                    data-bs-target="#useTemplateModal" {% if item_perms and not item_perms.can_edit_parameters %}disabled{% endif %}>
                                     <i class="bi bi-collection"></i> Use Template
                                 </button>
                             </div>
@@ -353,12 +383,14 @@
                                         </div>
                                         <div>
                                             <a href="{{ url_for('item_edit_parameter', item_id=item.id, param_id=param.id) }}"
-                                                class="btn btn-sm btn-warning btn-sm" title="Edit">
+                                                class="btn btn-sm btn-warning btn-sm" title="Edit"
+                                                {% if item_perms and not item_perms.can_edit_parameters %}onclick="event.preventDefault(); alert('You do not have permission to edit parameters.'); return false;"{% endif %}>
                                                 <i class="bi bi-pencil"></i>
                                             </a>
                                             <button type="button" class="btn btn-sm btn-danger btn-sm"
                                                 onclick="submitDeleteParameterForm({{ item.id }}, {{ param.id }}, event)"
-                                                title="Delete">
+                                                title="Delete"
+                                                {% if item_perms and not item_perms.can_edit_parameters %}disabled{% endif %}>
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </div>
@@ -377,7 +409,8 @@
                     <!-- Datasheet URLs - New Interface -->
                     <div class="mb-3">
                         <label class="form-label form-label-sm">Datasheet URLs</label>
-                        <button type="button" class="btn btn-sm btn-primary float-end" onclick="addDatasheetRow()">
+                        <button type="button" class="btn btn-sm btn-primary float-end" onclick="addDatasheetRow()"
+                            {% if item_perms and not item_perms.can_edit_datasheet %}disabled{% endif %}>
                             <i class="bi bi-plus-circle"></i> Add URL
                         </button>
                         <div id="datasheet-list" class="mt-2">
@@ -397,6 +430,9 @@
 
                         // Store datasheet data for form
                         let formDatasheets = [];
+                        
+                        // Check if user has permission to edit datasheets
+                        const canEditDatasheet = {% if item_perms and item_perms.can_edit_datasheet %}true{% else %}false{% endif %};
 
                         // Load existing datasheets
                         {% if form.datasheet_urls.data %}
@@ -431,8 +467,8 @@
                                 if (ds.info) {
                                     html += ` <span class="text-muted">- ${ds.info}</span>`;
                                 }
-                                html += ` <button type="button" class="btn btn-sm btn-outline-primary btn-sm ms-2" onclick="editFormDatasheet(${index})">Edit</button>`;
-                                html += ` <button type="button" class="btn btn-sm btn-outline-danger btn-sm" onclick="deleteFormDatasheet(${index})">Delete</button>`;
+                                html += ` <button type="button" class="btn btn-sm btn-outline-primary btn-sm ms-2" onclick="editFormDatasheet(${index})" ${!canEditDatasheet ? 'disabled' : ''}>Edit</button>`;
+                                html += ` <button type="button" class="btn btn-sm btn-outline-danger btn-sm" onclick="deleteFormDatasheet(${index})" ${!canEditDatasheet ? 'disabled' : ''}>Delete</button>`;
                                 html += `</div>`;
 
                                 // Edit mode
@@ -574,7 +610,7 @@
                         </div>
                         <div class="col-6">
                             <label class="form-label form-label-sm">Min Quantity</label>
-                            {{ form.min_quantity(class="form-control form-control-sm", placeholder="0") }}
+                            {{ form.min_quantity(class="form-control form-control-sm", placeholder="0", disabled=(item_perms and not item_perms.can_edit_quantity)) }}
                         </div>
                     </div>
 
@@ -585,11 +621,11 @@
                             <div class="row">
                                 <div class="col-6">
                                     <label class="form-label form-label-sm">Lend To</label>
-                                    {{ form.lend_to(class="form-control form-control-sm", id="lend_to_input") }}
+                                    {{ form.lend_to(class="form-control form-control-sm", id="lend_to_input", disabled=(item_perms and not item_perms.can_edit_lending)) }}
                                 </div>
                                 <div class="col-6" id="lend_qty_section" style="display: none;">
                                     <label class="form-label form-label-sm">Lend Quantity</label>
-                                    {{ form.lend_quantity(class="form-control form-control-sm", id="lend_qty_input") }}
+                                    {{ form.lend_quantity(class="form-control form-control-sm", id="lend_qty_input", disabled=(item_perms and not item_perms.can_edit_lending)) }}
                                     <small class="text-danger" id="lend_error"></small>
                                 </div>
                             </div>
@@ -627,11 +663,13 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-danger" onclick="deleteImageFromModal()">
+                <button type="button" class="btn btn-danger" onclick="deleteImageFromModal()"
+                    {% if item_perms and not item_perms.can_edit_upload %}disabled{% endif %}>
                     <i class="bi bi-trash"></i> Delete
                 </button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="saveImageName()">
+                <button type="button" class="btn btn-primary" onclick="saveImageName()"
+                    {% if item_perms and not item_perms.can_edit_upload %}disabled{% endif %}>
                     <i class="bi bi-save"></i> Save Name
                 </button>
             </div>
@@ -655,7 +693,8 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveFileName()">
+                <button type="button" class="btn btn-primary" onclick="saveFileName()"
+                    {% if item_perms and not item_perms.can_edit_upload %}disabled{% endif %}>
                     <i class="bi bi-save"></i> Save
                 </button>
             </div>
@@ -668,6 +707,9 @@
     let currentAttachmentId = null;
     let imageEditModalInstance = null;
     let fileRenameModalInstance = null;
+    
+    // Permission variables from backend
+    const canEditUpload = {{ 'true' if item_perms and item_perms.can_edit_upload else 'false' }};
 
     // Initialize modals
     document.addEventListener('DOMContentLoaded', function () {
@@ -685,12 +727,20 @@
     }
 
     function openFileRenameModal(attachmentId, filename) {
+        if (!canEditUpload) {
+            alert('You do not have permission to rename files.');
+            return;
+        }
         currentAttachmentId = attachmentId;
         document.getElementById('fileNameInput').value = filename;
         fileRenameModalInstance.show();
     }
 
     function saveImageName() {
+        if (!canEditUpload) {
+            alert('You do not have permission to rename files.');
+            return;
+        }
         const newName = document.getElementById('imageFileName').value.trim();
         if (!newName) {
             alert('File name cannot be empty!');
@@ -700,6 +750,10 @@
     }
 
     function saveFileName() {
+        if (!canEditUpload) {
+            alert('You do not have permission to rename files.');
+            return;
+        }
         const newName = document.getElementById('fileNameInput').value.trim();
         if (!newName) {
             alert('File name cannot be empty!');
@@ -731,12 +785,20 @@
     }
 
     function deleteImageFromModal() {
+        if (!canEditUpload) {
+            alert('You do not have permission to delete files.');
+            return;
+        }
         if (confirm('Delete this image?')) {
             deleteFile(currentAttachmentId);
         }
     }
 
     function deleteFile(attachmentId) {
+        if (!canEditUpload) {
+            alert('You do not have permission to delete files.');
+            return;
+        }
         if (confirm('Delete this file?')) {
             const form = document.createElement('form');
             form.method = 'POST';
@@ -858,11 +920,25 @@
         transform: none;
         border-color: var(--bs-secondary);
     }
+    
+    .drawer-cell-picker.no-permission {
+        opacity: 0.5;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+    
+    .drawer-cell-picker.no-permission:hover {
+        transform: none;
+        border-color: var(--bs-gray-400);
+    }
 </style>
 
 <script>
     // Racks data with unavailable drawers
     const racksData = {{ racks_data| tojson | safe }};
+    
+    // Permission check for location editing
+    const canEditLocation = {{ 'true' if item_perms and item_perms.can_edit_location else 'false' }};
 
     // Location type toggle
     const typeGeneral = document.getElementById('type_general');
@@ -920,6 +996,13 @@
                     cell.classList.add('unavailable');
                     cell.title = 'This drawer is unavailable';
                 }
+                
+                // Add disabled class if user lacks permission
+                if (!canEditLocation) {
+                    cell.classList.add('no-permission');
+                    cell.title = 'You do not have permission to edit location';
+                }
+                
                 cell.textContent = drawerId;
                 cell.dataset.drawer = drawerId;
 
@@ -929,6 +1012,10 @@
 
                 if (!isUnavailable) {
                     cell.addEventListener('click', function () {
+                        // Check permission before allowing drawer selection
+                        if (!canEditLocation) {
+                            return; // Prevent selection if no permission
+                        }
                         grid.querySelectorAll('.drawer-cell-picker').forEach(d => {
                             d.classList.remove('selected');
                         });

@@ -53,13 +53,18 @@
                     </div>
 
                     <div class="mb-3">
-                        {{ form.role.label(class="form-label") }}
+                        {{ form.role_id.label(class="form-label") }}
                         {% if user and user.is_demo_user and config.DEMO_MODE %}
                             <select class="form-select" disabled>
-                                <option selected>{{ user.role }}</option>
+                                <option selected>{{ user.user_role.name }}</option>
                             </select>
                         {% else %}
-                            {{ form.role(class="form-select") }}
+                            {{ form.role_id(class="form-select" + (" is-invalid" if form.role_id.errors else "")) }}
+                        {% endif %}
+                        {% if form.role_id.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.role_id.errors %}{{ error }}{% endfor %}
+                            </div>
                         {% endif %}
                         <small class="text-muted">
                             <strong>Admin:</strong> Full access. 

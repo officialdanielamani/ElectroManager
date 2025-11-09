@@ -362,3 +362,29 @@ table thead th i.sort-default {
     opacity: 0.7;
     font-size: 0.9rem;
 }
+
+/* Permission-based field styling */
+input.disabled,
+select.disabled,
+textarea.disabled {
+    background-color: #f5f5f5 !important;
+    color: #999 !important;
+    cursor: not-allowed !important;
+    opacity: 0.6 !important;
+}
+
+.opacity-50 {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.opacity-50 label {
+    color: #999;
+}
+
+.opacity-50 input,
+.opacity-50 select,
+.opacity-50 textarea {
+    background-color: #f5f5f5 !important;
+    color: #999 !important;
+}

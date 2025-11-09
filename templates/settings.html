@@ -10,7 +10,7 @@
 </div>
 
 <div class="row">
-    <!-- General Settings -->
+    <!-- General Settings (Always accessible) -->
     <div class="col-md-4 mb-3">
         <div class="card">
             <div class="card-body text-center">
@@ -22,14 +22,14 @@
         </div>
     </div>
 
-    <!-- System Settings (Admin Only) -->
-    {% if current_user.is_admin() %}
+    <!-- System Settings -->
+    {% if current_user.has_permission('settings_sections.system_settings', 'view') %}
     <div class="col-md-4 mb-3">
         <div class="card border-danger">
             <div class="card-body text-center">
                 <i class="bi bi-gear-fill" style="font-size: 3rem; color: #dc3545;"></i>
                 <h5 class="card-title mt-3">System Settings</h5>
-                <p class="card-text">Currency, file uploads (Admin)</p>
+                <p class="card-text">Currency, file uploads</p>
                 <a href="{{ url_for('settings_system') }}" class="btn btn-danger">Configure</a>
             </div>
         </div>
@@ -37,6 +37,7 @@
     {% endif %}
 
     <!-- Reports -->
+    {% if current_user.has_permission('settings_sections.reports', 'view') %}
     <div class="col-md-4 mb-3">
         <div class="card">
             <div class="card-body text-center">
@@ -47,8 +48,10 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- Item Management (Categories, Footprints, Tags) -->
+    {% if current_user.has_permission('settings_sections.item_management', 'view') %}
     <div class="col-md-4 mb-3">
         <div class="card">
             <div class="card-body text-center">
@@ -59,8 +62,10 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- Magic Parameters -->
+    {% if current_user.has_permission('settings_sections.magic_parameters', 'view') %}
     <div class="col-md-4 mb-3">
         <div class="card">
             <div class="card-body text-center">
@@ -71,8 +76,10 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- Location Management -->
+    {% if current_user.has_permission('settings_sections.location_management', 'view') %}
     <div class="col-md-4 mb-3">
         <div class="card">
             <div class="card-body text-center">
@@ -83,15 +90,16 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- Users -->
-    {% if current_user.is_admin() %}
+    {% if current_user.has_permission('settings_sections.users_roles', 'view') %}
     <div class="col-md-4 mb-3">
         <div class="card">
             <div class="card-body text-center">
                 <i class="bi bi-people" style="font-size: 3rem; color: #0dcaf0;"></i>
-                <h5 class="card-title mt-3">Users</h5>
-                <p class="card-text">Manage user accounts</p>
+                <h5 class="card-title mt-3">Users & Roles</h5>
+                <p class="card-text">Manage user accounts and roles</p>
                 <a href="{{ url_for('users') }}" class="btn btn-info">Manage Users</a>
             </div>
         </div>
@@ -99,7 +107,7 @@
     {% endif %}
 
     <!-- Backup & Restore -->
-    {% if current_user.is_admin() %}
+    {% if current_user.has_permission('settings_sections.backup_restore', 'view') %}
     <div class="col-md-4 mb-3">
         <div class="card">
             <div class="card-body text-center">

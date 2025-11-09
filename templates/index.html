@@ -67,7 +67,7 @@
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="bi bi-list-ul"></i> Items</h5>
-                {% if current_user.is_editor() %}
+                {% if current_user.has_permission('items', 'create') %}
                 <a href="{{ url_for('item_new') }}" class="btn btn-success btn-sm">
                     <i class="bi bi-plus-circle"></i> Add New Item
                 </a>
@@ -269,13 +269,32 @@
                                     {% endif %}
                                 {% endfor %}
                                 <td>
+                                    <!-- View button (only if has view permission) -->
+                                    {% if current_user.has_permission('items', 'view') %}
                                     <a href="{{ url_for('item_detail', uuid=item.uuid) }}" class="btn btn-sm btn-info" title="View">
                                         <i class="bi bi-eye"></i>
                                     </a>
-                                    {% if current_user.is_editor() %}
+                                    {% endif %}
+                                    
+                                    <!-- Edit button (if has any edit permission) -->
+                                    {% if current_user.has_permission('items', 'edit_name') or current_user.has_permission('items', 'edit_sku_type') or current_user.has_permission('items', 'edit_description') or current_user.has_permission('items', 'edit_datasheet') or current_user.has_permission('items', 'edit_upload') or current_user.has_permission('items', 'edit_lending') or current_user.has_permission('items', 'edit_price') or current_user.has_permission('items', 'edit_quantity') or current_user.has_permission('items', 'edit_location') or current_user.has_permission('items', 'edit_category') or current_user.has_permission('items', 'edit_footprint') or current_user.has_permission('items', 'edit_tags') or current_user.has_permission('items', 'edit_parameters') %}
                                     <a href="{{ url_for('item_edit', uuid=item.uuid) }}" class="btn btn-sm btn-warning" title="Edit">
                                         <i class="bi bi-pencil"></i>
                                     </a>
+                                    {% endif %}
+                                    
+                                    <!-- Delete button (if has delete permission) -->
+                                    {% if current_user.has_permission('items', 'delete') %}
+                                    <form method="POST" action="{{ url_for('item_delete', uuid=item.uuid) }}" style="display:inline">
+                                        <button type="submit" class="btn btn-sm btn-danger" title="Delete" onclick="return confirm('Delete this item?')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    
+                                    <!-- Show dash if no permissions -->
+                                    {% if not (current_user.has_permission('items', 'view') or current_user.has_permission('items', 'edit_name') or current_user.has_permission('items', 'edit_sku_type') or current_user.has_permission('items', 'edit_description') or current_user.has_permission('items', 'edit_datasheet') or current_user.has_permission('items', 'edit_upload') or current_user.has_permission('items', 'edit_lending') or current_user.has_permission('items', 'edit_price') or current_user.has_permission('items', 'edit_quantity') or current_user.has_permission('items', 'edit_location') or current_user.has_permission('items', 'edit_category') or current_user.has_permission('items', 'edit_footprint') or current_user.has_permission('items', 'edit_tags') or current_user.has_permission('items', 'edit_parameters') or current_user.has_permission('items', 'delete')) %}
+                                    <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -322,7 +341,7 @@
                 {% else %}
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle"></i> No items found. 
-                    {% if current_user.is_editor() %}
+                    {% if current_user.has_permission('items', 'create') %}
                     <a href="{{ url_for('item_new') }}">Add your first item</a>
                     {% endif %}
                 </div>

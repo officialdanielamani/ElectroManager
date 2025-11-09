@@ -3,8 +3,8 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from werkzeug.security import generate_password_hash
 from config import Config
 from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location
-from forms import LoginForm, RegistrationForm, CategoryForm, ItemForm, AttachmentForm, SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm
-from utils import save_file, log_audit, admin_required, editor_required, format_file_size, allowed_file
+from forms import LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEditForm, AttachmentForm, SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm
+from utils import save_file, log_audit, admin_required, permission_required, item_permission_required, format_file_size, allowed_file
 import os
 import json
 from datetime import datetime, timezone
@@ -74,7 +74,7 @@ def logout():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    from models import Setting
+    from models import Setting, Role
     signup_enabled = Setting.get('signup_enabled', True)
     
     if not signup_enabled:
@@ -86,10 +86,16 @@ def register():
     
     form = RegistrationForm()
     if form.validate_on_submit():
+        # Get Viewer role as default for new registrations
+        viewer_role = Role.query.filter_by(name='Viewer').first()
+        if not viewer_role:
+            flash('System error: Default role not found. Please contact administrator.', 'danger')
+            return redirect(url_for('login'))
+        
         user = User(
             username=form.username.data,
             email=form.email.data,
-            role='viewer'
+            role_id=viewer_role.id
         )
         user.set_password(form.password.data)
         db.session.add(user)
@@ -205,14 +211,57 @@ def index():
 
 # ============= ITEM ROUTES =============
 
+def get_item_edit_permissions(user):
+    """Get which item fields a user can edit"""
+    perms = {
+        'can_edit_name': user.has_permission('items', 'edit_name'),
+        'can_edit_sku_type': user.has_permission('items', 'edit_sku_type'),
+        'can_edit_description': user.has_permission('items', 'edit_description'),
+        'can_edit_datasheet': user.has_permission('items', 'edit_datasheet'),
+        'can_edit_upload': user.has_permission('items', 'edit_upload'),
+        'can_edit_lending': user.has_permission('items', 'edit_lending'),
+        'can_edit_price': user.has_permission('items', 'edit_price'),
+        'can_edit_quantity': user.has_permission('items', 'edit_quantity'),
+        'can_edit_location': user.has_permission('items', 'edit_location'),
+        'can_edit_category': user.has_permission('items', 'edit_category'),
+        'can_edit_footprint': user.has_permission('items', 'edit_footprint'),
+        'can_edit_tags': user.has_permission('items', 'edit_tags'),
+        'can_edit_parameters': user.has_permission('items', 'edit_parameters'),
+        'can_create': user.has_permission('items', 'create'),
+        'can_delete': user.has_permission('items', 'delete'),
+        'is_admin': user.is_admin()
+    }
+    return perms
+
 @app.route('/item/new', methods=['GET', 'POST'])
 @login_required
-@editor_required
+@item_permission_required
 def item_new():
     from models import Tag
+    from forms import ItemAddForm
     import json
     
-    form = ItemForm()
+    # Get user permissions
+    perms = get_item_edit_permissions(current_user)
+    
+    # Check if user has permission to create items
+    if not perms.get('can_create'):
+        flash('You do not have permission to create new items.', 'danger')
+        return redirect(url_for('index'))
+    
+    # Also check if user has ANY edit permission (in case someone tries to create with form directly)
+    if not (perms.get('can_edit_name') or perms.get('can_edit_sku_type') or 
+            perms.get('can_edit_description') or perms.get('can_edit_datasheet') or
+            perms.get('can_edit_upload') or perms.get('can_edit_lending') or
+            perms.get('can_edit_price') or perms.get('can_edit_quantity') or
+            perms.get('can_edit_location') or perms.get('can_edit_category') or
+            perms.get('can_edit_footprint') or perms.get('can_edit_tags') or
+            perms.get('can_edit_parameters')):
+        flash('You do not have permission to create items.', 'danger')
+        return redirect(url_for('index'))
+    
+    # Create form with permission-based field disabling
+    form = ItemAddForm(perms=perms)
     locations = Location.query.order_by(Location.name).all()
     racks = Rack.query.order_by(Rack.name).all()
     racks_data = [{'id': r.id, 'name': r.name, 'rows': r.rows, 'cols': r.cols, 
@@ -223,9 +272,21 @@ def item_new():
     prefill_drawer = request.args.get('drawer')
     
     if form.validate_on_submit():
-        location_id = form.location_id.data if form.location_id.data else None
-        rack_id = request.form.get('rack_id')
-        drawer = request.form.get('drawer')
+        # For view-only users, check if they're trying to edit
+        if not (perms.get('can_edit_name') or perms.get('can_edit_sku_type') or 
+                perms.get('can_edit_description') or perms.get('can_edit_datasheet') or
+                perms.get('can_edit_upload') or perms.get('can_edit_lending') or
+                perms.get('can_edit_price') or perms.get('can_edit_quantity') or
+                perms.get('can_edit_location') or perms.get('can_edit_category') or
+                perms.get('can_edit_footprint') or perms.get('can_edit_tags') or
+                perms.get('can_edit_parameters')):
+            flash('You do not have permission to create items with any editable fields.', 'danger')
+            return redirect(url_for('index'))
+        
+        # Apply default values for fields user cannot edit
+        location_id = form.location_id.data if form.location_id.data and perms['can_edit_location'] else None
+        rack_id = request.form.get('rack_id') if perms['can_edit_location'] else None
+        drawer = request.form.get('drawer') if perms['can_edit_location'] else None
         
         # Determine location type
         if rack_id and int(rack_id) > 0:
@@ -239,28 +300,29 @@ def item_new():
             rack_id_value = None
             drawer_value = None
         
-        # Get selected tags
-        selected_tags = request.form.getlist('tags[]')
+        # Get selected tags (only if can edit tags)
+        selected_tags = request.form.getlist('tags[]') if perms['can_edit_tags'] else []
         tags_json = json.dumps([int(t) for t in selected_tags if t])
         
+        # Create item with role-based restrictions
         item = Item(
-            name=form.name.data,
-            sku=form.sku.data if form.sku.data else None,
-            info=form.info.data,
-            description=form.description.data,
-            quantity=form.quantity.data,
-            price=form.price.data or 0.0,
+            name=form.name.data if perms['can_edit_name'] else 'New Item',
+            sku=form.sku.data if form.sku.data and perms['can_edit_sku_type'] else None,
+            info=form.info.data if perms['can_edit_sku_type'] else None,
+            description=form.description.data if perms['can_edit_description'] else None,
+            quantity=form.quantity.data if perms['can_edit_quantity'] else 0,
+            price=form.price.data if form.price.data and perms['can_edit_price'] else 0.0,
             location_id=location_id_value,
             rack_id=rack_id_value,
             drawer=drawer_value,
-            min_quantity=form.min_quantity.data or 0,
-            no_stock_warning=form.no_stock_warning.data,
-            category_id=form.category_id.data if form.category_id.data > 0 else None,
-            footprint_id=form.footprint_id.data if form.footprint_id.data > 0 else None,
+            min_quantity=form.min_quantity.data if form.min_quantity.data and perms['can_edit_quantity'] else 0,
+            no_stock_warning=form.no_stock_warning.data if perms['can_edit_quantity'] else True,
+            category_id=form.category_id.data if form.category_id.data and form.category_id.data > 0 and perms['can_edit_category'] else None,
+            footprint_id=form.footprint_id.data if form.footprint_id.data and form.footprint_id.data > 0 and perms['can_edit_footprint'] else None,
             tags=tags_json,
-            lend_to=form.lend_to.data,
-            lend_quantity=form.lend_quantity.data or 0,
-            datasheet_urls=form.datasheet_urls.data,
+            lend_to=form.lend_to.data if perms['can_edit_lending'] else None,
+            lend_quantity=form.lend_quantity.data if form.lend_quantity.data and perms['can_edit_lending'] else 0,
+            datasheet_urls=form.datasheet_urls.data if perms['can_edit_datasheet'] else None,
             created_by=current_user.id,
             updated_by=current_user.id
         )
@@ -273,25 +335,49 @@ def item_new():
     
     return render_template('item_form.html', form=form, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='New Item',
                          prefill_rack_id=prefill_rack_id, prefill_drawer=prefill_drawer, 
-                         currency=Setting.get('currency', '$'))
+                         currency=Setting.get('currency', '$'),
+                         item_perms=perms)
 
 @app.route('/item/<string:uuid>')
 @login_required
 def item_detail(uuid):
     item = Item.query.filter_by(uuid=uuid).first_or_404()
+    
+    # Check if user has view permission
+    if not current_user.has_permission('items', 'view'):
+        flash('You do not have permission to view items.', 'danger')
+        return redirect(url_for('index'))
+    
     attachment_form = AttachmentForm()
     currency_symbol = Setting.get('currency', '$')
     return render_template('item_detail.html', item=item, attachment_form=attachment_form, currency_symbol=currency_symbol)
 
 @app.route('/item/<string:uuid>/edit', methods=['GET', 'POST'])
 @login_required
-@editor_required
+@item_permission_required
 def item_edit(uuid):
     from models import Tag
+    from forms import ItemEditForm
     import json
     
     item = Item.query.filter_by(uuid=uuid).first_or_404()
-    form = ItemForm(obj=item)
+    
+    # Get user permissions for this item
+    perms = get_item_edit_permissions(current_user)
+    
+    # Check if user has any edit permissions
+    if not (perms.get('can_edit_name') or perms.get('can_edit_sku_type') or 
+            perms.get('can_edit_description') or perms.get('can_edit_datasheet') or
+            perms.get('can_edit_upload') or perms.get('can_edit_lending') or
+            perms.get('can_edit_price') or perms.get('can_edit_quantity') or
+            perms.get('can_edit_location') or perms.get('can_edit_category') or
+            perms.get('can_edit_footprint') or perms.get('can_edit_tags') or
+            perms.get('can_edit_parameters')):
+        flash('You do not have permission to edit items.', 'danger')
+        return redirect(url_for('item_detail', uuid=item.uuid))
+    
+    # Create form with permission-based field disabling
+    form = ItemEditForm(obj=item, perms=perms)
     locations = Location.query.order_by(Location.name).all()
     racks = Rack.query.order_by(Rack.name).all()
     racks_data = [{'id': r.id, 'name': r.name, 'rows': r.rows, 'cols': r.cols, 
@@ -299,40 +385,72 @@ def item_edit(uuid):
     all_tags = [{'id': t.id, 'name': t.name, 'color': t.color} for t in Tag.query.order_by(Tag.name).all()]
     
     if form.validate_on_submit():
-        location_id = form.location_id.data if form.location_id.data else None
-        rack_id = request.form.get('rack_id')
-        drawer = request.form.get('drawer')
+        # Check if user has permission to edit anything
+        if not (perms.get('can_edit_name') or perms.get('can_edit_sku_type') or 
+                perms.get('can_edit_description') or perms.get('can_edit_datasheet') or
+                perms.get('can_edit_upload') or perms.get('can_edit_lending') or
+                perms.get('can_edit_price') or perms.get('can_edit_quantity') or
+                perms.get('can_edit_location') or perms.get('can_edit_category') or
+                perms.get('can_edit_footprint') or perms.get('can_edit_tags') or
+                perms.get('can_edit_parameters')):
+            flash('You do not have permission to edit this item.', 'danger')
+            return redirect(url_for('item_detail', uuid=item.uuid))
         
-        # Determine location type
-        if rack_id and int(rack_id) > 0:
-            # Drawer storage
-            item.location_id = None
-            item.rack_id = int(rack_id)
-            item.drawer = drawer
-        else:
-            # General location
-            item.location_id = location_id if location_id and location_id != 0 else None
-            item.rack_id = None
-            item.drawer = None
+        # Only update fields user has permission for
+        if perms['can_edit_name']:
+            item.name = form.name.data
         
-        # Get selected tags
-        selected_tags = request.form.getlist('tags[]')
-        tags_json = json.dumps([int(t) for t in selected_tags if t])
+        if perms['can_edit_sku_type']:
+            item.sku = form.sku.data if form.sku.data else None
+            item.info = form.info.data
         
-        item.name = form.name.data
-        item.sku = form.sku.data if form.sku.data else None
-        item.info = form.info.data
-        item.description = form.description.data
-        item.quantity = form.quantity.data
-        item.price = form.price.data
-        item.min_quantity = form.min_quantity.data
-        item.no_stock_warning = form.no_stock_warning.data
-        item.category_id = form.category_id.data if form.category_id.data > 0 else None
-        item.footprint_id = form.footprint_id.data if form.footprint_id.data > 0 else None
-        item.tags = tags_json
-        item.lend_to = form.lend_to.data
-        item.lend_quantity = form.lend_quantity.data or 0
-        item.datasheet_urls = form.datasheet_urls.data
+        if perms['can_edit_description']:
+            item.description = form.description.data
+        
+        if perms['can_edit_datasheet']:
+            item.datasheet_urls = form.datasheet_urls.data
+        
+        if perms['can_edit_lending']:
+            item.lend_to = form.lend_to.data
+            item.lend_quantity = form.lend_quantity.data or 0
+        
+        if perms['can_edit_price']:
+            item.price = form.price.data
+        
+        if perms['can_edit_quantity']:
+            item.quantity = form.quantity.data
+            item.min_quantity = form.min_quantity.data
+            item.no_stock_warning = form.no_stock_warning.data
+        
+        if perms['can_edit_location']:
+            location_id = form.location_id.data if form.location_id.data else None
+            rack_id = request.form.get('rack_id')
+            drawer = request.form.get('drawer')
+            
+            # Determine location type
+            if rack_id and int(rack_id) > 0:
+                # Drawer storage
+                item.location_id = None
+                item.rack_id = int(rack_id)
+                item.drawer = drawer
+            else:
+                # General location
+                item.location_id = location_id if location_id and location_id != 0 else None
+                item.rack_id = None
+                item.drawer = None
+        
+        if perms['can_edit_category']:
+            item.category_id = form.category_id.data if form.category_id.data and form.category_id.data > 0 else None
+        
+        if perms['can_edit_footprint']:
+            item.footprint_id = form.footprint_id.data if form.footprint_id.data and form.footprint_id.data > 0 else None
+        
+        if perms['can_edit_tags']:
+            # Get selected tags
+            selected_tags = request.form.getlist('tags[]')
+            tags_json = json.dumps([int(t) for t in selected_tags if t])
+            item.tags = tags_json
+        
         item.updated_at = datetime.now(timezone.utc)
         item.updated_by = current_user.id
         
@@ -346,15 +464,23 @@ def item_edit(uuid):
     max_size_mb = int(Setting.get('max_file_size_mb', '10'))
     extensions_str = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
     
-    return render_template('item_form.html', form=form, item=item, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='Edit Item', currency=Setting.get('currency', '$'), max_file_size_mb=max_size_mb, allowed_file_types=extensions_str)
+    return render_template('item_form.html', form=form, item=item, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='Edit Item', currency=Setting.get('currency', '$'), max_file_size_mb=max_size_mb, allowed_file_types=extensions_str, item_perms=perms)
 
 @app.route('/item/<string:uuid>/delete', methods=['POST'])
 @login_required
-@editor_required
+@item_permission_required
 def item_delete(uuid):
     item = Item.query.filter_by(uuid=uuid).first_or_404()
+    
+    # Check if user has permission to delete items
+    perms = get_item_edit_permissions(current_user)
+    if not perms.get('can_delete'):
+        flash('You do not have permission to delete items.', 'danger')
+        return redirect(url_for('item_detail', uuid=item.uuid))
+    
     item_name = item.name
     
+    # Delete related attachments
     for attachment in item.attachments:
         try:
             if os.path.exists(attachment.file_path):
@@ -362,6 +488,11 @@ def item_delete(uuid):
         except Exception as e:
             print(f"Error deleting file: {e}")
     
+    # Delete item parameters (magic parameters)
+    from models import ItemParameter
+    ItemParameter.query.filter_by(item_id=item.id).delete()
+    
+    # Delete the item
     db.session.delete(item)
     db.session.commit()
     
@@ -373,10 +504,16 @@ def item_delete(uuid):
 
 @app.route('/item/<int:item_id>/upload', methods=['POST'])
 @login_required
-@editor_required
+@item_permission_required
 def upload_attachment(item_id):
     item = Item.query.get_or_404(item_id)
     form = AttachmentForm()
+    
+    # SECURITY CHECK: Verify user has upload permission
+    if not current_user.has_permission('items', 'edit_upload'):
+        flash('❌ You do not have permission to upload files.', 'danger')
+        log_audit(current_user.id, 'denied', 'attachment_upload', item.id, f'Unauthorized upload attempt to item: {item.name}')
+        return redirect(url_for('item_detail', uuid=item.uuid))
     
     files = request.files.getlist('files')
     
@@ -436,7 +573,7 @@ def upload_attachment(item_id):
 
 @app.route('/attachment/<int:id>/delete', methods=['POST'])
 @login_required
-@editor_required
+@item_permission_required
 def delete_attachment(id):
     attachment = Attachment.query.get_or_404(id)
     item = attachment.item
@@ -456,7 +593,7 @@ def delete_attachment(id):
 
 @app.route('/attachment/<int:attachment_id>/rename', methods=['POST'])
 @login_required
-@editor_required
+@item_permission_required
 def rename_attachment(attachment_id):
     """Rename an attachment file"""
     attachment = Attachment.query.get_or_404(attachment_id)
@@ -483,7 +620,7 @@ def rename_attachment(attachment_id):
 
 @app.route('/item/<int:item_id>/datasheets', methods=['POST'])
 @login_required
-@editor_required
+@item_permission_required
 def update_datasheets(item_id):
     """Update item datasheet URLs via AJAX"""
     item = Item.query.get_or_404(item_id)
@@ -524,13 +661,24 @@ def uploaded_file(filename):
 @login_required
 def item_management():
     """Combined management page for categories, footprints, and tags"""
+    # Check if user has view permission for item settings (not item_form)
+    if not current_user.has_permission('settings_sections.item_management', 'view'):
+        flash('You do not have permission to view item management settings.', 'danger')
+        return redirect(url_for('settings'))
+    
     categories = Category.query.order_by(Category.name).all()
     footprints = Footprint.query.order_by(Footprint.name).all()
     tags = Tag.query.order_by(Tag.name).all()
+    
+    can_edit = current_user.has_permission('settings_sections.item_management', 'edit')
+    can_delete = current_user.has_permission('settings_sections.item_management', 'delete')
+    
     return render_template('item_management.html', 
                           categories=categories, 
                           footprints=footprints, 
-                          tags=tags)
+                          tags=tags,
+                          can_edit=can_edit,
+                          can_delete=can_delete)
 
 @app.route('/categories')
 @login_required
@@ -541,7 +689,7 @@ def categories():
 
 @app.route('/category/new', methods=['GET', 'POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.item_management", "edit")
 def category_new():
     form = CategoryForm()
     
@@ -567,7 +715,7 @@ def category_new():
 
 @app.route('/category/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.item_management", "edit")
 def category_edit(id):
     category = Category.query.get_or_404(id)
     form = CategoryForm(obj=category)
@@ -585,7 +733,7 @@ def category_edit(id):
 
 @app.route('/category/<int:id>/delete', methods=['POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.item_management", "delete")
 def category_delete(id):
     category = Category.query.get_or_404(id)
     category_name = category.name
@@ -605,16 +753,38 @@ def category_delete(id):
 
 @app.route('/users')
 @login_required
-@admin_required
 def users():
-    from models import Setting
+    # Check granular permission for user management
+    if not current_user.has_permission('settings_sections.users_roles', 'view'):
+        flash('You do not have permission to view users.', 'danger')
+        return redirect(url_for('settings'))
+    
+    from models import Setting, Role
     users = User.query.order_by(User.username).all()
+    roles = Role.query.order_by(Role.name).all()
     signup_enabled = Setting.get('signup_enabled', True)
-    return render_template('users.html', users=users, signup_enabled=signup_enabled)
+    
+    can_create_user = current_user.has_permission('settings_sections.users_roles', 'users_create')
+    can_edit_user = current_user.has_permission('settings_sections.users_roles', 'users_edit')
+    can_delete_user = current_user.has_permission('settings_sections.users_roles', 'users_delete')
+    can_create_role = current_user.has_permission('settings_sections.users_roles', 'roles_create')
+    can_edit_role = current_user.has_permission('settings_sections.users_roles', 'roles_edit')
+    can_delete_role = current_user.has_permission('settings_sections.users_roles', 'roles_delete')
+    
+    return render_template('users.html', 
+                          users=users, 
+                          roles=roles, 
+                          signup_enabled=signup_enabled,
+                          can_create_user=can_create_user,
+                          can_edit_user=can_edit_user,
+                          can_delete_user=can_delete_user,
+                          can_create_role=can_create_role,
+                          can_edit_role=can_edit_role,
+                          can_delete_role=can_delete_role)
 
 @app.route('/toggle-signup', methods=['POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.users_roles", "users_edit")
 def toggle_signup():
     from models import Setting
     signup_enabled = request.form.get('signup_enabled') == 'on'
@@ -627,7 +797,7 @@ def toggle_signup():
 
 @app.route('/user/new', methods=['GET', 'POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.users_roles", "users_create")
 def user_new():
     form = UserForm()
     
@@ -647,7 +817,7 @@ def user_new():
         user = User(
             username=form.username.data,
             email=form.email.data,
-            role=form.role.data,
+            role_id=form.role_id.data,
             is_active=form.is_active.data
         )
         user.set_password(form.password.data)
@@ -662,7 +832,7 @@ def user_new():
 
 @app.route('/user/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.users_roles", "users_edit")
 def user_edit(id):
     user = User.query.get_or_404(id)
     
@@ -675,7 +845,7 @@ def user_edit(id):
     if form.validate_on_submit():
         user.username = form.username.data
         user.email = form.email.data
-        user.role = form.role.data
+        user.role_id = form.role_id.data
         user.is_active = form.is_active.data
         
         if form.password.data:
@@ -691,7 +861,7 @@ def user_edit(id):
 
 @app.route('/user/<int:id>/delete', methods=['POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.users_roles", "users_delete")
 def user_delete(id):
     if id == current_user.id:
         flash('You cannot delete your own account.', 'danger')
@@ -711,6 +881,254 @@ def user_delete(id):
     flash(f'User "{username}" deleted successfully!', 'success')
     return redirect(url_for('users'))
 
+# ============= ROLE MANAGEMENT =============
+
+@app.route('/roles')
+@login_required
+def roles():
+    """Redirect to users page - role management is now integrated there"""
+    return redirect(url_for('users'))
+
+@app.route('/role/new', methods=['GET', 'POST'])
+@login_required
+@permission_required("settings_sections.users_roles", "roles_create")
+def role_new():
+    from models import Role
+    from forms import RoleForm
+    form = RoleForm()
+    
+    if form.validate_on_submit():
+        # Check for duplicate role name
+        existing_role = Role.query.filter_by(name=form.name.data).first()
+        if existing_role:
+            flash(f'Role "{form.name.data}" already exists!', 'danger')
+            return render_template('role_form.html', form=form, title='New Role', role=None)
+        
+        # Create new role with default permissions (all false)
+        default_perms = {
+            # Item Management (granular)
+            "items": {
+                "view": False, 
+                "create": False,
+                "delete": False, 
+                "edit_name": False,
+                "edit_sku_type": False,
+                "edit_description": False,
+                "edit_datasheet": False,
+                "edit_upload": False,
+                "edit_lending": False,
+                "edit_price": False, 
+                "edit_quantity": False, 
+                "edit_location": False,
+                "edit_category": False,
+                "edit_footprint": False,
+                "edit_tags": False,
+                "edit_parameters": False
+            },
+            # Page Permissions
+            "pages": {
+                "visual_storage": {"view": False},
+                "notifications": {"view": False}
+            },
+            # Settings Page Sections
+            "settings_sections": {
+                "system_settings": {"view": False, "edit": False},
+                "reports": {"view": False},
+                "item_management": {"view": False, "edit": False, "delete": False},
+                "magic_parameters": {"view": False, "edit": False, "delete": False},
+                "location_management": {"view": False, "edit": False, "delete": False},
+                "users_roles": {
+                    "view": False,
+                    "roles_create": False,
+                    "roles_edit": False,
+                    "roles_delete": False,
+                    "users_create": False,
+                    "users_edit": False,
+                    "users_delete": False
+                },
+                "backup_restore": {"view": False, "upload_export": False, "delete": False}
+            }
+        }
+        
+        role = Role(
+            name=form.name.data,
+            description=form.description.data,
+            is_system_role=False
+        )
+        role.set_permissions(default_perms)
+        db.session.add(role)
+        db.session.commit()
+        
+        log_audit(current_user.id, 'create', 'role', role.id, f'Created role: {role.name}')
+        flash(f'Role "{role.name}" created successfully! Now configure its permissions.', 'success')
+        return redirect(url_for('role_edit', id=role.id))
+    
+    return render_template('role_form.html', form=form, title='New Role', role=None)
+
+@app.route('/role/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+@permission_required("settings_sections.users_roles", "roles_edit")
+def role_edit(id):
+    from models import Role
+    from forms import RoleForm
+    role = Role.query.get_or_404(id)
+    
+    form = RoleForm(obj=role)
+    
+    if request.method == 'POST':
+        if 'update_info' in request.form:
+            # Update role name and description
+            if form.validate_on_submit():
+                role.name = form.name.data
+                role.description = form.description.data
+                db.session.commit()
+                log_audit(current_user.id, 'update', 'role', role.id, f'Updated role info: {role.name}')
+                flash(f'Role "{role.name}" updated successfully!', 'success')
+        
+        if 'update_permissions' in request.form:
+            # Update permissions with new structure
+            perms = {
+                "items": {},
+                "pages": {},
+                "settings_sections": {}
+            }
+            
+            # Items permissions (granular)
+            item_actions = ['view', 'create', 'delete', 'edit_name', 'edit_sku_type', 'edit_description', 
+                           'edit_datasheet', 'edit_upload', 'edit_lending', 'edit_price', 'edit_quantity', 
+                           'edit_location', 'edit_category', 'edit_footprint', 'edit_tags', 'edit_parameters']
+            for action in item_actions:
+                checkbox_name = f'items_{action}'
+                perms['items'][action] = checkbox_name in request.form
+            
+            # Page permissions (Settings page removed - accessible to all users)
+            # Visual Storage and Notifications edit controlled by settings_sections
+            perms['pages']['visual_storage'] = {
+                'view': 'pages_visual_storage_view' in request.form
+            }
+            perms['pages']['notifications'] = {
+                'view': 'pages_notifications_view' in request.form
+            }
+            
+            # Settings sections permissions
+            # System Settings
+            perms['settings_sections']['system_settings'] = {
+                'view': 'settings_sections_system_settings_view' in request.form,
+                'edit': 'settings_sections_system_settings_edit' in request.form
+            }
+            
+            # Reports
+            perms['settings_sections']['reports'] = {
+                'view': 'settings_sections_reports_view' in request.form
+            }
+            
+            # Item Management
+            perms['settings_sections']['item_management'] = {
+                'view': 'settings_sections_item_management_view' in request.form,
+                'edit': 'settings_sections_item_management_edit' in request.form,
+                'delete': 'settings_sections_item_management_delete' in request.form
+            }
+            
+            # Magic Parameters
+            perms['settings_sections']['magic_parameters'] = {
+                'view': 'settings_sections_magic_parameters_view' in request.form,
+                'edit': 'settings_sections_magic_parameters_edit' in request.form,
+                'delete': 'settings_sections_magic_parameters_delete' in request.form
+            }
+            
+            # Location Management
+            perms['settings_sections']['location_management'] = {
+                'view': 'settings_sections_location_management_view' in request.form,
+                'edit': 'settings_sections_location_management_edit' in request.form,
+                'delete': 'settings_sections_location_management_delete' in request.form
+            }
+            
+            # User & Role Management
+            perms['settings_sections']['users_roles'] = {
+                'view': 'settings_sections_users_roles_view' in request.form,
+                'roles_create': 'settings_sections_users_roles_roles_create' in request.form,
+                'roles_edit': 'settings_sections_users_roles_roles_edit' in request.form,
+                'roles_delete': 'settings_sections_users_roles_roles_delete' in request.form,
+                'users_create': 'settings_sections_users_roles_users_create' in request.form,
+                'users_edit': 'settings_sections_users_roles_users_edit' in request.form,
+                'users_delete': 'settings_sections_users_roles_users_delete' in request.form
+            }
+            
+            # Backup & Restore
+            perms['settings_sections']['backup_restore'] = {
+                'view': 'settings_sections_backup_restore_view' in request.form,
+                'upload_export': 'settings_sections_backup_restore_upload_export' in request.form,
+                'delete': 'settings_sections_backup_restore_delete' in request.form
+            }
+            
+            role.set_permissions(perms)
+            db.session.commit()
+            
+            log_audit(current_user.id, 'update', 'role', role.id, f'Updated permissions for role: {role.name}')
+            flash(f'Permissions for role "{role.name}" updated successfully!', 'success')
+        
+        if 'update_info' in request.form or 'update_permissions' in request.form:
+            # Reload the role from database and re-render the form
+            db.session.refresh(role)
+            form = RoleForm(obj=role)
+            return render_template('role_form.html', form=form, role=role, title='Edit Role')
+    
+    return render_template('role_form.html', form=form, role=role, title='Edit Role')
+
+@app.route('/role/<int:id>/delete', methods=['POST'])
+@login_required
+@permission_required("settings_sections.users_roles", "roles_delete")
+def role_delete(id):
+    from models import Role
+    role = Role.query.get_or_404(id)
+    
+    # Prevent deleting system roles
+    if role.is_system_role:
+        flash('Cannot delete system role templates.', 'danger')
+        return redirect(url_for('roles'))
+    
+    # Check if any users have this role
+    if role.users:
+        flash(f'Cannot delete role "{role.name}" because it is assigned to {len(role.users)} user(s).', 'danger')
+        return redirect(url_for('roles'))
+    
+    role_name = role.name
+    db.session.delete(role)
+    db.session.commit()
+    
+    log_audit(current_user.id, 'delete', 'role', id, f'Deleted role: {role_name}')
+    flash(f'Role "{role_name}" deleted successfully!', 'success')
+    return redirect(url_for('roles'))
+
+@app.route('/role/<int:id>/clone', methods=['POST'])
+@login_required
+@permission_required("settings_sections.users_roles", "roles_create")
+def role_clone(id):
+    from models import Role
+    source_role = Role.query.get_or_404(id)
+    
+    # Generate unique name for cloned role
+    base_name = f"{source_role.name} (Copy)"
+    new_name = base_name
+    counter = 1
+    while Role.query.filter_by(name=new_name).first():
+        new_name = f"{base_name} {counter}"
+        counter += 1
+    
+    # Clone the role
+    new_role = Role(
+        name=new_name,
+        description=source_role.description,
+        is_system_role=False,
+        permissions=source_role.permissions
+    )
+    db.session.add(new_role)
+    db.session.commit()
+    
+    log_audit(current_user.id, 'create', 'role', new_role.id, f'Cloned role from: {source_role.name}')
+    flash(f'Role "{source_role.name}" cloned as "{new_name}". You can now customize it.', 'success')
+    return redirect(url_for('role_edit', id=new_role.id))
+
 # ============= REPORTS AND ANALYTICS =============
 
 @app.route('/low-stock')
@@ -722,6 +1140,11 @@ def low_stock():
 @app.route('/reports')
 @login_required
 def reports():
+    # Check granular permission for reports
+    if not current_user.has_permission('settings_sections.reports', 'view'):
+        flash('You do not have permission to view reports.', 'danger')
+        return redirect(url_for('settings'))
+    
     total_items = Item.query.count()
     total_value = db.session.query(db.func.sum(Item.price * Item.quantity)).scalar() or 0
     low_stock_count = Item.query.filter(Item.quantity <= Item.min_quantity).count()
@@ -743,12 +1166,28 @@ def reports():
 @login_required
 def location_management():
     """Combined location and rack management page"""
+    # Check if user has view permission for location settings (not visual_storage)
+    if not current_user.has_permission('settings_sections.location_management', 'view'):
+        # Check if user has visual storage access and redirect there instead
+        if current_user.has_permission('pages.visual_storage', 'view'):
+            flash('You do not have permission to manage racks. You can only view them in Visual Storage.', 'warning')
+            return redirect(url_for('visual_storage'))
+        else:
+            flash('You do not have permission to view location management settings.', 'danger')
+            return redirect(url_for('settings'))
+    
     from models import Location
     locations = Location.query.order_by(Location.name).all()
     racks = Rack.query.order_by(Rack.name).all()
+    
+    can_edit = current_user.has_permission('settings_sections.location_management', 'edit')
+    can_delete = current_user.has_permission('settings_sections.location_management', 'delete')
+    
     return render_template('location_management.html', 
                           locations=locations,
-                          racks=racks)
+                          racks=racks,
+                          can_edit=can_edit,
+                          can_delete=can_delete)
 
 @app.route('/location/<int:id>')
 @login_required
@@ -765,7 +1204,7 @@ def location_detail(id):
 
 @app.route('/location/new', methods=['GET', 'POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.location_management", "edit")
 def location_new():
     """Create new location"""
     from models import Location
@@ -840,7 +1279,7 @@ def location_new():
 
 @app.route('/location/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.location_management", "edit")
 def location_edit(id):
     """Edit location"""
     from models import Location
@@ -942,7 +1381,7 @@ def location_edit(id):
 
 @app.route('/location/<int:id>/delete', methods=['POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.location_management", "delete")
 def location_delete(id):
     """Delete location"""
     from models import Location
@@ -979,15 +1418,17 @@ def location_picture(filename):
 
 @app.route('/rack-management')
 @login_required
-@admin_required
+@permission_required("settings_sections.location_management", "view")
 def rack_management():
     """Rack management page"""
     racks = Rack.query.order_by(Rack.name).all()
-    return render_template('rack_management.html', racks=racks)
+    can_edit = current_user.has_permission('settings_sections.location_management', 'edit')
+    can_delete = current_user.has_permission('settings_sections.location_management', 'delete')
+    return render_template('rack_management.html', racks=racks, can_edit=can_edit, can_delete=can_delete)
 
 @app.route('/add-rack', methods=['POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.location_management", "edit")
 def add_rack():
     """Add a new rack"""
     name = request.form.get('name')
@@ -1019,7 +1460,7 @@ def add_rack():
 
 @app.route('/edit-rack', methods=['POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.location_management", "edit")
 def edit_rack():
     """Edit rack"""
     rack_id = request.form.get('rack_id')
@@ -1038,7 +1479,7 @@ def edit_rack():
 
 @app.route('/delete-rack', methods=['POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.location_management", "delete")
 def delete_rack():
     """Delete rack and clear item locations"""
     rack_id = request.form.get('rack_id')
@@ -1061,7 +1502,7 @@ def delete_rack():
 # REST-style rack routes for new UI
 @app.route('/rack/new', methods=['GET', 'POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.location_management", "edit")
 def rack_new():
     """Create new rack with form"""
     if request.method == 'POST':
@@ -1113,7 +1554,7 @@ def rack_new():
 
 @app.route('/rack/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.location_management", "edit")
 def rack_edit(id):
     """Edit rack with form"""
     rack = Rack.query.get_or_404(id)
@@ -1199,7 +1640,7 @@ def rack_edit(id):
 
 @app.route('/rack/<int:id>/delete', methods=['POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.location_management", "delete")
 def rack_delete(id):
     """Delete rack"""
     rack = Rack.query.get_or_404(id)
@@ -1240,6 +1681,17 @@ def rack_detail(id):
 @login_required
 def visual_storage():
     """Display visual storage system"""
+    # Check view permission
+    if not current_user.has_permission('pages.visual_storage', 'view'):
+        flash('You do not have permission to view visual storage.', 'danger')
+        return redirect(url_for('index'))
+    
+    # Store edit permission in context for template
+    can_edit = current_user.has_permission('pages.visual_storage', 'edit')
+    
+    # Check if user can access location management (for Manage Racks button)
+    can_manage_racks = current_user.has_permission('settings_sections.location_management', 'view')
+    
     rack_id = request.args.get('rack', type=int)
     location_id = request.args.get('location', type=int)
     
@@ -1294,7 +1746,14 @@ def visual_storage():
     # For the dropdown, show all racks for location selection, but filtered by current location for rack selection
     all_racks_for_dropdown = racks_to_display
     locations = Location.query.order_by(Location.name).all()
-    return render_template('visual_storage.html', racks=rack_data, all_racks=all_racks_for_dropdown, locations=locations, current_location_id=location_id, current_rack_id=rack_id)
+    return render_template('visual_storage.html', 
+                          racks=rack_data, 
+                          all_racks=all_racks_for_dropdown, 
+                          locations=locations, 
+                          current_location_id=location_id, 
+                          current_rack_id=rack_id, 
+                          can_edit_visual_storage=can_edit,
+                          can_manage_racks=can_manage_racks)
 
 @app.route('/api/drawer/<int:rack_id>/<path:drawer_id>')
 @login_required
@@ -1328,7 +1787,7 @@ def get_drawer_contents(rack_id, drawer_id):
 
 @app.route('/api/category/add', methods=['POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.item_management", "edit")
 def api_add_category():
     """API endpoint to add category from item form"""
     try:
@@ -1360,7 +1819,7 @@ def api_add_category():
 
 @app.route('/api/footprint/add', methods=['POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.item_management", "edit")
 def api_add_footprint():
     """API endpoint to add footprint from item form"""
     try:
@@ -1392,7 +1851,7 @@ def api_add_footprint():
 
 @app.route('/api/tag/add', methods=['POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.item_management", "edit")
 def api_add_tag():
     """API endpoint to add tag from item form"""
     try:
@@ -1424,7 +1883,7 @@ def api_add_tag():
 
 @app.route('/api/location/add', methods=['POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.location_management", "edit")
 def api_add_location():
     """API endpoint to add location from item form"""
     try:
@@ -1458,7 +1917,7 @@ def api_add_location():
 
 @app.route('/api/drawer/toggle-availability', methods=['POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.location_management", "edit")
 def toggle_drawer_availability():
     """Toggle drawer availability status"""
     try:
@@ -1492,7 +1951,7 @@ def toggle_drawer_availability():
 
 @app.route('/api/drawer/move-items', methods=['POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.location_management", "edit")
 def move_drawer_items():
     """Move all items from a drawer to a new location"""
     try:
@@ -1554,6 +2013,10 @@ def internal_error(error):
 @app.route('/settings')
 @login_required
 def settings():
+    """Settings page hub - accessible to all users"""
+    # Settings page is now accessible to all authenticated users
+    # Edit capabilities for sub-sections are controlled by settings_sections permissions
+    
     return render_template('settings.html')
 
 @app.route('/settings/general')
@@ -1606,10 +2069,19 @@ def save_table_columns_view():
 
 @app.route('/settings/system', methods=['GET', 'POST'])
 @login_required
-@admin_required
 def settings_system():
-    """System-wide settings (Admin only)"""
+    """System-wide settings"""
+    # Check granular permission for system settings
+    if not current_user.has_permission('settings_sections.system_settings', 'view'):
+        flash('You do not have permission to view system settings.', 'danger')
+        return redirect(url_for('settings'))
+    
+    can_edit = current_user.has_permission('settings_sections.system_settings', 'edit')
+    
     if request.method == 'POST':
+        if not can_edit:
+            flash('You do not have permission to edit system settings.', 'danger')
+            return redirect(url_for('settings_system'))
         try:
             # Currency setting
             currency = request.form.get('currency', '$').strip()
@@ -1716,7 +2188,7 @@ def footprints():
 
 @app.route('/footprint/new', methods=['GET', 'POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.item_management", "edit")
 def footprint_new():
     from models import Footprint
     if request.method == 'POST':
@@ -1738,7 +2210,7 @@ def footprint_new():
 
 @app.route('/footprint/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.item_management", "edit")
 def footprint_edit(id):
     from models import Footprint
     footprint = Footprint.query.get_or_404(id)
@@ -1752,7 +2224,7 @@ def footprint_edit(id):
 
 @app.route('/footprint/<int:id>/delete', methods=['POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.item_management", "delete")
 def footprint_delete(id):
     from models import Footprint
     footprint = Footprint.query.get_or_404(id)
@@ -1773,7 +2245,7 @@ def tags():
 
 @app.route('/tag/new', methods=['GET', 'POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.item_management", "edit")
 def tag_new():
     from models import Tag
     if request.method == 'POST':
@@ -1795,7 +2267,7 @@ def tag_new():
 
 @app.route('/tag/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.item_management", "edit")
 def tag_edit(id):
     from models import Tag
     tag = Tag.query.get_or_404(id)
@@ -1809,7 +2281,7 @@ def tag_edit(id):
 
 @app.route('/tag/<int:id>/delete', methods=['POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.item_management", "delete")
 def tag_delete(id):
     from models import Tag
     tag = Tag.query.get_or_404(id)
@@ -1823,13 +2295,22 @@ def tag_delete(id):
 
 @app.route('/backup-restore')
 @login_required
-@admin_required
 def backup_restore():
-    return render_template('backup_restore.html')
+    # Check permission for backup/restore
+    if not current_user.has_permission('settings_sections.backup_restore', 'view'):
+        flash('You do not have permission to view backups.', 'danger')
+        return redirect(url_for('settings'))
+    
+    can_upload_export = current_user.has_permission('settings_sections.backup_restore', 'upload_export')
+    can_delete = current_user.has_permission('settings_sections.backup_restore', 'delete')
+    
+    return render_template('backup_restore.html',
+                          can_upload_export=can_upload_export,
+                          can_delete=can_delete)
 
 @app.route('/backup/download')
 @login_required
-@admin_required
+@permission_required("settings_sections.backup_restore", "upload_export")
 def backup_download():
     import shutil
     import os
@@ -1843,7 +2324,7 @@ def backup_download():
 
 @app.route('/backup/restore', methods=['POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.backup_restore", "upload_export")
 def backup_restore_upload():
     import shutil
     import os
@@ -1865,7 +2346,7 @@ def backup_restore_upload():
 
 @app.route('/backup/export-selective', methods=['POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.backup_restore", "upload_export")
 def export_selective():
     """Export selected data types"""
     from importexport import DataExporter
@@ -1913,7 +2394,7 @@ def export_selective():
 
 @app.route('/backup/import-selective', methods=['POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.backup_restore", "upload_export")
 def import_selective():
     """Import selected data types"""
     from importexport import DataImporter
@@ -1999,22 +2480,32 @@ def magic_parameters():
     """Magic Parameters settings page"""
     from models import MagicParameter, ParameterTemplate
     
+    # Check view permission for magic parameter settings
+    if not current_user.has_permission('settings_sections.magic_parameters', 'view'):
+        flash('You do not have permission to view magic parameters.', 'danger')
+        return redirect(url_for('settings'))
+    
     # Get parameters grouped by type
     number_params = MagicParameter.query.filter_by(param_type='number').order_by(MagicParameter.name).all()
     date_params = MagicParameter.query.filter_by(param_type='date').order_by(MagicParameter.name).all()
     string_params = MagicParameter.query.filter_by(param_type='string').order_by(MagicParameter.name).all()
     templates = ParameterTemplate.query.order_by(ParameterTemplate.name).all()
     
+    can_edit = current_user.has_permission('settings_sections.magic_parameters', 'edit')
+    can_delete = current_user.has_permission('settings_sections.magic_parameters', 'delete')
+    
     return render_template('magic_parameters.html', 
                           number_params=number_params,
                           date_params=date_params,
                           string_params=string_params,
-                          templates=templates)
+                          templates=templates,
+                          can_edit=can_edit,
+                          can_delete=can_delete)
 
 
 @app.route('/magic-parameter/new', methods=['POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.magic_parameters", "edit")
 def magic_parameter_new():
     from models import MagicParameter, ParameterUnit, ParameterStringOption
     
@@ -2087,7 +2578,7 @@ def magic_parameter_new():
 
 @app.route('/magic-parameter/<int:id>/edit', methods=['POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.magic_parameters", "edit")
 def magic_parameter_edit(id):
     from models import MagicParameter, ParameterUnit, ParameterStringOption
     parameter = MagicParameter.query.get_or_404(id)
@@ -2106,7 +2597,7 @@ def magic_parameter_edit(id):
 
 @app.route('/magic-parameter/<int:id>/manage')
 @login_required
-@editor_required
+@permission_required("settings_sections.magic_parameters", "edit")
 def magic_parameter_manage(id):
     from models import MagicParameter
     parameter = MagicParameter.query.get_or_404(id)
@@ -2115,7 +2606,7 @@ def magic_parameter_manage(id):
 
 @app.route('/magic-parameter/<int:id>/add-unit', methods=['POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.magic_parameters", "edit")
 def magic_parameter_add_unit(id):
     from models import MagicParameter, ParameterUnit
     parameter = MagicParameter.query.get_or_404(id)
@@ -2145,7 +2636,7 @@ def magic_parameter_add_unit(id):
 
 @app.route('/magic-parameter/<int:id>/delete-unit/<int:unit_id>', methods=['POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.magic_parameters", "edit")
 def magic_parameter_delete_unit(id, unit_id):
     from models import ParameterUnit, ItemParameter
     unit = ParameterUnit.query.get_or_404(unit_id)
@@ -2169,7 +2660,7 @@ def magic_parameter_delete_unit(id, unit_id):
 
 @app.route('/magic-parameter/<int:id>/add-option', methods=['POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.magic_parameters", "edit")
 def magic_parameter_add_option(id):
     from models import MagicParameter, ParameterStringOption
     parameter = MagicParameter.query.get_or_404(id)
@@ -2199,7 +2690,7 @@ def magic_parameter_add_option(id):
 
 @app.route('/magic-parameter/<int:id>/delete-option/<int:option_id>', methods=['POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.magic_parameters", "edit")
 def magic_parameter_delete_option(id, option_id):
     from models import ParameterStringOption, ItemParameter
     option = ParameterStringOption.query.get_or_404(option_id)
@@ -2223,7 +2714,7 @@ def magic_parameter_delete_option(id, option_id):
 
 @app.route('/magic-parameter/<int:id>/delete', methods=['POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.magic_parameters", "delete")
 def magic_parameter_delete(id):
     from models import MagicParameter
     parameter = MagicParameter.query.get_or_404(id)
@@ -2271,7 +2762,7 @@ def api_magic_parameters(type):
 
 @app.route('/parameter-template/new', methods=['GET', 'POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.magic_parameters", "edit")
 def parameter_template_new():
     from models import ParameterTemplate
     
@@ -2305,7 +2796,7 @@ def parameter_template_new():
 
 @app.route('/parameter-template/<int:id>/manage')
 @login_required
-@editor_required
+@permission_required("settings_sections.magic_parameters", "edit")
 def parameter_template_manage(id):
     from models import ParameterTemplate
     template = ParameterTemplate.query.get_or_404(id)
@@ -2314,7 +2805,7 @@ def parameter_template_manage(id):
 
 @app.route('/parameter-template/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.magic_parameters", "edit")
 def parameter_template_edit(id):
     from models import ParameterTemplate
     template = ParameterTemplate.query.get_or_404(id)
@@ -2334,7 +2825,7 @@ def parameter_template_edit(id):
 
 @app.route('/parameter-template/<int:id>/add-parameter', methods=['POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.magic_parameters", "edit")
 def template_add_parameter(id):
     from models import TemplateParameter, MagicParameter, ParameterTemplate
     template = ParameterTemplate.query.get_or_404(id)
@@ -2380,7 +2871,7 @@ def template_add_parameter(id):
 
 @app.route('/parameter-template/<int:template_id>/delete-parameter/<int:param_id>', methods=['POST'])
 @login_required
-@editor_required
+@permission_required("settings_sections.magic_parameters", "edit")
 def template_delete_parameter(template_id, param_id):
     from models import TemplateParameter
     template_param = TemplateParameter.query.get_or_404(param_id)
@@ -2398,7 +2889,7 @@ def template_delete_parameter(template_id, param_id):
 
 @app.route('/parameter-template/<int:id>/delete', methods=['POST'])
 @login_required
-@admin_required
+@permission_required("settings_sections.magic_parameters", "delete")
 def parameter_template_delete(id):
     from models import ParameterTemplate
     template = ParameterTemplate.query.get_or_404(id)
@@ -2450,10 +2941,17 @@ def api_parameter_templates():
 
 @app.route('/item/<int:id>/populate-template', methods=['POST'])
 @login_required
-@editor_required
+@item_permission_required
 def item_populate_template(id):
     from models import ItemParameter, ParameterTemplate
     item = Item.query.get_or_404(id)
+    
+    # SECURITY CHECK: Verify user has parameter edit permission
+    if not current_user.has_permission('items', 'edit_parameters'):
+        flash('❌ You do not have permission to apply templates.', 'danger')
+        log_audit(current_user.id, 'denied', 'item_template_apply', id, f'Unauthorized template apply attempt to item: {item.name}')
+        return redirect(url_for('item_edit', uuid=item.uuid))
+    
     template_id = int(request.form.get('template_id', 0))
     
     template = ParameterTemplate.query.get(template_id)
@@ -2486,10 +2984,16 @@ def item_populate_template(id):
 
 @app.route('/item/<int:id>/add-parameter', methods=['POST'])
 @login_required
-@editor_required
+@item_permission_required
 def item_add_parameter(id):
     from models import ItemParameter, MagicParameter
     item = Item.query.get_or_404(id)
+    
+    # SECURITY CHECK: Verify user has parameter edit permission
+    if not current_user.has_permission('items', 'edit_parameters'):
+        flash('❌ You do not have permission to add parameters.', 'danger')
+        log_audit(current_user.id, 'denied', 'item_parameter_add', id, f'Unauthorized parameter add attempt to item: {item.name}')
+        return redirect(url_for('item_edit', uuid=item.uuid))
     
     # Get form data
     param_type = request.form.get('param_type')
@@ -2529,11 +3033,17 @@ def item_add_parameter(id):
 
 @app.route('/item/<int:item_id>/delete-parameter/<int:param_id>', methods=['POST'])
 @login_required
-@editor_required
+@item_permission_required
 def item_delete_parameter(item_id, param_id):
     from models import ItemParameter
     item = Item.query.get_or_404(item_id)
     item_param = ItemParameter.query.get_or_404(param_id)
+    
+    # SECURITY CHECK: Verify user has parameter edit permission
+    if not current_user.has_permission('items', 'edit_parameters'):
+        flash('❌ You do not have permission to delete parameters.', 'danger')
+        log_audit(current_user.id, 'denied', 'item_parameter_delete', item_id, f'Unauthorized parameter delete attempt to item: {item.name}')
+        return redirect(url_for('item_edit', uuid=item.uuid))
     
     if item_param.item_id != item_id:
         flash('Invalid parameter!', 'danger')
@@ -2549,7 +3059,7 @@ def item_delete_parameter(item_id, param_id):
 
 @app.route('/item/<int:item_id>/edit-parameter/<int:param_id>', methods=['GET', 'POST'])
 @login_required
-@editor_required
+@item_permission_required
 def item_edit_parameter(item_id, param_id):
     from models import ItemParameter, MagicParameter
     item = Item.query.get_or_404(item_id)
@@ -2583,6 +3093,14 @@ def notifications():
     """Show items with date parameter notifications due"""
     from models import ItemParameter
     from datetime import datetime
+    
+    # Check view permission
+    if not current_user.has_permission('pages.notifications', 'view'):
+        flash('You do not have permission to view notifications.', 'danger')
+        return redirect(url_for('index'))
+    
+    # Check if user can edit notifications
+    can_edit = current_user.has_permission('pages.notifications', 'edit')
     
     # Get all item parameters with notifications enabled
     notifications = []
@@ -2624,7 +3142,7 @@ def notifications():
         except:
             pass
     
-    return render_template('notifications.html', notifications=notifications)
+    return render_template('notifications.html', notifications=notifications, can_edit_notifications=can_edit)
 
 
 # ============= ERROR HANDLERS =============

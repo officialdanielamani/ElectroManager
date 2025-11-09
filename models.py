@@ -65,6 +65,66 @@ class Location(db.Model):
         return f'<Location {self.name}>'
 
 
+class Role(db.Model):
+    __tablename__ = 'roles'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+    description = db.Column(db.Text)
+    is_system_role = db.Column(db.Boolean, default=False)  # True for Admin, Manager, Viewer templates
+    
+    # Permissions JSON structure: {"items": {"view": true, "edit": true, "delete": true}, ...}
+    permissions = db.Column(db.Text, default='{}', nullable=False)
+    
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    
+    # Relationships
+    users = db.relationship('User', backref='user_role', lazy=True)
+    
+    def get_permissions(self):
+        """Get permissions as dictionary"""
+        try:
+            return json.loads(self.permissions) if self.permissions else {}
+        except (json.JSONDecodeError, TypeError):
+            return {}
+    
+    def set_permissions(self, perms):
+        """Set permissions from dictionary"""
+        json_str = json.dumps(perms)
+        self.permissions = json_str
+        # Mark the column as modified to ensure SQLAlchemy detects the change
+        from sqlalchemy.orm import attributes
+        attributes.flag_modified(self, 'permissions')
+    
+    def has_permission(self, resource, action):
+        """Check if role has specific permission
+        
+        Handles both old and new permission structures:
+        - items.view -> perms['items']['view']
+        - pages.visual_storage.view -> perms['pages']['visual_storage']['view']
+        - settings_sections.reports.view -> perms['settings_sections']['reports']['view']
+        """
+        perms = self.get_permissions()
+        
+        # Handle nested resources (e.g., "pages.visual_storage" or "settings_sections.reports")
+        if '.' in resource:
+            parts = resource.split('.')
+            current = perms
+            for part in parts:
+                if not isinstance(current, dict) or part not in current:
+                    return False
+                current = current[part]
+            # Now check the action in the final nested dict
+            return current.get(action, False) if isinstance(current, dict) else False
+        
+        # Handle simple resources (e.g., "items")
+        return perms.get(resource, {}).get(action, False)
+    
+    def __repr__(self):
+        return f'<Role {self.name}>'
+
+
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
     
@@ -72,7 +132,7 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(20), nullable=False, default='viewer')
+    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'), nullable=False)
     theme = db.Column(db.String(20), default='light')
     table_columns_view = db.Column(db.Text, default='["name", "category", "tags", "quantity", "total_price", "location", "status"]')  # JSON array of column names
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -86,10 +146,30 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, password)
     
     def is_admin(self):
-        return self.role == 'admin'
+        """Check if user has admin role"""
+        return self.user_role and self.user_role.name == 'Admin'
     
     def is_editor(self):
-        return self.role in ['admin', 'editor']
+        """Check if user has editor permission (can edit items)"""
+        if self.is_admin():
+            return True  # Admin can edit
+        # Can edit if user has create, edit_name, or any edit_ permission for items
+        return self.has_permission('items', 'view') and (
+            self.has_permission('items', 'create') or 
+            self.has_permission('items', 'edit_name') or 
+            self.has_permission('items', 'edit_data') or
+            self.has_permission('items', 'edit_price') or
+            self.has_permission('items', 'edit_quantity') or
+            self.has_permission('items', 'edit_location') or
+            self.has_permission('items', 'edit_classification') or
+            self.has_permission('items', 'edit_parameters')
+        )
+    
+    def has_permission(self, resource, action):
+        """Check if user has specific permission"""
+        if self.is_admin():
+            return True  # Admin has all permissions
+        return self.user_role and self.user_role.has_permission(resource, action)
     
     def get_table_columns(self):
         """Get user's preferred table columns as list"""
