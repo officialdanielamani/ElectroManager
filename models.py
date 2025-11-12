@@ -141,6 +141,7 @@ class User(UserMixin, db.Model):
     max_login_attempts = db.Column(db.Integer, default=0)  # 0 = unlimited attempts
     allow_password_reset = db.Column(db.Boolean, default=True)  # User can reset own password
     profile_photo = db.Column(db.String(255))  # Filename of profile photo
+    allow_profile_picture_change = db.Column(db.Boolean, default=True)  # User can change own profile picture
     failed_login_attempts = db.Column(db.Integer, default=0)  # Counter for failed attempts
     account_locked_until = db.Column(db.DateTime)  # Timestamp when account will be unlocked
     auto_unlock_enabled = db.Column(db.Boolean, default=True)  # Auto-unlock after time enabled
@@ -199,7 +200,9 @@ class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
     description = db.Column(db.Text)
+    color = db.Column(db.String(7), default='#6c757d')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     items = db.relationship('Item', backref='category', lazy=True)
     
@@ -213,7 +216,9 @@ class Footprint(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
     description = db.Column(db.Text)
+    color = db.Column(db.String(7), default='#6c757d')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     items = db.relationship('Item', backref='footprint', lazy=True)
     
@@ -226,8 +231,10 @@ class Tag(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
+    description = db.Column(db.Text)
     color = db.Column(db.String(7), default='#6c757d')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     def __repr__(self):
         return f'<Tag {self.name}>'

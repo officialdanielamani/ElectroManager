@@ -40,14 +40,18 @@ class RegistrationForm(FlaskForm):
 
 
 class UserForm(FlaskForm):
+    # --- Basic Section ---
     username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])
     email = StringField('Email', validators=[DataRequired(), Email()])
-    role_id = SelectField('Role', coerce=int, validators=[DataRequired()])
+    password = PasswordField('Password', validators=[Optional(), Length(min=6)])
+    role_id = SelectField('Roles', coerce=int, validators=[DataRequired()])
     is_active = BooleanField('Active')
-    password = PasswordField('Password (leave blank to keep current)', validators=[Optional(), Length(min=6)])
-    max_login_attempts = IntegerField('Max Login Attempts (0 = unlimited)', validators=[Optional(), NumberRange(min=0)], default=0)
+    
+    # --- Security Section ---
     allow_password_reset = BooleanField('Allow User to Reset Password', default=True)
-    auto_unlock_enabled = BooleanField('Unlock After Time', default=True)
+    allow_profile_picture_change = BooleanField('Allow User to change Profile Picture', default=True)
+    max_login_attempts = IntegerField('Max Login Attempt', validators=[Optional(), NumberRange(min=0)], default=0)
+    auto_unlock_enabled = BooleanField('Unlock after Time', default=True)
     auto_unlock_minutes = SelectField('Unlock After', coerce=int, choices=[
         (1, '1 minute'),
         (5, '5 minutes'),
@@ -60,6 +64,8 @@ class UserForm(FlaskForm):
         (4320, '3 days'),
         (10080, '1 week')
     ], default=15)
+    
+    # --- Other ---
     profile_photo = FileField('Profile Photo (Max 1MB, JPEG/PNG)', validators=[Optional()])
     submit = SubmitField('Save User')
     
@@ -72,6 +78,7 @@ class UserForm(FlaskForm):
 class CategoryForm(FlaskForm):
     name = StringField('Category Name', validators=[DataRequired(), Length(max=100)])
     description = TextAreaField('Description', validators=[Optional()])
+    color = StringField('Color', validators=[Optional(), Length(max=7)], render_kw={"type": "color", "value": "#6c757d"}, default='#6c757d')
     submit = SubmitField('Save Category')
 
 
@@ -286,3 +293,17 @@ class ItemParameterForm(FlaskForm):
             ('value', 'Value'),
             ('range', 'Range')
         ]
+
+
+class TagForm(FlaskForm):
+    name = StringField('Tag Name', validators=[DataRequired(), Length(max=100)])
+    description = TextAreaField('Description', validators=[Optional()])
+    color = StringField('Color', validators=[Optional(), Length(max=7)], render_kw={"type": "color", "value": "#6c757d"}, default='#6c757d')
+    submit = SubmitField('Save Tag')
+
+
+class FootprintForm(FlaskForm):
+    name = StringField('Footprint Name', validators=[DataRequired(), Length(max=100)])
+    description = TextAreaField('Description', validators=[Optional()])
+    color = StringField('Color', validators=[Optional(), Length(max=7)], render_kw={"type": "color", "value": "#6c757d"}, default='#6c757d')
+    submit = SubmitField('Save Footprint')

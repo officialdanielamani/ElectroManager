@@ -58,7 +58,15 @@ def login():
         # Check if account is locked due to too many failed attempts
         if user and user.account_locked_until:
             from datetime import timezone as tz_module
-            if datetime.now(tz_module.utc) < user.account_locked_until:
+            # Ensure both datetimes are timezone-aware (UTC)
+            now_utc = datetime.now(tz_module.utc)
+            locked_until = user.account_locked_until
+            
+            # If locked_until is timezone-naive, assume it's UTC and make it aware
+            if locked_until.tzinfo is None:
+                locked_until = locked_until.replace(tzinfo=tz_module.utc)
+            
+            if now_utc < locked_until:
                 flash('Account is temporarily locked due to too many failed login attempts. Please try again later.', 'danger')
                 return render_template('login.html', form=form, signup_enabled=signup_enabled, 
                                      demo_mode=demo_mode, demo_username=demo_username, 
@@ -759,7 +767,8 @@ def category_new():
         
         category = Category(
             name=form.name.data,
-            description=form.description.data
+            description=form.description.data,
+            color=form.color.data or '#6c757d'
         )
         db.session.add(category)
         db.session.commit()
@@ -780,6 +789,7 @@ def category_edit(id):
     if form.validate_on_submit():
         category.name = form.name.data
         category.description = form.description.data
+        category.color = form.color.data or '#6c757d'
         db.session.commit()
         
         log_audit(current_user.id, 'update', 'category', category.id, f'Updated category: {category.name}')
@@ -922,7 +932,7 @@ def user_edit(id):
         flash('Cannot modify admin user profile in demo mode.', 'warning')
         return redirect(url_for('users'))
     
-    form = UserForm(obj=user)
+    form = UserForm()
     
     if form.validate_on_submit():
         user.username = form.username.data
@@ -978,6 +988,16 @@ def user_edit(id):
         log_audit(current_user.id, 'update', 'user', user.id, f'Updated user: {user.username}')
         flash(f'User "{user.username}" updated successfully!', 'success')
         return redirect(url_for('users'))
+    else:
+        # Pre-populate form fields on GET request (for display)
+        form.username.data = user.username
+        form.email.data = user.email
+        form.role_id.data = user.role_id
+        form.is_active.data = user.is_active
+        form.max_login_attempts.data = user.max_login_attempts
+        form.allow_password_reset.data = user.allow_password_reset
+        form.auto_unlock_enabled.data = user.auto_unlock_enabled
+        form.auto_unlock_minutes.data = user.auto_unlock_minutes
     
     return render_template('user_form.html', form=form, user=user, title='Edit User', config=app.config)
 
@@ -1937,6 +1957,7 @@ def api_add_category():
         data = request.get_json()
         name = data.get('name', '').strip()
         description = data.get('description', '').strip()
+        color = data.get('color', '#6c757d')
         
         if not name:
             return jsonify({'success': False, 'error': 'Category name is required'})
@@ -1946,7 +1967,7 @@ def api_add_category():
         if existing:
             return jsonify({'success': False, 'error': 'Category already exists'})
         
-        category = Category(name=name, description=description)
+        category = Category(name=name, description=description, color=color)
         db.session.add(category)
         db.session.commit()
         
@@ -1954,7 +1975,7 @@ def api_add_category():
         
         return jsonify({
             'success': True, 
-            'category': {'id': category.id, 'name': category.name}
+            'category': {'id': category.id, 'name': category.name, 'color': category.color}
         })
     except Exception as e:
         db.session.rollback()
@@ -1969,6 +1990,7 @@ def api_add_footprint():
         data = request.get_json()
         name = data.get('name', '').strip()
         description = data.get('description', '').strip()
+        color = data.get('color', '#6c757d')
         
         if not name:
             return jsonify({'success': False, 'error': 'Footprint name is required'})
@@ -1978,7 +2000,7 @@ def api_add_footprint():
         if existing:
             return jsonify({'success': False, 'error': 'Footprint already exists'})
         
-        footprint = Footprint(name=name, description=description)
+        footprint = Footprint(name=name, description=description, color=color)
         db.session.add(footprint)
         db.session.commit()
         
@@ -1986,7 +2008,7 @@ def api_add_footprint():
         
         return jsonify({
             'success': True, 
-            'footprint': {'id': footprint.id, 'name': footprint.name}
+            'footprint': {'id': footprint.id, 'name': footprint.name, 'color': footprint.color}
         })
     except Exception as e:
         db.session.rollback()
@@ -2000,6 +2022,7 @@ def api_add_tag():
     try:
         data = request.get_json()
         name = data.get('name', '').strip()
+        description = data.get('description', '').strip()
         color = data.get('color', '#6c757d')
         
         if not name:
@@ -2010,7 +2033,7 @@ def api_add_tag():
         if existing:
             return jsonify({'success': False, 'error': 'Tag already exists'})
         
-        tag = Tag(name=name, color=color)
+        tag = Tag(name=name, description=description, color=color)
         db.session.add(tag)
         db.session.commit()
         
@@ -2018,7 +2041,7 @@ def api_add_tag():
         
         return jsonify({
             'success': True, 
-            'tag': {'id': tag.id, 'name': tag.name, 'color': tag.color}
+            'tag': {'id': tag.id, 'name': tag.name, 'description': tag.description, 'color': tag.color}
         })
     except Exception as e:
         db.session.rollback()
@@ -2439,36 +2462,46 @@ def footprints():
 @permission_required("settings_sections.item_management", "edit")
 def footprint_new():
     from models import Footprint
-    if request.method == 'POST':
+    from forms import FootprintForm
+    form = FootprintForm()
+    
+    if form.validate_on_submit():
         # Check for duplicate name
-        existing = Footprint.query.filter_by(name=request.form.get('name')).first()
+        existing = Footprint.query.filter_by(name=form.name.data).first()
         if existing:
-            flash(f'Footprint "{request.form.get("name")}" already exists!', 'danger')
-            return render_template('footprint_form.html', title='New Footprint')
+            flash(f'Footprint "{form.name.data}" already exists!', 'danger')
+            return render_template('footprint_form.html', form=form, title='New Footprint')
         
         footprint = Footprint(
-            name=request.form.get('name'),
-            description=request.form.get('description')
+            name=form.name.data,
+            description=form.description.data,
+            color=form.color.data or '#6c757d'
         )
         db.session.add(footprint)
         db.session.commit()
-        flash(f'Footprint "{footprint.name}" created!', 'success')
+        log_audit(current_user.id, 'create', 'footprint', footprint.id, f'Created footprint: {footprint.name}')
+        flash(f'Footprint "{footprint.name}" created successfully!', 'success')
         return redirect(url_for('item_management'))
-    return render_template('footprint_form.html', title='New Footprint')
+    return render_template('footprint_form.html', form=form, title='New Footprint')
 
 @app.route('/footprint/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 @permission_required("settings_sections.item_management", "edit")
 def footprint_edit(id):
     from models import Footprint
+    from forms import FootprintForm
     footprint = Footprint.query.get_or_404(id)
-    if request.method == 'POST':
-        footprint.name = request.form.get('name')
-        footprint.description = request.form.get('description')
+    form = FootprintForm(obj=footprint)
+    
+    if form.validate_on_submit():
+        footprint.name = form.name.data
+        footprint.description = form.description.data
+        footprint.color = form.color.data or '#6c757d'
         db.session.commit()
-        flash(f'Footprint "{footprint.name}" updated!', 'success')
+        log_audit(current_user.id, 'update', 'footprint', footprint.id, f'Updated footprint: {footprint.name}')
+        flash(f'Footprint "{footprint.name}" updated successfully!', 'success')
         return redirect(url_for('item_management'))
-    return render_template('footprint_form.html', footprint=footprint, title='Edit Footprint')
+    return render_template('footprint_form.html', form=form, footprint=footprint, title='Edit Footprint')
 
 @app.route('/footprint/<int:id>/delete', methods=['POST'])
 @login_required
@@ -2496,36 +2529,46 @@ def tags():
 @permission_required("settings_sections.item_management", "edit")
 def tag_new():
     from models import Tag
-    if request.method == 'POST':
+    from forms import TagForm
+    form = TagForm()
+    
+    if form.validate_on_submit():
         # Check for duplicate name
-        existing = Tag.query.filter_by(name=request.form.get('name')).first()
+        existing = Tag.query.filter_by(name=form.name.data).first()
         if existing:
-            flash(f'Tag "{request.form.get("name")}" already exists!', 'danger')
-            return render_template('tag_form.html', title='New Tag')
+            flash(f'Tag "{form.name.data}" already exists!', 'danger')
+            return render_template('tag_form.html', form=form, title='New Tag')
         
         tag = Tag(
-            name=request.form.get('name'),
-            color=request.form.get('color', '#6c757d')
+            name=form.name.data,
+            description=form.description.data,
+            color=form.color.data or '#6c757d'
         )
         db.session.add(tag)
         db.session.commit()
-        flash(f'Tag "{tag.name}" created!', 'success')
+        log_audit(current_user.id, 'create', 'tag', tag.id, f'Created tag: {tag.name}')
+        flash(f'Tag "{tag.name}" created successfully!', 'success')
         return redirect(url_for('item_management'))
-    return render_template('tag_form.html', title='New Tag')
+    return render_template('tag_form.html', form=form, title='New Tag')
 
 @app.route('/tag/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 @permission_required("settings_sections.item_management", "edit")
 def tag_edit(id):
     from models import Tag
+    from forms import TagForm
     tag = Tag.query.get_or_404(id)
-    if request.method == 'POST':
-        tag.name = request.form.get('name')
-        tag.color = request.form.get('color')
+    form = TagForm(obj=tag)
+    
+    if form.validate_on_submit():
+        tag.name = form.name.data
+        tag.description = form.description.data
+        tag.color = form.color.data or '#6c757d'
         db.session.commit()
-        flash(f'Tag "{tag.name}" updated!', 'success')
+        log_audit(current_user.id, 'update', 'tag', tag.id, f'Updated tag: {tag.name}')
+        flash(f'Tag "{tag.name}" updated successfully!', 'success')
         return redirect(url_for('item_management'))
-    return render_template('tag_form.html', tag=tag, title='Edit Tag')
+    return render_template('tag_form.html', form=form, tag=tag, title='Edit Tag')
 
 @app.route('/tag/<int:id>/delete', methods=['POST'])
 @login_required

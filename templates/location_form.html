@@ -42,10 +42,13 @@
                         <div class="col-md-6 mb-3">
                             {{ form.color.label(class="form-label") }}
                             <div class="input-group">
-                                {{ form.color(class="form-control form-control-color", type="color") }}
-                                <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('color').value='#6c757d'">Reset</button>
+                                <input type="color" class="form-control form-control-color" id="color" name="color" 
+                                       value="{{ form.color.data or '#6c757d' }}" style="width: 100px; cursor: pointer;">
+                                <input type="text" class="form-control bg-light" id="color_text" readonly 
+                                       value="{{ form.color.data or '#6c757d' }}" 
+                                       style="flex: 1; user-select: none;">
                             </div>
-                            <small class="text-muted">Pick a color for this location</small>
+                            <small class="text-muted d-block mt-2">Click color picker to choose • Hex value shown on right</small>
                         </div>
 
                         <div class="col-md-6 mb-3">
@@ -127,6 +130,22 @@ function showImageModal(imageSrc, locationName) {
     const modal = new bootstrap.Modal(document.getElementById('imageModal'));
     modal.show();
 }
+
+// Sync color input with text display
+document.addEventListener('DOMContentLoaded', function() {
+    const colorInput = document.getElementById('color');
+    const colorText = document.getElementById('color_text');
+    
+    if (colorInput && colorText) {
+        // Set initial value
+        colorText.value = colorInput.value;
+        
+        // Sync on change
+        colorInput.addEventListener('input', function() {
+            colorText.value = this.value;
+        });
+    }
+});
 </script>
 
 {% endblock %}

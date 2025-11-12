@@ -40,8 +40,8 @@ def save_file(file, upload_folder, item_uuid):
         filename = secure_filename(file.filename)
         ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
         
-        # Create item-specific folder: uploads/UUID/
-        item_folder = os.path.join(upload_folder, item_uuid)
+        # Create item-specific folder: uploads/items/UUID/
+        item_folder = os.path.join(upload_folder, 'items', item_uuid)
         os.makedirs(item_folder, exist_ok=True)
         
         # Keep original filename
@@ -63,7 +63,7 @@ def save_file(file, upload_folder, item_uuid):
         file_size = os.path.getsize(file_path)
         
         return {
-            'filename': f"{item_uuid}/{filename}",  # Store relative path
+            'filename': f"items/{item_uuid}/{filename}",  # Store relative path
             'original_filename': secure_filename(file.filename),
             'file_path': file_path,
             'file_type': ext,

@@ -2,32 +2,31 @@
 
 ## Version Details
 - **Application**: Inventory Manager
-- **Version**: 1.0.0
+- **Version**: 1.0.1
 - **Release Date**: October 2024
-- **Status**: Stable
+- **Status**: Beta
 
 ## Features
 - Inventory management with locations and racks
 - Item categorization and tagging
 - Visual storage rack management
-- User management with role-based access
 - Backup and restore functionality
 - Magic parameters for item attributes
-- Import/Export capabilities
+- Item Description with Markdown support
+- Import/Export capabilities for database and configurations
+- Role-based access control (RBAC)
 
-## System Requirements
-- **Python**: 3.11+
-- **Database**: SQLite (default) or PostgreSQL
-- **Browser**: Modern browser with HTML5 support
+## Future Plan
+- QR for Locations & Item
+- QR template creator
+- Basic Project Management system
+- Revempt the Item Management and log info
+- Auto Backup Database (with system version)
+- Adding more accessibility to Theme (Font, Colour)
+- Branding (logo, server name)
+- API intergation for external application with RBAC
+- SSO login intergation (Google, Github, ~~MyDigital ID *klw dpt rembat SDK dia*~~)
 
-## Configuration
-- Demo Mode: Configurable via environment variable
-- File Upload Limits: Adjustable in system settings
-- Currency Symbol: Customizable per instance
-- Theme Support: Light/Dark modes
+------------
 
-## Support
-For issues and feature requests, please contact the development team.
-
----
-*Last Updated: October 31, 2024*
+2025 | Daniel Amani | *Project EDNA&trade;* & DANP
