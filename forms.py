@@ -45,6 +45,22 @@ class UserForm(FlaskForm):
     role_id = SelectField('Role', coerce=int, validators=[DataRequired()])
     is_active = BooleanField('Active')
     password = PasswordField('Password (leave blank to keep current)', validators=[Optional(), Length(min=6)])
+    max_login_attempts = IntegerField('Max Login Attempts (0 = unlimited)', validators=[Optional(), NumberRange(min=0)], default=0)
+    allow_password_reset = BooleanField('Allow User to Reset Password', default=True)
+    auto_unlock_enabled = BooleanField('Unlock After Time', default=True)
+    auto_unlock_minutes = SelectField('Unlock After', coerce=int, choices=[
+        (1, '1 minute'),
+        (5, '5 minutes'),
+        (15, '15 minutes'),
+        (30, '30 minutes'),
+        (60, '1 hour'),
+        (360, '6 hours'),
+        (720, '12 hours'),
+        (1440, '1 day'),
+        (4320, '3 days'),
+        (10080, '1 week')
+    ], default=15)
+    profile_photo = FileField('Profile Photo (Max 1MB, JPEG/PNG)', validators=[Optional()])
     submit = SubmitField('Save User')
     
     def __init__(self, *args, **kwargs):

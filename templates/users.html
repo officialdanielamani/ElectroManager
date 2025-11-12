@@ -150,12 +150,14 @@
                                 <td>{{ user.username }}</td>
                                 <td>{{ user.email }}</td>
                                 <td>
-                                    {% if user.user_role.name == 'Admin' %}
-                                    <span class="badge bg-danger">{{ user.user_role.name }}</span>
-                                    {% elif user.user_role.name == 'Manager' %}
-                                    <span class="badge bg-warning">{{ user.user_role.name }}</span>
-                                    {% elif user.user_role.name == 'Viewer' %}
-                                    <span class="badge bg-secondary">{{ user.user_role.name }}</span>
+                                    {% if user.user_role.is_system_role %}
+                                        {% if user.user_role.name == 'Admin' %}
+                                        <span class="badge bg-danger">{{ user.user_role.name }} <i class="bi bi-star-fill"></i></span>
+                                        {% elif user.user_role.name == 'Manager' %}
+                                        <span class="badge bg-warning text-dark">{{ user.user_role.name }} <i class="bi bi-star-fill"></i></span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ user.user_role.name }} <i class="bi bi-star-fill"></i></span>
+                                        {% endif %}
                                     {% else %}
                                     <span class="badge bg-info">{{ user.user_role.name }}</span>
                                     {% endif %}
@@ -166,6 +168,9 @@
                                     {% else %}
                                     <span class="badge bg-danger">Inactive</span>
                                     {% endif %}
+                                    {% if user.account_locked_until %}
+                                    <br><span class="badge bg-danger mt-1"><i class="bi bi-lock"></i> Locked</span>
+                                    {% endif %}
                                 </td>
                                 <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
                                 <td>
@@ -173,6 +178,13 @@
                                     <a href="{{ url_for('user_edit', id=user.id) }}" class="btn btn-sm btn-warning">
                                         <i class="bi bi-pencil"></i> Edit
                                     </a>
+                                    {% endif %}
+                                    {% if can_edit_user and user.account_locked_until %}
+                                    <form method="POST" action="{{ url_for('user_unlock', id=user.id) }}" style="display:inline">
+                                        <button type="submit" class="btn btn-sm btn-info">
+                                            <i class="bi bi-unlock"></i> Unlock
+                                        </button>
+                                    </form>
                                     {% endif %}
                                     {% if can_delete_user and user.id != current_user.id %}
                                     <form method="POST" action="{{ url_for('user_delete', id=user.id) }}" style="display:inline">

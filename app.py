@@ -1,6 +1,7 @@
 from flask import Flask, render_template, redirect, url_for, flash, request, send_from_directory, abort, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash
+from werkzeug.utils import secure_filename
 from config import Config
 from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location
 from forms import LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEditForm, AttachmentForm, SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm
@@ -21,6 +22,7 @@ login_manager.login_message = 'Please log in to access this page.'
 
 # Create upload folder
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture'), exist_ok=True)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -52,13 +54,68 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
+        
+        # Check if account is locked due to too many failed attempts
+        if user and user.account_locked_until:
+            from datetime import timezone as tz_module
+            if datetime.now(tz_module.utc) < user.account_locked_until:
+                flash('Account is temporarily locked due to too many failed login attempts. Please try again later.', 'danger')
+                return render_template('login.html', form=form, signup_enabled=signup_enabled, 
+                                     demo_mode=demo_mode, demo_username=demo_username, 
+                                     demo_password=demo_password)
+            else:
+                # Unlock account if lockout time has passed
+                user.account_locked_until = None
+                user.failed_login_attempts = 0
+                db.session.commit()
+        
+        # Check if user exists, password correct, and account active
         if user and user.check_password(form.password.data) and user.is_active:
+            # Reset failed attempts on successful login
+            user.failed_login_attempts = 0
+            user.account_locked_until = None
+            db.session.commit()
+            
             login_user(user, remember=form.remember_me.data)
             log_audit(user.id, 'login', 'user', user.id, 'User logged in')
             next_page = request.args.get('next')
             return redirect(next_page or url_for('index'))
         else:
-            flash('Invalid username or password, or account is inactive.', 'danger')
+            # Handle failed login attempt
+            if user:
+                # Check if max_login_attempts is set and greater than 0
+                if user.max_login_attempts > 0:
+                    user.failed_login_attempts += 1
+                    
+                    # Check if attempts exceeded
+                    if user.failed_login_attempts >= user.max_login_attempts:
+                        from datetime import timedelta, timezone as tz_module
+                        # Lock account with configured unlock time or indefinitely
+                        if user.auto_unlock_enabled:
+                            user.account_locked_until = datetime.now(tz_module.utc) + timedelta(minutes=user.auto_unlock_minutes)
+                            unlock_msg = f"Try again in {user.auto_unlock_minutes} minutes."
+                        else:
+                            user.account_locked_until = datetime.now(tz_module.utc) + timedelta(days=365*10)  # Very far future
+                            unlock_msg = "Contact administrator to unlock."
+                        db.session.commit()
+                        log_audit(user.id, 'login_failed_locked', 'user', user.id, 
+                                f'Account locked after {user.failed_login_attempts} failed attempts')
+                        flash(f'Account locked due to {user.max_login_attempts} failed login attempts. {unlock_msg}', 'danger')
+                        return render_template('login.html', form=form, signup_enabled=signup_enabled, 
+                                             demo_mode=demo_mode, demo_username=demo_username, 
+                                             demo_password=demo_password)
+                    else:
+                        db.session.commit()
+                        remaining = user.max_login_attempts - user.failed_login_attempts
+                        log_audit(user.id, 'login_failed', 'user', user.id, 
+                                f'Failed login attempt {user.failed_login_attempts}/{user.max_login_attempts}')
+                        flash(f'Invalid username or password. {remaining} attempt(s) remaining before account lock.', 'danger')
+                else:
+                    # Unlimited attempts
+                    log_audit(user.id, 'login_failed', 'user', user.id, 'Failed login attempt')
+                    flash('Invalid username or password, or account is inactive.', 'danger')
+            else:
+                flash('Invalid username or password, or account is inactive.', 'danger')
     
     return render_template('login.html', form=form, signup_enabled=signup_enabled, 
                          demo_mode=demo_mode, demo_username=demo_username, 
@@ -818,9 +875,34 @@ def user_new():
             username=form.username.data,
             email=form.email.data,
             role_id=form.role_id.data,
-            is_active=form.is_active.data
+            is_active=form.is_active.data,
+            max_login_attempts=form.max_login_attempts.data or 0,
+            allow_password_reset=form.allow_password_reset.data,
+            auto_unlock_enabled=form.auto_unlock_enabled.data,
+            auto_unlock_minutes=form.auto_unlock_minutes.data
         )
         user.set_password(form.password.data)
+        
+        # Handle profile photo upload
+        if form.profile_photo.data:
+            file = form.profile_photo.data
+            if file and allowed_file(file.filename, {'png', 'jpg', 'jpeg'}):
+                # Check file size (max 1MB)
+                file.seek(0, os.SEEK_END)
+                file_size = file.tell()
+                file.seek(0)
+                
+                if file_size > 1024 * 1024:  # 1MB
+                    flash('Profile photo must be smaller than 1MB', 'danger')
+                    return render_template('user_form.html', form=form, title='New User')
+                
+                # Save with username as filename
+                ext = file.filename.rsplit('.', 1)[1].lower()
+                filename = f"{form.username.data}.{ext}"
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture', filename)
+                file.save(filepath)
+                user.profile_photo = filename
+        
         db.session.add(user)
         db.session.commit()
         
@@ -847,9 +929,49 @@ def user_edit(id):
         user.email = form.email.data
         user.role_id = form.role_id.data
         user.is_active = form.is_active.data
+        user.max_login_attempts = form.max_login_attempts.data or 0
+        user.allow_password_reset = form.allow_password_reset.data
+        user.auto_unlock_enabled = form.auto_unlock_enabled.data
+        user.auto_unlock_minutes = form.auto_unlock_minutes.data
+        
+        # Check if admin is unlocking the account
+        unlock_account = request.form.get('unlock_account')
+        if unlock_account and user.account_locked_until:
+            user.account_locked_until = None
+            user.failed_login_attempts = 0
+            from datetime import timezone as tz_module
+            timestamp = datetime.now(tz_module.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+            log_audit(current_user.id, 'update', 'user', user.id, f'{current_user.username} manually unlock: {user.username} on {timestamp}')
+            flash(f'Account "{user.username}" has been unlocked.', 'success')
         
         if form.password.data:
             user.set_password(form.password.data)
+        
+        # Handle profile photo upload
+        if form.profile_photo.data:
+            file = form.profile_photo.data
+            if file and allowed_file(file.filename, {'png', 'jpg', 'jpeg'}):
+                # Check file size (max 1MB)
+                file.seek(0, os.SEEK_END)
+                file_size = file.tell()
+                file.seek(0)
+                
+                if file_size > 1024 * 1024:  # 1MB
+                    flash('Profile photo must be smaller than 1MB', 'danger')
+                    return render_template('user_form.html', form=form, user=user, title='Edit User', config=app.config)
+                
+                # Delete old photo if exists
+                if user.profile_photo:
+                    old_file = os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
+                    if os.path.exists(old_file):
+                        os.remove(old_file)
+                
+                # Save with username as filename
+                ext = file.filename.rsplit('.', 1)[1].lower()
+                filename = f"{form.username.data}.{ext}"
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture', filename)
+                file.save(filepath)
+                user.profile_photo = filename
         
         db.session.commit()
         
@@ -879,6 +1001,27 @@ def user_delete(id):
     
     log_audit(current_user.id, 'delete', 'user', id, f'Deleted user: {username}')
     flash(f'User "{username}" deleted successfully!', 'success')
+    return redirect(url_for('users'))
+
+@app.route('/user/<int:id>/unlock', methods=['POST'])
+@login_required
+@permission_required("settings_sections.users_roles", "users_edit")
+def user_unlock(id):
+    """Unlock a locked user account"""
+    user = User.query.get_or_404(id)
+    
+    if user.account_locked_until:
+        user.account_locked_until = None
+        user.failed_login_attempts = 0
+        db.session.commit()
+        
+        from datetime import timezone as tz_module
+        timestamp = datetime.now(tz_module.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+        log_audit(current_user.id, 'update', 'user', user.id, f'{current_user.username} manually unlock: {user.username} on {timestamp}')
+        flash(f'User "{user.username}" account unlocked successfully!', 'success')
+    else:
+        flash(f'User "{user.username}" account is not locked.', 'info')
+    
     return redirect(url_for('users'))
 
 # ============= ROLE MANAGEMENT =============
@@ -2043,6 +2186,111 @@ def save_theme():
     log_audit(current_user.id, 'update', 'user', current_user.id, f'Changed theme to {theme}')
     return redirect(url_for('settings_general'))
 
+@app.route('/change-password', methods=['POST'])
+@login_required
+def change_password():
+    """Change current user password"""
+    if not current_user.allow_password_reset:
+        flash('Password change is disabled for your account.', 'danger')
+        return redirect(url_for('settings_general'))
+    
+    current_password = request.form.get('current_password')
+    new_password = request.form.get('new_password')
+    confirm_password = request.form.get('confirm_password')
+    
+    # Validate inputs
+    if not current_password or not new_password or not confirm_password:
+        flash('All password fields are required.', 'danger')
+        return redirect(url_for('settings_general'))
+    
+    # Check current password
+    if not current_user.check_password(current_password):
+        flash('Current password is incorrect.', 'danger')
+        return redirect(url_for('settings_general'))
+    
+    # Check new passwords match
+    if new_password != confirm_password:
+        flash('New passwords do not match.', 'danger')
+        return redirect(url_for('settings_general'))
+    
+    # Check minimum length
+    if len(new_password) < 6:
+        flash('New password must be at least 6 characters.', 'danger')
+        return redirect(url_for('settings_general'))
+    
+    # Set new password
+    current_user.set_password(new_password)
+    current_user.failed_login_attempts = 0  # Reset failed attempts
+    current_user.account_locked_until = None
+    db.session.commit()
+    
+    log_audit(current_user.id, 'update', 'user', current_user.id, 'Changed password')
+    flash('Password changed successfully!', 'success')
+    return redirect(url_for('settings_general'))
+
+@app.route('/upload-profile-photo', methods=['POST'])
+@login_required
+def upload_profile_photo():
+    """Upload user profile photo"""
+    if 'profile_photo' not in request.files:
+        flash('No file selected.', 'danger')
+        return redirect(url_for('settings_general'))
+    
+    file = request.files['profile_photo']
+    
+    if file.filename == '':
+        flash('No file selected.', 'danger')
+        return redirect(url_for('settings_general'))
+    
+    if not allowed_file(file.filename, {'png', 'jpg', 'jpeg'}):
+        flash('Only PNG and JPEG files are allowed.', 'danger')
+        return redirect(url_for('settings_general'))
+    
+    # Check file size (max 1MB)
+    file.seek(0, os.SEEK_END)
+    file_size = file.tell()
+    file.seek(0)
+    
+    if file_size > 1024 * 1024:  # 1MB
+        flash('Profile photo must be smaller than 1MB.', 'danger')
+        return redirect(url_for('settings_general'))
+    
+    # Delete old photo if exists
+    if current_user.profile_photo:
+        old_file = os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture', current_user.profile_photo)
+        if os.path.exists(old_file):
+            os.remove(old_file)
+    
+    # Save with username as filename
+    ext = file.filename.rsplit('.', 1)[1].lower()
+    filename = f"{current_user.username}.{ext}"
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture', filename)
+    file.save(filepath)
+    
+    current_user.profile_photo = filename
+    db.session.commit()
+    
+    log_audit(current_user.id, 'update', 'user', current_user.id, 'Updated profile photo')
+    flash('Profile photo updated successfully!', 'success')
+    return redirect(url_for('settings_general'))
+
+@app.route('/delete-profile-photo', methods=['POST'])
+@login_required
+def delete_profile_photo():
+    """Delete user profile photo"""
+    if current_user.profile_photo:
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture', current_user.profile_photo)
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        
+        current_user.profile_photo = None
+        db.session.commit()
+        
+        log_audit(current_user.id, 'update', 'user', current_user.id, 'Deleted profile photo')
+        flash('Profile photo deleted successfully!', 'success')
+    
+    return redirect(url_for('settings_general'))
+
 @app.route('/save-table-columns-view', methods=['POST'])
 @login_required
 def save_table_columns_view():
@@ -3143,6 +3391,14 @@ def notifications():
             pass
     
     return render_template('notifications.html', notifications=notifications, can_edit_notifications=can_edit)
+
+
+# ============= USER PROFILE PICTURES =============
+
+@app.route('/uploads/userpicture/<filename>')
+def serve_user_picture(filename):
+    """Serve user profile pictures"""
+    return send_from_directory(os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture'), filename)
 
 
 # ============= ERROR HANDLERS =============

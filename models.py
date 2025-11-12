@@ -138,6 +138,13 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     is_active = db.Column(db.Boolean, default=True)
     is_demo_user = db.Column(db.Boolean, default=False)
+    max_login_attempts = db.Column(db.Integer, default=0)  # 0 = unlimited attempts
+    allow_password_reset = db.Column(db.Boolean, default=True)  # User can reset own password
+    profile_photo = db.Column(db.String(255))  # Filename of profile photo
+    failed_login_attempts = db.Column(db.Integer, default=0)  # Counter for failed attempts
+    account_locked_until = db.Column(db.DateTime)  # Timestamp when account will be unlocked
+    auto_unlock_enabled = db.Column(db.Boolean, default=True)  # Auto-unlock after time enabled
+    auto_unlock_minutes = db.Column(db.Integer, default=15)  # Minutes to unlock (5, 15, 30, 60, 360, 720, 1440, 4320)
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)

@@ -153,6 +153,84 @@
             </div>
         </div>
 
+        <!-- Profile Photo Upload -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5><i class="bi bi-image"></i> Profile Photo</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-3">
+                    <i class="bi bi-info-circle"></i> <strong>Note:</strong> Upload a profile photo (Max 1MB, JPEG or PNG format).
+                </div>
+                
+                {% if current_user.profile_photo %}
+                <div class="mb-3">
+                    <p><strong>Current Photo:</strong></p>
+                    <img src="{{ url_for('serve_user_picture', filename=current_user.profile_photo) }}" alt="{{ current_user.username }}" style="max-width: 150px; max-height: 150px; border-radius: 8px; border: 1px solid #dee2e6;">
+                </div>
+                {% endif %}
+                
+                <form method="POST" action="{{ url_for('upload_profile_photo') }}" enctype="multipart/form-data" class="mb-3">
+                    <div class="mb-3">
+                        <label for="profilePhoto" class="form-label">Upload New Photo</label>
+                        <input type="file" class="form-control" id="profilePhoto" name="profile_photo" accept=".jpg,.jpeg,.png" required>
+                        <small class="text-muted">Max 1MB, JPEG or PNG format</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-upload"></i> Upload Photo
+                    </button>
+                </form>
+                
+                {% if current_user.profile_photo %}
+                <form method="POST" action="{{ url_for('delete_profile_photo') }}" class="d-inline">
+                    <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete your profile photo?')">
+                        <i class="bi bi-trash"></i> Delete Photo
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Change Password -->
+        {% if current_user.allow_password_reset %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5><i class="bi bi-lock"></i> Change Password</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning mb-3">
+                    <i class="bi bi-exclamation-triangle"></i> <strong>Important:</strong> Keep your password secure and never share it with anyone.
+                </div>
+                
+                <form method="POST" action="{{ url_for('change_password') }}">
+                    <div class="mb-3">
+                        <label for="currentPassword" class="form-label">Current Password</label>
+                        <input type="password" class="form-control" id="currentPassword" name="current_password" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="newPassword" class="form-label">New Password</label>
+                        <input type="password" class="form-control" id="newPassword" name="new_password" minlength="6" required>
+                        <small class="text-muted">At least 6 characters</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="confirmPassword" class="form-label">Confirm New Password</label>
+                        <input type="password" class="form-control" id="confirmPassword" name="confirm_password" minlength="6" required>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Update Password
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        </div>
+    </div>
+</div>
+
 <style>
 .btn-check:checked + .btn-outline-secondary {
     background-color: #0d6efd;

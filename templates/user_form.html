@@ -21,7 +21,7 @@
                     This admin user cannot be modified in demo mode. Changes are restricted to maintain demo integrity.
                 </div>
                 {% endif %}
-                <form method="POST">
+                <form method="POST" enctype="multipart/form-data">
                     {{ form.hidden_tag() }}
                     
                     <div class="mb-3">
@@ -99,6 +99,87 @@
                             {{ form.is_active.label(class="form-check-label") }}
                         {% endif %}
                     </div>
+
+                    <div class="mb-3">
+                        {{ form.max_login_attempts.label(class="form-label") }}
+                        {% if user and user.is_demo_user and config.DEMO_MODE %}
+                            <input type="number" class="form-control" value="{{ form.max_login_attempts.data or 0 }}" disabled>
+                        {% else %}
+                            {{ form.max_login_attempts(class="form-control" + (" is-invalid" if form.max_login_attempts.errors else "")) }}
+                        {% endif %}
+                        {% if form.max_login_attempts.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.max_login_attempts.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                        <small class="text-muted">Set to 0 for unlimited login attempts</small>
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        {% if user and user.is_demo_user and config.DEMO_MODE %}
+                            <input type="checkbox" class="form-check-input" disabled checked>
+                            {{ form.allow_password_reset.label(class="form-check-label") }}
+                        {% else %}
+                            {{ form.allow_password_reset(class="form-check-input") }}
+                            {{ form.allow_password_reset.label(class="form-check-label") }}
+                        {% endif %}
+                    </div>
+
+                    {% if user %}
+                    <div class="mb-3">
+                        {{ form.profile_photo.label(class="form-label") }}
+                        {% if user and user.is_demo_user and config.DEMO_MODE %}
+                            <input type="file" class="form-control" disabled>
+                        {% else %}
+                            {{ form.profile_photo(class="form-control" + (" is-invalid" if form.profile_photo.errors else "")) }}
+                        {% endif %}
+                        {% if form.profile_photo.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.profile_photo.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                        <small class="text-muted">Max 1MB, JPEG or PNG format</small>
+                        {% if user and user.profile_photo %}
+                        <div class="mt-2">
+                            <p><small>Current photo:</small></p>
+                            <img src="{{ url_for('serve_user_picture', filename=user.profile_photo) }}" alt="{{ user.username }}" style="max-width: 100px; max-height: 100px; border-radius: 5px; border: 1px solid #dee2e6;">
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-3 form-check">
+                        {% if user and user.is_demo_user and config.DEMO_MODE %}
+                            <input type="checkbox" class="form-check-input" disabled checked>
+                            {{ form.auto_unlock_enabled.label(class="form-check-label") }}
+                        {% else %}
+                            {{ form.auto_unlock_enabled(class="form-check-input") }}
+                            {{ form.auto_unlock_enabled.label(class="form-check-label") }}
+                        {% endif %}
+                        <small class="text-muted d-block mt-1">Auto-unlock account after failed login attempts</small>
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.auto_unlock_minutes.label(class="form-label") }}
+                        {% if user and user.is_demo_user and config.DEMO_MODE %}
+                            <select class="form-select" disabled>
+                                <option selected>{{ form.auto_unlock_minutes.data }} minutes</option>
+                            </select>
+                        {% else %}
+                            {{ form.auto_unlock_minutes(class="form-select" + (" is-invalid" if form.auto_unlock_minutes.errors else "")) }}
+                        {% endif %}
+                        <small class="text-muted">Only applicable if "Unlock After Time" is enabled</small>
+                    </div>
+
+                    {% if user and user.account_locked_until %}
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="unlockAccount" name="unlock_account" value="true">
+                        <label class="form-check-label" for="unlockAccount">
+                            <strong><i class="bi bi-unlock"></i> Unlock Account Immediately</strong>
+                        </label>
+                        <small class="text-danger d-block mt-1">This account is currently locked. Check this box to unlock it now.</small>
+                    </div>
+                    {% endif %}
 
                     <div class="d-flex justify-content-between">
                         <a href="{{ url_for('users') }}" class="btn btn-secondary">
