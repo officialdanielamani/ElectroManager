@@ -105,76 +105,64 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
-        
-        # Check if account is locked due to too many failed attempts
+
         if user and user.account_locked_until:
             from datetime import timezone as tz_module
-            # Ensure both datetimes are timezone-aware (UTC)
             now_utc = datetime.now(tz_module.utc)
             locked_until = user.account_locked_until
-            
-            # If locked_until is timezone-naive, assume it's UTC and make it aware
+
             if locked_until.tzinfo is None:
                 locked_until = locked_until.replace(tzinfo=tz_module.utc)
-            
+
             if now_utc < locked_until:
                 flash('Account is temporarily locked due to too many failed login attempts. Please try again later.', 'danger')
-                return render_template('login.html', form=form, signup_enabled=signup_enabled, 
-                                     demo_mode=demo_mode, demo_username=demo_username, 
+                return render_template('login.html', form=form, signup_enabled=signup_enabled,
+                                     demo_mode=demo_mode, demo_username=demo_username,
                                      demo_password=demo_password)
             else:
-                # Unlock account if lockout time has passed
                 user.account_locked_until = None
                 user.failed_login_attempts = 0
                 db.session.commit()
-        
-        # Check if user exists, password correct, and account active
+
         if user and user.check_password(form.password.data) and user.is_active:
-            # Reset failed attempts on successful login
             user.failed_login_attempts = 0
             user.account_locked_until = None
             db.session.commit()
-            
+
             login_user(user, remember=form.remember_me.data)
             log_audit(user.id, 'login', 'user', user.id, 'User logged in')
             next_page = request.args.get('next')
             # Validate redirect URL to prevent open redirect attacks
             if next_page and is_safe_url(next_page):
                 return redirect(next_page)
-            # Unsafe or missing redirect target: go to the index page
             return redirect(url_for('index'))
         else:
-            # Handle failed login attempt
             if user:
-                # Check if max_login_attempts is set and greater than 0
                 if user.max_login_attempts > 0:
                     user.failed_login_attempts += 1
-                    
-                    # Check if attempts exceeded
+
                     if user.failed_login_attempts >= user.max_login_attempts:
                         from datetime import timedelta, timezone as tz_module
-                        # Lock account with configured unlock time or indefinitely
                         if user.auto_unlock_enabled:
                             user.account_locked_until = datetime.now(tz_module.utc) + timedelta(minutes=user.auto_unlock_minutes)
                             unlock_msg = f"Try again in {user.auto_unlock_minutes} minutes."
                         else:
-                            user.account_locked_until = datetime.now(tz_module.utc) + timedelta(days=365*10)  # Very far future
+                            user.account_locked_until = datetime.now(tz_module.utc) + timedelta(days=365*10)
                             unlock_msg = "Contact administrator to unlock."
                         db.session.commit()
-                        log_audit(user.id, 'login_failed_locked', 'user', user.id, 
+                        log_audit(user.id, 'login_failed_locked', 'user', user.id,
                                 f'Account locked after {user.failed_login_attempts} failed attempts')
                         flash(f'Account locked due to {user.max_login_attempts} failed login attempts. {unlock_msg}', 'danger')
-                        return render_template('login.html', form=form, signup_enabled=signup_enabled, 
-                                             demo_mode=demo_mode, demo_username=demo_username, 
+                        return render_template('login.html', form=form, signup_enabled=signup_enabled,
+                                             demo_mode=demo_mode, demo_username=demo_username,
                                              demo_password=demo_password)
                     else:
                         db.session.commit()
                         remaining = user.max_login_attempts - user.failed_login_attempts
-                        log_audit(user.id, 'login_failed', 'user', user.id, 
+                        log_audit(user.id, 'login_failed', 'user', user.id,
                                 f'Failed login attempt {user.failed_login_attempts}/{user.max_login_attempts}')
                         flash(f'Invalid username or password. {remaining} attempt(s) remaining before account lock.', 'danger')
                 else:
-                    # Unlimited attempts
                     log_audit(user.id, 'login_failed', 'user', user.id, 'Failed login attempt')
                     flash('Invalid username or password, or account is inactive.', 'danger')
             else:
@@ -600,8 +588,7 @@ def item_delete(uuid):
         return redirect(url_for('item_detail', uuid=item.uuid))
     
     item_name = item.name
-    
-    # Delete related attachments
+
     for attachment in item.attachments:
         try:
             if attachment.file_path and is_safe_file_path(attachment.file_path):
@@ -609,12 +596,10 @@ def item_delete(uuid):
                     os.remove(attachment.file_path)
         except Exception as e:
             logging.error(f"Error deleting attachment file {attachment.id}: {e}")
-    
-    # Delete item parameters (magic parameters)
+
     from models import ItemParameter
     ItemParameter.query.filter_by(item_id=item.id).delete()
-    
-    # Delete the item
+
     db.session.delete(item)
     db.session.commit()
     
