@@ -26,6 +26,7 @@
                 <h5 class="mb-0">Rack Information</h5>
             </div>
             <div class="card-body">
+                <p><strong>UUID:</strong> <code class="font-monospace">{{ rack.uuid }}</code></p>
                 <p><strong>Name:</strong> {{ rack.name }}</p>
                 <p><strong>Description:</strong> {{ rack.description or 'N/A' }}</p>
                 <p><strong>Color:</strong> 
@@ -49,10 +50,10 @@
                 <hr>
                 <div>
                     <p><strong>Picture:</strong></p>
-                    <img src="{{ url_for('rack_picture', filename=rack.picture) }}" 
+                    <img src="{{ url_for('rack_picture', filepath=rack.picture) }}" 
                          alt="{{ rack.name }}" 
                          style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 8px; border: 2px solid #dee2e6; cursor: pointer;"
-                         onclick="showImageModal('{{ url_for('rack_picture', filename=rack.picture) }}', '{{ rack.name }}')">
+                         onclick="showImageModal('{{ url_for('rack_picture', filepath=rack.picture) }}', '{{ rack.name }}')">
                     <small class="text-muted d-block mt-2">Click to enlarge</small>
                 </div>
                 {% endif %}

@@ -351,18 +351,15 @@ class DataImporter:
                 if not name:
                     continue
                 
-                existing = Location.query.filter_by(name=name).first()
-                if existing:
-                    skipped += 1
-                else:
-                    loc = Location(
-                        name=name,
-                        info=ld.get('info', ''),
-                        description=ld.get('description', ''),
-                        color=ld.get('color', '#6c757d')
-                    )
-                    db.session.add(loc)
-                    imported += 1
+                # Allow duplicate names - UUID ensures uniqueness
+                loc = Location(
+                    name=name,
+                    info=ld.get('info', ''),
+                    description=ld.get('description', ''),
+                    color=ld.get('color', '#6c757d')
+                )
+                db.session.add(loc)
+                imported += 1
             except Exception as e:
                 errors.append(f"Location '{ld.get('name', '?')}': {str(e)[:50]}")
         
@@ -385,28 +382,26 @@ class DataImporter:
                 if not name:
                     continue
                 
-                existing = Rack.query.filter_by(name=name).first()
-                if existing:
-                    skipped += 1
-                else:
-                    location_id = None
-                    location_name = rd.get('location_name', '').strip()
-                    if location_name:
-                        loc = Location.query.filter_by(name=location_name).first()
-                        if loc:
-                            location_id = loc.id
-                    
-                    rack = Rack(
-                        name=name,
-                        description=rd.get('description', ''),
-                        location_id=location_id,
-                        color=rd.get('color', '#6c757d'),
-                        rows=rd.get('rows', 5),
-                        cols=rd.get('cols', 5),
-                        unavailable_drawers=rd.get('unavailable_drawers', '')
-                    )
-                    db.session.add(rack)
-                    imported += 1
+                # Allow duplicate names - UUID ensures uniqueness
+                location_id = None
+                location_name = rd.get('location_name', '').strip()
+                if location_name:
+                    # Get first matching location by name (since names can now be duplicated)
+                    loc = Location.query.filter_by(name=location_name).first()
+                    if loc:
+                        location_id = loc.id
+                
+                rack = Rack(
+                    name=name,
+                    description=rd.get('description', ''),
+                    location_id=location_id,
+                    color=rd.get('color', '#6c757d'),
+                    rows=rd.get('rows', 5),
+                    cols=rd.get('cols', 5),
+                    unavailable_drawers=rd.get('unavailable_drawers', '')
+                )
+                db.session.add(rack)
+                imported += 1
             except Exception as e:
                 errors.append(f"Rack '{rd.get('name', '?')}': {str(e)[:50]}")
         

@@ -34,6 +34,7 @@
                                     <h6 class="card-title mb-1">
                                         <span class="badge" style="background-color: {{ location.color }};">{{ location.name }}</span>
                                     </h6>
+                                    <small class="text-muted d-block mb-2 font-monospace">{{ location.uuid }}</small>
                                     {% if location.info %}
                                     <p class="card-text text-muted small mb-1">{{ location.info }}</p>
                                     {% endif %}
@@ -47,10 +48,10 @@
                                 </div>
                                 {% if location.picture %}
                                 <div class="ms-2">
-                                    <img src="{{ url_for('location_picture', filename=location.picture) }}" 
+                                    <img src="{{ url_for('location_picture', filepath=location.picture) }}" 
                                          alt="{{ location.name }}" 
                                          style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px; border: 2px solid #dee2e6; cursor: pointer;"
-                                         onclick="showImageModal('{{ url_for('location_picture', filename=location.picture) }}', '{{ location.name }}')">
+                                         onclick="showImageModal('{{ url_for('location_picture', filepath=location.picture) }}', '{{ location.name }}')">
                                 </div>
                                 {% endif %}
                             </div>
@@ -104,6 +105,7 @@
                                     <h6 class="card-title mb-1">
                                         <span class="badge" style="background-color: {{ rack.color }};">{{ rack.name }}</span>
                                     </h6>
+                                    <small class="text-muted d-block mb-2 font-monospace">{{ rack.uuid }}</small>
                                     {% if rack.description %}
                                     <p class="card-text text-muted small mb-1">{{ rack.description[:100] }}{% if rack.description|length > 100 %}...{% endif %}</p>
                                     {% endif %}
@@ -121,10 +123,10 @@
                                 </div>
                                 {% if rack.picture %}
                                 <div class="ms-2">
-                                    <img src="{{ url_for('rack_picture', filename=rack.picture) }}" 
+                                    <img src="{{ url_for('rack_picture', filepath=rack.picture) }}" 
                                          alt="{{ rack.name }}" 
                                          style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px; border: 2px solid #dee2e6; cursor: pointer;"
-                                         onclick="showImageModal('{{ url_for('rack_picture', filename=rack.picture) }}', '{{ rack.name }}')">
+                                         onclick="showImageModal('{{ url_for('rack_picture', filepath=rack.picture) }}', '{{ rack.name }}')">
                                 </div>
                                 {% endif %}
                             </div>

@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import json
 import secrets
 import string
+import uuid
 
 db = SQLAlchemy()
 
@@ -49,10 +50,11 @@ class Location(db.Model):
     __tablename__ = 'locations'
     
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
+    uuid = db.Column(db.String(12), unique=True, nullable=False)
+    name = db.Column(db.String(100), nullable=False)  # No longer unique - allows duplicate names
     info = db.Column(db.String(500))
     description = db.Column(db.Text)
-    picture = db.Column(db.String(200))  # filename
+    picture = db.Column(db.String(200))  # Now stores {location_uuid}/{picture_uuid}.ext
     color = db.Column(db.String(7), default='#6c757d')  # hex color
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -60,6 +62,12 @@ class Location(db.Model):
     # Relationships
     racks = db.relationship('Rack', backref='physical_location', lazy=True, foreign_keys='Rack.location_id')
     items = db.relationship('Item', backref='general_location', lazy=True, foreign_keys='Item.location_id')
+    
+    def __init__(self, **kwargs):
+        super(Location, self).__init__(**kwargs)
+        if not self.uuid:
+            chars = string.ascii_uppercase + string.digits
+            self.uuid = ''.join(secrets.choice(chars) for _ in range(12))
     
     def __repr__(self):
         return f'<Location {self.name}>'
@@ -245,7 +253,8 @@ class Rack(db.Model):
     __tablename__ = 'racks'
     
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
+    uuid = db.Column(db.String(12), unique=True, nullable=False)
+    name = db.Column(db.String(100), nullable=False)  # No longer unique - allows duplicate names
     description = db.Column(db.Text)
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
     picture = db.Column(db.String(200))  # filename
@@ -257,6 +266,12 @@ class Rack(db.Model):
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     items = db.relationship('Item', backref='rack', lazy=True)
+    
+    def __init__(self, **kwargs):
+        super(Rack, self).__init__(**kwargs)
+        if not self.uuid:
+            chars = string.ascii_uppercase + string.digits
+            self.uuid = ''.join(secrets.choice(chars) for _ in range(12))
     
     def get_unavailable_drawers(self):
         """Get list of unavailable drawer IDs"""

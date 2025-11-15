@@ -8,6 +8,8 @@ from forms import LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEd
 from utils import save_file, log_audit, admin_required, permission_required, item_permission_required, format_file_size, allowed_file
 import os
 import json
+import secrets
+import string
 from datetime import datetime, timezone
 
 app = Flask(__name__)
@@ -1401,12 +1403,6 @@ def location_new():
     form = LocationForm()
     
     if form.validate_on_submit():
-        # Check for duplicate name
-        existing = Location.query.filter_by(name=form.name.data).first()
-        if existing:
-            flash(f'Location "{form.name.data}" already exists!', 'danger')
-            return render_template('location_form.html', form=form, location=None)
-        
         location = Location(
             name=form.name.data,
             info=form.info.data,
@@ -1414,7 +1410,11 @@ def location_new():
             color=form.color.data or '#6c757d'
         )
         
-        # Handle picture upload
+        # Add and commit location first to generate UUID
+        db.session.add(location)
+        db.session.commit()
+        
+        # Handle picture upload with UUID-based path structure
         if form.picture.data:
             file = form.picture.data
             
@@ -1428,6 +1428,8 @@ def location_new():
             
             if file_size > max_size_bytes:
                 flash(f'File size exceeds maximum allowed size of {max_size_mb}MB', 'danger')
+                db.session.delete(location)
+                db.session.commit()
                 return render_template('location_form.html', form=form, location=None)
             
             # Only allow PNG and JPEG
@@ -1435,34 +1437,33 @@ def location_new():
                 ext = file.filename.rsplit('.', 1)[1].lower()
                 if ext not in ['png', 'jpg', 'jpeg']:
                     flash('Only PNG and JPEG images are allowed for locations!', 'danger')
+                    db.session.delete(location)
+                    db.session.commit()
                     return render_template('location_form.html', form=form, location=None)
                 
-                # Sanitize location name for filename
-                safe_name = secure_filename(form.name.data)
-                if not safe_name:
-                    safe_name = "location"
+                # Use UUID-based directory structure: /uploads/locations/{location_uuid}/
+                picture_uuid = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(12))
                 
-                # Use location name as filename
                 if ext == 'jpg':
                     ext = 'jpeg'
-                filename = f"{safe_name}.{ext}"
+                filename = f"{picture_uuid}.{ext}"
                 
-                # Create locations directory
-                location_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'locations')
+                # Create location-specific directory with UUID
+                location_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'locations', location.uuid)
                 os.makedirs(location_dir, exist_ok=True)
                 
                 filepath = os.path.join(location_dir, filename)
                 file.save(filepath)
-                location.picture = filename
-        
-        db.session.add(location)
-        db.session.commit()
+                # Store path as {location_uuid}/{picture_uuid}.ext
+                location.picture = f"{location.uuid}/{filename}"
+                db.session.commit()
         
         log_audit(current_user.id, 'create', 'location', location.id, f'Created location: {location.name}')
         flash(f'Location "{location.name}" created successfully!', 'success')
         return redirect(url_for('location_management'))
     
-    return render_template('location_form.html', form=form, location=None)
+    max_file_size_mb = int(Setting.get('max_file_size_mb', '10'))
+    return render_template('location_form.html', form=form, location=None, max_file_size_mb=max_file_size_mb)
 
 @app.route('/location/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -1477,14 +1478,6 @@ def location_edit(id):
     form = LocationForm(obj=location)
     
     if form.validate_on_submit():
-        # Check for duplicate name (exclude current location)
-        if form.name.data != location.name:
-            existing = Location.query.filter_by(name=form.name.data).first()
-            if existing:
-                flash(f'Location "{form.name.data}" already exists!', 'danger')
-                return render_template('location_form.html', form=form, location=location)
-        
-        old_name = location.name
         location.name = form.name.data
         location.info = form.info.data
         location.description = form.description.data
@@ -1493,6 +1486,7 @@ def location_edit(id):
         # Handle picture deletion
         if request.form.get('delete_picture'):
             if location.picture:
+                # Path is {location_uuid}/{picture_uuid}.ext
                 old_path = os.path.join(app.config['UPLOAD_FOLDER'], 'locations', location.picture)
                 if os.path.exists(old_path):
                     os.remove(old_path)
@@ -1520,43 +1514,26 @@ def location_edit(id):
                     flash('Only PNG and JPEG images are allowed for locations!', 'danger')
                     return render_template('location_form.html', form=form, location=location)
                 
-                # Delete old picture if name changed
-                if location.picture and old_name != location.name:
+                # Delete old picture if exists
+                if location.picture:
                     old_path = os.path.join(app.config['UPLOAD_FOLDER'], 'locations', location.picture)
                     if os.path.exists(old_path):
                         os.remove(old_path)
                 
-                # Sanitize location name for filename
-                safe_name = secure_filename(form.name.data)
-                if not safe_name:
-                    safe_name = "location"
+                # Use UUID-based path: /uploads/locations/{location_uuid}/{picture_uuid}.ext
+                picture_uuid = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(12))
                 
-                # Use location name as filename
                 if ext == 'jpg':
                     ext = 'jpeg'
-                filename = f"{safe_name}.{ext}"
+                filename = f"{picture_uuid}.{ext}"
                 
-                location_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'locations')
+                location_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'locations', location.uuid)
                 os.makedirs(location_dir, exist_ok=True)
                 
                 filepath = os.path.join(location_dir, filename)
                 file.save(filepath)
-                location.picture = filename
-        elif old_name != location.name and location.picture:
-            # Rename existing picture file if location name changed
-            old_filename = location.picture
-            old_path = os.path.join(app.config['UPLOAD_FOLDER'], 'locations', old_filename)
-            
-            if os.path.exists(old_path):
-                ext = old_filename.rsplit('.', 1)[1].lower()
-                safe_name = secure_filename(form.name.data)
-                if not safe_name:
-                    safe_name = "location"
-                new_filename = f"{safe_name}.{ext}"
-                new_path = os.path.join(app.config['UPLOAD_FOLDER'], 'locations', new_filename)
-                
-                os.rename(old_path, new_path)
-                location.picture = new_filename
+                # Store path as {location_uuid}/{picture_uuid}.ext
+                location.picture = f"{location.uuid}/{filename}"
         
         db.session.commit()
         
@@ -1564,7 +1541,8 @@ def location_edit(id):
         flash(f'Location "{location.name}" updated successfully!', 'success')
         return redirect(url_for('location_management'))
     
-    return render_template('location_form.html', form=form, location=location)
+    max_file_size_mb = int(Setting.get('max_file_size_mb', '10'))
+    return render_template('location_form.html', form=form, location=location, max_file_size_mb=max_file_size_mb)
 
 @app.route('/location/<int:id>/delete', methods=['POST'])
 @login_required
@@ -1580,11 +1558,15 @@ def location_delete(id):
         flash('Cannot delete location that is in use by items or racks!', 'danger')
         return redirect(url_for('location_management'))
     
-    # Delete picture file
-    if location.picture:
-        picture_path = os.path.join(app.config['UPLOAD_FOLDER'], 'locations', location.picture)
-        if os.path.exists(picture_path):
-            os.remove(picture_path)
+    # Delete picture directory and all its contents
+    if location.uuid:
+        location_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'locations', location.uuid)
+        if os.path.exists(location_dir):
+            import shutil
+            try:
+                shutil.rmtree(location_dir)
+            except Exception as e:
+                print(f"Error deleting location directory: {e}")
     
     location_name = location.name
     db.session.delete(location)
@@ -1594,12 +1576,23 @@ def location_delete(id):
     flash(f'Location "{location_name}" deleted successfully!', 'success')
     return redirect(url_for('location_management'))
 
-@app.route('/location-picture/<filename>')
+@app.route('/location-picture/<path:filepath>')
 @login_required
-def location_picture(filename):
-    """Serve location pictures"""
+def location_picture(filepath):
+    """Serve location pictures from UUID-based paths
+    filepath format: {location_uuid}/{picture_uuid}.ext
+    """
     location_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'locations')
-    return send_from_directory(location_dir, filename)
+    return send_from_directory(location_dir, filepath)
+
+@app.route('/rack-picture/<path:filepath>')
+@login_required
+def rack_picture(filepath):
+    """Serve rack pictures from UUID-based paths
+    filepath format: {rack_uuid}/{picture_uuid}.ext
+    """
+    rack_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'racks')
+    return send_from_directory(rack_dir, filepath)
 
 # ============= RACK MANAGEMENT ROUTES =============
 
@@ -1619,13 +1612,6 @@ def rack_management():
 def add_rack():
     """Add a new rack"""
     name = request.form.get('name')
-    
-    # Check for duplicate name
-    existing = Rack.query.filter_by(name=name).first()
-    if existing:
-        flash(f'Rack "{name}" already exists!', 'danger')
-        return redirect(url_for('rack_management'))
-    
     description = request.form.get('description')
     location = request.form.get('location')
     rows = int(request.form.get('rows', 5))
@@ -1634,7 +1620,7 @@ def add_rack():
     rack = Rack(
         name=name,
         description=description,
-        location=location,
+        location_id=location if location else None,
         rows=rows,
         cols=cols
     )
@@ -1695,14 +1681,10 @@ def rack_new():
     if request.method == 'POST':
         name = request.form.get('name')
         
-        # Check for duplicate
-        existing = Rack.query.filter_by(name=name).first()
-        if existing:
-            flash(f'Rack "{name}" already exists!', 'danger')
-            return redirect(url_for('rack_new'))
-        
+        # Allow duplicate names - UUID ensures uniqueness
         description = request.form.get('description')
         location_id = request.form.get('location_id')
+        color = request.form.get('color', '#6c757d')
         rows = int(request.form.get('rows', 5))
         cols = int(request.form.get('cols', 5))
         
@@ -1722,11 +1704,52 @@ def rack_new():
             name=name,
             description=description,
             location_id=int(location_id) if location_id and location_id != '0' else None,
+            color=color,
             rows=rows,
             cols=cols
         )
         db.session.add(rack)
         db.session.commit()
+        
+        # Handle picture upload with UUID-based path structure
+        if request.files.get('picture'):
+            file = request.files['picture']
+            
+            # Check file size against system settings
+            max_size_mb = int(Setting.get('max_file_size_mb', '10'))
+            max_size_bytes = max_size_mb * 1024 * 1024
+            
+            file.seek(0, 2)
+            file_size = file.tell()
+            file.seek(0)
+            
+            if file_size > max_size_bytes:
+                flash(f'File size exceeds maximum allowed size of {max_size_mb}MB', 'danger')
+                return redirect(url_for('rack_new'))
+            
+            # Only allow PNG and JPEG
+            if file.filename and allowed_file(file.filename):
+                ext = file.filename.rsplit('.', 1)[1].lower()
+                if ext not in ['png', 'jpg', 'jpeg']:
+                    flash('Only PNG and JPEG images are allowed for racks!', 'danger')
+                    return redirect(url_for('rack_new'))
+                
+                # Use UUID-based directory structure: /uploads/racks/{rack_uuid}/
+                picture_uuid = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(12))
+                
+                if ext == 'jpg':
+                    ext = 'jpeg'
+                filename = f"{picture_uuid}.{ext}"
+                
+                # Create rack-specific directory with UUID
+                rack_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'racks', rack.uuid)
+                os.makedirs(rack_dir, exist_ok=True)
+                
+                filepath = os.path.join(rack_dir, filename)
+                file.save(filepath)
+                # Store path as {rack_uuid}/{picture_uuid}.ext
+                rack.picture = f"{rack.uuid}/{filename}"
+                db.session.commit()
         
         log_audit(current_user.id, 'create', 'rack', rack.id, f'Created rack: {name}')
         flash(f'Rack "{name}" created successfully!', 'success')
@@ -1736,8 +1759,10 @@ def rack_new():
     locations = Location.query.order_by(Location.name).all()
     max_drawer_rows = int(Setting.get('max_drawer_rows', '10'))
     max_drawer_cols = int(Setting.get('max_drawer_cols', '10'))
+    max_file_size_mb = int(Setting.get('max_file_size_mb', '10'))
     return render_template('rack_form.html', rack=None, locations=locations, 
-                         max_drawer_rows=max_drawer_rows, max_drawer_cols=max_drawer_cols)
+                         max_drawer_rows=max_drawer_rows, max_drawer_cols=max_drawer_cols,
+                         max_file_size_mb=max_file_size_mb)
 
 @app.route('/rack/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -1749,19 +1774,10 @@ def rack_edit(id):
     if request.method == 'POST':
         new_name = request.form.get('name')
         
-        # Check for duplicate name (exclude current rack)
-        if new_name != rack.name:
-            existing = Rack.query.filter_by(name=new_name).first()
-            if existing:
-                flash(f'Rack "{new_name}" already exists!', 'danger')
-                locations = Location.query.order_by(Location.name).all()
-                max_drawer_rows = int(Setting.get('max_drawer_rows', '10'))
-                max_drawer_cols = int(Setting.get('max_drawer_cols', '10'))
-                return render_template('rack_form.html', rack=rack, locations=locations,
-                                     max_drawer_rows=max_drawer_rows, max_drawer_cols=max_drawer_cols)
-        
+        # Allow duplicate names - UUID ensures uniqueness
         rack.name = new_name
         rack.description = request.form.get('description')
+        rack.color = request.form.get('color', '#6c757d')
         location_id = request.form.get('location_id')
         rack.location_id = int(location_id) if location_id and location_id != '0' else None
         
@@ -1812,6 +1828,57 @@ def rack_edit(id):
             if items_cleared > 0:
                 flash(f'Warning: {items_cleared} item(s) were removed from drawers outside new bounds. These items now have no location.', 'warning')
         
+        # Handle picture deletion
+        if request.form.get('delete_picture'):
+            if rack.picture:
+                old_path = os.path.join(app.config['UPLOAD_FOLDER'], 'racks', rack.picture)
+                if os.path.exists(old_path):
+                    os.remove(old_path)
+                rack.picture = None
+        
+        # Handle new picture upload
+        if request.files.get('picture'):
+            file = request.files['picture']
+            if hasattr(file, 'filename') and file.filename and allowed_file(file.filename):
+                # Check file size against system settings
+                max_size_mb = int(Setting.get('max_file_size_mb', '10'))
+                max_size_bytes = max_size_mb * 1024 * 1024
+                
+                file.seek(0, 2)
+                file_size = file.tell()
+                file.seek(0)
+                
+                if file_size > max_size_bytes:
+                    flash(f'File size exceeds maximum allowed size of {max_size_mb}MB', 'danger')
+                    return redirect(url_for('rack_edit', id=id))
+                
+                # Only allow PNG and JPEG
+                ext = file.filename.rsplit('.', 1)[1].lower()
+                if ext not in ['png', 'jpg', 'jpeg']:
+                    flash('Only PNG and JPEG images are allowed for racks!', 'danger')
+                    return redirect(url_for('rack_edit', id=id))
+                
+                # Delete old picture if exists
+                if rack.picture:
+                    old_path = os.path.join(app.config['UPLOAD_FOLDER'], 'racks', rack.picture)
+                    if os.path.exists(old_path):
+                        os.remove(old_path)
+                
+                # Use UUID-based path: /uploads/racks/{rack_uuid}/{picture_uuid}.ext
+                picture_uuid = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(12))
+                
+                if ext == 'jpg':
+                    ext = 'jpeg'
+                filename = f"{picture_uuid}.{ext}"
+                
+                rack_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'racks', rack.uuid)
+                os.makedirs(rack_dir, exist_ok=True)
+                
+                filepath = os.path.join(rack_dir, filename)
+                file.save(filepath)
+                # Store path as {rack_uuid}/{picture_uuid}.ext
+                rack.picture = f"{rack.uuid}/{filename}"
+        
         db.session.commit()
         
         log_audit(current_user.id, 'update', 'rack', rack.id, f'Updated rack: {rack.name} (size: {rows}x{cols})')
@@ -1822,8 +1889,10 @@ def rack_edit(id):
     locations = Location.query.order_by(Location.name).all()
     max_drawer_rows = int(Setting.get('max_drawer_rows', '10'))
     max_drawer_cols = int(Setting.get('max_drawer_cols', '10'))
+    max_file_size_mb = int(Setting.get('max_file_size_mb', '10'))
     return render_template('rack_form.html', rack=rack, locations=locations,
-                         max_drawer_rows=max_drawer_rows, max_drawer_cols=max_drawer_cols)
+                         max_drawer_rows=max_drawer_rows, max_drawer_cols=max_drawer_cols,
+                         max_file_size_mb=max_file_size_mb)
 
 @app.route('/rack/<int:id>/delete', methods=['POST'])
 @login_required
@@ -2086,11 +2155,7 @@ def api_add_location():
         if not name:
             return jsonify({'success': False, 'error': 'Location name is required'})
         
-        # Check if exists
-        existing = Location.query.filter_by(name=name).first()
-        if existing:
-            return jsonify({'success': False, 'error': 'Location already exists'})
-        
+        # Allow duplicate names - UUID ensures uniqueness
         location = Location(name=name, info=info, description=description, color=color)
         db.session.add(location)
         db.session.commit()
@@ -2099,7 +2164,7 @@ def api_add_location():
         
         return jsonify({
             'success': True, 
-            'location': {'id': location.id, 'name': location.name, 'color': location.color}
+            'location': {'id': location.id, 'uuid': location.uuid, 'name': location.name, 'color': location.color}
         })
     except Exception as e:
         db.session.rollback()

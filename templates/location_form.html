@@ -16,6 +16,19 @@
                 <form method="POST" enctype="multipart/form-data">
                     {{ form.hidden_tag() }}
                     
+                    {% if location %}
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">UUID</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control bg-light font-monospace" value="{{ location.uuid }}" readonly>
+                            <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText('{{ location.uuid }}'); alert('UUID copied!')">
+                                <i class="bi bi-clipboard"></i> Copy
+                            </button>
+                        </div>
+                        <small class="text-muted">Unique identifier for this location (auto-generated, immutable)</small>
+                    </div>
+                    {% endif %}
+                    
                     <div class="mb-3">
                         {{ form.name.label(class="form-label") }}
                         {{ form.name(class="form-control" + (" is-invalid" if form.name.errors else "")) }}
@@ -54,13 +67,13 @@
                         <div class="col-md-6 mb-3">
                             {{ form.picture.label(class="form-label") }}
                             {{ form.picture(class="form-control") }}
-                            <small class="text-muted">Upload a picture (PNG, JPG, max 5MB)</small>
+                            <small class="text-muted">Upload a picture (PNG, JPG, max {{ max_file_size_mb }}MB)</small>
                             {% if location and location.picture %}
                             <div class="mt-2">
-                                <img src="{{ url_for('location_picture', filename=location.picture) }}" 
+                                <img src="{{ url_for('location_picture', filepath=location.picture) }}" 
                                      alt="{{ location.name }}" 
                                      style="width: 200px; height: 200px; object-fit: cover; border-radius: 8px; border: 2px solid #dee2e6; cursor: pointer;"
-                                     onclick="showImageModal('{{ url_for('location_picture', filename=location.picture) }}', '{{ location.name }}')">
+                                     onclick="showImageModal('{{ url_for('location_picture', filepath=location.picture) }}', '{{ location.name }}')">
                                 <div class="form-check mt-2">
                                     <input type="checkbox" class="form-check-input" id="delete_picture" name="delete_picture">
                                     <label class="form-check-label small" for="delete_picture">Delete current picture</label>
@@ -86,7 +99,7 @@
             </div>
             <div class="card-body">
                 <h6>Location Name</h6>
-                <p class="small">Give this location a clear, unique name (e.g., "Lab Room 101", "Warehouse A")</p>
+                <p class="small">Give this location a clear name/p>
                 
                 <h6 class="mt-3">Info</h6>
                 <p class="small">Add a short note or description that will be displayed alongside the name.</p>

@@ -28,6 +28,6 @@
 - SSO login intergation (Google, Github, ~~MyDigital ID *klw dpt rembat SDK dia*~~)
 
 ------------
-official.danielamani@gmail.com
+
 2025 | Daniel Amani | *Project EDNA&trade;* & DANP
 
