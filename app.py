@@ -14,6 +14,19 @@ import logging
 from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
 
+def is_safe_url(target):
+    """
+    Only allow redirects to internal relative URLs (not external sites).
+    Strips backslashes and checks that scheme/netloc are empty.
+    """
+    # Normalize backslashes (important for browser behavior)
+    target = target.replace('\\', '')
+    # Only allow redirects to relative paths under this app
+    res = urlparse(target)
+    if not res.netloc and not res.scheme:
+        return True
+    return False
+
 app = Flask(__name__)
 app.config.from_object(Config)
 
@@ -106,6 +119,7 @@ def login():
             # Validate redirect URL to prevent open redirect attacks
             if next_page and is_safe_url(next_page):
                 return redirect(next_page)
+            # Unsafe or missing redirect target: go to the index page
             return redirect(url_for('index'))
         else:
             # Handle failed login attempt
