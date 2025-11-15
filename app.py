@@ -1,6 +1,6 @@
 from flask import Flask, render_template, redirect, url_for, flash, request, send_from_directory, abort, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, safe_join
 from werkzeug.utils import secure_filename
 from config import Config
 from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location
@@ -10,7 +10,9 @@ import os
 import json
 import secrets
 import string
+import logging
 from datetime import datetime, timezone
+from urllib.parse import urlparse, urljoin
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -29,6 +31,18 @@ os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture'), exist_ok=T
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
+
+def is_safe_url(target):
+    """Validate that a URL is safe for redirects (prevents open redirect attacks)"""
+    if not target:
+        return False
+
+    # Parse the target URL
+    ref_url = urlparse(request.host_url)
+    test_url = urlparse(urljoin(request.host_url, target))
+
+    # URL is safe if it has no scheme/netloc (relative URL) or matches our host
+    return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
 
 @app.template_filter('filesize')
 def filesize_filter(size):
@@ -89,7 +103,10 @@ def login():
             login_user(user, remember=form.remember_me.data)
             log_audit(user.id, 'login', 'user', user.id, 'User logged in')
             next_page = request.args.get('next')
-            return redirect(next_page or url_for('index'))
+            # Validate redirect URL to prevent open redirect attacks
+            if next_page and is_safe_url(next_page):
+                return redirect(next_page)
+            return redirect(url_for('index'))
         else:
             # Handle failed login attempt
             if user:
@@ -679,11 +696,12 @@ def rename_attachment(attachment_id):
         db.session.commit()
         
         log_audit(current_user.id, 'update', 'attachment', attachment_id, f'Renamed attachment from "{old_name}" to "{new_name}"')
-        
+
         return jsonify({'success': True})
-    
+
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logging.error(f"Error renaming attachment {attachment_id}: {str(e)}")
+        return jsonify({'success': False, 'error': 'An error occurred while renaming the attachment'}), 500
 
 
 @app.route('/item/<int:item_id>/datasheets', methods=['POST'])
@@ -710,17 +728,22 @@ def update_datasheets(item_id):
         db.session.commit()
         
         log_audit(current_user.id, 'update', 'item', item.id, f'Updated datasheets for item: {item.name}')
-        
+
         return jsonify({'success': True})
-    
+
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logging.error(f"Error updating datasheets for item {item_id}: {str(e)}")
+        return jsonify({'success': False, 'error': 'An error occurred while updating datasheets'}), 500
 
 
 @app.route('/uploads/<path:filename>')
 @login_required
 def uploaded_file(filename):
     """Serve uploaded files from uploads folder"""
+    # Prevent path traversal attacks
+    safe_path = safe_join(app.config['UPLOAD_FOLDER'], filename)
+    if safe_path is None or not os.path.exists(safe_path):
+        abort(404)
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 # ============= CATEGORY ROUTES =============
@@ -1583,6 +1606,10 @@ def location_picture(filepath):
     filepath format: {location_uuid}/{picture_uuid}.ext
     """
     location_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'locations')
+    # Prevent path traversal attacks
+    safe_path = safe_join(location_dir, filepath)
+    if safe_path is None or not os.path.exists(safe_path):
+        abort(404)
     return send_from_directory(location_dir, filepath)
 
 @app.route('/rack-picture/<path:filepath>')
@@ -1592,6 +1619,10 @@ def rack_picture(filepath):
     filepath format: {rack_uuid}/{picture_uuid}.ext
     """
     rack_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'racks')
+    # Prevent path traversal attacks
+    safe_path = safe_join(rack_dir, filepath)
+    if safe_path is None or not os.path.exists(safe_path):
+        abort(404)
     return send_from_directory(rack_dir, filepath)
 
 # ============= RACK MANAGEMENT ROUTES =============
@@ -2067,12 +2098,13 @@ def api_add_category():
         log_audit(current_user.id, 'create', 'category', category.id, f'Created category: {category.name}')
         
         return jsonify({
-            'success': True, 
+            'success': True,
             'category': {'id': category.id, 'name': category.name, 'color': category.color}
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)})
+        logging.error(f"Error adding category: {str(e)}")
+        return jsonify({'success': False, 'error': 'An error occurred while adding the category'})
 
 @app.route('/api/footprint/add', methods=['POST'])
 @login_required
@@ -2100,12 +2132,13 @@ def api_add_footprint():
         log_audit(current_user.id, 'create', 'footprint', footprint.id, f'Created footprint: {footprint.name}')
         
         return jsonify({
-            'success': True, 
+            'success': True,
             'footprint': {'id': footprint.id, 'name': footprint.name, 'color': footprint.color}
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)})
+        logging.error(f"Error adding footprint: {str(e)}")
+        return jsonify({'success': False, 'error': 'An error occurred while adding the footprint'})
 
 @app.route('/api/tag/add', methods=['POST'])
 @login_required
@@ -2133,12 +2166,13 @@ def api_add_tag():
         log_audit(current_user.id, 'create', 'tag', tag.id, f'Created tag: {tag.name}')
         
         return jsonify({
-            'success': True, 
+            'success': True,
             'tag': {'id': tag.id, 'name': tag.name, 'description': tag.description, 'color': tag.color}
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)})
+        logging.error(f"Error adding tag: {str(e)}")
+        return jsonify({'success': False, 'error': 'An error occurred while adding the tag'})
 
 @app.route('/api/location/add', methods=['POST'])
 @login_required
@@ -2163,12 +2197,13 @@ def api_add_location():
         log_audit(current_user.id, 'create', 'location', location.id, f'Created location: {location.name}')
         
         return jsonify({
-            'success': True, 
+            'success': True,
             'location': {'id': location.id, 'uuid': location.uuid, 'name': location.name, 'color': location.color}
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)})
+        logging.error(f"Error adding location: {str(e)}")
+        return jsonify({'success': False, 'error': 'An error occurred while adding the location'})
 
 @app.route('/api/drawer/toggle-availability', methods=['POST'])
 @login_required
@@ -2196,13 +2231,14 @@ def toggle_drawer_availability():
         rack.unavailable_drawers = json.dumps(unavailable)
         db.session.commit()
         
-        log_audit(current_user.id, 'update', 'rack', rack.id, 
+        log_audit(current_user.id, 'update', 'rack', rack.id,
                  f'Drawer {drawer_id} marked as {"unavailable" if is_unavailable else "available"}')
-        
+
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)})
+        logging.error(f"Error toggling drawer availability: {str(e)}")
+        return jsonify({'success': False, 'error': 'An error occurred while toggling drawer availability'})
 
 @app.route('/api/drawer/move-items', methods=['POST'])
 @login_required
@@ -2245,13 +2281,14 @@ def move_drawer_items():
         
         db.session.commit()
         
-        log_audit(current_user.id, 'bulk_update', 'item', None, 
+        log_audit(current_user.id, 'bulk_update', 'item', None,
                  f'Moved {len(items)} items from Rack {rack_id} Drawer {drawer_id}')
-        
+
         return jsonify({'success': True, 'items_moved': len(items)})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)})
+        logging.error(f"Error moving drawer items: {str(e)}")
+        return jsonify({'success': False, 'error': 'An error occurred while moving drawer items'})
 
 # ============= ERROR HANDLERS =============
 
@@ -2473,7 +2510,8 @@ def save_table_columns_view():
         flash('Table columns view updated successfully!', 'success')
         log_audit(current_user.id, 'update', 'user', current_user.id, f'Updated table columns view')
     except Exception as e:
-        flash(f'Error saving table columns: {str(e)}', 'danger')
+        logging.error(f"Error saving table columns for user {current_user.id}: {str(e)}")
+        flash('Error saving table columns. Please try again.', 'danger')
     
     return redirect(url_for('settings_general'))
 
@@ -2567,11 +2605,12 @@ def settings_system():
             app.config['MAX_CONTENT_LENGTH'] = max_file_size * 1024 * 1024
             
             flash('System settings updated successfully!', 'success')
-            log_audit(current_user.id, 'update', 'settings', 0, 
+            log_audit(current_user.id, 'update', 'settings', 0,
                      f'Updated system settings: currency={currency}, max_file_size={max_file_size}MB, drawer_size={max_drawer_rows}x{max_drawer_cols}, banner_timeout={banner_timeout}s')
-            
+
         except Exception as e:
-            flash(f'Error saving settings: {str(e)}', 'danger')
+            logging.error(f"Error saving system settings: {str(e)}")
+            flash('Error saving settings. Please try again.', 'danger')
         
         return redirect(url_for('settings_system'))
     
@@ -2839,7 +2878,8 @@ def export_selective():
         response.headers['Content-Type'] = 'application/json'
         return response
     except Exception as e:
-        flash(f'Export error: {str(e)}', 'danger')
+        logging.error(f"Export error: {str(e)}")
+        flash('An error occurred during export. Please try again.', 'danger')
         return redirect(url_for('backup_restore'))
 
 
@@ -2917,10 +2957,11 @@ def import_selective():
             flash(f'⚠️ +{len(results["errors"])-3} more errors', 'warning')
         
         return redirect(url_for('backup_restore'))
-        
+
     except Exception as e:
         db.session.rollback()
-        flash(f'Fatal error: {str(e)}', 'danger')
+        logging.error(f"Import fatal error: {str(e)}")
+        flash('A fatal error occurred during import. Please check the file and try again.', 'danger')
         return redirect(url_for('backup_restore'))
 
 # ============= MAGIC PARAMETERS =============
@@ -3018,12 +3059,13 @@ def magic_parameter_new():
             'parameter_id': parameter.id,
             'redirect_url': url_for('magic_parameter_manage', id=parameter.id)
         })
-    
+
     except Exception as e:
         db.session.rollback()
+        logging.error(f"Error creating parameter: {str(e)}")
         return jsonify({
             'success': False,
-            'errors': [f'Error creating parameter: {str(e)}']
+            'errors': ['An error occurred while creating the parameter']
         }), 500
 
 
