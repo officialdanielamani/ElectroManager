@@ -272,12 +272,29 @@ def inject_settings():
 @app.route('/')
 @login_required
 def index():
+    """Simple landing page"""
+    return render_template('index.html')
+
+@app.route('/items')
+@login_required
+def items():
+    """Main items listing page"""
+    # Check if user has permission to view items
+    if not current_user.has_permission('items', 'view'):
+        flash('You do not have permission to view items.', 'danger')
+        return redirect(url_for('index'))
+    
     search_form = SearchForm()
     
     search_query = request.args.get('search', '')
     category_id = request.args.get('category', 0, type=int)
+    status_filter = request.args.get('status', '')
     page = request.args.get('page', 1, type=int)
-    per_page = 20
+    per_page = request.args.get('per_page', 25, type=int)
+    
+    # Cap per_page at a reasonable maximum
+    if per_page > 999999:
+        per_page = 999999
     
     query = Item.query
     
@@ -293,30 +310,94 @@ def index():
     if category_id > 0:
         query = query.filter_by(category_id=category_id)
     
-    # Default sort by updated_at descending
-    pagination = query.order_by(Item.updated_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
+    # Apply status filter
+    if status_filter:
+        statuses = status_filter.split(',')
+        filtered_items = []
+        
+        for item in query.all():
+            if 'ok' in statuses and not item.is_no_stock() and not item.is_low_stock():
+                filtered_items.append(item)
+            elif 'low' in statuses and item.is_low_stock():
+                filtered_items.append(item)
+            elif 'no' in statuses and item.is_no_stock():
+                filtered_items.append(item)
+        
+        # Sort by updated_at descending
+        filtered_items.sort(key=lambda x: x.updated_at, reverse=True)
+        
+        # Manually paginate
+        total = len(filtered_items)
+        start = (page - 1) * per_page
+        end = start + per_page
+        items = filtered_items[start:end]
+        
+        # Create a manual pagination object
+        class Pagination:
+            def __init__(self, items, page, per_page, total):
+                self.items = items
+                self.page = page
+                self.per_page = per_page
+                self.total = total
+                self.pages = (total + per_page - 1) // per_page
+            
+            @property
+            def has_next(self):
+                return self.page < self.pages
+            
+            @property
+            def has_prev(self):
+                return self.page > 1
+            
+            @property
+            def next_num(self):
+                return self.page + 1 if self.has_next else None
+            
+            @property
+            def prev_num(self):
+                return self.page - 1 if self.has_prev else None
+            
+            def iter_pages(self, left_edge=1, right_edge=1, left_current=1, right_current=2):
+                for num in range(1, self.pages + 1):
+                    if (num <= left_edge or
+                        num > self.pages - right_edge or
+                        (self.page - left_current <= num <= self.page + right_current)):
+                        yield num
+                    elif num == left_edge + 1 or num == self.pages - right_edge:
+                        yield None
+        
+        pagination = Pagination(items, page, per_page, total)
+    else:
+        # Default sort by updated_at descending
+        pagination = query.order_by(Item.updated_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
     
     items = pagination.items
     
     total_items = Item.query.count()
-    low_stock_items = Item.query.filter(Item.quantity <= Item.min_quantity).count()
+    # Low stock: quantity > 0 AND quantity <= min_quantity
+    low_stock_items = Item.query.filter(Item.quantity > 0, Item.quantity <= Item.min_quantity).count()
+    # No stock: quantity = 0
+    no_stock_items = Item.query.filter(Item.quantity == 0).count()
     total_categories = Category.query.count()
     
     # Get user's table columns preference
     user_columns = current_user.get_table_columns()
     
-    return render_template('index.html', 
+    return render_template('items.html', 
                          items=items,
                          pagination=pagination,
                          search_form=search_form,
                          search_query=search_query,
                          category_id=category_id,
+                         status_filter=status_filter,
                          total_items=total_items,
                          low_stock_items=low_stock_items,
+                         no_stock_items=no_stock_items,
                          total_categories=total_categories,
-                         user_columns=user_columns)
+                         user_columns=user_columns,
+                         per_page=per_page)
 
 # ============= ITEM ROUTES =============
 
@@ -356,7 +437,7 @@ def item_new():
     # Check if user has permission to create items
     if not perms.get('can_create'):
         flash('You do not have permission to create new items.', 'danger')
-        return redirect(url_for('index'))
+        return redirect(url_for('items'))
     
     # Also check if user has ANY edit permission (in case someone tries to create with form directly)
     if not (perms.get('can_edit_name') or perms.get('can_edit_sku_type') or 
@@ -367,7 +448,7 @@ def item_new():
             perms.get('can_edit_footprint') or perms.get('can_edit_tags') or
             perms.get('can_edit_parameters')):
         flash('You do not have permission to create items.', 'danger')
-        return redirect(url_for('index'))
+        return redirect(url_for('items'))
     
     # Create form with permission-based field disabling
     form = ItemAddForm(perms=perms)
@@ -390,7 +471,7 @@ def item_new():
                 perms.get('can_edit_footprint') or perms.get('can_edit_tags') or
                 perms.get('can_edit_parameters')):
             flash('You do not have permission to create items with any editable fields.', 'danger')
-            return redirect(url_for('index'))
+            return redirect(url_for('items'))
         
         # Apply default values for fields user cannot edit
         location_id = form.location_id.data if form.location_id.data and perms['can_edit_location'] else None
@@ -455,7 +536,7 @@ def item_detail(uuid):
     # Check if user has view permission
     if not current_user.has_permission('items', 'view'):
         flash('You do not have permission to view items.', 'danger')
-        return redirect(url_for('index'))
+        return redirect(url_for('items'))
     
     attachment_form = AttachmentForm()
     currency_symbol = Setting.get('currency', '$')
@@ -605,7 +686,7 @@ def item_delete(uuid):
     
     log_audit(current_user.id, 'delete', 'item', item.id, f'Deleted item: {item_name}')
     flash(f'Item "{item_name}" deleted successfully!', 'success')
-    return redirect(url_for('index'))
+    return redirect(url_for('items'))
 
 # ============= ATTACHMENT ROUTES =============
 
@@ -2092,6 +2173,84 @@ def get_drawer_contents(rack_id, drawer_id):
         'drawer_id': drawer_id,
         'is_unavailable': rack.is_drawer_unavailable(drawer_id)
     })
+
+@app.route('/api/search-item', methods=['POST'])
+@login_required
+def search_item():
+    """API endpoint to search for items in visual storage"""
+    data = request.get_json()
+    search_term = data.get('search', '').strip()
+    location_id = data.get('location_id')
+    rack_id = data.get('rack_id')
+    exact_match = data.get('exact_match', False)
+    
+    if not search_term:
+        return jsonify({'items': []})
+    
+    # Determine if searching by UUID or name
+    is_uuid_search = search_term.lower().startswith('uuid:')
+    
+    if is_uuid_search:
+        # Extract UUID from search term
+        uuid_value = search_term[5:].strip()
+        items = Item.query.filter_by(uuid=uuid_value).all()
+    else:
+        # Search by name (case-insensitive)
+        if exact_match:
+            # Exact match
+            items = Item.query.filter(Item.name.ilike(search_term)).all()
+        else:
+            # Partial match
+            items = Item.query.filter(Item.name.ilike(f'%{search_term}%')).all()
+    
+    results = []
+    
+    for item in items:
+        # Apply location and rack filters if specified
+        if location_id and item.location_id != location_id:
+            continue
+        
+        if rack_id and item.rack_id != rack_id:
+            continue
+        
+        # Check if item is in a rack (drawer storage)
+        if item.rack_id and item.drawer:
+            rack = Rack.query.get(item.rack_id)
+            location_name = None
+            if rack and rack.physical_location:
+                location_name = rack.physical_location.name
+            
+            results.append({
+                'type': 'rack',
+                'id': item.id,
+                'name': item.name,
+                'uuid': item.uuid,
+                'quantity': item.quantity,
+                'sku': item.sku or 'N/A',
+                'rack_id': item.rack_id,
+                'rack_name': rack.name if rack else 'Unknown Rack',
+                'drawer': item.drawer,
+                'location_name': location_name
+            })
+        # Check if item is in a general location
+        elif item.location_id:
+            location = Location.query.get(item.location_id)
+            results.append({
+                'type': 'general',
+                'id': item.id,
+                'name': item.name,
+                'uuid': item.uuid,
+                'quantity': item.quantity,
+                'sku': item.sku or 'N/A',
+                'location_id': item.location_id,
+                'location_name': location.name if location else 'Unknown Location'
+            })
+    
+    # Sort: rack items first, then general location items
+    rack_items = [item for item in results if item['type'] == 'rack']
+    general_items = [item for item in results if item['type'] == 'general']
+    
+    return jsonify({'items': rack_items + general_items})
 
 # ============= API ENDPOINTS FOR INLINE ADD =============
 

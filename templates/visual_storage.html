@@ -19,7 +19,7 @@
     </div>
 </div>
 
-<!-- Rack Filter -->
+<!-- Rack Filter & Search -->
 {% if locations|length > 0 or all_racks|length > 1 %}
 <div class="row mb-3">
     <div class="col-md-12">
@@ -43,6 +43,26 @@
                             <option value="{{ r.id }}" {% if current_rack_id == r.id %}selected{% endif %}>{{ r.name }}{% if r.physical_location %} - {{ r.physical_location.name }}{% endif %}</option>
                             {% endfor %}
                         </select>
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label mb-0">Search Item:</label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" id="searchInput" class="form-control" placeholder="Name or uuid:XXXXX" style="min-width: 200px;" onkeydown="handleSearchKeydown(event)">
+                            <button class="btn btn-primary" type="button" onclick="searchItem()">
+                                <i class="bi bi-search"></i> Find
+                            </button>
+                            <button class="btn btn-secondary" type="button" onclick="clearSearch()">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="exactMatch" value="option1">
+                            <label class="form-check-label" for="exactMatch">
+                                <small>Exact Match</small>
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -226,6 +246,21 @@
     </div>
 </div>
 
+<!-- Search Results Modal -->
+<div class="modal fade" id="searchResultsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="searchResultsTitle">Search Results</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="searchResultsBody">
+                <!-- Content loaded dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
 .drawer-grid {
     display: table;
@@ -344,6 +379,56 @@
     margin-bottom: 30px;
 }
 
+.drawer-cell.search-highlighted {
+    background: linear-gradient(145deg, #fff3cd, #ffe69c) !important;
+    border-color: #ffc107 !important;
+    border-width: 3px !important;
+    box-shadow: 0 0 10px rgba(255, 193, 7, 0.5) !important;
+    animation: pulse-highlight 1s infinite;
+    position: relative;
+    z-index: 1050;
+}
+
+@keyframes pulse-highlight {
+    0%, 100% { box-shadow: 0 0 10px rgba(255, 193, 7, 0.5); }
+    50% { box-shadow: 0 0 20px rgba(255, 193, 7, 0.8); }
+}
+
+.search-result-badge {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background-color: #ffc107;
+    color: #000;
+    border-radius: 4px;
+    font-weight: bold;
+    margin-bottom: 1rem;
+}
+
+.search-result-item {
+    padding: 1rem;
+    border-left: 4px solid #198754;
+    background-color: #f8f9fa;
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.search-result-item:hover {
+    background-color: #e9ecef;
+    transform: translateX(5px);
+}
+
+.search-result-item.general-location {
+    border-left-color: #0dcaf0;
+}
+
+.search-result-notfound {
+    padding: 2rem;
+    text-align: center;
+    color: #dc3545;
+}
+
 @media (max-width: 768px) {
     .drawer-cell {
         width: 80px;
@@ -358,6 +443,169 @@
 </style>
 
 <script>
+// ========== SEARCH FUNCTIONALITY (DECLARE FIRST) ==========
+function handleSearchKeydown(event) {
+    if (event.key === 'Enter') {
+        searchItem();
+    }
+}
+
+function clearSearch() {
+    document.getElementById('searchInput').value = '';
+    document.querySelectorAll('.drawer-cell.search-highlighted').forEach(cell => {
+        cell.classList.remove('search-highlighted');
+    });
+    // Close modal if open
+    const searchModal = bootstrap.Modal.getInstance(document.getElementById('searchResultsModal'));
+    if (searchModal) searchModal.hide();
+}
+
+function searchItem() {
+    const searchValue = document.getElementById('searchInput').value.trim();
+    const exactMatch = document.getElementById('exactMatch').checked;
+    
+    if (!searchValue) {
+        alert('Please enter a search term');
+        return;
+    }
+    
+    const locationId = document.getElementById('locationFilter').value || null;
+    const rackId = document.getElementById('rackFilter').value || null;
+    
+    // Call API to search
+    fetch('/api/search-item', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            search: searchValue,
+            location_id: locationId ? parseInt(locationId) : null,
+            rack_id: rackId ? parseInt(rackId) : null,
+            exact_match: exactMatch
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        displaySearchResults(data, searchValue);
+    })
+    .catch(error => {
+        console.error('Search error:', error);
+        alert('Error during search');
+    });
+}
+
+function displaySearchResults(data, searchTerm) {
+    // Clear previous highlights
+    document.querySelectorAll('.drawer-cell.search-highlighted').forEach(cell => {
+        cell.classList.remove('search-highlighted');
+    });
+    
+    const searchResultsModal = document.getElementById('searchResultsModal');
+    const title = document.getElementById('searchResultsTitle');
+    const body = document.getElementById('searchResultsBody');
+    
+    let html = '';
+    
+    if (data.items && data.items.length > 0) {
+        title.textContent = `Search Results for "${searchTerm}" (${data.items.length} found)`;
+        
+        data.items.forEach(item => {
+            if (item.type === 'rack') {
+                // Item found in rack/drawer
+                html += `
+                    <div class="search-result-item" onclick="highlightAndNavigateToDrawer(${item.rack_id}, '${item.drawer}', true)">
+                        <div>
+                            <strong>${item.name}</strong>
+                            <span class="badge bg-success ms-2">${item.quantity}</span>
+                            <span class="badge bg-info">UUID: ${item.uuid}</span>
+                        </div>
+                        <small class="text-muted d-block mt-1">
+                            <i class="bi bi-box-seam"></i> ${item.rack_name} - ${item.drawer}
+                            ${item.location_name ? `<br><i class="bi bi-geo-alt"></i> ${item.location_name}` : ''}
+                        </small>
+                    </div>
+                `;
+                
+                // Highlight the drawer
+                setTimeout(() => {
+                    const drawer = document.querySelector(`.drawer-cell[data-drawer="${item.drawer}"][data-rack="${item.rack_id}"]`);
+                    if (drawer) {
+                        drawer.classList.add('search-highlighted');
+                    }
+                }, 100);
+            } else if (item.type === 'general') {
+                // Item found in general location
+                html += `
+                    <div class="search-result-item general-location" onclick="closeSearchModal()">
+                        <div>
+                            <strong>${item.name}</strong>
+                            <span class="badge bg-success ms-2">${item.quantity}</span>
+                            <span class="badge bg-info">UUID: ${item.uuid}</span>
+                        </div>
+                        <small class="text-muted d-block mt-1">
+                            <i class="bi bi-geo-alt"></i> <strong>${item.location_name}</strong>
+                        </small>
+                    </div>
+                `;
+            }
+        });
+    } else {
+        title.textContent = 'Search Results';
+        html += `
+            <div class="search-result-notfound">
+                <i class="bi bi-search" style="font-size: 3rem; color: #dc3545;"></i>
+                <h5 class="mt-3">Item Not Found</h5>
+                <p>No items matching "${searchTerm}" were found in the inventory.</p>
+            </div>
+        `;
+    }
+    
+    body.innerHTML = html;
+    
+    // Show modal
+    const searchResultsModalInstance = new bootstrap.Modal(searchResultsModal);
+    searchResultsModalInstance.show();
+}
+
+function closeSearchModal() {
+    const searchResultsModal = document.getElementById('searchResultsModal');
+    const instance = bootstrap.Modal.getInstance(searchResultsModal);
+    if (instance) {
+        instance.hide();
+    }
+}
+
+function highlightAndNavigateToDrawer(rackId, drawer, closeModal = false) {
+    // Close modal if requested
+    if (closeModal) {
+        const searchResultsModal = document.getElementById('searchResultsModal');
+        const instance = bootstrap.Modal.getInstance(searchResultsModal);
+        if (instance) {
+            instance.hide();
+        }
+    }
+    
+    // Scroll to the rack
+    const rackSection = document.querySelector(`[data-rack-id="${rackId}"]`);
+    if (rackSection) {
+        rackSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        // Add pulse effect
+        setTimeout(() => {
+            const drawerCell = rackSection.querySelector(`.drawer-cell[data-drawer="${drawer}"]`);
+            if (drawerCell) {
+                drawerCell.click();
+                drawerCell.classList.add('search-highlighted');
+                
+                // Remove highlight after 3 seconds
+                setTimeout(() => {
+                    drawerCell.classList.remove('search-highlighted');
+                }, 3000);
+            }
+        }, 500);
+    }
+}
+
+// ========== OTHER FUNCTIONS ==========
 let currentRackId = null;
 let currentDrawerId = null;
 
@@ -365,7 +613,7 @@ function openDrawer(rackName, drawerId, rackId) {
     currentRackId = rackId;
     currentDrawerId = drawerId;
     
-    const modal = new bootstrap.Modal(document.getElementById('drawerModal'));
+    const drawerModal = new bootstrap.Modal(document.getElementById('drawerModal'));
     document.getElementById('drawerModalTitle').textContent = `${rackName} - Drawer ${drawerId}`;
     document.getElementById('drawerModalBody').innerHTML = '<div class="text-center"><div class="spinner-border"></div><p>Loading...</p></div>';
     
@@ -373,6 +621,7 @@ function openDrawer(rackName, drawerId, rackId) {
         .then(response => response.json())
         .then(data => {
             let html = '';
+
             
             {% if current_user.has_permission('settings_sections.location_management', 'edit') %}
             // Controls section
@@ -429,7 +678,7 @@ function openDrawer(rackName, drawerId, rackId) {
             document.getElementById('drawerModalBody').innerHTML = '<div class="alert alert-danger">Error loading drawer contents.</div>';
         });
     
-    modal.show();
+    drawerModal.show();
 }
 
 function toggleDrawerAvailability() {

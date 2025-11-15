@@ -89,11 +89,13 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
+                    {% if current_user.has_permission('items', 'view') %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('index') }}">
-                            <i class="bi bi-house"></i> Home
+                        <a class="nav-link" href="{{ url_for('items') }}">
+                            <i class="bi bi-box"></i> Items
                         </a>
                     </li>
+                    {% endif %}
                     {% if current_user.has_permission('pages.visual_storage', 'view') %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('visual_storage') }}">
@@ -113,13 +115,6 @@
                             {% if notification_count > 0 %}
                             <span class="badge bg-danger">{{ notification_count }}</span>
                             {% endif %}
-                        </a>
-                    </li>
-                    {% endif %}
-                    {% if current_user.has_permission('items', 'create') %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('item_new') }}">
-                            <i class="bi bi-plus-circle"></i> New Item
                         </a>
                     </li>
                     {% endif %}

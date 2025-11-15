@@ -2,7 +2,7 @@
 
 ## Version Details
 - **Application**: Inventory Manager
-- **Version**: 1.0.1
+- **Version**: 1.0.2
 - **Release Date**: October 2024
 - **Status**: Beta
 
@@ -15,6 +15,9 @@
 - Item Description with Markdown support
 - Import/Export capabilities for database and configurations
 - Role-based access control (RBAC)
+- Now with card view for item
+- Item page now on dedicated page
+- Search and locate item at Visual Storage
 
 ## Future Plan
 - QR for Locations & Item
