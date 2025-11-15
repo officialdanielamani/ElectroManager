@@ -57,6 +57,24 @@ def is_safe_url(target):
     # URL is safe if it has no scheme/netloc (relative URL) or matches our host
     return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
 
+def is_safe_file_path(file_path, base_dir=None):
+    """Validate that a file path is safe for file operations (prevents path traversal)"""
+    if not file_path:
+        return False
+
+    if base_dir is None:
+        base_dir = app.config['UPLOAD_FOLDER']
+
+    try:
+        # Resolve to absolute paths to handle .. and symlinks
+        base_path = os.path.abspath(base_dir)
+        abs_file_path = os.path.abspath(file_path)
+
+        # Ensure the file path is within the base directory
+        return abs_file_path.startswith(base_path + os.sep) or abs_file_path == base_path
+    except (ValueError, OSError):
+        return False
+
 @app.template_filter('filesize')
 def filesize_filter(size):
     return format_file_size(size)
@@ -582,10 +600,11 @@ def item_delete(uuid):
     # Delete related attachments
     for attachment in item.attachments:
         try:
-            if os.path.exists(attachment.file_path):
-                os.remove(attachment.file_path)
+            if attachment.file_path and is_safe_file_path(attachment.file_path):
+                if os.path.exists(attachment.file_path):
+                    os.remove(attachment.file_path)
         except Exception as e:
-            print(f"Error deleting file: {e}")
+            logging.error(f"Error deleting attachment file {attachment.id}: {e}")
     
     # Delete item parameters (magic parameters)
     from models import ItemParameter
@@ -678,10 +697,11 @@ def delete_attachment(id):
     item = attachment.item
     
     try:
-        if os.path.exists(attachment.file_path):
-            os.remove(attachment.file_path)
+        if attachment.file_path and is_safe_file_path(attachment.file_path):
+            if os.path.exists(attachment.file_path):
+                os.remove(attachment.file_path)
     except Exception as e:
-        print(f"Error deleting file: {e}")
+        logging.error(f"Error deleting attachment file {attachment.id}: {e}")
     
     db.session.delete(attachment)
     db.session.commit()
@@ -946,9 +966,9 @@ def user_new():
                     flash('Profile photo must be smaller than 1MB', 'danger')
                     return render_template('user_form.html', form=form, title='New User')
                 
-                # Save with username as filename
-                ext = file.filename.rsplit('.', 1)[1].lower()
-                filename = f"{form.username.data}.{ext}"
+                # Save with username as filename - sanitize extension
+                ext = secure_filename(file.filename.rsplit('.', 1)[1].lower())
+                filename = f"{secure_filename(form.username.data)}.{ext}"
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture', filename)
                 file.save(filepath)
                 user.profile_photo = filename
@@ -982,7 +1002,7 @@ def user_edit(id):
         if action == 'delete_photo':
             if user.profile_photo:
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
-                if os.path.exists(filepath):
+                if is_safe_file_path(filepath) and os.path.exists(filepath):
                     os.remove(filepath)
                 user.profile_photo = None
                 log_audit(current_user.id, 'update', 'user', user.id, f'Deleted profile photo for user: {user.username}')
@@ -1007,12 +1027,12 @@ def user_edit(id):
                     # Delete old photo if exists
                     if user.profile_photo:
                         old_file = os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
-                        if os.path.exists(old_file):
+                        if is_safe_file_path(old_file) and os.path.exists(old_file):
                             os.remove(old_file)
-                    
-                    # Save with username as filename
-                    ext = file.filename.rsplit('.', 1)[1].lower()
-                    filename = f"{form.username.data}.{ext}"
+
+                    # Save with username as filename - sanitize extension
+                    ext = secure_filename(file.filename.rsplit('.', 1)[1].lower())
+                    filename = f"{secure_filename(form.username.data)}.{ext}"
                     filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture', filename)
                     file.save(filepath)
                     user.profile_photo = filename
@@ -1525,7 +1545,7 @@ def location_edit(id):
             if location.picture:
                 # Path is {location_uuid}/{picture_uuid}.ext
                 old_path = os.path.join(app.config['UPLOAD_FOLDER'], 'locations', location.picture)
-                if os.path.exists(old_path):
+                if is_safe_file_path(old_path) and os.path.exists(old_path):
                     os.remove(old_path)
                 location.picture = None
         
@@ -1554,7 +1574,7 @@ def location_edit(id):
                 # Delete old picture if exists
                 if location.picture:
                     old_path = os.path.join(app.config['UPLOAD_FOLDER'], 'locations', location.picture)
-                    if os.path.exists(old_path):
+                    if is_safe_file_path(old_path) and os.path.exists(old_path):
                         os.remove(old_path)
                 
                 # Use UUID-based path: /uploads/locations/{location_uuid}/{picture_uuid}.ext
@@ -1877,7 +1897,7 @@ def rack_edit(id):
         if request.form.get('delete_picture'):
             if rack.picture:
                 old_path = os.path.join(app.config['UPLOAD_FOLDER'], 'racks', rack.picture)
-                if os.path.exists(old_path):
+                if is_safe_file_path(old_path) and os.path.exists(old_path):
                     os.remove(old_path)
                 rack.picture = None
         
@@ -1906,7 +1926,7 @@ def rack_edit(id):
                 # Delete old picture if exists
                 if rack.picture:
                     old_path = os.path.join(app.config['UPLOAD_FOLDER'], 'racks', rack.picture)
-                    if os.path.exists(old_path):
+                    if is_safe_file_path(old_path) and os.path.exists(old_path):
                         os.remove(old_path)
                 
                 # Use UUID-based path: /uploads/racks/{rack_uuid}/{picture_uuid}.ext
@@ -2471,12 +2491,12 @@ def upload_profile_photo():
     # Delete old photo if exists
     if current_user.profile_photo:
         old_file = os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture', current_user.profile_photo)
-        if os.path.exists(old_file):
+        if is_safe_file_path(old_file) and os.path.exists(old_file):
             os.remove(old_file)
-    
-    # Save with username as filename
-    ext = file.filename.rsplit('.', 1)[1].lower()
-    filename = f"{current_user.username}.{ext}"
+
+    # Save with username as filename - sanitize extension
+    ext = secure_filename(file.filename.rsplit('.', 1)[1].lower())
+    filename = f"{secure_filename(current_user.username)}.{ext}"
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture', filename)
     file.save(filepath)
     
@@ -2493,7 +2513,7 @@ def delete_profile_photo():
     """Delete user profile photo"""
     if current_user.profile_photo:
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture', current_user.profile_photo)
-        if os.path.exists(filepath):
+        if is_safe_file_path(filepath) and os.path.exists(filepath):
             os.remove(filepath)
         
         current_user.profile_photo = None
