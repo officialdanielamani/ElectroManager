@@ -19,9 +19,17 @@ except ImportError:
     MARKDOWN_AVAILABLE = False
 
 def allowed_file(filename, allowed_extensions=None):
-    """Check if file extension is allowed"""
-    if allowed_extensions is None:
-        # Try to get from database settings
+    """Check if file extension is allowed - respects DEMO_MODE setting"""
+    from flask import current_app
+    
+    # Check if demo mode is enabled via app config
+    demo_mode_enabled = current_app.config.get('DEMO_MODE', False)
+    
+    if demo_mode_enabled:
+        # DEMO MODE: Use hardcoded whitelist only
+        allowed_extensions = {'jpg', 'jpeg', 'png', 'txt', 'md'}
+    elif allowed_extensions is None:
+        # Non-demo mode: Try to get from database settings
         try:
             from models import Setting
             extensions_str = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
@@ -35,8 +43,23 @@ def allowed_file(filename, allowed_extensions=None):
 
 
 def save_file(file, upload_folder, item_uuid):
-    """Save uploaded file organized by item UUID"""
+    """Save uploaded file organized by item UUID - respects DEMO_MODE"""
+    from flask import current_app
+    
     if file and file.filename:
+        # Check if demo mode is enabled
+        demo_mode_enabled = current_app.config.get('DEMO_MODE', False)
+        
+        # In demo mode, enforce 1MB max file size
+        if demo_mode_enabled:
+            DEMO_MODE_MAX_SIZE = 1 * 1024 * 1024  # 1 MB in bytes
+            file.seek(0, os.SEEK_END)  # Seek to end to get size
+            file_size = file.tell()
+            file.seek(0)  # Reset to beginning for actual save
+            
+            if file_size > DEMO_MODE_MAX_SIZE:
+                return None  # File too large - will be caught by upload handler
+        
         filename = secure_filename(file.filename)
         ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
         

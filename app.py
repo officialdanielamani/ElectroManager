@@ -220,7 +220,8 @@ def inject_settings():
         currency_symbol=currency,
         max_file_size_mb=max_file_size,
         allowed_file_types=allowed_extensions,
-        notification_count=notification_count
+        notification_count=notification_count,
+        banner_timeout=Setting.get('banner_timeout', '5')
     )
 
 # ============= MAIN ROUTES =============
@@ -935,6 +936,55 @@ def user_edit(id):
     form = UserForm()
     
     if form.validate_on_submit():
+        # Check for action button clicks first
+        action = request.form.get('action')
+        
+        # Handle profile photo delete (stay on form)
+        if action == 'delete_photo':
+            if user.profile_photo:
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                user.profile_photo = None
+                log_audit(current_user.id, 'update', 'user', user.id, f'Deleted profile photo for user: {user.username}')
+                db.session.commit()
+                flash('Profile photo deleted successfully!', 'success')
+            return redirect(url_for('user_edit', id=user.id))
+        
+        # Handle profile photo upload (stay on form)
+        elif action == 'upload_photo':
+            if form.profile_photo.data:
+                file = form.profile_photo.data
+                if file and allowed_file(file.filename, {'png', 'jpg', 'jpeg'}):
+                    # Check file size (max 1MB)
+                    file.seek(0, os.SEEK_END)
+                    file_size = file.tell()
+                    file.seek(0)
+                    
+                    if file_size > 1024 * 1024:  # 1MB
+                        flash('Profile photo must be smaller than 1MB', 'danger')
+                        return render_template('user_form.html', form=form, user=user, title='Edit User', config=app.config)
+                    
+                    # Delete old photo if exists
+                    if user.profile_photo:
+                        old_file = os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
+                        if os.path.exists(old_file):
+                            os.remove(old_file)
+                    
+                    # Save with username as filename
+                    ext = file.filename.rsplit('.', 1)[1].lower()
+                    filename = f"{form.username.data}.{ext}"
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture', filename)
+                    file.save(filepath)
+                    user.profile_photo = filename
+                    log_audit(current_user.id, 'update', 'user', user.id, f'Updated profile photo for user: {user.username}')
+                    db.session.commit()
+                    flash('Profile photo uploaded successfully!', 'success')
+                else:
+                    flash('Only PNG and JPEG files are allowed.', 'danger')
+            return redirect(url_for('user_edit', id=user.id))
+        
+        # Regular form submission (full user edit)
         user.username = form.username.data
         user.email = form.email.data
         user.role_id = form.role_id.data
@@ -956,32 +1006,6 @@ def user_edit(id):
         
         if form.password.data:
             user.set_password(form.password.data)
-        
-        # Handle profile photo upload
-        if form.profile_photo.data:
-            file = form.profile_photo.data
-            if file and allowed_file(file.filename, {'png', 'jpg', 'jpeg'}):
-                # Check file size (max 1MB)
-                file.seek(0, os.SEEK_END)
-                file_size = file.tell()
-                file.seek(0)
-                
-                if file_size > 1024 * 1024:  # 1MB
-                    flash('Profile photo must be smaller than 1MB', 'danger')
-                    return render_template('user_form.html', form=form, user=user, title='Edit User', config=app.config)
-                
-                # Delete old photo if exists
-                if user.profile_photo:
-                    old_file = os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
-                    if os.path.exists(old_file):
-                        os.remove(old_file)
-                
-                # Save with username as filename
-                ext = file.filename.rsplit('.', 1)[1].lower()
-                filename = f"{form.username.data}.{ext}"
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture', filename)
-                file.save(filepath)
-                user.profile_photo = filename
         
         db.session.commit()
         
@@ -2189,7 +2213,8 @@ def settings():
 @login_required
 def settings_general():
     current_theme = current_user.theme or 'light'
-    return render_template('settings_general.html', current_theme=current_theme)
+    current_font = current_user.user_font or 'system'
+    return render_template('settings_general.html', current_theme=current_theme, current_font=current_font)
 
 @app.route('/save-theme', methods=['POST'])
 @login_required
@@ -2207,6 +2232,55 @@ def save_theme():
     
     flash(f'Your theme changed to "{theme.capitalize()}"!', 'success')
     log_audit(current_user.id, 'update', 'user', current_user.id, f'Changed theme to {theme}')
+    return redirect(url_for('settings_general'))
+
+@app.route('/save-font', methods=['POST'])
+@login_required
+def save_font():
+    user_font = request.form.get('user_font', 'system')
+    
+    # Validate font
+    valid_fonts = ['system', 'open-dyslexic', 'courier']
+    if user_font not in valid_fonts:
+        user_font = 'system'
+    
+    # Save to current user
+    current_user.user_font = user_font
+    db.session.commit()
+    
+    font_names = {
+        'system': 'System (Default)',
+        'open-dyslexic': 'OpenDyslexic',
+        'courier': 'Courier New'
+    }
+    
+    flash(f'Your font changed to "{font_names.get(user_font, user_font)}"!', 'success')
+    log_audit(current_user.id, 'update', 'user', current_user.id, f'Changed font to {user_font}')
+    return redirect(url_for('settings_general'))
+
+@app.route('/save-ui-preference', methods=['POST'])
+@login_required
+def save_ui_preference():
+    """Save both theme and font together"""
+    # Save theme
+    theme = request.form.get('theme', 'light')
+    valid_themes = ['light', 'dark', 'blue', 'keqing']
+    if theme not in valid_themes:
+        theme = 'light'
+    
+    current_user.theme = theme
+    
+    # Save font
+    user_font = request.form.get('user_font', 'system')
+    valid_fonts = ['system', 'open-dyslexic', 'courier']
+    if user_font not in valid_fonts:
+        user_font = 'system'
+    
+    current_user.user_font = user_font
+    db.session.commit()
+    
+    flash(f'Your UI preferences have been saved!', 'success')
+    log_audit(current_user.id, 'update', 'user', current_user.id, f'Changed UI preference: theme={theme}, font={user_font}')
     return redirect(url_for('settings_general'))
 
 @app.route('/change-password', methods=['POST'])
@@ -2360,22 +2434,28 @@ def settings_system():
                 flash('Currency symbol must be 7 characters or less!', 'danger')
                 return redirect(url_for('settings_system'))
             
-            # Max file size (in MB)
-            max_file_size = request.form.get('max_file_size', '10')
-            try:
-                max_file_size = int(max_file_size)
-                if max_file_size < 1 or max_file_size > 100:
-                    flash('Max file size must be between 1 and 100 MB!', 'danger')
+            # In DEMO MODE, skip file validation and use stored defaults
+            if app.config.get('DEMO_MODE', False):
+                # Demo mode: use fixed values, ignore form input for file settings
+                allowed_extensions = 'jpg,jpeg,png,txt,md'
+                max_file_size = 1
+            else:
+                # Production mode: validate file settings from form
+                allowed_extensions = request.form.get('allowed_extensions', '').strip()
+                if not allowed_extensions:
+                    flash('You must specify at least one allowed file type!', 'danger')
                     return redirect(url_for('settings_system'))
-            except ValueError:
-                flash('Invalid max file size value!', 'danger')
-                return redirect(url_for('settings_system'))
-            
-            # Allowed file extensions
-            allowed_extensions = request.form.get('allowed_extensions', '').strip()
-            if not allowed_extensions:
-                flash('You must specify at least one allowed file type!', 'danger')
-                return redirect(url_for('settings_system'))
+                
+                # Max file size validation (production mode only)
+                max_file_size = request.form.get('max_file_size', '10')
+                try:
+                    max_file_size = int(max_file_size)
+                    if max_file_size < 1 or max_file_size > 100:
+                        flash('Max file size must be between 1 and 100 MB!', 'danger')
+                        return redirect(url_for('settings_system'))
+                except ValueError:
+                    flash('Invalid max file size value!', 'danger')
+                    return redirect(url_for('settings_system'))
             
             # Max drawer rows
             max_drawer_rows = request.form.get('max_drawer_rows', '10')
@@ -2399,19 +2479,31 @@ def settings_system():
                 flash('Invalid max drawer columns value!', 'danger')
                 return redirect(url_for('settings_system'))
             
+            # Banner timeout
+            banner_timeout = request.form.get('banner_timeout', '5')
+            try:
+                banner_timeout = int(banner_timeout)
+                if banner_timeout < 0 or banner_timeout > 60:
+                    flash('Banner timeout must be between 0 and 60 seconds!', 'danger')
+                    return redirect(url_for('settings_system'))
+            except ValueError:
+                flash('Invalid banner timeout value!', 'danger')
+                return redirect(url_for('settings_system'))
+            
             # Save settings
             Setting.set('currency', currency, 'Currency symbol for prices')
             Setting.set('max_file_size_mb', max_file_size, 'Maximum file upload size in MB')
             Setting.set('allowed_extensions', allowed_extensions, 'Allowed file extensions (comma-separated)')
             Setting.set('max_drawer_rows', max_drawer_rows, 'Maximum drawer rows (1-32)')
             Setting.set('max_drawer_cols', max_drawer_cols, 'Maximum drawer columns (1-32)')
+            Setting.set('banner_timeout', banner_timeout, 'Banner auto-dismiss timeout in seconds (0=permanent)')
             
             # Update app config dynamically
             app.config['MAX_CONTENT_LENGTH'] = max_file_size * 1024 * 1024
             
             flash('System settings updated successfully!', 'success')
             log_audit(current_user.id, 'update', 'settings', 0, 
-                     f'Updated system settings: currency={currency}, max_file_size={max_file_size}MB, drawer_size={max_drawer_rows}x{max_drawer_cols}')
+                     f'Updated system settings: currency={currency}, max_file_size={max_file_size}MB, drawer_size={max_drawer_rows}x{max_drawer_cols}, banner_timeout={banner_timeout}s')
             
         except Exception as e:
             flash(f'Error saving settings: {str(e)}', 'danger')
@@ -2424,6 +2516,7 @@ def settings_system():
     allowed_extensions = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
     max_drawer_rows = Setting.get('max_drawer_rows', '10')
     max_drawer_cols = Setting.get('max_drawer_cols', '10')
+    banner_timeout = Setting.get('banner_timeout', '5')
     
     # Read system information from verinfo file
     verinfo_content = ""
@@ -2445,7 +2538,9 @@ def settings_system():
                           allowed_extensions=allowed_extensions,
                           max_drawer_rows=max_drawer_rows,
                           max_drawer_cols=max_drawer_cols,
-                          verinfo_content=verinfo_content)
+                          banner_timeout=banner_timeout,
+                          verinfo_content=verinfo_content,
+                          demo_mode=app.config.get('DEMO_MODE', False))
 
 
 # ============= FOOTPRINTS =============

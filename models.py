@@ -134,6 +134,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'), nullable=False)
     theme = db.Column(db.String(20), default='light')
+    user_font = db.Column(db.String(50), default='system')  # Font family selection (system, open-dyslexic, courier)
     table_columns_view = db.Column(db.Text, default='["name", "category", "tags", "quantity", "total_price", "location", "status"]')  # JSON array of column names
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     is_active = db.Column(db.Boolean, default=True)

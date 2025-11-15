@@ -52,15 +52,13 @@
                     <div class="row mb-2">
                         <div class="col-6">
                             <label class="form-label form-label-sm">Type / Model</label>
-                            {{ form.info(class="form-control form-control-sm", placeholder="e.g., 1N4001, MD124,
-                            Standard", disabled=(item_perms and not item_perms.can_edit_sku_type)) }}
+                            {{ form.info(class="form-control form-control-sm", placeholder="eg TVS Diode", disabled=(item_perms and not item_perms.can_edit_sku_type)) }}
                         </div>
                     </div>
 
                     <div class="mb-2">
                         <label class="form-label form-label-sm">Description</label>
-                        {{ form.description(class="form-control form-control-sm", placeholder="Detailed description of
-                        the item", rows=4, disabled=(item_perms and not item_perms.can_edit_description)) }}
+                        {{ form.description(class="form-control form-control-sm", placeholder="Support Markdown format", rows=4, disabled=(item_perms and not item_perms.can_edit_description)) }}
                     </div>
 
                     <!-- Row 3: Category and Quantity -->
@@ -86,8 +84,7 @@
                     <div class="row mb-2">
                         <div class="col-6">
                             <label class="form-label form-label-sm">Price per Qty ({{ currency }})</label>
-                            {{ form.price(class="form-control form-control-sm", placeholder="0.00", id="price_per_qty", disabled=(item_perms and not item_perms.can_edit_price))
-                            }}
+                            {{ form.price(class="form-control form-control-sm", placeholder="0.00", id="price_per_qty", disabled=(item_perms and not item_perms.can_edit_price)) }}
                         </div>
                         <div class="col-6">
                             <label class="form-label form-label-sm">Total Price ({{ currency }})</label>

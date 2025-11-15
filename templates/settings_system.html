@@ -14,28 +14,104 @@
     <div class="col-md-8">
         <form method="POST" action="{{ url_for('settings_system') }}">
             
-            <!-- Currency Settings Card -->
+            <!-- System Customization Card -->
             <div class="card mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="bi bi-currency-dollar"></i> Currency Settings</h5>
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="bi bi-palette"></i> System Customization</h5>
                 </div>
                 <div class="card-body">
                     <div class="mb-3">
-                        <label for="currency" class="form-label">Currency Symbol <span class="text-danger">*</span></label>
-                        <input type="text" 
+                        <label for="banner_timeout" class="form-label">Banner Timeout (seconds) <span class="text-danger">*</span></label>
+                        <input type="number" 
                                class="form-control" 
-                               id="currency" 
-                               name="currency" 
-                               value="{{ currency }}" 
-                               maxlength="7" 
-                               required
-                               placeholder="$">
+                               id="banner_timeout" 
+                               name="banner_timeout" 
+                               value="{{ banner_timeout }}" 
+                               min="0" 
+                               max="60" 
+                               required>
                         <div class="form-text">
-                            <i class="bi bi-info-circle"></i> Maximum 7 characters. Examples: $, USD, RM, €, £
+                            <i class="bi bi-info-circle"></i> Set to 0 for permanent banner (closes only with X button), or 1-60 seconds for auto-dismiss
                         </div>
                     </div>
                     <div class="alert alert-info mb-0">
-                        <i class="bi bi-lightbulb"></i> <strong>Note:</strong> This symbol will be displayed next to all prices throughout the system.
+                        <i class="bi bi-lightbulb"></i> <strong>Note:</strong> This affects info/alert banners displayed throughout the system.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Currency Settings & Drawer Size - Two Cards in One Container -->
+            <div class="row mb-4">
+                <!-- Currency Settings Card -->
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="bi bi-currency-dollar"></i> Currency Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="currency" class="form-label">Currency Symbol <span class="text-danger">*</span></label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="currency" 
+                                       name="currency" 
+                                       value="{{ currency }}" 
+                                       maxlength="7" 
+                                       required
+                                       placeholder="$">
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle"></i> Maximum 7 characters. Examples: $, USD, RM, €, £
+                                </div>
+                            </div>
+                            <div class="alert alert-info mb-0">
+                                <i class="bi bi-lightbulb"></i> <strong>Note:</strong> This symbol will be displayed next to all prices throughout the system.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Drawer Size Settings Card -->
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0"><i class="bi bi-grid-3x3"></i> Max Drawer Size Limits</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-12 mb-3">
+                                    <label for="max_drawer_rows" class="form-label">Maximum Rows <span class="text-danger">*</span></label>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="max_drawer_rows" 
+                                           name="max_drawer_rows" 
+                                           value="{{ max_drawer_rows }}" 
+                                           min="1" 
+                                           max="32" 
+                                           required>
+                                    <div class="form-text">
+                                        <i class="bi bi-info-circle"></i> Maximum rows allowed (1-32)
+                                    </div>
+                                </div>
+
+                                <div class="col-12">
+                                    <label for="max_drawer_cols" class="form-label">Maximum Columns <span class="text-danger">*</span></label>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="max_drawer_cols" 
+                                           name="max_drawer_cols" 
+                                           value="{{ max_drawer_cols }}" 
+                                           min="1" 
+                                           max="32" 
+                                           required>
+                                    <div class="form-text">
+                                        <i class="bi bi-info-circle"></i> Maximum columns allowed (1-32)
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="alert alert-info mb-0 mt-3">
+                                <i class="bi bi-lightbulb"></i> <strong>Note:</strong> These limits will be applied when creating or editing racks.
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -46,6 +122,11 @@
                     <h5 class="mb-0"><i class="bi bi-cloud-upload"></i> File Upload Settings</h5>
                 </div>
                 <div class="card-body">
+                    {% if demo_mode %}
+                    <div class="alert alert-warning">
+                        <i class="bi bi-lock"></i> <strong>File size and type cannot be changed for security purpose. Disable Demo Mode to enable this feature.</strong>
+                    </div>
+                    {% else %}
                     <div class="mb-3">
                         <label for="max_file_size" class="form-label">Maximum File Size (MB) <span class="text-danger">*</span></label>
                         <input type="number" 
@@ -85,50 +166,37 @@
                             <strong>Example:</strong> pdf,png,jpg (allows only PDF and PNG/JPG images)
                         </small>
                     </div>
+                    {% endif %}
                 </div>
             </div>
 
-            <!-- Drawer Size Settings Card -->
+            <!-- Current Settings Display -->
             <div class="card mb-4">
-                <div class="card-header bg-warning text-dark">
-                    <h5 class="mb-0"><i class="bi bi-grid-3x3"></i> Max Drawer Size Limits</h5>
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Current Settings</h5>
                 </div>
                 <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="max_drawer_rows" class="form-label">Maximum Rows <span class="text-danger">*</span></label>
-                            <input type="number" 
-                                   class="form-control" 
-                                   id="max_drawer_rows" 
-                                   name="max_drawer_rows" 
-                                   value="{{ max_drawer_rows }}" 
-                                   min="1" 
-                                   max="32" 
-                                   required>
-                            <div class="form-text">
-                                <i class="bi bi-info-circle"></i> Maximum rows allowed (1-32)
-                            </div>
-                        </div>
+                    <dl class="row mb-0 small">
+                        <dt class="col-sm-6">Banner Timeout:</dt>
+                        <dd class="col-sm-6"><span class="badge bg-info">{{ banner_timeout }}s</span></dd>
 
-                        <div class="col-md-6 mb-3">
-                            <label for="max_drawer_cols" class="form-label">Maximum Columns <span class="text-danger">*</span></label>
-                            <input type="number" 
-                                   class="form-control" 
-                                   id="max_drawer_cols" 
-                                   name="max_drawer_cols" 
-                                   value="{{ max_drawer_cols }}" 
-                                   min="1" 
-                                   max="32" 
-                                   required>
-                            <div class="form-text">
-                                <i class="bi bi-info-circle"></i> Maximum columns allowed (1-32)
-                            </div>
-                        </div>
-                    </div>
+                        <dt class="col-sm-6">Currency:</dt>
+                        <dd class="col-sm-6"><span class="badge bg-primary">{{ currency }}</span></dd>
+                        
+                        <dt class="col-sm-6">Max Drawer Size:</dt>
+                        <dd class="col-sm-6"><span class="badge bg-warning text-dark">{{ max_drawer_rows }} × {{ max_drawer_cols }}</span></dd>
 
-                    <div class="alert alert-info mb-0">
-                        <i class="bi bi-lightbulb"></i> <strong>Note:</strong> These limits will be applied when creating or editing racks. Users cannot exceed these values.
-                    </div>
+                        <dt class="col-sm-6">Max File Size:</dt>
+                        <dd class="col-sm-6"><span class="badge bg-success">{{ max_file_size }} MB</span></dd>
+                        
+                        <dt class="col-sm-12">Allowed Types:</dt>
+                        <dd class="col-sm-12">
+                            {% set extensions = allowed_extensions.split(',') %}
+                            {% for ext in extensions %}
+                                <span class="badge bg-secondary">{{ ext.strip() }}</span>
+                            {% endfor %}
+                        </dd>
+                    </dl>
                 </div>
             </div>
 
@@ -136,7 +204,7 @@
             <div class="card">
                 <div class="card-body">
                     <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-save"></i> Save Settings
+                        <i class="bi bi-save"></i> Save All Settings
                     </button>
                     <a href="{{ url_for('settings') }}" class="btn btn-secondary">
                         <i class="bi bi-arrow-left"></i> Back to Settings
@@ -148,7 +216,7 @@
         <!-- System Information Card -->
         {% if verinfo_content %}
         <div class="card mt-4">
-            <div class="card-header bg-info text-white">
+            <div class="card-header bg-dark text-white">
                 <h5 class="mb-0"><i class="bi bi-info-circle"></i> System Information</h5>
             </div>
             <div class="card-body">
@@ -162,12 +230,15 @@
 
     <!-- Help Panel -->
     <div class="col-md-4">
-        <div class="card bg-light">
+        <div class="card bg-light sticky-top" style="top: 20px;">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-question-circle"></i> Help</h5>
             </div>
             <div class="card-body">
-                <h6>Currency Symbol</h6>
+                <h6>System Customization</h6>
+                <p class="small">Control how banners are displayed. Set timeout to 0 for persistent banners that only close with the X button.</p>
+
+                <h6 class="mt-3">Currency Symbol</h6>
                 <p class="small">The currency symbol will appear next to all prices in your inventory. You can use standard symbols ($, €, £) or currency codes (USD, RM, MYR).</p>
                 
                 <h6 class="mt-3">File Size Limits</h6>
@@ -182,36 +253,6 @@
                 <div class="alert alert-info small mb-0 mt-3">
                     <i class="bi bi-shield-check"></i> <strong>Security Tip:</strong> Avoid allowing executable file types (.exe, .bat, .sh) for security reasons.
                 </div>
-            </div>
-        </div>
-
-        <!-- Current Settings Display -->
-        <div class="card bg-light mt-3">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Current Settings</h5>
-            </div>
-            <div class="card-body">
-                <dl class="row mb-0 small">
-                    <dt class="col-sm-6">Currency:</dt>
-                    <dd class="col-sm-6"><span class="badge bg-primary">{{ currency }}</span></dd>
-                    
-                    <dt class="col-sm-6">Max File Size:</dt>
-                    <dd class="col-sm-6"><span class="badge bg-success">{{ max_file_size }} MB</span></dd>
-                    
-                    <dt class="col-sm-6">Allowed Types:</dt>
-                    <dd class="col-sm-6">
-                        {% set extensions = allowed_extensions.split(',') %}
-                        {% for ext in extensions[:3] %}
-                            <span class="badge bg-secondary">{{ ext.strip() }}</span>
-                        {% endfor %}
-                        {% if extensions|length > 3 %}
-                            <span class="badge bg-secondary">+{{ extensions|length - 3 }} more</span>
-                        {% endif %}
-                    </dd>
-                    
-                    <dt class="col-sm-6">Max Drawer Size:</dt>
-                    <dd class="col-sm-6"><span class="badge bg-warning text-dark">{{ max_drawer_rows }} × {{ max_drawer_cols }}</span></dd>
-                </dl>
             </div>
         </div>
     </div>
