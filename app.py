@@ -18,9 +18,13 @@ def is_safe_url(target):
     """
     Only allow redirects to internal relative URLs (not external sites).
     Strips backslashes and checks that scheme/netloc are empty.
+    Also rejects targets that start with two or more slashes (e.g., '//evil.com').
     """
     # Normalize backslashes (important for browser behavior)
     target = target.replace('\\', '')
+    # Reject protocol-relative or ambiguous URLs (e.g., //evil.com)
+    if target.startswith('//'):
+        return False
     # Only allow redirects to relative paths under this app
     res = urlparse(target)
     if not res.netloc and not res.scheme:
