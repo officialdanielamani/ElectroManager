@@ -117,7 +117,7 @@
                             </div>
                         </div>
                         
-                        <button class="btn btn-secondary btn-sm" disabled>
+                        <button class="btn btn-secondary btn-sm" onclick="printItemsList()">
                             <i class="bi bi-printer"></i> Print This List
                         </button>
                     </div>
@@ -560,6 +560,30 @@
 </div>
 
 <script>
+// Print items list function
+function printItemsList() {
+    // Get current URL parameters
+    const url = new URL(window.location.href);
+    const params = new URLSearchParams(url.search);
+    
+    // Determine current view type (table or card)
+    const viewType = localStorage.getItem('itemsView') || 'table';
+    
+    // Build print URL with all current parameters
+    const printUrl = new URL('{{ url_for("items_print") }}', window.location.origin);
+    
+    // Copy all query parameters
+    for (const [key, value] of params.entries()) {
+        printUrl.searchParams.set(key, value);
+    }
+    
+    // Add view type parameter
+    printUrl.searchParams.set('view', viewType);
+    
+    // Open print page in new window
+    window.open(printUrl.toString(), '_blank');
+}
+
 // Select all checkbox functionality
 document.getElementById('selectAll')?.addEventListener('change', function() {
     const checkboxes = document.querySelectorAll('.item-checkbox');

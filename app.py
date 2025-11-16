@@ -3885,6 +3885,169 @@ def serve_user_picture(filename):
     return send_from_directory(os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture'), filename)
 
 
+# ============= ITEMS PRINT =============
+
+@app.route('/items/print')
+@login_required
+def items_print():
+    """Print view for items list"""
+    # Check if user has permission to view items
+    if not current_user.has_permission('items', 'view'):
+        flash('You do not have permission to view items.', 'danger')
+        return redirect(url_for('index'))
+    
+    # Get the same parameters as the items route
+    search_query = request.args.get('search', '')
+    category_id = request.args.get('category', 0, type=int)
+    status_filter = request.args.get('status', '')
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 25, type=int)
+    view_type = request.args.get('view', 'table')  # table or card
+    
+    # Cap per_page at a reasonable maximum
+    if per_page > 999999:
+        per_page = 999999
+    
+    query = Item.query
+    
+    if search_query:
+        query = query.filter(
+            db.or_(
+                Item.name.ilike(f'%{search_query}%'),
+                Item.description.ilike(f'%{search_query}%'),
+                Item.sku.ilike(f'%{search_query}%')
+            )
+        )
+    
+    if category_id > 0:
+        query = query.filter_by(category_id=category_id)
+    
+    # Apply status filter
+    if status_filter:
+        statuses = status_filter.split(',')
+        filtered_items = []
+        
+        for item in query.all():
+            if 'ok' in statuses and not item.is_no_stock() and not item.is_low_stock():
+                filtered_items.append(item)
+            elif 'low' in statuses and item.is_low_stock():
+                filtered_items.append(item)
+            elif 'no' in statuses and item.is_no_stock():
+                filtered_items.append(item)
+        
+        # Sort by updated_at descending
+        filtered_items.sort(key=lambda x: x.updated_at, reverse=True)
+        
+        # Manually paginate
+        total = len(filtered_items)
+        start = (page - 1) * per_page
+        end = start + per_page
+        items = filtered_items[start:end]
+        
+        # Create a manual pagination object
+        class Pagination:
+            def __init__(self, items, page, per_page, total):
+                self.items = items
+                self.page = page
+                self.per_page = per_page
+                self.total = total
+                self.pages = (total + per_page - 1) // per_page
+            
+            @property
+            def has_next(self):
+                return self.page < self.pages
+            
+            @property
+            def has_prev(self):
+                return self.page > 1
+            
+            @property
+            def next_num(self):
+                return self.page + 1 if self.has_next else None
+            
+            @property
+            def prev_num(self):
+                return self.page - 1 if self.has_prev else None
+            
+            def iter_pages(self, left_edge=1, right_edge=1, left_current=1, right_current=2):
+                for num in range(1, self.pages + 1):
+                    if (num <= left_edge or
+                        num > self.pages - right_edge or
+                        (self.page - left_current <= num <= self.page + right_current)):
+                        yield num
+                    elif num == left_edge + 1 or num == self.pages - right_edge:
+                        yield None
+        
+        pagination = Pagination(items, page, per_page, total)
+    else:
+        # Default sort by updated_at descending
+        pagination = query.order_by(Item.updated_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+    
+    items = pagination.items
+    
+    # Get user's table columns preference
+    user_columns = current_user.get_table_columns()
+    currency_symbol = Setting.get('currency', '$')
+    currency_decimal_places = int(Setting.get('currency_decimal_places', '2'))
+    
+    # Get current datetime for footer
+    from datetime import datetime
+    current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    return render_template('items_print.html', 
+                         items=items,
+                         page=page,
+                         per_page=per_page,
+                         view_type=view_type,
+                         user_columns=user_columns,
+                         currency_symbol=currency_symbol,
+                         currency_decimal_places=currency_decimal_places,
+                         current_user=current_user,
+                         current_datetime=current_datetime)
+
+@app.route('/item/<string:uuid>/print')
+@login_required
+def item_detail_print(uuid):
+    """Print view for item detail"""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    
+    # Check if user has view permission
+    if not current_user.has_permission('items', 'view'):
+        flash('You do not have permission to view items.', 'danger')
+        return redirect(url_for('items'))
+    
+    currency_symbol = Setting.get('currency', '$')
+    currency_decimal_places = int(Setting.get('currency_decimal_places', '2'))
+    
+    # Get current datetime for footer
+    from datetime import datetime
+    current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    # Parse datasheets
+    datasheets = []
+    if item.datasheet_urls:
+        try:
+            import json
+            datasheets = json.loads(item.datasheet_urls)
+            if not isinstance(datasheets, list):
+                datasheets = []
+        except (json.JSONDecodeError, TypeError):
+            # Fallback: old format (plain URLs separated by newlines)
+            urls = item.datasheet_urls.split('\n')
+            datasheets = [{'url': url.strip(), 'title': '', 'info': ''} for url in urls if url.strip()]
+    
+    return render_template('item_detail_print.html',
+                         item=item,
+                         currency_symbol=currency_symbol,
+                         currency_decimal_places=currency_decimal_places,
+                         current_user=current_user,
+                         current_datetime=current_datetime,
+                         datasheets=datasheets)
+
+
+
 # ============= ERROR HANDLERS =============
 
 @app.errorhandler(404)

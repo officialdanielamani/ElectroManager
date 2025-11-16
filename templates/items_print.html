@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Items List - Print</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+        }
+        
+        .print-header {
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+        
+        .print-header h1 {
+            font-size: 24px;
+            margin: 0;
+        }
+        
+        .print-info {
+            font-size: 11px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        /* Table View Styles */
+        .table {
+            font-size: 11px;
+            margin-bottom: 0;
+        }
+        
+        .table th {
+            background-color: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            font-weight: 600;
+            padding: 8px 5px;
+        }
+        
+        .table td {
+            padding: 6px 5px;
+            vertical-align: middle;
+        }
+        
+        .badge {
+            font-size: 10px;
+            padding: 3px 6px;
+        }
+        
+        /* Card View Styles - Match original style */
+        .card-view-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: flex-start;
+        }
+        
+        .print-card {
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            width: calc(20% - 8px);
+            min-width: 180px;
+            page-break-inside: avoid;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .print-card-header {
+            padding: 8px;
+            border-bottom: 1px solid #dee2e6;
+            background-color: #f8f9fa;
+        }
+        
+        .print-card-header h6 {
+            font-size: 12px;
+            margin: 0;
+            font-weight: 600;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .print-card-body {
+            padding: 8px;
+            font-size: 10px;
+            flex: 1;
+        }
+        
+        .print-card-body p {
+            margin-bottom: 4px;
+            line-height: 1.4;
+        }
+        
+        .print-card-body hr {
+            margin: 8px 0;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        .print-card-image {
+            height: 140px;
+            width: 100%;
+            overflow: hidden;
+            background-color: #f5f5f5;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+            position: relative;
+        }
+        
+        .print-card-image img {
+            max-width: 100%;
+            max-height: 100%;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        
+        .print-card-image i {
+            font-size: 2rem;
+            color: #adb5bd;
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* Print Footer */
+        .print-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 9px;
+            color: #666;
+            padding: 10px 0;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        /* Print Media Styles */
+        @media print {
+            body {
+                margin: 0;
+                padding: 15mm 15mm;
+            }
+            
+            .print-footer {
+                position: fixed;
+                bottom: 0;
+            }
+            
+            .table {
+                page-break-inside: auto;
+            }
+            
+            .table tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+            
+            .table thead {
+                display: table-header-group;
+            }
+            
+            .print-card {
+                page-break-inside: avoid;
+            }
+            
+            @page {
+                margin: 0;
+                @bottom-center {
+                    content: counter(page);
+                }
+            }
+            
+            /* Hide print button in print mode */
+            .no-print {
+                display: none !important;
+            }
+            
+            /* Ensure colors print */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+        }
+        
+        @media screen {
+            body {
+                padding: 20px;
+                padding-bottom: 60px;
+            }
+            
+            .print-footer {
+                position: relative;
+                margin-top: 30px;
+            }
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 1200px) {
+            .print-card {
+                width: calc(25% - 8px);
+            }
+        }
+        
+        @media (max-width: 992px) {
+            .print-card {
+                width: calc(33.333% - 8px);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .print-card {
+                width: calc(50% - 8px);
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .print-card {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Print Header -->
+    <div class="print-header">
+        <h1>Items List</h1>
+        <div class="print-info">
+            Page {{ page }} | Displaying {{ items|length }} items ({{ per_page }} per page)
+        </div>
+    </div>
+    
+    <!-- Print Button (hidden in print mode) -->
+    <div class="no-print mb-3">
+        <button onclick="window.print()" class="btn btn-primary btn-sm">
+            <i class="bi bi-printer"></i> Print / Save as PDF
+        </button>
+        <button onclick="window.close()" class="btn btn-secondary btn-sm">
+            <i class="bi bi-x-circle"></i> Close
+        </button>
+    </div>
+    
+    {% if items %}
+        {% if view_type == 'table' %}
+        <!-- Table View -->
+        <div class="table-responsive">
+            <table class="table table-bordered table-sm">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        {% for col in user_columns %}
+                            {% if col == 'type_model' %}<th>Type/Model</th>{% endif %}
+                            {% if col == 'sku' %}<th>SKU</th>{% endif %}
+                            {% if col == 'category' %}<th>Category</th>{% endif %}
+                            {% if col == 'tags' %}<th>Tags</th>{% endif %}
+                            {% if col == 'footprint' %}<th>Footprint</th>{% endif %}
+                            {% if col == 'quantity' %}<th>Quantity</th>{% endif %}
+                            {% if col == 'price_per_unit' %}<th>Price/Unit</th>{% endif %}
+                            {% if col == 'total_price' %}<th>Total Price</th>{% endif %}
+                            {% if col == 'location' %}<th>Location</th>{% endif %}
+                            {% if col == 'uuid' %}<th>UUID</th>{% endif %}
+                            {% if col == 'status' %}<th>Status</th>{% endif %}
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td><strong>{{ item.name }}</strong></td>
+                        {% for col in user_columns %}
+                            {% if col == 'type_model' %}
+                                <td>{{ item.info or '-' }}</td>
+                            {% endif %}
+                            {% if col == 'sku' %}
+                                <td>{{ item.sku or '-' }}</td>
+                            {% endif %}
+                            {% if col == 'category' %}
+                                <td>
+                                    {% if item.category %}
+                                        <span class="badge" style="background-color: {{ item.category.color }}; color: white;">{{ item.category.name }}</span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            {% endif %}
+                            {% if col == 'tags' %}
+                                <td>
+                                    {% for tag in item.get_tags_list() %}
+                                        <span class="badge" style="background-color: {{ tag.color }}; color: white;">{{ tag.name }}</span>
+                                    {% endfor %}
+                                    {% if not item.get_tags_list() %}-{% endif %}
+                                </td>
+                            {% endif %}
+                            {% if col == 'footprint' %}
+                                <td>
+                                    {% if item.footprint %}
+                                        {{ item.footprint.name }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            {% endif %}
+                            {% if col == 'quantity' %}
+                                <td>{{ item.quantity }}</td>
+                            {% endif %}
+                            {% if col == 'price_per_unit' %}
+                                <td>
+                                    {% if item.price %}
+                                        {{ currency_symbol }}{{ item.price|format_amount(currency_decimal_places) }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            {% endif %}
+                            {% if col == 'total_price' %}
+                                <td>
+                                    {% if item.get_total_price() %}
+                                        {{ currency_symbol }}{{ item.get_total_price()|format_amount(currency_decimal_places) }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            {% endif %}
+                            {% if col == 'location' %}
+                                <td>
+                                    {% if item.rack and item.drawer %}
+                                        {{ item.rack.name }} - {{ item.drawer }}
+                                    {% elif item.location %}
+                                        {{ item.location.name }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            {% endif %}
+                            {% if col == 'uuid' %}
+                                <td><small>{{ item.uuid }}</small></td>
+                            {% endif %}
+                            {% if col == 'status' %}
+                                <td>
+                                    {% if item.is_no_stock() %}
+                                        <span class="badge bg-danger">No Stock</span>
+                                    {% elif item.is_low_stock() %}
+                                        <span class="badge bg-warning text-dark">Low Stock</span>
+                                    {% else %}
+                                        <span class="badge bg-success">OK</span>
+                                    {% endif %}
+                                </td>
+                            {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% else %}
+        <!-- Card View - Match original styling -->
+        <div class="card-view-container">
+            {% for item in items %}
+            <div class="print-card">
+                <div class="print-card-header">
+                    <h6 title="{{ item.name }}">{{ item.name }}</h6>
+                </div>
+                <div class="print-card-body">
+                    <p><strong>Model:</strong> {{ item.info or '-' }}</p>
+                    <p><strong>SKU:</strong> {{ item.sku or '-' }}</p>
+                    <p>
+                        <strong>Category:</strong> 
+                        {% if item.category %}
+                            <span class="badge" style="background-color: {{ item.category.color }}; color: white; font-size: 0.65rem;">{{ item.category.name }}</span>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </p>
+                    <p class="text-muted"><small>{{ item.uuid }}</small></p>
+                    
+                    <hr>
+                    
+                    <!-- Picture -->
+                    <div class="print-card-image">
+                        {% set image_found = namespace(value=false) %}
+                        {% for attachment in item.attachments %}
+                            {% if not image_found.value and attachment.file_type and attachment.file_type in ['png', 'jpg', 'jpeg', 'gif', 'webp'] %}
+                                <img src="{{ url_for('uploaded_file', filename=attachment.filename) }}" 
+                                     alt="{{ item.name }}">
+                                {% set image_found.value = true %}
+                            {% endif %}
+                        {% endfor %}
+                        {% if not image_found.value %}
+                            <i class="bi bi-image"></i>
+                        {% endif %}
+                    </div>
+                    
+                    <hr>
+                    
+                    <p>
+                        <strong>Tags:</strong> 
+                        {% for tag in item.get_tags_list() %}
+                            <span class="badge" style="background-color: {{ tag.color }}; color: white; font-size: 0.65rem;">{{ tag.name }}</span>
+                        {% endfor %}
+                        {% if not item.get_tags_list() %}-{% endif %}
+                    </p>
+                    <p><strong>Footprint:</strong> {{ item.footprint.name if item.footprint else '-' }}</p>
+                    <p>
+                        <strong>Location:</strong> 
+                        {% if item.rack and item.drawer %}
+                            {{ item.rack.name }} - {{ item.drawer }}
+                        {% elif item.location %}
+                            {{ item.location.name }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </p>
+                    <p>
+                        <strong>Quantity:</strong> {{ item.quantity }}
+                        {% if item.is_no_stock() %}
+                            <span class="badge bg-danger" style="font-size: 0.65rem;">No Stock</span>
+                        {% elif item.is_low_stock() %}
+                            <span class="badge bg-warning" style="font-size: 0.65rem;">Low</span>
+                        {% else %}
+                            <span class="badge bg-success" style="font-size: 0.65rem;">OK</span>
+                        {% endif %}
+                    </p>
+                    <p><strong>Price/Unit:</strong> {{ currency_symbol }}{{ item.price|format_amount(currency_decimal_places) if item.price else '-' }}</p>
+                    <p><strong>Total:</strong> {{ currency_symbol }}{{ item.get_total_price()|format_amount(currency_decimal_places) if item.get_total_price() else '-' }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% else %}
+        <div class="alert alert-info">
+            No items to display.
+        </div>
+    {% endif %}
+    
+    <!-- Print Footer -->
+    <div class="print-footer">
+        The data is printed by {{ current_user.username }} at {{ current_datetime }}. This data may change in future.
+    </div>
+</body>
+</html>
