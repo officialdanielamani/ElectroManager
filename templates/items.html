@@ -1,4 +1,4 @@
-card-body{% extends "base.html" %}
+{% extends "base.html" %}
 
 {% block title %}Items - Inventory Manager{% endblock %}
 
@@ -417,8 +417,8 @@ card-body{% extends "base.html" %}
                                 <div class="text-center mb-2 border rounded" style="height: 100px; overflow: hidden;">
                                     {% set image_found = false %}
                                     {% for attachment in item.attachments %}
-                                        {% if not image_found and attachment.file_type and attachment.file_type.startswith('image/') %}
-                                            <img src="{{ url_for('serve_attachment', filename=attachment.file_path.split('/')[-1]) }}" 
+                                        {% if not image_found and attachment.file_type and attachment.file_type in ['png', 'jpg', 'jpeg', 'gif', 'webp'] %}
+                                            <img src="{{ url_for('uploaded_file', filename=attachment.filename) }}" 
                                                  alt="{{ item.name }}" 
                                                  style="max-width: 100%; max-height: 100%; object-fit: contain;">
                                             {% set image_found = true %}

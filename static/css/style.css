@@ -363,6 +363,30 @@ table thead th i.sort-default {
     font-size: 0.9rem;
 }
 
+/* Stat cards equal height */
+.card.bg-primary,
+.card.bg-warning,
+.card.bg-danger,
+.card.bg-success {
+    min-height: 150px;
+    display: flex;
+    flex-direction: column;
+}
+
+.card.bg-primary .card-body,
+.card.bg-warning .card-body,
+.card.bg-danger .card-body,
+.card.bg-success .card-body {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* Card view item name center alignment */
+#cardView .card-header h6 {
+    text-align: center;
+}
+
 /* Permission-based field styling */
 input.disabled,
 select.disabled,
