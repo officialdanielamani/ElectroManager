@@ -63,8 +63,25 @@
                                     <i class="bi bi-info-circle"></i> Maximum 7 characters. Examples: $, USD, RM, €, £
                                 </div>
                             </div>
+                            <div class="mb-3">
+                                <label for="currency_decimal_places" class="form-label">Currency Decimal Places <span class="text-danger">*</span></label>
+                                <select class="form-select" 
+                                        id="currency_decimal_places" 
+                                        name="currency_decimal_places" 
+                                        required>
+                                    <option value="0" {% if currency_decimal_places|int == 0 %}selected{% endif %}>0 decimal places (e.g., ¥ 1050)</option>
+                                    <option value="1" {% if currency_decimal_places|int == 1 %}selected{% endif %}>1 decimal place (e.g., $ 105.0)</option>
+                                    <option value="2" {% if currency_decimal_places|int == 2 %}selected{% endif %}>2 decimal places (e.g., $ 10.50)</option>
+                                    <option value="3" {% if currency_decimal_places|int == 3 %}selected{% endif %}>3 decimal places (e.g., $ 1.050)</option>
+                                    <option value="4" {% if currency_decimal_places|int == 4 %}selected{% endif %}>4 decimal places (e.g., $ 0.1050)</option>
+                                    <option value="5" {% if currency_decimal_places|int == 5 %}selected{% endif %}>5 decimal places (e.g., $ 0.01050)</option>
+                                </select>
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle"></i> Number of decimal places to display for all prices and currency values.
+                                </div>
+                            </div>
                             <div class="alert alert-info mb-0">
-                                <i class="bi bi-lightbulb"></i> <strong>Note:</strong> This symbol will be displayed next to all prices throughout the system.
+                                <i class="bi bi-lightbulb"></i> <strong>Note:</strong> Both currency symbol and decimal places apply to all prices throughout the system.
                             </div>
                         </div>
                     </div>

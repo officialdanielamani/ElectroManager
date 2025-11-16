@@ -143,7 +143,7 @@ class User(UserMixin, db.Model):
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'), nullable=False)
     theme = db.Column(db.String(20), default='light')
     user_font = db.Column(db.String(50), default='system')  # Font family selection (system, open-dyslexic, courier)
-    table_columns_view = db.Column(db.Text, default='["name", "category", "tags", "quantity", "total_price", "location", "status"]')  # JSON array of column names
+    table_columns_view = db.Column(db.Text, default='["name", "category", "tags", "type_model", "sku", "footprint", "quantity", "total_price", "price_per_unit", "location", "uuid", "status"]')  # JSON array of column names
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     is_active = db.Column(db.Boolean, default=True)
     is_demo_user = db.Column(db.Boolean, default=False)
@@ -193,7 +193,7 @@ class User(UserMixin, db.Model):
         try:
             return json.loads(self.table_columns_view)
         except (json.JSONDecodeError, TypeError):
-            return ["name", "category", "tags", "quantity", "total_price", "location", "status"]
+            return ["name", "category", "tags", "type_model", "sku", "footprint", "quantity", "total_price", "price_per_unit", "location", "uuid", "status"]
     
     def set_table_columns(self, columns):
         """Set user's preferred table columns"""

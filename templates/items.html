@@ -125,6 +125,8 @@
             </div>
             <div class="card-body" style="min-height: 420px;">
                 {% if items %}
+                <!-- Table View Container -->
+                <div id="tableViewContainer" data-view="table">
                 <!-- Table View -->
                 <div id="tableView" class="table-responsive">
                     <table class="table table-hover" id="itemTable">
@@ -213,6 +215,14 @@
                                             </a>
                                         </th>
                                     {% endif %}
+                                    {% if col == 'uuid' %}
+                                        <th>
+                                            <a href="#" class="text-decoration-none" title="Item UUID">
+                                                UUID
+                                                <i class="bi bi-arrow-down-up text-muted sort-default"></i>
+                                            </a>
+                                        </th>
+                                    {% endif %}
                                     {% if col == 'updated_at' %}
                                         <th>
                                             <a href="#" class="text-decoration-none" title="Sort by Last Updated">
@@ -272,7 +282,7 @@
                                 </td>
                                 {% for col in user_columns %}
                                     {% if col == 'type_model' %}
-                                    <td>{{ item.type_model or '-' }}</td>
+                                    <td>{{ item.info or '-' }}</td>
                                     {% endif %}
                                     {% if col == 'sku' %}
                                     <td>{{ item.sku or '-' }}</td>
@@ -290,10 +300,10 @@
                                     {% endif %}
                                     {% if col == 'tags' %}
                                     <td>
-                                        {% for tag in item.tags %}
+                                        {% for tag in item.get_tags_list() %}
                                         <span class="badge" style="background-color: {{ tag.color }}; color: white;">{{ tag.name }}</span>
                                         {% endfor %}
-                                        {% if not item.tags %}-{% endif %}
+                                        {% if not item.get_tags_list() %}-{% endif %}
                                     </td>
                                     {% endif %}
                                     {% if col == 'footprint' %}
@@ -310,8 +320,8 @@
                                     {% endif %}
                                     {% if col == 'total_price' %}
                                     <td>
-                                        {% if item.total_price %}
-                                        {{ "%.2f"|format(item.total_price) }}
+                                        {% if item.get_total_price() %}
+                                        {{ currency_symbol }}{{ item.get_total_price()|format_amount(currency_decimal_places) }}
                                         {% else %}
                                         -
                                         {% endif %}
@@ -319,8 +329,8 @@
                                     {% endif %}
                                     {% if col == 'price_per_unit' %}
                                     <td>
-                                        {% if item.price_per_unit %}
-                                        {{ "%.2f"|format(item.price_per_unit) }}
+                                        {% if item.price %}
+                                        {{ currency_symbol }}{{ item.price|format_amount(currency_decimal_places) }}
                                         {% else %}
                                         -
                                         {% endif %}
@@ -338,6 +348,13 @@
                                         {% else %}
                                         -
                                         {% endif %}
+                                    </td>
+                                    {% endif %}
+                                    {% if col == 'uuid' %}
+                                    <td>
+                                        <code style="font-size: 0.9rem; background-color: #f5f5f5; padding: 2px 6px; border-radius: 3px;">
+                                            {{ item.uuid }}
+                                        </code>
                                     </td>
                                     {% endif %}
                                     {% if col == 'updated_at' %}
@@ -389,11 +406,15 @@
                         </tbody>
                     </table>
                 </div>
+                </div>
+                <!-- End Table View Container -->
 
+                <!-- Card View Container -->
+                <div id="cardViewContainer" data-view="card" style="display: none;">
                 <!-- Card View -->
-                <div id="cardView" class="row g-3" style="display: none;">
+                <div id="cardView" class="row g-2 justify-content-center">
                     {% for item in items %}
-                    <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
+                    <div class="col-12 col-sm-6 col-md-3 col-lg-2-4 col-xl-2-4">
                         <div class="card h-100 border">
                             <div class="card-header p-2">
                                 <h6 class="mb-0 text-truncate" title="{{ item.name }}" text-align="center">
@@ -414,19 +435,19 @@
                                 <hr class="my-2">
                                 
                                 <!-- Picture -->
-                                <div class="text-center mb-2 border rounded" style="height: 100px; overflow: hidden;">
+                                <div class="text-center mb-2 border rounded" style="height: 180px; width: 100%; overflow: hidden; background-color: #f5f5f5;">
                                     {% set image_found = false %}
                                     {% for attachment in item.attachments %}
                                         {% if not image_found and attachment.file_type and attachment.file_type in ['png', 'jpg', 'jpeg', 'gif', 'webp'] %}
                                             <img src="{{ url_for('uploaded_file', filename=attachment.filename) }}" 
                                                  alt="{{ item.name }}" 
-                                                 style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                                                 style="max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: contain; display: block;">
                                             {% set image_found = true %}
                                         {% endif %}
                                     {% endfor %}
                                     {% if not image_found %}
-                                    <div class="d-flex align-items-center justify-content-center h-100">
-                                        <i class="bi bi-image text-muted" style="font-size: 2rem;"></i>
+                                    <div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">
+                                        <i class="bi bi-image text-muted" style="font-size: 2.5rem;"></i>
                                     </div>
                                     {% endif %}
                                 </div>
@@ -435,10 +456,10 @@
                                 
                                 <p class="mb-1 small">
                                     <strong>Tags:</strong> 
-                                    {% for tag in item.tags %}
+                                    {% for tag in item.get_tags_list() %}
                                     <span class="badge" style="background-color: {{ tag.color }}; color: white; font-size: 0.65rem;">{{ tag.name }}</span>
                                     {% endfor %}
-                                    {% if not item.tags %}-{% endif %}
+                                    {% if not item.get_tags_list() %}-{% endif %}
                                 </p>
                                 <p class="mb-1 small">
                                     <strong>Footprint:</strong> {{ item.footprint.name if item.footprint else '-' }}
@@ -461,8 +482,8 @@
                                     <span class="badge bg-success" style="font-size: 0.65rem;">OK</span>
                                     {% endif %}
                                 </p>
-                                <p class="mb-1 small"><strong>Price/Unit:</strong> {{ "%.2f"|format(item.price_per_unit) if item.price_per_unit else '-' }}</p>
-                                <p class="mb-2 small"><strong>Total:</strong> {{ "%.2f"|format(item.total_price) if item.total_price else '-' }}</p>
+                                <p class="mb-1 small"><strong>Price/Unit:</strong> {{ currency_symbol }}{{ item.price|format_amount(currency_decimal_places) if item.price else '-' }}</p>
+                                <p class="mb-2 small"><strong>Total:</strong> {{ currency_symbol }}{{ item.get_total_price()|format_amount(currency_decimal_places) if item.get_total_price() else '-' }}</p>
                                 
                                 <div class="btn-group btn-group-sm w-100" role="group">
                                     {% if current_user.has_permission('items', 'view') %}
@@ -487,6 +508,8 @@
                     </div>
                     {% endfor %}
                 </div>
+                </div>
+                <!-- End Card View Container -->
 
                 <!-- Pagination -->
                 {% if pagination.pages > 1 %}
@@ -601,21 +624,42 @@ function changeItemsPerPage() {
 }
 
 // Toggle between table and card view
-document.getElementById('viewTable')?.addEventListener('click', function() {
-    document.getElementById('tableView').style.display = 'block';
-    document.getElementById('cardView').style.display = 'none';
-    document.getElementById('viewTable').classList.add('active');
-    document.getElementById('viewCard').classList.remove('active');
-    localStorage.setItem('itemsView', 'table');
-});
+function setupViewToggle() {
+    document.getElementById('viewTable')?.addEventListener('click', function() {
+        const tableContainer = document.getElementById('tableViewContainer');
+        const cardContainer = document.getElementById('cardViewContainer');
+        
+        if (tableContainer) {
+            tableContainer.classList.remove('hidden');
+        }
+        if (cardContainer) {
+            cardContainer.classList.remove('visible');
+        }
+        
+        document.getElementById('viewTable').classList.add('active');
+        document.getElementById('viewCard').classList.remove('active');
+        localStorage.setItem('itemsView', 'table');
+    });
 
-document.getElementById('viewCard')?.addEventListener('click', function() {
-    document.getElementById('tableView').style.display = 'none';
-    document.getElementById('cardView').style.display = 'flex';
-    document.getElementById('viewCard').classList.add('active');
-    document.getElementById('viewTable').classList.remove('active');
-    localStorage.setItem('itemsView', 'card');
-});
+    document.getElementById('viewCard')?.addEventListener('click', function() {
+        const tableContainer = document.getElementById('tableViewContainer');
+        const cardContainer = document.getElementById('cardViewContainer');
+        
+        if (tableContainer) {
+            tableContainer.classList.add('hidden');
+        }
+        if (cardContainer) {
+            cardContainer.classList.add('visible');
+        }
+        
+        document.getElementById('viewCard').classList.add('active');
+        document.getElementById('viewTable').classList.remove('active');
+        localStorage.setItem('itemsView', 'card');
+    });
+}
+
+// Setup view toggle immediately
+setupViewToggle();
 
 // Restore view preference on page load
 document.addEventListener('DOMContentLoaded', function() {

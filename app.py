@@ -31,6 +31,30 @@ def is_safe_url(target):
         return True
     return False
 
+def format_currency(amount, currency_symbol=None, decimal_places=None):
+    """
+    Format amount as currency with configurable decimal places.
+    
+    Args:
+        amount: The numeric amount to format
+        currency_symbol: Currency symbol (defaults to server setting)
+        decimal_places: Number of decimal places (defaults to server setting)
+    
+    Returns:
+        Formatted string like "RM 1234.56" or "¥ 1050"
+    """
+    if currency_symbol is None:
+        currency_symbol = Setting.get('currency', '$')
+    if decimal_places is None:
+        decimal_places = int(Setting.get('currency_decimal_places', '2'))
+    
+    if amount is None:
+        return '-'
+    
+    format_string = f'{{:.{decimal_places}f}}'
+    formatted_amount = format_string.format(float(amount))
+    return f'{currency_symbol}{formatted_amount}'
+
 app = Flask(__name__)
 app.config.from_object(Config)
 
@@ -82,6 +106,21 @@ def is_safe_file_path(file_path, base_dir=None):
 @app.template_filter('filesize')
 def filesize_filter(size):
     return format_file_size(size)
+
+@app.template_filter('format_amount')
+def jinja_format_amount(amount, decimal_places=None):
+    """Jinja2 filter to format amounts with configurable decimal places"""
+    if decimal_places is None:
+        decimal_places = int(Setting.get('currency_decimal_places', '2'))
+    
+    if amount is None or amount == '':
+        return ''
+    
+    try:
+        format_string = f'{{:.{int(decimal_places)}f}}'
+        return format_string.format(float(amount))
+    except (ValueError, TypeError):
+        return str(amount)
 
 @app.template_filter('markdown')
 def markdown_filter(text):
@@ -384,6 +423,8 @@ def items():
     
     # Get user's table columns preference
     user_columns = current_user.get_table_columns()
+    currency_symbol = Setting.get('currency', '$')
+    currency_decimal_places = int(Setting.get('currency_decimal_places', '2'))
     
     return render_template('items.html', 
                          items=items,
@@ -397,7 +438,9 @@ def items():
                          no_stock_items=no_stock_items,
                          total_categories=total_categories,
                          user_columns=user_columns,
-                         per_page=per_page)
+                         per_page=per_page,
+                         currency_symbol=currency_symbol,
+                         currency_decimal_places=currency_decimal_places)
 
 # ============= ITEM ROUTES =============
 
@@ -2719,6 +2762,17 @@ def settings_system():
                 flash('Currency symbol must be 7 characters or less!', 'danger')
                 return redirect(url_for('settings_system'))
             
+            # Currency decimal places
+            currency_decimal_places = request.form.get('currency_decimal_places', '2')
+            try:
+                currency_decimal_places = int(currency_decimal_places)
+                if currency_decimal_places < 0 or currency_decimal_places > 5:
+                    flash('Currency decimal places must be between 0 and 5!', 'danger')
+                    return redirect(url_for('settings_system'))
+            except ValueError:
+                flash('Invalid currency decimal places value!', 'danger')
+                return redirect(url_for('settings_system'))
+            
             # In DEMO MODE, skip file validation and use stored defaults
             if app.config.get('DEMO_MODE', False):
                 # Demo mode: use fixed values, ignore form input for file settings
@@ -2777,6 +2831,7 @@ def settings_system():
             
             # Save settings
             Setting.set('currency', currency, 'Currency symbol for prices')
+            Setting.set('currency_decimal_places', currency_decimal_places, 'Currency decimal places (0-5)')
             Setting.set('max_file_size_mb', max_file_size, 'Maximum file upload size in MB')
             Setting.set('allowed_extensions', allowed_extensions, 'Allowed file extensions (comma-separated)')
             Setting.set('max_drawer_rows', max_drawer_rows, 'Maximum drawer rows (1-32)')
@@ -2788,7 +2843,7 @@ def settings_system():
             
             flash('System settings updated successfully!', 'success')
             log_audit(current_user.id, 'update', 'settings', 0,
-                     f'Updated system settings: currency={currency}, max_file_size={max_file_size}MB, drawer_size={max_drawer_rows}x{max_drawer_cols}, banner_timeout={banner_timeout}s')
+                     f'Updated system settings: currency={currency}, decimal_places={currency_decimal_places}, max_file_size={max_file_size}MB, drawer_size={max_drawer_rows}x{max_drawer_cols}, banner_timeout={banner_timeout}s')
 
         except Exception as e:
             logging.error(f"Error saving system settings: {str(e)}")
@@ -2798,6 +2853,7 @@ def settings_system():
     
     # GET request - load current settings
     currency = Setting.get('currency', '$')
+    currency_decimal_places = Setting.get('currency_decimal_places', '2')
     max_file_size = Setting.get('max_file_size_mb', '10')
     allowed_extensions = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
     max_drawer_rows = Setting.get('max_drawer_rows', '10')
@@ -2820,6 +2876,7 @@ def settings_system():
     
     return render_template('settings_system.html', 
                           currency=currency,
+                          currency_decimal_places=currency_decimal_places,
                           max_file_size=max_file_size,
                           allowed_extensions=allowed_extensions,
                           max_drawer_rows=max_drawer_rows,

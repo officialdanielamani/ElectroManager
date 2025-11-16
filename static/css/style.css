@@ -382,9 +382,96 @@ table thead th i.sort-default {
     justify-content: center;
 }
 
-/* Card view item name center alignment */
+/* Table and Card View Containers */
+#tableViewContainer {
+    display: block;
+}
+
+#cardViewContainer {
+    display: none;
+}
+
+#tableViewContainer.hidden {
+    display: none;
+}
+
+#cardViewContainer.visible {
+    display: block !important;
+}
+
+/* Card View Styling */
+#cardView {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 0 auto;
+    gap: 0.5rem;
+}
+
 #cardView .card-header h6 {
     text-align: center;
+}
+
+#cardView .card {
+    width: 100%;
+}
+
+/* Responsive card columns */
+.col-lg-2-4 {
+    flex: 0 0 auto;
+    width: 20%;
+}
+
+.col-xl-2-4 {
+    flex: 0 0 auto;
+    width: 20%;
+}
+
+/* Medium screens: 5 cards per row */
+@media (max-width: 1400px) {
+    .col-lg-2-4 {
+        width: 25%;
+    }
+    .col-xl-2-4 {
+        width: 25%;
+    }
+}
+
+/* Tablet: 3-4 cards per row */
+@media (max-width: 992px) {
+    .col-md-3 {
+        flex: 0 0 auto;
+        width: 33.333%;
+    }
+}
+
+/* Small tablets and large phones: 2 cards per row */
+@media (max-width: 768px) {
+    .col-sm-6 {
+        flex: 0 0 auto;
+        width: 48%;
+    }
+}
+
+/* Mobile phones: Full width cards */
+@media (max-width: 576px) {
+    .col-12 {
+        flex: 0 0 auto;
+        width: 90% !important;
+        margin: 0 auto;
+    }
+    
+    .col-sm-6 {
+        flex: 0 0 auto;
+        width: 90% !important;
+        margin: 0 auto;
+    }
+    
+    .col-md-3 {
+        flex: 0 0 auto;
+        width: 90% !important;
+        margin: 0 auto;
+    }
 }
 
 /* Permission-based field styling */
