@@ -3903,87 +3903,116 @@ def items_print():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 25, type=int)
     view_type = request.args.get('view', 'table')  # table or card
+    item_ids = request.args.get('item_ids', '')  # Selected item IDs (comma-separated)
     
     # Cap per_page at a reasonable maximum
     if per_page > 999999:
         per_page = 999999
     
-    query = Item.query
-    
-    if search_query:
-        query = query.filter(
-            db.or_(
-                Item.name.ilike(f'%{search_query}%'),
-                Item.description.ilike(f'%{search_query}%'),
-                Item.sku.ilike(f'%{search_query}%')
-            )
-        )
-    
-    if category_id > 0:
-        query = query.filter_by(category_id=category_id)
-    
-    # Apply status filter
-    if status_filter:
-        statuses = status_filter.split(',')
-        filtered_items = []
+    # If specific items are selected, only print those
+    if item_ids:
+        # Parse the comma-separated IDs
+        id_list = [int(id.strip()) for id in item_ids.split(',') if id.strip().isdigit()]
         
-        for item in query.all():
-            if 'ok' in statuses and not item.is_no_stock() and not item.is_low_stock():
-                filtered_items.append(item)
-            elif 'low' in statuses and item.is_low_stock():
-                filtered_items.append(item)
-            elif 'no' in statuses and item.is_no_stock():
-                filtered_items.append(item)
+        # Query only the selected items
+        items = Item.query.filter(Item.id.in_(id_list)).order_by(Item.updated_at.desc()).all()
         
-        # Sort by updated_at descending
-        filtered_items.sort(key=lambda x: x.updated_at, reverse=True)
-        
-        # Manually paginate
-        total = len(filtered_items)
-        start = (page - 1) * per_page
-        end = start + per_page
-        items = filtered_items[start:end]
-        
-        # Create a manual pagination object
-        class Pagination:
-            def __init__(self, items, page, per_page, total):
+        # Create a simple pagination object for selected items
+        class SimplePagination:
+            def __init__(self, items):
                 self.items = items
-                self.page = page
-                self.per_page = per_page
-                self.total = total
-                self.pages = (total + per_page - 1) // per_page
+                self.page = 1
+                self.per_page = len(items)
+                self.total = len(items)
+                self.pages = 1
             
             @property
             def has_next(self):
-                return self.page < self.pages
+                return False
             
             @property
             def has_prev(self):
-                return self.page > 1
-            
-            @property
-            def next_num(self):
-                return self.page + 1 if self.has_next else None
-            
-            @property
-            def prev_num(self):
-                return self.page - 1 if self.has_prev else None
-            
-            def iter_pages(self, left_edge=1, right_edge=1, left_current=1, right_current=2):
-                for num in range(1, self.pages + 1):
-                    if (num <= left_edge or
-                        num > self.pages - right_edge or
-                        (self.page - left_current <= num <= self.page + right_current)):
-                        yield num
-                    elif num == left_edge + 1 or num == self.pages - right_edge:
-                        yield None
+                return False
         
-        pagination = Pagination(items, page, per_page, total)
+        pagination = SimplePagination(items)
     else:
-        # Default sort by updated_at descending
-        pagination = query.order_by(Item.updated_at.desc()).paginate(
-            page=page, per_page=per_page, error_out=False
-        )
+        # Print all items with current filters
+        query = Item.query
+        
+        if search_query:
+            query = query.filter(
+                db.or_(
+                    Item.name.ilike(f'%{search_query}%'),
+                    Item.description.ilike(f'%{search_query}%'),
+                    Item.sku.ilike(f'%{search_query}%')
+                )
+            )
+        
+        if category_id > 0:
+            query = query.filter_by(category_id=category_id)
+        
+        # Apply status filter
+        if status_filter:
+            statuses = status_filter.split(',')
+            filtered_items = []
+            
+            for item in query.all():
+                if 'ok' in statuses and not item.is_no_stock() and not item.is_low_stock():
+                    filtered_items.append(item)
+                elif 'low' in statuses and item.is_low_stock():
+                    filtered_items.append(item)
+                elif 'no' in statuses and item.is_no_stock():
+                    filtered_items.append(item)
+            
+            # Sort by updated_at descending
+            filtered_items.sort(key=lambda x: x.updated_at, reverse=True)
+            
+            # Manually paginate
+            total = len(filtered_items)
+            start = (page - 1) * per_page
+            end = start + per_page
+            items = filtered_items[start:end]
+            
+            # Create a manual pagination object
+            class Pagination:
+                def __init__(self, items, page, per_page, total):
+                    self.items = items
+                    self.page = page
+                    self.per_page = per_page
+                    self.total = total
+                    self.pages = (total + per_page - 1) // per_page
+                
+                @property
+                def has_next(self):
+                    return self.page < self.pages
+                
+                @property
+                def has_prev(self):
+                    return self.page > 1
+                
+                @property
+                def next_num(self):
+                    return self.page + 1 if self.has_next else None
+                
+                @property
+                def prev_num(self):
+                    return self.page - 1 if self.has_prev else None
+                
+                def iter_pages(self, left_edge=1, right_edge=1, left_current=1, right_current=2):
+                    for num in range(1, self.pages + 1):
+                        if (num <= left_edge or
+                            num > self.pages - right_edge or
+                            (self.page - left_current <= num <= self.page + right_current)):
+                            yield num
+                        elif num == left_edge + 1 or num == self.pages - right_edge:
+                            yield None
+            
+            pagination = Pagination(items, page, per_page, total)
+        else:
+            # Default sort by updated_at descending
+            pagination = query.order_by(Item.updated_at.desc()).paginate(
+                page=page, per_page=per_page, error_out=False
+            )
     
     items = pagination.items
     

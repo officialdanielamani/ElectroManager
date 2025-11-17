@@ -83,11 +83,8 @@
                             <i class="bi bi-plus-circle"></i> Add New Item
                         </a>
                         {% endif %}
-                        <button class="btn btn-primary btn-sm" disabled>
-                            <i class="bi bi-pencil-square"></i> Bulk Edit
-                        </button>
-                        <button class="btn btn-secondary btn-sm" disabled>
-                            <i class="bi bi-qr-code"></i> Bulk Print QR
+                        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#bulkOperationModal">
+                            <i class="bi bi-lightning-fill"></i> Bulk Operation
                         </button>
                     </div>
                     
@@ -417,8 +414,9 @@
                     <div class="col-12 col-sm-6 col-md-3 col-lg-2-4 col-xl-2-4">
                         <div class="card h-100 border">
                             <div class="card-header p-2">
-                                <h6 class="mb-0 text-truncate" title="{{ item.name }}" text-align="center">
-                                    <strong>{{ item.name }}</strong>
+                                <h6 class="mb-0 d-flex align-items-center" title="{{ item.name }}">
+                                    <input type="checkbox" class="item-checkbox form-check-input me-2" value="{{ item.id }}" style="margin-top: 0;">
+                                    <strong class="text-truncate">{{ item.name }}</strong>
                                 </h6>
                             </div>
                             <div class="card-body p-2">
@@ -559,6 +557,49 @@
     </div>
 </div>
 
+<!-- Bulk Operation Modal -->
+<div class="modal fade" id="bulkOperationModal" tabindex="-1" aria-labelledby="bulkOperationModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bulkOperationModalLabel">
+                    <i class="bi bi-lightning-fill"></i> Bulk Operation
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-3">
+                    <i class="bi bi-info-circle"></i> Select items from the list using checkboxes, then choose an operation below.
+                </p>
+                
+                <div class="d-grid gap-2">
+                    <button class="btn btn-warning btn-lg" disabled>
+                        <i class="bi bi-pencil-square"></i> Bulk Edit
+                        <small class="d-block text-muted" style="font-size: 0.8rem;">Edit multiple items at once</small>
+                    </button>
+                    
+                    <button class="btn btn-danger btn-lg" disabled>
+                        <i class="bi bi-trash"></i> Bulk Delete
+                        <small class="d-block text-muted" style="font-size: 0.8rem;">Delete selected items</small>
+                    </button>
+                    
+                    <button class="btn btn-secondary btn-lg" disabled>
+                        <i class="bi bi-qr-code"></i> Bulk Print QR
+                        <small class="d-block text-muted" style="font-size: 0.8rem;">Print QR codes for selected items</small>
+                    </button>
+                </div>
+                
+                <div class="alert alert-info mt-3 mb-0">
+                    <small><i class="bi bi-exclamation-circle"></i> These features are coming soon!</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // Print items list function
 function printItemsList() {
@@ -579,6 +620,15 @@ function printItemsList() {
     
     // Add view type parameter
     printUrl.searchParams.set('view', viewType);
+    
+    // Check for selected items
+    const checkedBoxes = document.querySelectorAll('.item-checkbox:checked');
+    if (checkedBoxes.length > 0) {
+        // Get all selected item IDs
+        const selectedIds = Array.from(checkedBoxes).map(cb => cb.value).join(',');
+        printUrl.searchParams.set('item_ids', selectedIds);
+    }
+    // If no items selected or all selected, print all (no item_ids parameter)
     
     // Open print page in new window
     window.open(printUrl.toString(), '_blank');
