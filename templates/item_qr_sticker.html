@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}QR Sticker - {{ item.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-10 offset-md-1">
+            
+            <!-- Header -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="bi bi-qr-code"></i> QR/Barcode Sticker
+                        </h4>
+                        <a href="{{ url_for('item.item_detail', uuid=item.uuid) }}" class="btn btn-light btn-sm">
+                            <i class="bi bi-box"></i> Back to Item
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <h6 class="text-muted mb-0">{{ item.name }}</h6>
+                    <small class="text-muted">Item UUID: <code>{{ item.uuid }}</code></small>
+                </div>
+            </div>
+
+            <!-- Template Selection -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-sliders"></i> Select Template</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <label class="form-label"><strong>Choose a template</strong></label>
+                            <select id="qr-template-select" class="form-select">
+                                <option value="">-- Select a template --</option>
+                                {% for template in templates %}
+                                <option value="{{ template.id }}">
+                                    {{ template.name }} ({{ template.width_mm }}×{{ template.height_mm }}mm)
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button id="btn-load-preview" class="btn btn-info w-100">
+                                <i class="bi bi-eye"></i> Load Preview
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preview Area -->
+            <div id="preview-section" class="card mb-4" style="display: none;">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-image"></i> Preview</h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="alert alert-info mb-3">
+                        <small><i class="bi bi-info-circle"></i> This preview may not be to exact scale. Print a test to verify.</small>
+                    </div>
+                    <div id="preview-svg" style="border: 2px solid #ddd; padding: 20px; background: #f9f9f9; 
+                                                  display: flex; align-items: center; justify-content: center;
+                                                  max-height: 70vh; overflow: auto; margin: 20px auto;">
+                        <!-- SVG preview inserted here -->
+                    </div>
+                    <div class="mt-3">
+                        <small id="preview-dimensions" class="text-muted d-block"></small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading -->
+            <div id="qr-loading" class="text-center" style="display: none;">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p>Generating sticker preview...</p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div id="action-buttons" class="d-grid gap-2 d-sm-flex justify-content-center mb-5" style="display: none;">
+                <button id="btn-print-qr" class="btn btn-success flex-grow-1">
+                    <i class="bi bi-printer"></i> Print (PDF)
+                </button>
+                <button id="btn-download-svg" class="btn btn-secondary flex-grow-1">
+                    <i class="bi bi-download"></i> Download (SVG)
+                </button>
+                <button id="btn-download-png" class="btn btn-info flex-grow-1">
+                    <i class="bi bi-image"></i> Download (PNG)
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+const itemUuid = '{{ item.uuid }}';
+const itemName = '{{ item.name }}';
+let currentTemplate = null;
+let currentSvgData = null;
+
+document.getElementById('btn-load-preview').addEventListener('click', async function() {
+    const templateId = document.getElementById('qr-template-select').value;
+    
+    if (!templateId) {
+        alert('Please select a template first');
+        return;
+    }
+    
+    const loading = document.getElementById('qr-loading');
+    const preview = document.getElementById('preview-section');
+    const buttons = document.getElementById('action-buttons');
+    
+    loading.style.display = 'block';
+    preview.style.display = 'none';
+    buttons.style.display = 'none';
+    
+    try {
+        const response = await fetch(`/api/item/${itemUuid}/sticker-preview/${templateId}`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        currentSvgData = data.svg;
+        currentTemplate = {
+            id: templateId,
+            width_mm: data.width_mm,
+            height_mm: data.height_mm,
+            name: data.template_name
+        };
+        
+        // Insert SVG into preview
+        document.getElementById('preview-svg').innerHTML = data.svg;
+        document.getElementById('preview-dimensions').textContent = 
+            `Template: ${data.template_name} | Size: ${data.width_mm}×${data.height_mm}mm | Item: ${itemName}`;
+        
+        preview.style.display = 'block';
+        buttons.style.display = 'flex';
+        
+    } catch (error) {
+        alert('Error: ' + error.message);
+        console.error(error);
+    } finally {
+        loading.style.display = 'none';
+    }
+});
+
+document.getElementById('btn-print-qr').addEventListener('click', function() {
+    if (currentTemplate) {
+        window.open(`/api/item/${itemUuid}/sticker-print/${currentTemplate.id}`, '_blank');
+    }
+});
+
+document.getElementById('btn-download-svg').addEventListener('click', function() {
+    if (!currentSvgData) return;
+    
+    const blob = new Blob([currentSvgData], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${currentTemplate.name}_${itemUuid}.svg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+});
+
+document.getElementById('btn-download-png').addEventListener('click', async function() {
+    if (!currentSvgData) return;
+    
+    const button = this;
+    const originalText = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-hourglass-split"></i> Converting...';
+    
+    try {
+        // Create canvas from SVG
+        const svgElement = document.getElementById('preview-svg').querySelector('svg');
+        if (!svgElement) {
+            throw new Error('SVG not found');
+        }
+        
+        // Clone SVG for rendering
+        const svgClone = svgElement.cloneNode(true);
+        
+        // Get SVG dimensions (in mm converted to pixels at 96 DPI)
+        const widthMm = currentTemplate.width_mm;
+        const heightMm = currentTemplate.height_mm;
+        const dpi = 96;
+        const mmToPx = dpi / 25.4;
+        const width = widthMm * mmToPx;
+        const height = heightMm * mmToPx;
+        
+        // Create canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.style.backgroundColor = 'white';
+        
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, width, height);
+        
+        // Convert SVG to image
+        const svgString = new XMLSerializer().serializeToString(svgClone);
+        const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
+        const svgUrl = URL.createObjectURL(svgBlob);
+        
+        const img = new Image();
+        img.onload = function() {
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(svgUrl);
+            
+            // Download PNG
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${currentTemplate.name}_${itemUuid}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }, 'image/png');
+        };
+        img.onerror = function() {
+            URL.revokeObjectURL(svgUrl);
+            throw new Error('Failed to convert SVG to image');
+        };
+        img.src = svgUrl;
+        
+    } catch (error) {
+        alert('Error converting to PNG: ' + error.message);
+        console.error(error);
+        button.disabled = false;
+        button.innerHTML = originalText;
+    }
+});
+</script>
+{% endblock %}

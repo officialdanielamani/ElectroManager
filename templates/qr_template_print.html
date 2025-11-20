@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Print Stickers: {{ template.name }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-10 offset-md-1">
+            <h3><i class="bi bi-printer"></i> Print Stickers: {{ template.name }}</h3>
+            <p class="text-muted">Select items to print stickers for</p>
+            
+            <form method="POST" class="mt-4">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <input type="text" id="search-box" class="form-control" placeholder="Search...">
+                            <button class="btn btn-outline-secondary" type="button" id="btn-select-all">Select All</button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="bi bi-download"></i> Generate PDF
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 50px;">
+                                    <input type="checkbox" id="check-all" class="form-check-input">
+                                </th>
+                                <th>Name</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in records %}
+                            <tr>
+                                <td>
+                                    <input type="checkbox" name="selected_ids" value="{{ record.id }}" class="form-check-input record-check">
+                                </td>
+                                <td><strong>{{ record.name }}</strong></td>
+                                <td>{{ record.uuid if hasattr(record, 'uuid') else '' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <p><strong id="selected-count">0</strong> selected</p>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <a href="{{ url_for('qr_template.settings_qr') }}" class="btn btn-secondary">Back</a>
+                        <button type="submit" class="btn btn-success">Generate PDF</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+const checkAll = document.getElementById('check-all');
+const checkboxes = document.querySelectorAll('.record-check');
+
+checkAll.addEventListener('change', (e) => {
+    checkboxes.forEach(cb => cb.checked = e.target.checked);
+    updateCount();
+});
+
+checkboxes.forEach(cb => cb.addEventListener('change', updateCount));
+
+function updateCount() {
+    const count = document.querySelectorAll('.record-check:checked').length;
+    document.getElementById('selected-count').textContent = count;
+}
+
+updateCount();
+</script>
+{% endblock %}

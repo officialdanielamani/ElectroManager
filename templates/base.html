@@ -91,26 +91,26 @@
                 <ul class="navbar-nav me-auto">
                     {% if current_user.has_permission('items', 'view') %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('items') }}">
+                        <a class="nav-link" href="{{ url_for('item.items') }}">
                             <i class="bi bi-box"></i> Items
                         </a>
                     </li>
                     {% endif %}
                     {% if current_user.has_permission('pages.visual_storage', 'view') %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('visual_storage') }}">
+                        <a class="nav-link" href="{{ url_for('visual_storage.visual_storage') }}">
                             <i class="bi bi-grid-3x3"></i> Visual Storage
                         </a>
                     </li>
                     {% endif %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('settings') }}">
+                        <a class="nav-link" href="{{ url_for('settings.settings') }}">
                             <i class="bi bi-gear"></i> Settings
                         </a>
                     </li>
                     {% if current_user.has_permission('pages.notifications', 'view') %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('notifications') }}">
+                        <a class="nav-link" href="{{ url_for('notification.notifications') }}">
                             <i class="bi bi-bell"></i> Notifications
                             {% if notification_count > 0 %}
                             <span class="badge bg-danger">{{ notification_count }}</span>
@@ -127,14 +127,14 @@
                         <ul class="dropdown-menu dropdown-menu-end" style="width: 180px;">
                             {% if current_user.profile_photo %}
                             <li style="padding: 12px; text-align: center; border-bottom: 1px solid #dee2e6;">
-                                <img src="{{ url_for('serve_user_picture', filename=current_user.profile_photo) }}" alt="{{ current_user.username }}" style="width: 120px; height: 120px; border-radius: 50%; border: 2px solid #dee2e6; object-fit: cover;">
+                                <img src="{{ url_for('user_role.serve_user_picture', filename=current_user.profile_photo) }}" alt="{{ current_user.username }}" style="width: 120px; height: 120px; border-radius: 50%; border: 2px solid #dee2e6; object-fit: cover;">
                             </li>
                             {% endif %}
-                            <li><a class="dropdown-item" href="{{ url_for('settings_general') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('settings.settings_general') }}">
                                 <i class="bi bi-palette"></i> General Settings
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">
                                 <i class="bi bi-box-arrow-right"></i> Logout
                             </a></li>
                         </ul>

@@ -20,7 +20,7 @@
                     Other users will keep their own preferences.
                 </div>
                 
-                <form method="POST" action="{{ url_for('save_theme') }}" id="uiPreferenceForm">
+                <form method="POST" action="{{ url_for('settings.save_theme') }}" id="uiPreferenceForm">
                     <!-- Select Theme Section -->
                     <div class="mb-4">
                         <label class="form-label"><strong>Select Theme</strong></label>
@@ -122,7 +122,7 @@
 
                     <!-- Action Buttons -->
                     <div class="d-flex justify-content-between">
-                        <a href="{{ url_for('settings') }}" class="btn btn-secondary">
+                        <a href="{{ url_for('settings.settings') }}" class="btn btn-secondary">
                             <i class="bi bi-arrow-left"></i> Back
                         </a>
                         <button type="button" class="btn btn-primary" onclick="saveUIPreference()">
@@ -143,7 +143,7 @@
                     <i class="bi bi-info-circle"></i> <strong>Note:</strong> Customize which columns appear in the item table on the home page.
                     Checkbox, Name, and Action are always shown. You can rearrange other columns and reset to default.
                 </div>
-                <form method="POST" action="{{ url_for('save_table_columns_view') }}" id="tableColumnsForm">
+                <form method="POST" action="{{ url_for('settings.save_table_columns_view') }}" id="tableColumnsForm">
                     <div class="mb-3">
                         <label class="form-label"><strong>Available Columns</strong></label>
                         <p class="text-muted small mb-2">Drag the handle <i class="bi bi-grip-vertical"></i> to reorder. Checked columns will be visible.</p>
@@ -154,7 +154,7 @@
 
                     <div class="d-flex justify-content-between">
                         <div>
-                            <a href="{{ url_for('settings') }}" class="btn btn-secondary">
+                            <a href="{{ url_for('settings.settings') }}" class="btn btn-secondary">
                                 <i class="bi bi-arrow-left"></i> Back
                             </a>
                             <button type="button" class="btn btn-warning" onclick="resetTableColumns()">
@@ -185,7 +185,7 @@
                     
                     {% if current_user.profile_photo %}
                     <div class="mb-3 text-center">
-                        <img id="settingsPhotoPreview" src="{{ url_for('serve_user_picture', filename=current_user.profile_photo) }}" alt="{{ current_user.username }}" style="max-width: 150px; max-height: 150px; border-radius: 8px; border: 2px solid #dee2e6; cursor: pointer;" data-bs-toggle="modal" data-bs-target="#settingsPhotoModal" title="Click to view full size">
+                        <img id="settingsPhotoPreview" src="{{ url_for('user_role.serve_user_picture', filename=current_user.profile_photo) }}" alt="{{ current_user.username }}" style="max-width: 150px; max-height: 150px; border-radius: 8px; border: 2px solid #dee2e6; cursor: pointer;" data-bs-toggle="modal" data-bs-target="#settingsPhotoModal" title="Click to view full size">
                         
                         <!-- Full Size Photo Modal -->
                         <div class="modal fade" id="settingsPhotoModal" tabindex="-1">
@@ -196,7 +196,7 @@
                                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body text-center">
-                                        <img id="settingsFullSizePhoto" src="{{ url_for('serve_user_picture', filename=current_user.profile_photo) }}" alt="{{ current_user.username }}" style="max-width: 100%; height: auto; border-radius: 8px;">
+                                        <img id="settingsFullSizePhoto" src="{{ url_for('user_role.serve_user_picture', filename=current_user.profile_photo) }}" alt="{{ current_user.username }}" style="max-width: 100%; height: auto; border-radius: 8px;">
                                     </div>
                                 </div>
                             </div>
@@ -206,7 +206,7 @@
                     
                     <div class="row g-2" style="align-items: flex-start;">
                         <div class="col-6">
-                            <form method="POST" action="{{ url_for('upload_profile_photo') }}" enctype="multipart/form-data">
+                            <form method="POST" action="{{ url_for('settings.upload_profile_photo') }}" enctype="multipart/form-data">
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="bi bi-image"></i></span>
                                     <input type="file" class="form-control" id="profilePhoto" name="profile_photo" accept=".jpg,.jpeg,.png">
@@ -219,7 +219,7 @@
                         </div>
                         {% if current_user.profile_photo %}
                         <div class="col-6">
-                            <form method="POST" action="{{ url_for('delete_profile_photo') }}">
+                            <form method="POST" action="{{ url_for('settings.delete_profile_photo') }}">
                                 <button type="submit" class="btn btn-danger w-100" onclick="return confirm('Delete profile photo?')">
                                     <i class="bi bi-trash"></i> Delete
                                 </button>
@@ -237,7 +237,7 @@
                         <i class="bi bi-lock"></i> Change Password
                     </h6>
                     
-                    <form method="POST" action="{{ url_for('change_password') }}">
+                    <form method="POST" action="{{ url_for('user_role.change_password') }}">
                         <div class="mb-3">
                             <label for="oldPassword" class="form-label">Old Password</label>
                             <input type="password" class="form-control" id="oldPassword" name="old_password" autocomplete="current-password" required>
@@ -331,7 +331,7 @@ function saveUIPreference() {
     // Create a form to submit both values
     const form = document.createElement('form');
     form.method = 'POST';
-    form.action = '{{ url_for("save_ui_preference") }}';
+    form.action = '{{ url_for('settings.save_ui_preference') }}';
     
     const themeInput = document.createElement('input');
     themeInput.type = 'hidden';
@@ -576,7 +576,7 @@ document.getElementById('tableColumnsForm').addEventListener('submit', function(
 });
 
 // Theme form submit - reload page after save to apply theme
-document.querySelector("form[action=\"{{ url_for('save_theme') }}\"]")?.addEventListener('submit', function(e) {
+document.querySelector("form[action=\"{{ url_for('settings.save_theme') }}\"]")?.addEventListener('submit', function(e) {
     // Form will submit normally, but we ensure page reloads after response
     setTimeout(function() {
         location.reload();

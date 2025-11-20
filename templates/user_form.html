@@ -36,7 +36,7 @@
                             <!-- Picture Preview -->
                             {% if user and user.profile_photo %}
                             <div class="mb-2 text-center">
-                                <img id="profilePhotoPreview" src="{{ url_for('serve_user_picture', filename=user.profile_photo) }}" alt="{{ user.username }}" style="max-width: 180px; max-height: 180px; border-radius: 10px; border: 2px solid #dee2e6; cursor: pointer;" data-bs-toggle="modal" data-bs-target="#photoModal" title="Click to view full size">
+                                <img id="profilePhotoPreview" src="{{ url_for('user_role.serve_user_picture', filename=user.profile_photo) }}" alt="{{ user.username }}" style="max-width: 180px; max-height: 180px; border-radius: 10px; border: 2px solid #dee2e6; cursor: pointer;" data-bs-toggle="modal" data-bs-target="#photoModal" title="Click to view full size">
                             </div>
 
                             <!-- Full Size Photo Modal -->
@@ -48,7 +48,7 @@
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                         </div>
                                         <div class="modal-body text-center">
-                                            <img id="fullSizePhoto" src="{{ url_for('serve_user_picture', filename=user.profile_photo) }}" alt="{{ user.username }}" style="max-width: 100%; height: auto; border-radius: 10px;">
+                                            <img id="fullSizePhoto" src="{{ url_for('user_role.serve_user_picture', filename=user.profile_photo) }}" alt="{{ user.username }}" style="max-width: 100%; height: auto; border-radius: 10px;">
                                         </div>
                                     </div>
                                 </div>
@@ -242,7 +242,7 @@
                     </div>
 
                     <div class="d-flex justify-content-between">
-                        <a href="{{ url_for('users') }}" class="btn btn-secondary">
+                        <a href="{{ url_for('user_role.users') }}" class="btn btn-secondary">
                             <i class="bi bi-arrow-left"></i> Cancel
                         </a>
                         {% if user and user.is_demo_user and config.DEMO_MODE %}

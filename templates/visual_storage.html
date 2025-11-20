@@ -9,7 +9,7 @@
             <h2><i class="bi bi-grid-3x3"></i> Visual Storage System</h2>
             <div>
                 {% if can_manage_racks %}
-                <a href="{{ url_for('location_management') }}" class="btn btn-secondary">
+                <a href="{{ url_for('location_rack.location_management') }}" class="btn btn-secondary">
                     <i class="bi bi-gear"></i> Manage Racks
                 </a>
                 {% endif %}
@@ -92,7 +92,7 @@
                         <div><small><i class="bi bi-geo-alt"></i> {{ rack.location }}</small></div>
                         {% endif %}
                     </div>
-                    <a href="{{ url_for('rack_detail', id=rack.id) }}" class="btn btn-sm btn-info" title="View Rack Details">
+                    <a href="{{ url_for('location_rack.rack_detail', id=rack.id) }}" class="btn btn-sm btn-info" title="View Rack Details">
                         <i class="bi bi-eye"></i> View
                     </a>
                 </div>
@@ -136,7 +136,7 @@
             <h5><i class="bi bi-info-circle"></i> No Racks Created Yet</h5>
             <p>Create your first rack to start organizing your inventory visually.</p>
             {% if current_user.has_permission('settings_sections.location_management', 'edit') %}
-            <a href="{{ url_for('location_management') }}" class="btn btn-primary">
+            <a href="{{ url_for('location_rack.location_management') }}" class="btn btn-primary">
                 <i class="bi bi-plus-circle"></i> Create First Rack
             </a>
             {% endif %}

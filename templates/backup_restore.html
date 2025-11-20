@@ -16,7 +16,7 @@
             </div>
             <div class="card-body">
                 <p>Download a copy of your database</p>
-                <a href="{{ url_for('backup_download') }}" class="btn btn-success">
+                <a href="{{ url_for('backup.backup_download') }}" class="btn btn-success">
                     <i class="bi bi-download"></i> Download Backup
                 </a>
             </div>
@@ -30,7 +30,7 @@
             </div>
             <div class="card-body">
                 <p class="text-danger"><strong>Warning:</strong> This will replace all current data!</p>
-                <form method="POST" action="{{ url_for('backup_restore_upload') }}" enctype="multipart/form-data">
+                <form method="POST" action="{{ url_for('backup.backup_restore_upload') }}" enctype="multipart/form-data">
                     <input type="file" name="backup" class="form-control mb-2" accept=".db" required>
                     <button type="submit" class="btn btn-warning" onclick="return confirm('Replace all data?')">
                         <i class="bi bi-upload"></i> Restore
@@ -52,7 +52,7 @@
             </div>
             <div class="card-body">
                 <p>Export selected configurations</p>
-                <form method="POST" action="{{ url_for('export_selective') }}" enctype="multipart/form-data" id="exportForm">
+                <form method="POST" action="{{ url_for('backup.export_selective') }}" enctype="multipart/form-data" id="exportForm">
                     
                     <!-- Item Parameters Checkbox -->
                     <div class="mb-3">
@@ -162,7 +162,7 @@
             </div>
             <div class="card-body">
                 <p>Import configurations from JSON file</p>
-                <form method="POST" action="{{ url_for('import_selective') }}" enctype="multipart/form-data" id="importForm">
+                <form method="POST" action="{{ url_for('backup.import_selective') }}" enctype="multipart/form-data" id="importForm">
                     
                     <!-- File Upload -->
                     <div class="mb-3">

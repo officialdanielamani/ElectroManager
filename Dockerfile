@@ -2,9 +2,17 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies for QR, barcode, and PDF generation
 RUN apt-get update && apt-get install -y \
     sqlite3 \
+    libpango-1.0-0 \
+    libpango1.0-dev \
+    libpangoft2-1.0-0 \
+    libffi-dev \
+    libcairo2 \
+    libcairo2-dev \
+    fonts-dejavu \
+    fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements

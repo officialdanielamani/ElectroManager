@@ -18,7 +18,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <h5 class="mb-0 text-white"><i class="bi bi-collection"></i> Parameter Templates <span class="badge bg-dark">{{ templates|length }}</span></h5>
                     {% if can_edit %}
-                    <a href="{{ url_for('parameter_template_new') }}" class="btn btn-dark btn-sm">
+                    <a href="{{ url_for('magic_parameter.parameter_template_new') }}" class="btn btn-dark btn-sm">
                         <i class="bi bi-plus-circle"></i> Add Template
                     </a>
                     {% endif %}
@@ -34,11 +34,11 @@
                             <small class="text-muted"><i class="bi bi-list"></i> {{ template.template_parameters|length }} parameters</small>
                             <div class="mt-2">
                                 {% if can_edit %}
-                                <a href="{{ url_for('parameter_template_manage', id=template.id) }}" class="btn btn-sm btn-primary" title="Manage">
+                                <a href="{{ url_for('magic_parameter.parameter_template_manage', id=template.id) }}" class="btn btn-sm btn-primary" title="Manage">
                                     <i class="bi bi-gear"></i> Manage
                                 </a>
                                 {% if can_delete %}
-                                <form method="POST" action="{{ url_for('parameter_template_delete', id=template.id) }}" style="display: inline;">
+                                <form method="POST" action="{{ url_for('magic_parameter.parameter_template_delete', id=template.id) }}" style="display: inline;">
                                     <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this template?')" title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
@@ -81,11 +81,11 @@
                             {% endif %}
                             <div class="mt-2">
                                 {% if can_edit %}
-                                <a href="{{ url_for('magic_parameter_manage', id=param.id) }}" class="btn btn-sm btn-primary" title="Manage">
+                                <a href="{{ url_for('magic_parameter.magic_parameter_manage', id=param.id) }}" class="btn btn-sm btn-primary" title="Manage">
                                     <i class="bi bi-gear"></i>
                                 </a>
                                 {% if can_delete %}
-                                <form method="POST" action="{{ url_for('magic_parameter_delete', id=param.id) }}" style="display: inline;">
+                                <form method="POST" action="{{ url_for('magic_parameter.magic_parameter_delete', id=param.id) }}" style="display: inline;">
                                     <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this parameter?')" title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
@@ -132,11 +132,11 @@
                             <p class="card-text text-muted small mb-1">{{ param.description or 'No description' }}</p>
                             <div class="mt-2">
                                 {% if can_edit %}
-                                <a href="{{ url_for('magic_parameter_manage', id=param.id) }}" class="btn btn-sm btn-primary" title="Manage">
+                                <a href="{{ url_for('magic_parameter.magic_parameter_manage', id=param.id) }}" class="btn btn-sm btn-primary" title="Manage">
                                     <i class="bi bi-gear"></i>
                                 </a>
                                 {% if can_delete %}
-                                <form method="POST" action="{{ url_for('magic_parameter_delete', id=param.id) }}" style="display: inline;">
+                                <form method="POST" action="{{ url_for('magic_parameter.magic_parameter_delete', id=param.id) }}" style="display: inline;">
                                     <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this parameter?')" title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
@@ -179,11 +179,11 @@
                             {% endif %}
                             <div class="mt-2">
                                 {% if can_edit %}
-                                <a href="{{ url_for('magic_parameter_manage', id=param.id) }}" class="btn btn-sm btn-primary" title="Manage">
+                                <a href="{{ url_for('magic_parameter.magic_parameter_manage', id=param.id) }}" class="btn btn-sm btn-primary" title="Manage">
                                     <i class="bi bi-gear"></i>
                                 </a>
                                 {% if can_delete %}
-                                <form method="POST" action="{{ url_for('magic_parameter_delete', id=param.id) }}" style="display: inline;">
+                                <form method="POST" action="{{ url_for('magic_parameter.magic_parameter_delete', id=param.id) }}" style="display: inline;">
                                     <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this parameter?')" title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
@@ -206,7 +206,7 @@
 <div class="modal fade" id="newParameterModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form id="newParameterForm" method="POST" action="{{ url_for('magic_parameter_new') }}">
+            <form id="newParameterForm" method="POST" action="{{ url_for('magic_parameter.magic_parameter_new') }}">
                 <div class="modal-header">
                     <h5 class="modal-title">New <span id="paramTypeTitle"></span> Parameter</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -263,56 +263,64 @@
 </div>
 
 <script>
-// Form submission handler
-document.getElementById('newParameterForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
+// Store element references when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('newParameterForm');
     const submitBtn = document.getElementById('submitBtn');
     const errorDiv = document.getElementById('formErrors');
     
-    // Reset error display
-    errorDiv.style.display = 'none';
-    errorDiv.innerHTML = '';
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating...';
+    if (!form || !submitBtn || !errorDiv) {
+        console.error('Missing form elements', {form, submitBtn, errorDiv});
+        return;
+    }
     
-    try {
-        const formData = new FormData(this);
-        const response = await fetch(this.action, {
-            method: 'POST',
-            body: formData
-        });
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
         
-        const data = await response.json();
+        // Reset error display
+        errorDiv.style.display = 'none';
+        errorDiv.innerHTML = '';
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating...';
         
-        if (data.success) {
-            // Close modal and redirect
-            const modal = bootstrap.Modal.getInstance(document.getElementById('newParameterModal'));
-            modal.hide();
+        try {
+            const formData = new FormData(this);
+            const response = await fetch(this.action, {
+                method: 'POST',
+                body: formData
+            });
             
-            // Show success message
-            const alertDiv = document.createElement('div');
-            alertDiv.className = 'alert alert-success alert-dismissible fade show';
-            alertDiv.innerHTML = `Parameter created successfully! Redirecting...<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
-            document.body.insertAdjacentElement('afterbegin', alertDiv);
+            const data = await response.json();
             
-            // Redirect after short delay
-            setTimeout(() => {
-                window.location.href = data.redirect_url;
-            }, 500);
-        } else {
-            // Show errors
-            errorDiv.innerHTML = data.errors.map(err => `<strong>Error:</strong> ${err}`).join('<br>');
+            if (data.success) {
+                // Close modal and redirect
+                const modal = bootstrap.Modal.getInstance(document.getElementById('newParameterModal'));
+                modal.hide();
+                
+                // Show success message
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-success alert-dismissible fade show';
+                alertDiv.innerHTML = `Parameter created successfully! Redirecting...<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+                document.body.insertAdjacentElement('afterbegin', alertDiv);
+                
+                // Redirect after short delay
+                setTimeout(() => {
+                    window.location.href = data.redirect_url;
+                }, 500);
+            } else {
+                // Show errors
+                errorDiv.innerHTML = data.errors.map(err => `<strong>Error:</strong> ${err}`).join('<br>');
+                errorDiv.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Create Parameter';
+            }
+        } catch (error) {
+            errorDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
             errorDiv.style.display = 'block';
             submitBtn.disabled = false;
             submitBtn.innerHTML = 'Create Parameter';
         }
-    } catch (error) {
-        errorDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
-        errorDiv.style.display = 'block';
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = 'Create Parameter';
-    }
+    });
 });
 
 function showNewParameterModal(type) {

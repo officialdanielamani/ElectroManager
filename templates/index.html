@@ -10,16 +10,16 @@
         
         <div class="mt-5">
             {% if current_user.has_permission('items', 'view') %}
-            <a href="{{ url_for('items') }}" class="btn btn-primary btn-lg mx-2">
+            <a href="{{ url_for('item.items') }}" class="btn btn-primary btn-lg mx-2">
                 <i class="bi bi-box"></i> Items
             </a>
             {% endif %}
             {% if current_user.has_permission('pages.visual_storage', 'view') %}
-            <a href="{{ url_for('visual_storage') }}" class="btn btn-info btn-lg mx-2">
+            <a href="{{ url_for('visual_storage.visual_storage') }}" class="btn btn-info btn-lg mx-2">
                 <i class="bi bi-grid-3x3"></i> Visual Storage
             </a>
             {% endif %}
-            <a href="{{ url_for('settings') }}" class="btn btn-secondary btn-lg mx-2">
+            <a href="{{ url_for('settings.settings') }}" class="btn btn-secondary btn-lg mx-2">
                 <i class="bi bi-gear"></i> Settings
             </a>
         </div>

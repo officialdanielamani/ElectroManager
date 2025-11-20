@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Create QR/Barcode Template{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="bi bi-qr-code"></i> Create New Template</h4>
+                </div>
+                
+                <div class="card-body">
+                    <form method="POST">
+                        
+                        <div class="mb-3">
+                            <label for="name" class="form-label"><strong>Template Name</strong></label>
+                            <input type="text" class="form-control" id="name" name="name" 
+                                   placeholder="e.g., 30x20mm Label" required>
+                            <small class="form-text text-muted">Give your template a descriptive name</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="template_type" class="form-label"><strong>Template Type</strong></label>
+                            <select class="form-select" id="template_type" name="template_type" required>
+                                <option value="">-- Select Type --</option>
+                                <option value="Items">Items (for product stickers)</option>
+                                <option value="Location">Location (for location labels)</option>
+                                <option value="Racks">Racks (for rack labels)</option>
+                            </select>
+                            <small class="form-text text-muted">Choose what you'll be labeling</small>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="mb-3">
+                                    <label for="width_mm" class="form-label"><strong>Width (mm)</strong></label>
+                                    <input type="number" class="form-control" id="width_mm" name="width_mm" 
+                                           value="30" step="0.1" required>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="mb-3">
+                                    <label for="height_mm" class="form-label"><strong>Height (mm)</strong></label>
+                                    <input type="number" class="form-control" id="height_mm" name="height_mm" 
+                                           value="20" step="0.1" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info" role="alert">
+                            <small>
+                                <strong>Common sizes:</strong>
+                                <ul class="mb-0 ps-3">
+                                    <li>4x6" Label: 101.6 × 152.4 mm</li>
+                                    <li>3x3" Label: 76.2 × 76.2 mm</li>
+                                    <li>30×20mm: Small sticker</li>
+                                    <li>50×50mm: Square sticker</li>
+                                </ul>
+                            </small>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-check-circle"></i> Create Template
+                            </button>
+                            <a href="{{ url_for('qr_template.settings_qr') }}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Back
+                            </a>
+                        </div>
+                        
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}QR/Barcode Templates - Settings{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="bi bi-qr-code"></i> QR/Barcode Sticker Templates</h2>
+            <p class="text-muted">Design custom sticker layouts with placeholders</p>
+        </div>
+        <div class="col-auto">
+            {% if can_edit %}
+            <a href="{{ url_for('qr_template.create_qr_template') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> New Template
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    
+    {% if templates %}
+    <div class="row">
+        {% for template in templates %}
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">{{ template.name }}</h5>
+                    <p class="card-text text-muted">
+                        <small>
+                            <strong>Type:</strong> 
+                            <span class="badge bg-info">{{ template.template_type }}</span>
+                        </small>
+                    </p>
+                    <p class="card-text">
+                        <small>
+                            <strong>Size:</strong> {{ template.width_mm }}×{{ template.height_mm }}mm
+                        </small>
+                    </p>
+                    <p class="card-text">
+                        <small class="text-muted">
+                            Created: {{ template.created_at.strftime('%Y-%m-%d') }}
+                        </small>
+                    </p>
+                </div>
+                <div class="card-footer bg-transparent">
+                    <div class="btn-group btn-group-sm w-100" role="group">
+                        {% if can_edit %}
+                        <a href="{{ url_for('qr_template.edit_qr_template', template_id=template.id) }}" 
+                           class="btn btn-warning">
+                            <i class="bi bi-pencil"></i> Edit
+                        </a>
+                        {% endif %}
+                        {% if can_delete %}
+                        <form method="POST" action="{{ url_for('qr_template.delete_qr_template', template_id=template.id) }}" 
+                              style="display: inline;">
+                            <button type="submit" class="btn btn-danger btn-sm" 
+                                    onclick="return confirm('Delete this template?')">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info" role="alert">
+        <i class="bi bi-info-circle"></i>
+        <strong>No templates yet.</strong> 
+        {% if can_edit %}
+        <a href="{{ url_for('qr_template.create_qr_template') }}">Create your first template</a> to get started.
+        {% else %}
+        Contact an administrator to create templates.
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

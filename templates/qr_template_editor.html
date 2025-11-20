@@ -1,0 +1,1867 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Template - {{ template.name }}{% endblock %}
+
+{% block content %}
+<style>
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Theme-aware styling */
+    :root {
+        --editor-panel-bg-success: #28a745;
+        --editor-panel-bg-secondary: #6c757d;
+        --editor-panel-bg-primary: #007bff;
+        --editor-panel-bg-light: #f8f9fa;
+        --editor-border-color: #ddd;
+    }
+
+    /* Dark theme adjustments */
+    body.dark-theme {
+        --editor-panel-bg-success: #228B22;
+        --editor-panel-bg-secondary: #555;
+        --editor-panel-bg-primary: #0056b3;
+        --editor-panel-bg-light: #2d2d2d;
+        --editor-border-color: #3d3d3d;
+    }
+
+    /* Keqing theme adjustments */
+    body.keqing-theme {
+        --editor-panel-bg-success: #1f9e6a;
+        --editor-panel-bg-secondary: #5f4a6d;
+        --editor-panel-bg-primary: #3d5c8f;
+        --editor-panel-bg-light: #2a2a3a;
+        --editor-border-color: #444;
+    }
+
+    /* Blue theme adjustments */
+    body.blue-theme {
+        --editor-panel-bg-success: #0066cc;
+        --editor-panel-bg-secondary: #4c6f99;
+        --editor-panel-bg-primary: #0052a3;
+        --editor-panel-bg-light: #f0f4f8;
+        --editor-border-color: #b3d9ff;
+    }
+
+    .toolbar {
+        background-color: var(--editor-panel-bg-light);
+        border-bottom: 2px solid var(--editor-border-color);
+        padding: 10px 15px;
+    }
+
+    .panel-header-success {
+        background-color: var(--editor-panel-bg-success) !important;
+        color: white;
+        padding: 10px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+        cursor: pointer;
+    }
+
+    .panel-header-secondary {
+        background-color: var(--editor-panel-bg-secondary) !important;
+        color: white;
+        padding: 10px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+        cursor: pointer;
+    }
+
+    .panel-header-primary {
+        background-color: var(--editor-panel-bg-primary) !important;
+        color: white;
+        padding: 10px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+        cursor: pointer;
+    }
+
+    .panel-content-bg {
+        background-color: var(--editor-panel-bg-light) !important;
+    }
+
+    .canvas-wrapper {
+        position: relative;
+        display: inline-block;
+    }
+
+    .ruler-x, .ruler-y {
+        background: #f0f0f0;
+        border: 1px solid #ccc;
+        font-size: 9px;
+        color: #666;
+    }
+
+    .ruler-x {
+        height: 20px;
+        display: flex;
+        position: relative;
+        border-bottom: 2px solid #999;
+    }
+
+    .ruler-y {
+        width: 20px;
+        position: relative;
+        border-right: 2px solid #999;
+        float: left;
+    }
+
+    .ruler-mark {
+        position: absolute;
+        font-size: 8px;
+        color: #333;
+    }
+
+    #canvas {
+        background: white;
+        border: 2px solid #999;
+        cursor: crosshair;
+        position: relative;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        display: block;
+    }
+
+    .element-box {
+        position: absolute;
+        border: 2px dashed #007bff;
+        cursor: move;
+        box-sizing: border-box;
+        padding: 2px;
+        font-size: 10px;
+        color: #666;
+        background: rgba(0,123,255,0.05);
+        overflow: hidden;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        text-align: left;  /* Default to left, will be overridden by element styling */
+    }
+
+    .element-box:hover {
+        border-color: #0056b3;
+        background: rgba(0,123,255,0.15);
+    }
+
+    .element-box.selected {
+        border: 2px solid #28a745;
+        background: rgba(40,167,69,0.15);
+    }
+
+    .resize-handle {
+        position: absolute;
+        width: 0;
+        height: 0;
+        bottom: -6px;
+        right: -6px;
+        cursor: se-resize;
+        z-index: 10;
+        /* Red triangle pointing to bottom-right */
+        border-left: 15px solid transparent;
+        border-top: 15px solid transparent;
+        border-right: 15px solid #dc3545;
+        border-bottom: 15px solid #dc3545;
+    }
+
+    .toolbar {
+        background-color: var(--bs-gray-100, #f8f9fa);
+        border-bottom: 2px solid var(--bs-gray-200, #dee2e6);
+        padding: 10px 15px;
+    }
+
+    /* Apply card-header styling for theme consistency */
+    body.dark-theme .toolbar {
+        background-color: #3d3d3d;
+        border-bottom-color: #4d4d4d;
+        color: #e0e0e0;
+    }
+
+    body.keqing-theme .toolbar {
+        background-color: #2a2a3a;
+        border-bottom-color: #444;
+        color: #e0e0e0;
+    }
+
+    body.blue-theme .toolbar {
+        background-color: #f0f4f8;
+        border-bottom-color: #b3d9ff;
+    }
+
+    /* Mobile optimizations */
+    @media (max-width: 768px) {
+        .toolbar {
+            padding: 8px;
+        }
+        .toolbar h5 {
+            font-size: 14px;
+        }
+        .toolbar .btn-sm {
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+        #canvas-container {
+            min-height: 300px !important;
+            flex: 1 !important;
+        }
+        .editor-container {
+            flex-direction: column !important;
+            height: auto !important;
+        }
+        .properties-sidebar {
+            width: 100% !important;
+            min-width: 100% !important;
+            max-width: 100% !important;
+            height: 300px !important;
+            max-height: 300px !important;
+            border-top: 2px solid #dee2e6 !important;
+            border-left: none !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            display: flex !important;
+            flex-direction: column !important;
+            -webkit-overflow-scrolling: touch;
+        }
+        .panel-content {
+            transition: max-height 0.3s ease, overflow 0.3s ease, padding 0.3s ease !important;
+            max-height: none !important;
+            overflow: visible !important;
+        }
+    }
+</style>
+
+<div class="container-fluid">
+    
+    <!-- Custom Modal for Template Settings -->
+    <div id="templateSettingsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+        <div style="background: white; border-radius: 8px; padding: 25px; width: 90%; max-width: 400px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+            <h5 style="margin-bottom: 20px;"><i class="bi bi-pencil"></i> Edit Template</h5>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 500; font-size: 13px;">Template Name</label>
+                <input type="text" id="settingsTemplateName" class="form-control form-control-sm" style="width: 100%;">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+                <div>
+                    <label style="display: block; margin-bottom: 5px; font-weight: 500; font-size: 13px;">Width (mm) <span style="color: #999; font-size: 11px;">5-500</span></label>
+                    <input type="number" id="settingsTemplateWidth" class="form-control form-control-sm" step="0.1" min="5" max="500">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 5px; font-weight: 500; font-size: 13px;">Height (mm) <span style="color: #999; font-size: 11px;">5-500</span></label>
+                    <input type="number" id="settingsTemplateHeight" class="form-control form-control-sm" step="0.1" min="5" max="500">
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('templateSettingsModal').style.display='none'">Cancel</button>
+                <button type="button" class="btn btn-sm btn-primary" id="btnSaveSettings">Save</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <div class="row align-items-center g-1">
+            <div class="col-12 col-md-auto mb-2 mb-md-0">
+                <div class="d-flex gap-2 align-items-center">
+                    <button id="btn-edit-template" class="btn btn-sm btn-outline-secondary" title="Edit template name and size">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <h5 class="mb-0" style="margin: 0;">
+                        <span id="templateNameDisplay">{{ template.name }}</span>
+                        <small class="text-muted">(<span id="templateWidthDisplay">{{ template.width_mm }}</span>×<span id="templateHeightDisplay">{{ template.height_mm }}</span>mm)</small>
+                    </h5>
+                </div>
+            </div>
+            
+            <div class="col-12 col-md mb-2 mb-md-0">
+                <div class="d-flex gap-1 align-items-center flex-wrap">
+                    <button id="btn-zoom-out" class="btn btn-sm btn-outline-secondary" title="Zoom Out (10% step)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <input type="number" id="zoom-input" class="form-control form-control-sm" 
+                           style="width: 70px;" min="10" max="500" step="0.5" 
+                           placeholder="100" title="Enter custom zoom level (%)">
+                    <span class="text-muted" style="font-size: 12px;">%</span>
+                    <button id="btn-zoom-in" class="btn btn-sm btn-outline-secondary" title="Zoom In (10% step)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button id="btn-zoom-reset" class="btn btn-sm btn-outline-secondary">
+                        100%
+                    </button>
+                    <button id="btn-fit-screen" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-fullscreen"></i> Fit
+                    </button>
+                </div>
+            </div>
+            
+            <div class="col-12 col-md-auto">
+                <div class="d-flex gap-1 flex-wrap">
+                    <button id="btn-save" class="btn btn-sm btn-success">
+                        <i class="bi bi-check-circle"></i> Save
+                    </button>
+                    <a href="{{ url_for('qr_template.settings_qr') }}" class="btn btn-sm btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Back
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Editor -->
+    <div class="mt-2" style="padding: 0 10px;">
+        <div class="d-flex editor-container" style="height: calc(100vh - 160px); gap: 10px; flex-wrap: wrap;">
+            
+            <!-- Canvas Area -->
+            <div id="canvas-container" style="flex: 1; overflow: auto; border: 1px solid var(--bs-gray-300, #ddd); border-radius: 4px; display: flex; align-items: flex-start; justify-content: flex-start; background: #e9ecef; padding: 15px; min-height: 400px; width: 100%;">
+                <div class="canvas-wrapper">
+                    <!-- X Ruler -->
+                    <div class="ruler-x" id="ruler-x" style="margin-left: 20px;"></div>
+                    
+                    <div style="display: flex;">
+                        <!-- Y Ruler -->
+                        <div class="ruler-y" id="ruler-y"></div>
+                        
+                        <!-- Canvas -->
+                        <div id="canvas" style="width: 800px; 
+                                                height: 600px;
+                                                transform-origin: top left;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Layers & Properties Sidebar -->
+            <div class="properties-sidebar" style="width: 300px; min-width: 300px; max-width: 300px; border: 1px solid var(--bs-gray-300, #ddd); border-radius: 4px; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; background: white;">
+                
+                <!-- Fields Panel (NEW) -->
+                <div style="border-bottom: 1px solid var(--editor-border-color, #ddd);">
+                    <div class="card-header panel-toggle" data-panel="fields" style="cursor: pointer; padding: 10px;">
+                        <h6 class="mb-0" style="cursor: pointer;"><i class="bi bi-plus-square"></i> Fields <span class="toggle-icon" style="float: right;">▼</span></h6>
+                    </div>
+                    <div id="fields-content" class="panel-content panel-content-bg" style="max-height: 200px; overflow-y: auto; padding: 10px; box-sizing: border-box;">
+                        <div class="d-grid gap-2">
+                            <button id="btn-add-text" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-type"></i> Text
+                            </button>
+                            <button id="btn-add-qr" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-qr-code"></i> QR
+                            </button>
+                            <button id="btn-add-barcode" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-barcode"></i> Barcode
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Properties Panel - Takes remaining space -->
+                <div id="properties-wrapper" style="flex: 1; display: flex; flex-direction: column; border-bottom: 1px solid var(--editor-border-color, #ddd);">
+                    <div class="card-header panel-toggle" data-panel="properties" style="cursor: pointer; padding: 10px;">
+                        <h6 class="mb-0" style="cursor: pointer;"><i class="bi bi-sliders"></i> Properties <span class="toggle-icon" style="float: right;">▼</span></h6>
+                    </div>
+                    <div id="properties-content" class="panel-content panel-content-bg" style="flex: 1; min-height: 0; overflow-y: auto; padding: 10px; box-sizing: border-box;">
+                        <div id="properties-panel">
+                            <p class="text-muted mb-0" style="font-size: 13px;"><i class="bi bi-hand-index"></i> Select element to edit</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Layers Panel -->
+                <div style="border-bottom: 1px solid var(--editor-border-color, #ddd);">
+                    <div class="card-header panel-toggle" data-panel="layers" style="cursor: pointer; padding: 10px;">
+                        <h6 class="mb-0" style="cursor: pointer;"><i class="bi bi-layers"></i> Layers <span class="toggle-icon" style="float: right;">▼</span></h6>
+                    </div>
+                    <div id="layers-content" class="panel-content panel-content-bg" style="max-height: 180px; overflow-y: auto; padding: 10px; box-sizing: border-box;">
+                        <div id="layers-panel">
+                            <p class="text-muted mb-0" style="font-size: 12px;"><i class="bi bi-inbox"></i> No elements</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tools Panel -->
+                <div style="border-bottom: 1px solid var(--editor-border-color, #ddd);">
+                    <div class="card-header panel-toggle" data-panel="tools" style="cursor: pointer; padding: 10px;">
+                        <h6 class="mb-0" style="cursor: pointer;"><i class="bi bi-tools"></i> Tools <span class="toggle-icon" style="float: right;">▼</span></h6>
+                    </div>
+                    <div id="tools-content" class="panel-content panel-content-bg" style="max-height: 250px; overflow-y: auto; padding: 10px; box-sizing: border-box;">
+                        <div class="mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="show-x-ruler" checked>
+                                <label class="form-check-label" style="font-size: 12px;" for="show-x-ruler">
+                                    Show X Ruler
+                                </label>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="show-y-ruler" checked>
+                                <label class="form-check-label" style="font-size: 12px;" for="show-y-ruler">
+                                    Show Y Ruler
+                                </label>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label style="font-size: 12px;"><strong>Ruler Step (mm)</strong></label>
+                            <select class="form-select form-select-sm" id="ruler-step" style="font-size: 12px;">
+                                <option value="1">1 mm</option>
+                                <option value="5">5 mm</option>
+                                <option value="10" selected>10 mm</option>
+                                <option value="50">50 mm</option>
+                            </select>
+                        </div>
+                        <hr style="margin: 8px 0;">
+                        <div class="mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="show-grid">
+                                <label class="form-check-label" style="font-size: 12px;" for="show-grid">
+                                    Show Grid
+                                </label>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label style="font-size: 12px;"><strong>Grid Step (mm)</strong></label>
+                            <select class="form-select form-select-sm" id="grid-step" style="font-size: 12px;">
+                                <option value="1">1 mm</option>
+                                <option value="5">5 mm</option>
+                                <option value="10" selected>10 mm</option>
+                                <option value="50">50 mm</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<script>
+const templateId = {{ template.id }};
+let templateWidth = {{ template.width_mm }};
+let templateHeight = {{ template.height_mm }};
+const templateType = '{{ template.template_type | default("item") }}' || 'item';  // item, location, or rack
+let MM_TO_PX = 3.78;  // Will be recalculated during initialization
+let layout = [];
+let selectedElement = null;
+let currentZoom = 1;
+
+// Debounce timers for drag and resize to prevent API DDOS
+let dragDebounceTimer = null;
+let resizeDebounceTimer = null;
+const DEBOUNCE_DELAY = 1000; // 1 second delay after user stops moving/resizing
+
+// Tool settings
+let toolSettings = {
+    showXRuler: true,
+    showYRuler: true,
+    rulerStep: 10,
+    showGrid: false,
+    gridStep: 10
+};
+
+function createRulers() {
+    const rulerX = document.getElementById('ruler-x');
+    const rulerY = document.getElementById('ruler-y');
+    const canvas = document.getElementById('canvas');
+    
+    // Use the canvas dimensions which already have the correct MM_TO_PX applied
+    const canvasWidthPx = canvas.style.width ? parseFloat(canvas.style.width) : templateWidth * MM_TO_PX;
+    const canvasHeightPx = canvas.style.height ? parseFloat(canvas.style.height) : templateHeight * MM_TO_PX;
+    
+    console.log(`%cCreating rulers: ${canvasWidthPx.toFixed(0)}px × ${canvasHeightPx.toFixed(0)}px (MM_TO_PX: ${MM_TO_PX.toFixed(2)})`, 'color: #00aaff');
+    
+    const step = toolSettings.rulerStep || 10;
+    
+    // X ruler
+    if (toolSettings.showXRuler) {
+        rulerX.style.display = 'flex';
+        rulerX.style.width = canvasWidthPx + 'px';
+        rulerX.innerHTML = '';
+        for (let i = 0; i <= templateWidth; i += step) {
+            const mark = document.createElement('div');
+            mark.className = 'ruler-mark';
+            mark.textContent = i;
+            mark.style.left = (i * MM_TO_PX) + 'px';
+            mark.style.top = '2px';
+            rulerX.appendChild(mark);
+        }
+    } else {
+        rulerX.style.display = 'none';
+    }
+    
+    // Y ruler
+    if (toolSettings.showYRuler) {
+        rulerY.style.display = 'flex';
+        rulerY.style.height = canvasHeightPx + 'px';
+        rulerY.innerHTML = '';
+        for (let i = 0; i <= templateHeight; i += step) {
+            const mark = document.createElement('div');
+            mark.className = 'ruler-mark';
+            mark.textContent = i;
+            mark.style.top = (i * MM_TO_PX) + 'px';
+            mark.style.left = '2px';
+            mark.style.writingMode = 'vertical-rl';
+            rulerY.appendChild(mark);
+        }
+    } else {
+        rulerY.style.display = 'none';
+    }
+    
+    console.log(`%cRulers created: ${canvasWidthPx.toFixed(0)}px × ${canvasHeightPx.toFixed(0)}px`, 'color: #00aaff');
+}
+
+function initializeZoom() {
+    // Only initialize once - ignore subsequent calls from resize events during load
+    if (isInitialized) {
+        console.log('%c⚠️ initializeZoom called again, but already initialized. Ignoring.', 'color: #ffaa00; font-weight: bold');
+        return;
+    }
+    
+    const container = document.getElementById('canvas-container');
+    const canvas = document.getElementById('canvas');
+    const wrapper = document.querySelector('.canvas-wrapper');
+    
+    // Get EXACT container dimensions
+    const containerRect = container.getBoundingClientRect();
+    const containerWidth = containerRect.width;
+    const containerHeight = containerRect.height;
+    
+    // Account for padding (30px each side per the CSS)
+    const usableWidth = containerWidth - 60;
+    const usableHeight = containerHeight - 60;
+    
+    // Ruler takes 20px
+    const rulerSize = 20;
+    const availableCanvasWidth = usableWidth - rulerSize;
+    const availableCanvasHeight = usableHeight - rulerSize;
+    
+    // Template dimensions in MM
+    const templateWidthMm = templateWidth;
+    const templateHeightMm = templateHeight;
+    
+    // Calculate aspect ratio (W:H)
+    const aspectRatio = templateWidthMm / templateHeightMm;
+    
+    // Use available width as the base
+    // Calculate height based on aspect ratio
+    let canvasWidth = availableCanvasWidth;
+    let canvasHeight = canvasWidth / aspectRatio;
+    
+    // If height exceeds available space, use available height as base instead
+    if (canvasHeight > availableCanvasHeight) {
+        canvasHeight = availableCanvasHeight;
+        canvasWidth = canvasHeight * aspectRatio;
+    }
+    
+    // Set canvas dimensions directly (no MM conversion)
+    canvas.style.width = canvasWidth + 'px';
+    canvas.style.height = canvasHeight + 'px';
+    
+    // No scale transform needed - canvas is already the right size
+    wrapper.style.transform = 'scale(1)';
+    wrapper.style.transformOrigin = 'top left';
+    
+    // Update current zoom
+    currentZoom = 1;
+    
+    // Calculate MM to PX ratio for this canvas
+    const mmToPxWidth = canvasWidth / templateWidthMm;
+    const mmToPxHeight = canvasHeight / templateHeightMm;
+    // Use average for consistency
+    const newMmToPx = (mmToPxWidth + mmToPxHeight) / 2;
+    
+    // Update MM_TO_PX globally so elements render correctly
+    MM_TO_PX = newMmToPx;
+    
+    console.log('%c=== CANVAS INITIALIZATION ===', 'color: #00ff00; font-weight: bold; font-size: 14px');
+    console.log(`Container available: ${availableCanvasWidth.toFixed(0)}px × ${availableCanvasHeight.toFixed(0)}px`);
+    console.log(`Template size: ${templateWidthMm}mm × ${templateHeightMm}mm`);
+    console.log(`Aspect ratio: ${aspectRatio.toFixed(3)} (W:H)`);
+    console.log(`Canvas size: ${canvasWidth.toFixed(0)}px × ${canvasHeight.toFixed(0)}px`);
+    console.log(`Updated MM_TO_PX: ${newMmToPx.toFixed(2)}`);
+    console.log('%c===========================', 'color: #00ff00; font-weight: bold; font-size: 14px');
+    
+    // Re-render with new dimensions
+    renderCanvas();
+    createRulers();
+    
+    // Mark as initialized
+    isInitialized = true;
+    console.log('%c✓ Initialization complete and locked', 'color: #00ff00; font-weight: bold');
+}
+
+const canvas = document.getElementById('canvas');
+const canvasContainer = document.getElementById('canvas-container');
+
+let isInitialized = false;
+let resizeTimeout;
+
+function setZoom(scale) {
+    currentZoom = Math.max(0.1, Math.min(5, scale));  // Constrain between 10% and 500%
+    const wrapper = document.querySelector('.canvas-wrapper');
+    
+    // Apply scale via CSS transform to wrapper
+    wrapper.style.transform = `scale(${currentZoom})`;
+    wrapper.style.transformOrigin = 'top left';
+    
+    const percentage = Math.round(currentZoom * 100);
+    console.log(`%cZoom set to: ${percentage}%`, 'color: #ffaa00; font-weight: bold');
+    
+    const inputEl = document.getElementById('zoom-input');
+    
+    if (inputEl) inputEl.value = percentage;
+}
+
+// Defer zoom button listeners until DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    const zoomInBtn = document.getElementById('btn-zoom-in');
+    const zoomOutBtn = document.getElementById('btn-zoom-out');
+    const zoomResetBtn = document.getElementById('btn-zoom-reset');
+    const zoomInput = document.getElementById('zoom-input');
+    const zoomChangeInput = document.getElementById('zoom-input');
+    
+    if (zoomInBtn) zoomInBtn.addEventListener('click', () => setZoom(currentZoom + 0.1));
+    if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => setZoom(currentZoom - 0.1));
+    if (zoomResetBtn) zoomResetBtn.addEventListener('click', () => setZoom(1));
+    
+    if (zoomInput) {
+        zoomInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const val = parseFloat(zoomInput.value);
+                if (!isNaN(val) && val >= 10 && val <= 500) {
+                    setZoom(val / 100);
+                }
+            }
+        });
+        
+        zoomInput.addEventListener('change', () => {
+            const val = parseFloat(zoomInput.value);
+            if (!isNaN(val) && val >= 10 && val <= 500) {
+                setZoom(val / 100);
+            }
+        });
+    }
+});
+document.getElementById('btn-fit-screen').addEventListener('click', () => {
+    console.log('%c→ User clicked Fit button, resetting initialization lock', 'color: #00ccff; font-weight: bold');
+    isInitialized = false;  // Reset flag to allow recalculation
+    initializeZoom();
+});
+
+async function loadTemplate() {
+    try {
+        console.log('%cLoading template...', 'color: #ffff00; font-weight: bold; font-size: 12px');
+        const response = await fetch(`/api/qr-template/${templateId}`);
+        const data = await response.json();
+        layout = data.layout || [];
+        console.log(`Template loaded: ${layout.length} elements`);
+        
+        console.log('%cWaiting for DOM to stabilize...', 'color: #ff00ff');
+        
+        // Wait for DOM to be fully rendered with actual dimensions
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                console.log('DOMContentLoaded fired, calling initializeZoom');
+                initializeZoom();
+            });
+        } else {
+            // DOM already ready
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    console.log('AnimationFrame 2, calling initializeZoom');
+                    initializeZoom();
+                });
+            });
+        }
+    } catch (error) {
+        console.error('Load error:', error);
+        alert('Error loading template');
+    }
+}
+
+function renderCanvas() {
+    canvas.innerHTML = '';
+    layout.forEach((el, idx) => {
+        const div = createElementDiv(el, idx);
+        canvas.appendChild(div);
+    });
+    renderGrid();
+    renderLayers();
+}
+
+function renderLayers() {
+    const layersPanel = document.getElementById('layers-panel');
+    if (!layersPanel) return;
+    
+    if (layout.length === 0) {
+        layersPanel.innerHTML = '<p class="text-muted mb-0" style="font-size: 12px; padding: 10px;"><i class="bi bi-inbox"></i> No elements</p>';
+        return;
+    }
+    
+    let html = '<div style="padding: 8px;" id="layers-list">';
+    layout.forEach((el, idx) => {
+        const isSelected = selectedElement === idx;
+        const typeIcon = el.type === 'text' ? 'type' : el.type === 'qr' ? 'qr-code' : 'barcode';
+        const layerName = el.layer_name || (el.type === 'text' ? `Text${idx + 1}` : el.type === 'qr' ? `QR${idx + 1}` : `Barcode${idx + 1}`);
+        const isVisible = el.visible !== false; // Default to visible
+        
+        html += `
+        <div class="layer-item" 
+             data-layer-index="${idx}"
+             draggable="true"
+             style="
+                padding: 8px 6px;
+                margin-bottom: 4px;
+                background: ${isSelected ? '#007bff' : '#fff'};
+                color: ${isSelected ? '#fff' : '#333'};
+                border: 1px solid ${isSelected ? '#0056b3' : '#ddd'};
+                border-radius: 3px;
+                cursor: grab;
+                font-size: 12px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                user-select: none;
+                transition: all 0.2s;
+             "
+             onmouseover="this.style.background='${isSelected ? '#0056b3' : '#f0f0f0'}'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.1)'"
+             onmouseout="this.style.background='${isSelected ? '#007bff' : '#fff'}'; this.style.boxShadow='none'"
+        >
+            <i class="bi bi-grip-vertical" style="font-size: 12px; cursor: grab; flex-shrink: 0;"></i>
+            <i class="bi bi-${typeIcon}" style="font-size: 14px; flex-shrink: 0;"></i>
+            <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" onclick="event.stopPropagation(); selectLayerByName(${idx})">${layerName}</span>
+            <button class="layer-visibility-btn" data-layer-index="${idx}" style="background: none; border: none; padding: 2px 4px; cursor: pointer; color: ${isSelected ? '#fff' : '#666'}; font-size: 14px;" title="${isVisible ? 'Hide' : 'Show'}">
+                <i class="bi bi-${isVisible ? 'eye' : 'eye-slash'}"></i>
+            </button>
+        </div>
+        `;
+    });
+    html += '</div>';
+    
+    layersPanel.innerHTML = html;
+    
+    // Attach layer click handlers
+    document.querySelectorAll('.layer-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            if (!e.target.closest('.layer-visibility-btn')) {
+                const layerIdx = parseInt(item.dataset.layerIndex);
+                const elementDiv = document.querySelector(`[data-index="${layerIdx}"]`);
+                if (elementDiv) selectElement(layerIdx, elementDiv);
+            }
+        });
+        
+        // Drag to reorder
+        item.addEventListener('dragstart', (e) => {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', item);
+            item.style.opacity = '0.5';
+        });
+        
+        item.addEventListener('dragend', () => {
+            item.style.opacity = '1';
+        });
+        
+        item.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const afterElement = getDragAfterElement(document.getElementById('layers-list'), e.clientY);
+            const draggingItem = document.querySelector('[style*="opacity: 0.5"]');
+            if (afterElement == null) {
+                document.getElementById('layers-list').appendChild(draggingItem);
+            } else {
+                document.getElementById('layers-list').insertBefore(draggingItem, afterElement);
+            }
+        });
+        
+        item.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const fromIdx = Array.from(document.querySelectorAll('.layer-item')).indexOf(document.querySelector('[style*="opacity: 0.5"]'));
+            const toIdx = parseInt(item.dataset.layerIndex);
+            if (fromIdx !== toIdx && fromIdx >= 0) {
+                reorderLayers(fromIdx, toIdx);
+            }
+        });
+    });
+    
+    // Visibility button handlers
+    document.querySelectorAll('.layer-visibility-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const layerIdx = parseInt(btn.dataset.layerIndex);
+            toggleLayerVisibility(layerIdx);
+        });
+    });
+}
+
+function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.layer-item:not([style*="opacity: 0.5"])')];
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+function reorderLayers(fromIdx, toIdx) {
+    const element = layout.splice(fromIdx, 1)[0];
+    layout.splice(toIdx, 0, element);
+    renderCanvas();
+    renderLayers();
+}
+
+function toggleLayerVisibility(idx) {
+    layout[idx].visible = layout[idx].visible !== false ? false : true;
+    renderCanvas();
+    renderLayers();
+}
+
+function selectLayerByName(idx) {
+    const elementDiv = document.querySelector(`[data-index="${idx}"]`);
+    if (elementDiv) selectElement(idx, elementDiv);
+}
+
+function createElementDiv(element, index) {
+    const div = document.createElement('div');
+    div.className = 'element-box';
+    div.dataset.index = index;
+    
+    // Store the MM values for reference
+    div.dataset.xMm = element.x_mm;
+    div.dataset.yMm = element.y_mm;
+    div.dataset.wMm = element.width_mm;
+    div.dataset.hMm = element.height_mm;
+    
+    // Hide if not visible
+    if (element.visible === false) {
+        div.style.display = 'none';
+        return div;
+    }
+    
+    // Always use current MM_TO_PX - convert from MM to PX
+    const x = element.x_mm * MM_TO_PX;
+    const y = element.y_mm * MM_TO_PX;
+    const w = element.width_mm * MM_TO_PX;
+    const h = element.height_mm * MM_TO_PX;
+    
+    div.style.left = x + 'px';
+    div.style.top = y + 'px';
+    div.style.width = w + 'px';
+    div.style.height = h + 'px';
+    
+    if (element.type === 'text') {
+        const fontSizeMm = element.font_size_mm || 4;
+        const fontSizePx = fontSizeMm * MM_TO_PX;
+        const textAlign = element.text_align || 'left';
+        
+        // Remove flex properties and use proper text alignment
+        div.style.display = 'block';
+        div.style.textAlign = textAlign;
+        
+        div.innerHTML = `<span style="font-size: ${fontSizePx}px; color: ${element.color || '#000'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; line-height: 1.2; display: inline-block;">${element.content || 'Text'}</span>`;
+    } else if (element.type === 'qr') {
+        // Restore flex for QR
+        div.style.display = 'flex';
+        div.style.justifyContent = 'center';
+        div.style.alignItems = 'center';
+        
+        // Check if source_field has content
+        const hasContent = element.source_field && element.source_field.trim() !== '';
+        
+        if (hasContent) {
+            // Has content - generate QR from backend
+            div.innerHTML = `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: white; position: relative; overflow: hidden;"><div id="qr-${element.id}" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #0066cc;"><i class="bi bi-hourglass-split" style="font-size: 20px; animation: spin 1s linear infinite;"></i></div></div>`;
+            
+            // Generate QR code from backend
+            setTimeout(() => {
+                const qrContainer = document.getElementById(`qr-${element.id}`);
+                if (qrContainer) {
+                    fetch(`/api/qr-template/${templateId}/preview-element`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            type: 'qr',
+                            content: element.source_field,
+                            width_mm: element.width_mm,
+                            height_mm: element.height_mm,
+                            mm_to_px: MM_TO_PX,
+                            error_correction: element.error_correction || 'M'
+                        })
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.svg && data.success) {
+                            // Wrap SVG to ensure proper scaling
+                            qrContainer.innerHTML = `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden;">${data.svg}</div>`;
+                            // Make SVG responsive
+                            const svgElement = qrContainer.querySelector('svg');
+                            if (svgElement) {
+                                svgElement.style.maxWidth = '100%';
+                                svgElement.style.maxHeight = '100%';
+                                svgElement.style.width = 'auto';
+                                svgElement.style.height = 'auto';
+                            }
+                        } else {
+                            qrContainer.innerHTML = `<span style="color: red; font-size: 11px;">QR: ${data.error || 'Error'}</span>`;
+                        }
+                    })
+                    .catch(e => {
+                        console.error('QR fetch error:', e);
+                        qrContainer.innerHTML = `<span style="color: red; font-size: 11px;">${e.message}</span>`;
+                    });
+                }
+            }, 50);
+        } else {
+            // Empty - show placeholder icon
+            const iconSize = Math.min(w, h) * 0.6;
+            div.innerHTML = `<div style="width: 100%; height: 100%; border: 2px dashed #0066cc; display: flex; align-items: center; justify-content: center; background: rgba(0,102,204,0.1); position: relative;"><i class="bi bi-qr-code" style="font-size: ${iconSize}px; color: #0066cc;"></i><span style="position: absolute; bottom: 2px; right: 2px; font-size: calc(${MM_TO_PX}px * 2); color: #0066cc; background: white; padding: 1px 3px; border-radius: 2px;">QR</span></div>`;
+        }
+    } else if (element.type === 'barcode') {
+        // Restore flex for barcode
+        div.style.display = 'flex';
+        div.style.justifyContent = 'center';
+        div.style.alignItems = 'center';
+        
+        // Check if source_field has content
+        const hasContent = element.source_field && element.source_field.trim() !== '';
+        
+        if (hasContent) {
+            // Has content - generate barcode from backend
+            div.innerHTML = `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: white; position: relative; overflow: hidden;"><div id="barcode-${element.id}" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #cc6600; background: white; overflow: hidden;"><i class="bi bi-hourglass-split" style="font-size: 20px; animation: spin 1s linear infinite;"></i></div></div>`;
+            
+            // Generate barcode from backend
+            setTimeout(() => {
+                const barcodeContainer = document.getElementById(`barcode-${element.id}`);
+                if (barcodeContainer) {
+                    console.log(`[DEBUG] Barcode element show_label: ${element.show_label}, type: ${typeof element.show_label}`);
+                    fetch(`/api/qr-template/${templateId}/preview-element`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            type: 'barcode',
+                            content: element.source_field,
+                            width_mm: element.width_mm,
+                            height_mm: element.height_mm,
+                            format: element.format || 'CODE128',
+                            mm_to_px: MM_TO_PX,
+                            show_label: element.show_label || false
+                        })
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.svg && data.success) {
+                            // Wrap SVG to ensure proper scaling
+                            barcodeContainer.innerHTML = `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden;">${data.svg}</div>`;
+                            // Make SVG responsive
+                            const svgElement = barcodeContainer.querySelector('svg');
+                            if (svgElement) {
+                                svgElement.style.maxWidth = '100%';
+                                svgElement.style.maxHeight = '100%';
+                                svgElement.style.width = 'auto';
+                                svgElement.style.height = 'auto';
+                            }
+                        } else {
+                            barcodeContainer.innerHTML = `<span style="color: red; font-size: 10px;">BC: ${data.error || 'Error'}</span>`;
+                        }
+                    })
+                    .catch(e => {
+                        console.error('Barcode fetch error:', e);
+                        barcodeContainer.innerHTML = `<span style="color: red; font-size: 10px;">${e.message}</span>`;
+                    });
+                }
+            }, 50);
+        } else {
+            // Empty - show placeholder icon
+            const iconSize = Math.min(w, h) * 0.6;
+            div.innerHTML = `<div style="width: 100%; height: 100%; border: 2px dashed #cc6600; display: flex; align-items: center; justify-content: center; background: rgba(204,102,0,0.1); position: relative;"><i class="bi bi-barcode" style="font-size: ${iconSize}px; color: #cc6600;"></i><span style="position: absolute; bottom: 2px; right: 2px; font-size: calc(${MM_TO_PX}px * 2); color: #cc6600; background: white; padding: 1px 3px; border-radius: 2px;">Barcode</span></div>`;
+        }
+    }
+    
+    const resizeHandle = document.createElement('div');
+    resizeHandle.className = 'resize-handle';
+    div.appendChild(resizeHandle);
+    
+    div.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectElement(index, div);
+    });
+    
+    makeDraggable(div, element, index);
+    makeResizable(div, element, index, resizeHandle);
+    
+    return div;
+}
+
+function selectElement(index, element) {
+    selectedElement = index;
+    document.querySelectorAll('.element-box').forEach(el => el.classList.remove('selected'));
+    if (element) element.classList.add('selected');
+    updatePropertiesPanel(index);
+}
+
+canvas.addEventListener('click', (e) => {
+    if (e.target === canvas) {
+        selectedElement = null;
+        document.querySelectorAll('.element-box').forEach(el => el.classList.remove('selected'));
+        document.getElementById('properties-panel').innerHTML = '<p class="text-muted mb-0" style="font-size: 13px;"><i class="bi bi-hand-index"></i> Select element to edit</p>';
+    }
+});
+
+function updatePropertiesPanel(index) {
+    const panel = document.getElementById('properties-panel');
+    const element = layout[index];
+    
+    let html = `<div class="mb-2"><h6 class="text-primary" style="font-size: 14px;"><i class="bi bi-${element.type === 'text' ? 'type' : element.type === 'qr' ? 'qr-code' : 'barcode'}"></i> ${element.type.toUpperCase()}</h6></div>`;
+
+    // Define placeholders based on template type context
+    const placeholders = {
+        item: [
+            { label: '{ItemUUID} - Unique ID', value: '{ItemUUID}' },
+            { label: '{ItemName} - Product name', value: '{ItemName}' },
+            { label: '{SKU} - Stock code', value: '{SKU}' },
+            { label: '{Price} - Price', value: '{Price}' },
+            { label: '{Quantity} - Stock quantity', value: '{Quantity}' },
+            { label: '{Category} - Category name', value: '{Category}' },
+            { label: '{LocationName} - Location', value: '{LocationName}' },
+            { label: '{RackName} - Rack name', value: '{RackName}' },
+            { label: '{Drawer} - Drawer ID', value: '{Drawer}' },
+            { label: '{Description} - Description', value: '{Description}' },
+            { label: '{MinQuantity} - Min stock', value: '{MinQuantity}' }
+        ],
+        location: [
+            { label: '{LocationUUID} - Location ID', value: '{LocationUUID}' },
+            { label: '{LocationName} - Name', value: '{LocationName}' },
+            { label: '{LocationInfo} - Info field', value: '{LocationInfo}' },
+            { label: '{Description} - Description', value: '{Description}' },
+            { label: '{ItemCount} - # of items', value: '{ItemCount}' }
+        ],
+        rack: [
+            { label: '{RackUUID} - Rack ID', value: '{RackUUID}' },
+            { label: '{RackName} - Name', value: '{RackName}' },
+            { label: '{Description} - Description', value: '{Description}' },
+            { label: '{Capacity} - Total slots', value: '{Capacity}' },
+            { label: '{ItemCount} - # of items', value: '{ItemCount}' },
+            { label: '{Rows} - # rows', value: '{Rows}' },
+            { label: '{Cols} - # columns', value: '{Cols}' }
+        ]
+    };
+
+    if (element.type === 'text') {
+        const fontSizeMm = element.font_size_mm || 4;
+        const layerName = element.layer_name || `Text${index + 1}`;
+        
+        // Filter placeholders based on template type
+        let placeholderOptions = '';
+        placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        
+        if (templateType === 'location') {
+            placeholderOptions += `<optgroup label="Locations">${placeholders.location.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else if (templateType === 'rack') {
+            placeholderOptions += `<optgroup label="Racks">${placeholders.rack.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        }
+        
+        html += `
+        <div class="mb-2">
+            <label class="form-label" style="font-size: 12px;"><strong>Layer Name</strong></label>
+            <input type="text" class="form-control form-control-sm" id="prop-layername" value="${layerName}" style="font-size: 12px;">
+        </div>
+        <div class="mb-2">
+            <label class="form-label" style="font-size: 12px;"><strong>Content</strong></label>
+            <textarea class="form-control form-control-sm" rows="3" id="prop-content" style="font-size: 12px; font-family: monospace;">${element.content || ''}</textarea>
+            <small class="text-muted" style="font-size: 11px;">Use placeholders from dropdown</small>
+        </div>
+        <div class="mb-2">
+            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                <select class="form-select form-select-sm" id="prop-placeholder" style="font-size: 12px; flex: 1;">
+                    <option value="">Select placeholder...</option>
+                    ${placeholderOptions}
+                </select>
+                <button class="btn btn-sm btn-outline-primary" id="btn-add-placeholder" style="font-size: 12px; padding: 4px 10px;">
+                    <i class="bi bi-plus"></i> Add
+                </button>
+            </div>
+        </div>
+        <div class="mb-2">
+            <label class="form-label" style="font-size: 12px;"><strong>Font Size (mm)</strong></label>
+            <input type="number" class="form-control form-control-sm" id="prop-fontsize" min="1" max="50" step="0.5" value="${fontSizeMm}" style="font-size: 12px;">
+            <small class="text-muted" style="font-size: 11px;">Range: 1-50mm</small>
+        </div>
+        <div class="mb-2">
+            <label class="form-label" style="font-size: 12px;"><strong>Color</strong></label>
+            <input type="color" class="form-control form-control-color w-100" id="prop-color" value="${element.color || '#000000'}">
+        </div>
+        <div class="mb-2">
+            <label class="form-label" style="font-size: 12px;"><strong>Text Align</strong></label>
+            <select class="form-select form-select-sm" id="prop-textalign" style="font-size: 12px;">
+                <option value="left" ${element.text_align === 'left' || !element.text_align ? 'selected' : ''}>Left</option>
+                <option value="center" ${element.text_align === 'center' ? 'selected' : ''}>Center</option>
+                <option value="right" ${element.text_align === 'right' ? 'selected' : ''}>Right</option>
+            </select>
+        </div>`;
+    } else if (element.type === 'qr') {
+        const layerName = element.layer_name || `QR${index + 1}`;
+        
+        // Filter placeholders based on template type
+        let placeholderOptions = '';
+        placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        
+        if (templateType === 'location') {
+            placeholderOptions += `<optgroup label="Locations">${placeholders.location.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else if (templateType === 'rack') {
+            placeholderOptions += `<optgroup label="Racks">${placeholders.rack.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        }
+        
+        html += `
+        <div class="mb-2">
+            <label class="form-label" style="font-size: 12px;"><strong>Layer Name</strong></label>
+            <input type="text" class="form-control form-control-sm" id="prop-layername" value="${layerName}" style="font-size: 12px;">
+        </div>
+        <div class="mb-2">
+            <label class="form-label" style="font-size: 12px;"><strong>Content</strong></label>
+            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                <input type="text" class="form-control form-control-sm" id="prop-source" value="${element.source_field || ''}" placeholder="" style="font-size: 12px; flex: 1;">
+                <button class="btn btn-sm btn-outline-primary" id="btn-add-placeholder" style="font-size: 12px; padding: 4px 10px;">
+                    <i class="bi bi-plus"></i>
+                </button>
+            </div>
+            <select class="form-select form-select-sm" id="prop-placeholder" style="font-size: 12px;">
+                <option value="">Select placeholder to add...</option>
+                ${placeholderOptions}
+            </select>
+            <small class="text-muted" style="font-size: 11px;">Type text or add placeholders</small>
+        </div>
+        <div class="mb-2">
+            <label class="form-label" style="font-size: 12px;"><strong>Error Correction</strong></label>
+            <select class="form-select form-select-sm" id="prop-ec" style="font-size: 12px;">
+                <option value="L" ${element.error_correction === 'L' ? 'selected' : ''}>Low (7%)</option>
+                <option value="M" ${element.error_correction === 'M' ? 'selected' : ''}>Medium (15%)</option>
+                <option value="Q" ${element.error_correction === 'Q' ? 'selected' : ''}>High (25%)</option>
+                <option value="H" ${element.error_correction === 'H' ? 'selected' : ''}>Very High (30%)</option>
+            </select>
+        </div>`;
+    } else if (element.type === 'barcode') {
+        const layerName = element.layer_name || `Barcode${index + 1}`;
+        
+        // Filter placeholders based on template type
+        let placeholderOptions = '';
+        placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        
+        if (templateType === 'location') {
+            placeholderOptions += `<optgroup label="Locations">${placeholders.location.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else if (templateType === 'rack') {
+            placeholderOptions += `<optgroup label="Racks">${placeholders.rack.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        }
+        
+        html += `
+        <div class="mb-2">
+            <label class="form-label" style="font-size: 12px;"><strong>Layer Name</strong></label>
+            <input type="text" class="form-control form-control-sm" id="prop-layername" value="${layerName}" style="font-size: 12px;">
+        </div>
+        <div class="mb-2">
+            <label class="form-label" style="font-size: 12px;"><strong>Content</strong></label>
+            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                <input type="text" class="form-control form-control-sm" id="prop-source" value="${element.source_field || ''}" placeholder="" style="font-size: 12px; flex: 1;">
+                <button class="btn btn-sm btn-outline-primary" id="btn-add-placeholder" style="font-size: 12px; padding: 4px 10px;">
+                    <i class="bi bi-plus"></i>
+                </button>
+            </div>
+            <select class="form-select form-select-sm" id="prop-placeholder" style="font-size: 12px;">
+                <option value="">Select placeholder to add...</option>
+                ${placeholderOptions}
+            </select>
+            <small class="text-muted" style="font-size: 11px;">Type text or add placeholders</small>
+        </div>
+        <div class="mb-2">
+            <label class="form-label" style="font-size: 12px;"><strong>Format</strong></label>
+            <select class="form-select form-select-sm" id="prop-format" style="font-size: 12px;">
+                <option value="CODE128" ${element.format === 'CODE128' ? 'selected' : ''}>CODE128</option>
+                <option value="CODE39" ${element.format === 'CODE39' ? 'selected' : ''}>CODE39</option>
+                <option value="EAN13" ${element.format === 'EAN13' ? 'selected' : ''}>EAN13</option>
+                <option value="EAN8" ${element.format === 'EAN8' ? 'selected' : ''}>EAN8</option>
+            </select>
+        </div>
+        <div class="mb-2">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prop-show-label" ${element.show_label ? 'checked' : ''}>
+                <label class="form-check-label" style="font-size: 12px;" for="prop-show-label">
+                    Show Label (data text below barcode)
+                </label>
+            </div>
+        </div>`;
+    }
+
+    html += `
+    <hr class="my-2">
+    <div class="mb-2"><h6 class="text-secondary" style="font-size: 13px;"><i class="bi bi-arrows-move"></i> Position & Size</h6></div>
+    <div class="row g-2 mb-2">
+        <div class="col-6">
+            <label class="form-label" style="font-size: 12px;"><strong>X</strong> (mm)</label>
+            <input type="number" class="form-control form-control-sm" id="prop-x" value="${element.x_mm.toFixed(1)}" step="0.1" style="font-size: 12px;">
+        </div>
+        <div class="col-6">
+            <label class="form-label" style="font-size: 12px;"><strong>Y</strong> (mm)</label>
+            <input type="number" class="form-control form-control-sm" id="prop-y" value="${element.y_mm.toFixed(1)}" step="0.1" style="font-size: 12px;">
+        </div>
+    </div>
+    <div class="row g-2 mb-2">
+        <div class="col-6">
+            <label class="form-label" style="font-size: 12px;"><strong>Width</strong> (mm)</label>
+            <input type="number" class="form-control form-control-sm" id="prop-w" value="${element.width_mm.toFixed(1)}" step="0.1" min="1" style="font-size: 12px;">
+        </div>
+        <div class="col-6">
+            <label class="form-label" style="font-size: 12px;"><strong>Height</strong> (mm)</label>
+            <input type="number" class="form-control form-control-sm" id="prop-h" value="${element.height_mm.toFixed(1)}" step="0.1" min="1" style="font-size: 12px;">
+        </div>
+    </div>
+    <button class="btn btn-danger btn-sm w-100" onclick="deleteElement(${index})" style="font-size: 12px;">
+        <i class="bi bi-trash"></i> Delete Element
+    </button>`;
+
+    panel.innerHTML = html;
+    attachPropertyListeners(index);
+}
+
+function attachPropertyListeners(index) {
+    const el = layout[index];
+
+    const updateProp = (prop, value, skipRender = false) => {
+        if (prop.includes('_mm') || prop === 'font_size_mm') {
+            el[prop] = parseFloat(value);
+        } else {
+            el[prop] = value;
+        }
+        if (!skipRender) {
+            renderCanvas();
+            renderLayers();
+            setTimeout(() => {
+                const elementDiv = document.querySelector(`[data-index="${index}"]`);
+                if (elementDiv) selectElement(index, elementDiv);
+            }, 10);
+        }
+    };
+
+    const updatePropOnly = (prop, value) => {
+        // Update only - no re-render
+        if (prop.includes('_mm') || prop === 'font_size_mm') {
+            el[prop] = parseFloat(value);
+        } else {
+            el[prop] = value;
+        }
+    };
+
+    // Layer name - immediate update
+    document.getElementById('prop-layername')?.addEventListener('input', e => {
+        updateProp('layer_name', e.target.value);
+    });
+
+    // Position and size fields - only re-render on blur or Enter (not on every keystroke)
+    const positionSizeFields = ['prop-x', 'prop-y', 'prop-w', 'prop-h'];
+    const fieldMap = { 'prop-x': 'x_mm', 'prop-y': 'y_mm', 'prop-w': 'width_mm', 'prop-h': 'height_mm' };
+    
+    positionSizeFields.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.addEventListener('blur', e => updateProp(fieldMap[fieldId], e.target.value));
+            field.addEventListener('keydown', e => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    updateProp(fieldMap[fieldId], e.target.value);
+                    field.blur();
+                }
+            });
+        }
+    });
+
+    // Placeholder button handler
+    const placeholderBtn = document.getElementById('btn-add-placeholder');
+    const placeholderSelect = document.getElementById('prop-placeholder');
+    
+    if (placeholderBtn && placeholderSelect) {
+        placeholderBtn.addEventListener('click', () => {
+            const selected = placeholderSelect.value;
+            if (!selected) {
+                alert('Please select a placeholder');
+                return;
+            }
+            
+            // Determine which field to update
+            const contentField = document.getElementById('prop-content');
+            const sourceField = document.getElementById('prop-source');
+            
+            if (contentField) {
+                // Text element - ensure field is focused to get correct cursor position
+                contentField.focus();
+                const currentValue = contentField.value;
+                const cursorPos = contentField.selectionStart || currentValue.length;
+                const newValue = currentValue.substring(0, cursorPos) + selected + currentValue.substring(contentField.selectionEnd || cursorPos);
+                contentField.value = newValue;
+                contentField.selectionStart = contentField.selectionEnd = cursorPos + selected.length;
+                updatePropOnly('content', newValue);
+                contentField.focus();
+            } else if (sourceField) {
+                // QR or Barcode element - ensure field is focused to get correct cursor position
+                sourceField.focus();
+                const currentValue = sourceField.value;
+                const cursorPos = sourceField.selectionStart || currentValue.length;
+                const newValue = currentValue.substring(0, cursorPos) + selected + currentValue.substring(sourceField.selectionEnd || cursorPos);
+                sourceField.value = newValue;
+                sourceField.selectionStart = sourceField.selectionEnd = cursorPos + selected.length;
+                updatePropOnly('source_field', newValue);
+                sourceField.focus();
+            }
+            
+            // Reset dropdown
+            placeholderSelect.value = '';
+        });
+    }
+
+    // Text content - only re-render on blur or Enter (not on every keystroke)
+    const contentField = document.getElementById('prop-content');
+    if (contentField) {
+        contentField.addEventListener('blur', e => updateProp('content', e.target.value));
+        contentField.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                updateProp('content', e.target.value);
+                contentField.blur();
+            } else if (e.key === 'Enter' && e.shiftKey) {
+                // Allow Shift+Enter for new lines
+                e.preventDefault();
+                const start = e.target.selectionStart;
+                const end = e.target.selectionEnd;
+                e.target.value = e.target.value.substring(0, start) + '\n' + e.target.value.substring(end);
+                e.target.selectionStart = e.target.selectionEnd = start + 1;
+            }
+        });
+    }
+    
+    // Font size and color - immediate re-render
+    document.getElementById('prop-fontsize')?.addEventListener('input', e => {
+        updateProp('font_size_mm', parseFloat(e.target.value));
+    });
+    document.getElementById('prop-color')?.addEventListener('input', e => updateProp('color', e.target.value));
+    document.getElementById('prop-textalign')?.addEventListener('change', e => updateProp('text_align', e.target.value));
+
+    // Source field (QR/Barcode content) - only re-render on blur or Enter (not on every keystroke)
+    const sourceField = document.getElementById('prop-source');
+    if (sourceField) {
+        sourceField.addEventListener('blur', e => updateProp('source_field', e.target.value));
+        sourceField.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                updateProp('source_field', e.target.value);
+                sourceField.blur();
+            }
+        });
+    }
+    
+    // Error correction, format, show label - change (not input) for immediate re-render
+    document.getElementById('prop-ec')?.addEventListener('change', e => updateProp('error_correction', e.target.value));
+    document.getElementById('prop-format')?.addEventListener('change', e => updateProp('format', e.target.value));
+    document.getElementById('prop-show-label')?.addEventListener('change', e => updateProp('show_label', e.target.checked));
+}
+
+function makeDraggable(element, layoutElement, index) {
+    let isDragging = false;
+    let startX, startY, initialX, initialY;
+
+    element.addEventListener('mousedown', (e) => {
+        if (e.target.classList.contains('resize-handle')) return;
+        isDragging = true;
+        const rect = canvas.getBoundingClientRect();
+        startX = e.clientX - rect.left;
+        startY = e.clientY - rect.top;
+        initialX = layoutElement.x_mm * MM_TO_PX;
+        initialY = layoutElement.y_mm * MM_TO_PX;
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging || selectedElement !== index) return;
+        const rect = canvas.getBoundingClientRect();
+        const currentX = e.clientX - rect.left;
+        const currentY = e.clientY - rect.top;
+        const deltaX = currentX - startX;
+        const deltaY = currentY - startY;
+        let newX = (initialX + deltaX) / MM_TO_PX;
+        let newY = (initialY + deltaY) / MM_TO_PX;
+        newX = Math.max(0, Math.min(newX, templateWidth - layoutElement.width_mm));
+        newY = Math.max(0, Math.min(newY, templateHeight - layoutElement.height_mm));
+        layoutElement.x_mm = newX;
+        layoutElement.y_mm = newY;
+        
+        // Update element position immediately for smooth visual feedback
+        element.style.left = (newX * MM_TO_PX) + 'px';
+        element.style.top = (newY * MM_TO_PX) + 'px';
+        
+        // Debounce the full render (which triggers API calls)
+        clearTimeout(dragDebounceTimer);
+        dragDebounceTimer = setTimeout(() => {
+            renderCanvas();
+            setTimeout(() => {
+                const elementDiv = document.querySelector(`[data-index="${index}"]`);
+                if (elementDiv) selectElement(index, elementDiv);
+            }, 10);
+        }, DEBOUNCE_DELAY);
+    });
+
+    document.addEventListener('mouseup', () => { 
+        if (isDragging) {
+            isDragging = false;
+            // Trigger immediate render on mouseup to ensure final state is rendered
+            clearTimeout(dragDebounceTimer);
+            renderCanvas();
+            setTimeout(() => {
+                const elementDiv = document.querySelector(`[data-index="${index}"]`);
+                if (elementDiv) selectElement(index, elementDiv);
+            }, 10);
+        }
+    });
+}
+
+function makeResizable(element, layoutElement, index, handle) {
+    let isResizing = false;
+    let startX, startY, startWidth, startHeight;
+
+    handle.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        const rect = canvas.getBoundingClientRect();
+        startX = e.clientX - rect.left;
+        startY = e.clientY - rect.top;
+        startWidth = layoutElement.width_mm * MM_TO_PX;
+        startHeight = layoutElement.height_mm * MM_TO_PX;
+        e.stopPropagation();
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing || selectedElement !== index) return;
+        const rect = canvas.getBoundingClientRect();
+        const currentX = e.clientX - rect.left;
+        const currentY = e.clientY - rect.top;
+        const deltaX = currentX - startX;
+        const deltaY = currentY - startY;
+        let newWidth = (startWidth + deltaX) / MM_TO_PX;
+        let newHeight = (startHeight + deltaY) / MM_TO_PX;
+        newWidth = Math.max(2, newWidth);
+        newHeight = Math.max(2, newHeight);
+        newWidth = Math.min(newWidth, templateWidth - layoutElement.x_mm);
+        newHeight = Math.min(newHeight, templateHeight - layoutElement.y_mm);
+        layoutElement.width_mm = newWidth;
+        layoutElement.height_mm = newHeight;
+        
+        // Update element size immediately for smooth visual feedback
+        element.style.width = (newWidth * MM_TO_PX) + 'px';
+        element.style.height = (newHeight * MM_TO_PX) + 'px';
+        
+        // Debounce the full render (which triggers API calls)
+        clearTimeout(resizeDebounceTimer);
+        resizeDebounceTimer = setTimeout(() => {
+            renderCanvas();
+            setTimeout(() => {
+                const elementDiv = document.querySelector(`[data-index="${index}"]`);
+                if (elementDiv) selectElement(index, elementDiv);
+            }, 10);
+        }, DEBOUNCE_DELAY);
+    });
+
+    document.addEventListener('mouseup', () => { 
+        if (isResizing) {
+            isResizing = false;
+            // Trigger immediate render on mouseup to ensure final state is rendered
+            clearTimeout(resizeDebounceTimer);
+            renderCanvas();
+            setTimeout(() => {
+                const elementDiv = document.querySelector(`[data-index="${index}"]`);
+                if (elementDiv) selectElement(index, elementDiv);
+            }, 10);
+        }
+    });
+}
+
+function deleteElement(index) {
+    if (confirm('Delete this element?')) {
+        layout.splice(index, 1);
+        selectedElement = null;
+        renderCanvas();
+        renderLayers();
+        document.getElementById('properties-panel').innerHTML = '<p class="text-muted mb-0" style="font-size: 13px;"><i class="bi bi-hand-index"></i> Select element to edit</p>';
+    }
+}
+
+document.getElementById('btn-add-text').addEventListener('click', () => {
+    layout.push({
+        id: 'text-' + Date.now(),
+        type: 'text',
+        content: '',
+        x_mm: 2,
+        y_mm: 2,
+        width_mm: Math.max(20, templateWidth * 0.6),
+        height_mm: 8,
+        font_size_mm: 4,
+        color: '#000000'
+    });
+    renderCanvas();
+    renderLayers();
+    setTimeout(() => {
+        const elementDiv = document.querySelector(`[data-index="${layout.length - 1}"]`);
+        if (elementDiv) selectElement(layout.length - 1, elementDiv);
+    }, 50);
+});
+
+document.getElementById('btn-add-qr').addEventListener('click', () => {
+    const size = Math.min(templateWidth, templateHeight) * 0.3;
+    layout.push({
+        id: 'qr-' + Date.now(),
+        type: 'qr',
+        source_field: '',
+        x_mm: 2,
+        y_mm: templateHeight - size - 2,
+        width_mm: size,
+        height_mm: size,
+        error_correction: 'M'
+    });
+    renderCanvas();
+    renderLayers();
+    setTimeout(() => {
+        const elementDiv = document.querySelector(`[data-index="${layout.length - 1}"]`);
+        if (elementDiv) selectElement(layout.length - 1, elementDiv);
+    }, 50);
+});
+
+document.getElementById('btn-add-barcode').addEventListener('click', () => {
+    layout.push({
+        id: 'barcode-' + Date.now(),
+        type: 'barcode',
+        source_field: '',
+        x_mm: 2,
+        y_mm: templateHeight / 2,
+        width_mm: Math.max(15, templateWidth * 0.5),
+        height_mm: Math.max(8, templateHeight * 0.2),
+        format: 'CODE128',
+        show_label: false
+    });
+    renderCanvas();
+    renderLayers();
+    setTimeout(() => {
+        const elementDiv = document.querySelector(`[data-index="${layout.length - 1}"]`);
+        if (elementDiv) selectElement(layout.length - 1, elementDiv);
+    }, 50);
+});
+
+async function saveTemplate() {
+    try {
+        const response = await fetch(`/api/qr-template/${templateId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ layout })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Save failed');
+        }
+        
+        const data = await response.json();
+        if (data.status === 'success') {
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+            alert.style.zIndex = '9999';
+            alert.innerHTML = '<i class="bi bi-check-circle-fill"></i> Saved! <button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+            document.body.appendChild(alert);
+            setTimeout(() => alert.remove(), 2000);
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('Save error:', error);
+        alert('Save error: ' + error.message);
+        return false;
+    }
+}
+
+document.getElementById('btn-save').addEventListener('click', saveTemplate);
+
+// Collapsible panels
+const panelStates = {
+    fields: false,
+    properties: false,
+    layers: false,
+    tools: false
+};
+
+// Initialize panels to closed state on page load
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.panel-toggle').forEach(toggle => {
+        const panel = toggle.dataset.panel;
+        const contentId = panel === 'fields' ? 'fields-content' :
+                         panel === 'layers' ? 'layers-content' : 
+                         panel === 'properties' ? 'properties-content' : 'tools-content';
+        const content = document.getElementById(contentId);
+        const wrapper = panel === 'properties' ? document.getElementById('properties-wrapper') : null;
+        const icon = toggle.querySelector('.toggle-icon');
+        
+        if (content) {
+            content.style.display = 'none';
+        }
+        if (wrapper && panel === 'properties') {
+            wrapper.style.flex = '0';
+        }
+        if (icon) {
+            icon.textContent = '▶';
+        }
+    });
+});
+
+document.querySelectorAll('.panel-toggle').forEach(toggle => {
+    toggle.addEventListener('click', () => {
+        const panel = toggle.dataset.panel;
+        const contentId = panel === 'fields' ? 'fields-content' :
+                         panel === 'layers' ? 'layers-content' : 
+                         panel === 'properties' ? 'properties-content' : 'tools-content';
+        const content = document.getElementById(contentId);
+        const icon = toggle.querySelector('.toggle-icon');
+        const wrapper = panel === 'properties' ? document.getElementById('properties-wrapper') : null;
+        
+        panelStates[panel] = !panelStates[panel];
+        
+        if (panelStates[panel]) {
+            // Show panel content
+            if (panel === 'properties') {
+                wrapper.style.flex = '1';
+                content.style.flex = '1';
+                content.style.minHeight = '0';
+            } else if (panel === 'fields') {
+                content.style.maxHeight = '200px';
+            } else if (panel === 'layers') {
+                content.style.maxHeight = '180px';
+            } else if (panel === 'tools') {
+                content.style.maxHeight = '250px';
+            }
+            content.style.overflow = 'auto';
+            content.style.padding = '10px';
+            content.style.boxSizing = 'border-box';
+            content.style.display = 'block';
+            icon.textContent = '▼';
+        } else {
+            // Hide panel content only (keep header visible)
+            if (panel === 'properties') {
+                wrapper.style.flex = '0';
+                content.style.flex = '0';
+                content.style.minHeight = 'auto';
+            }
+            content.style.display = 'none';
+            icon.textContent = '▶';
+        }
+    });
+});
+
+// Note: We do NOT auto-recalculate on window resize anymore
+// The initial zoom is locked in at load time
+// User can click "Fit" button if they want to recalculate after resizing
+// This prevents unwanted recalculations from font loading or layout shifts
+
+loadTemplate();
+function renderGrid() {
+    const canvas = document.getElementById('canvas');
+    const gridCanvas = document.getElementById('grid-canvas');
+    
+    if (!toolSettings.showGrid) {
+        if (gridCanvas) gridCanvas.remove();
+        return;
+    }
+    
+    // Create or update grid
+    let existingGrid = document.getElementById('grid-canvas');
+    if (existingGrid) existingGrid.remove();
+    
+    const gridSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    gridSvg.id = 'grid-canvas';
+    gridSvg.style.position = 'absolute';
+    gridSvg.style.top = '0';
+    gridSvg.style.left = '0';
+    gridSvg.style.pointerEvents = 'none';
+    gridSvg.style.zIndex = '1';
+    
+    const canvasWidthPx = parseFloat(canvas.style.width);
+    const canvasHeightPx = parseFloat(canvas.style.height);
+    
+    gridSvg.setAttribute('width', canvasWidthPx);
+    gridSvg.setAttribute('height', canvasHeightPx);
+    
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+    pattern.setAttribute('id', 'grid-pattern');
+    pattern.setAttribute('width', (toolSettings.gridStep * MM_TO_PX).toString());
+    pattern.setAttribute('height', (toolSettings.gridStep * MM_TO_PX).toString());
+    pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+    
+    const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line1.setAttribute('x1', '0');
+    line1.setAttribute('y1', '0');
+    line1.setAttribute('x2', '0');
+    line1.setAttribute('y2', (toolSettings.gridStep * MM_TO_PX).toString());
+    line1.setAttribute('stroke', '#e0e0e0');
+    line1.setAttribute('stroke-width', '0.5');
+    
+    const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line2.setAttribute('x1', '0');
+    line2.setAttribute('y1', '0');
+    line2.setAttribute('x2', (toolSettings.gridStep * MM_TO_PX).toString());
+    line2.setAttribute('y2', '0');
+    line2.setAttribute('stroke', '#e0e0e0');
+    line2.setAttribute('stroke-width', '0.5');
+    
+    pattern.appendChild(line1);
+    pattern.appendChild(line2);
+    defs.appendChild(pattern);
+    gridSvg.appendChild(defs);
+    
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('width', '100%');
+    rect.setAttribute('height', '100%');
+    rect.setAttribute('fill', 'url(#grid-pattern)');
+    gridSvg.appendChild(rect);
+    
+    canvas.style.position = 'relative';
+    canvas.insertBefore(gridSvg, canvas.firstChild);
+}
+
+// Tool event listeners
+document.getElementById('show-x-ruler').addEventListener('change', (e) => {
+    toolSettings.showXRuler = e.target.checked;
+    createRulers();
+});
+
+document.getElementById('show-y-ruler').addEventListener('change', (e) => {
+    toolSettings.showYRuler = e.target.checked;
+    createRulers();
+});
+
+document.getElementById('ruler-step').addEventListener('change', (e) => {
+    toolSettings.rulerStep = parseInt(e.target.value);
+    createRulers();
+});
+
+document.getElementById('show-grid').addEventListener('change', (e) => {
+    toolSettings.showGrid = e.target.checked;
+    renderGrid();
+});
+
+document.getElementById('grid-step').addEventListener('change', (e) => {
+    toolSettings.gridStep = parseInt(e.target.value);
+    if (toolSettings.showGrid) renderGrid();
+});
+
+// Note: We do NOT auto-recalculate on window resize anymore
+// The initial zoom is locked in at load time
+// User can click "Fit" button if they want to recalculate after resizing
+// This prevents unwanted recalculations from font loading or layout shifts
+
+// Detect current theme and apply appropriate class
+function applyThemeClass() {
+    const themeLink = document.getElementById('theme-link');
+    if (themeLink && themeLink.href) {
+        if (themeLink.href.includes('dark.css')) {
+            document.body.classList.add('dark-theme');
+        } else if (themeLink.href.includes('keqing.css')) {
+            document.body.classList.add('keqing-theme');
+        } else if (themeLink.href.includes('blue.css')) {
+            document.body.classList.add('blue-theme');
+        }
+    }
+}
+applyThemeClass();
+
+// Custom Modal Handler (no Bootstrap dependency)
+const modalElement = document.getElementById('templateSettingsModal');
+
+document.getElementById('btn-edit-template').addEventListener('click', () => {
+    const name = document.getElementById('templateNameDisplay').textContent.trim();
+    const width = parseFloat(document.getElementById('templateWidthDisplay').textContent);
+    const height = parseFloat(document.getElementById('templateHeightDisplay').textContent);
+    
+    document.getElementById('settingsTemplateName').value = name;
+    document.getElementById('settingsTemplateWidth').value = width;
+    document.getElementById('settingsTemplateHeight').value = height;
+    
+    modalElement.style.display = 'flex';
+});
+
+// Close modal when clicking outside
+modalElement.addEventListener('click', (e) => {
+    if (e.target === modalElement) {
+        modalElement.style.display = 'none';
+    }
+});
+
+document.getElementById('btnSaveSettings').addEventListener('click', async () => {
+    const newName = document.getElementById('settingsTemplateName').value.trim();
+    const newWidth = parseFloat(document.getElementById('settingsTemplateWidth').value);
+    const newHeight = parseFloat(document.getElementById('settingsTemplateHeight').value);
+    
+    if (!newName) {
+        alert('Template name is required');
+        return;
+    }
+    
+    if (isNaN(newWidth) || isNaN(newHeight)) {
+        alert('Please enter valid width and height values');
+        return;
+    }
+    
+    if (newWidth < 5 || newHeight < 5) {
+        alert('Minimum template size is 5×5mm');
+        return;
+    }
+    
+    if (newWidth > 500 || newHeight > 500) {
+        alert('Maximum template size is 500×500mm');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/qr-template/${templateId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: newName,
+                width_mm: newWidth,
+                height_mm: newHeight,
+                layout: layout
+            })
+        });
+        
+        if (!response.ok) throw new Error('Save failed');
+        
+        const data = await response.json();
+        if (data.status === 'success') {
+            templateWidth = newWidth;
+            templateHeight = newHeight;
+            
+            document.getElementById('templateNameDisplay').textContent = newName;
+            document.getElementById('templateWidthDisplay').textContent = newWidth;
+            document.getElementById('templateHeightDisplay').textContent = newHeight;
+            
+            renderCanvas();
+            renderLayers();
+            
+            modalElement.style.display = 'none';
+            
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+            alert.style.zIndex = '9998';
+            alert.innerHTML = '<i class="bi bi-check-circle-fill"></i> Settings saved! Refreshing... <button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+            document.body.appendChild(alert);
+            
+            // Refresh page after 1 second to reload canvas with new dimensions
+            setTimeout(() => window.location.reload(), 1000);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        const data = await error.json?.() || { message: error.message };
+        const errorMsg = data.message || error.message || 'Unknown error';
+        alert('Error saving settings: ' + errorMsg);
+    }
+});
+
+loadTemplate();
+</script>
+{% endblock %}

@@ -48,7 +48,7 @@
     <div class="col-md-12">
         <div class="card">
             <div class="card-body">
-                <form method="GET" action="{{ url_for('items') }}" class="row g-3">
+                <form method="GET" action="{{ url_for('item.items') }}" class="row g-3">
                     <div class="col-md-5">
                         <input type="text" name="search" class="form-control" placeholder="Search items..." value="{{ search_query }}">
                     </div>
@@ -62,7 +62,7 @@
                     </div>
                     <div class="col-md-3">
                         <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Search</button>
-                        <a href="{{ url_for('items') }}" class="btn btn-secondary"><i class="bi bi-x-circle"></i> Clear</a>
+                        <a href="{{ url_for('item.items') }}" class="btn btn-secondary"><i class="bi bi-x-circle"></i> Clear</a>
                     </div>
                 </form>
             </div>
@@ -79,7 +79,7 @@
                     <div class="d-flex align-items-center gap-2 flex-wrap">
                         <h5 class="mb-0 me-2"><i class="bi bi-list-ul"></i> Items</h5>
                         {% if current_user.has_permission('items', 'create') %}
-                        <a href="{{ url_for('item_new') }}" class="btn btn-success btn-sm">
+                        <a href="{{ url_for('item.item_new') }}" class="btn btn-success btn-sm">
                             <i class="bi bi-plus-circle"></i> Add New Item
                         </a>
                         {% endif %}
@@ -275,7 +275,7 @@
                                     <input type="checkbox" class="item-checkbox" value="{{ item.id }}">
                                 </td>
                                 <td>
-                                    <a href="{{ url_for('item_detail', uuid=item.uuid) }}">{{ item.name }}</a>
+                                    <a href="{{ url_for('item.item_detail', uuid=item.uuid) }}">{{ item.name }}</a>
                                 </td>
                                 {% for col in user_columns %}
                                     {% if col == 'type_model' %}
@@ -372,21 +372,21 @@
                                 <td>
                                     <!-- View button (only if has view permission) -->
                                     {% if current_user.has_permission('items', 'view') %}
-                                    <a href="{{ url_for('item_detail', uuid=item.uuid) }}" class="btn btn-sm btn-info" title="View">
+                                    <a href="{{ url_for('item.item_detail', uuid=item.uuid) }}" class="btn btn-sm btn-info" title="View">
                                         <i class="bi bi-eye"></i>
                                     </a>
                                     {% endif %}
                                     
                                     <!-- Edit button (if has any edit permission) -->
                                     {% if current_user.has_permission('items', 'edit_name') or current_user.has_permission('items', 'edit_sku_type') or current_user.has_permission('items', 'edit_description') or current_user.has_permission('items', 'edit_datasheet') or current_user.has_permission('items', 'edit_upload') or current_user.has_permission('items', 'edit_lending') or current_user.has_permission('items', 'edit_price') or current_user.has_permission('items', 'edit_quantity') or current_user.has_permission('items', 'edit_location') or current_user.has_permission('items', 'edit_category') or current_user.has_permission('items', 'edit_footprint') or current_user.has_permission('items', 'edit_tags') or current_user.has_permission('items', 'edit_parameters') %}
-                                    <a href="{{ url_for('item_edit', uuid=item.uuid) }}" class="btn btn-sm btn-warning" title="Edit">
+                                    <a href="{{ url_for('item.item_edit', uuid=item.uuid) }}" class="btn btn-sm btn-warning" title="Edit">
                                         <i class="bi bi-pencil"></i>
                                     </a>
                                     {% endif %}
                                     
                                     <!-- Delete button (if has delete permission) -->
                                     {% if current_user.has_permission('items', 'delete') %}
-                                    <form method="POST" action="{{ url_for('item_delete', uuid=item.uuid) }}" style="display:inline">
+                                    <form method="POST" action="{{ url_for('item.item_delete', uuid=item.uuid) }}" style="display:inline">
                                         <button type="submit" class="btn btn-sm btn-danger" title="Delete" onclick="return confirm('Delete this item?')">
                                             <i class="bi bi-trash"></i>
                                         </button>
@@ -485,12 +485,12 @@
                                 
                                 <div class="btn-group btn-group-sm w-100" role="group">
                                     {% if current_user.has_permission('items', 'view') %}
-                                    <a href="{{ url_for('item_detail', uuid=item.uuid) }}" class="btn btn-sm btn-info" title="View">
+                                    <a href="{{ url_for('item.item_detail', uuid=item.uuid) }}" class="btn btn-sm btn-info" title="View">
                                         <i class="bi bi-eye"></i>
                                     </a>
                                     {% endif %}
                                     {% if current_user.has_permission('items', 'edit_name') or current_user.has_permission('items', 'edit_sku_type') or current_user.has_permission('items', 'edit_description') or current_user.has_permission('items', 'edit_datasheet') or current_user.has_permission('items', 'edit_upload') or current_user.has_permission('items', 'edit_lending') or current_user.has_permission('items', 'edit_price') or current_user.has_permission('items', 'edit_quantity') or current_user.has_permission('items', 'edit_location') or current_user.has_permission('items', 'edit_category') or current_user.has_permission('items', 'edit_footprint') or current_user.has_permission('items', 'edit_tags') or current_user.has_permission('items', 'edit_parameters') %}
-                                    <a href="{{ url_for('item_edit', uuid=item.uuid) }}" class="btn btn-sm btn-warning" title="Edit">
+                                    <a href="{{ url_for('item.item_edit', uuid=item.uuid) }}" class="btn btn-sm btn-warning" title="Edit">
                                         <i class="bi bi-pencil"></i>
                                     </a>
                                     {% endif %}
@@ -498,7 +498,7 @@
                                     <button type="button" class="btn btn-sm btn-danger" title="Delete" onclick="if(confirm('Delete {{ item.name }}?')) { document.getElementById('delete-form-{{ item.id }}').submit(); }">
                                         <i class="bi bi-trash"></i>
                                     </button>
-                                    <form id="delete-form-{{ item.id }}" method="POST" action="{{ url_for('item_delete', uuid=item.uuid) }}" style="display:none;"></form>
+                                    <form id="delete-form-{{ item.id }}" method="POST" action="{{ url_for('item.item_delete', uuid=item.uuid) }}" style="display:none;"></form>
                                     {% endif %}
                                 </div>
                             </div>
@@ -515,7 +515,7 @@
                     <ul class="pagination justify-content-center">
                         {% if pagination.has_prev %}
                         <li class="page-item">
-                            <a class="page-link" href="{{ url_for('items', page=pagination.prev_num, search=search_query, category=category_id, status=status_filter, per_page=per_page) }}">Previous</a>
+                            <a class="page-link" href="{{ url_for('item.items', page=pagination.prev_num, search=search_query, category=category_id, status=status_filter, per_page=per_page) }}">Previous</a>
                         </li>
                         {% endif %}
 
@@ -523,7 +523,7 @@
                             {% if page_num %}
                                 {% if page_num != pagination.page %}
                                 <li class="page-item">
-                                    <a class="page-link" href="{{ url_for('items', page=page_num, search=search_query, category=category_id, status=status_filter, per_page=per_page) }}">{{ page_num }}</a>
+                                    <a class="page-link" href="{{ url_for('item.items', page=page_num, search=search_query, category=category_id, status=status_filter, per_page=per_page) }}">{{ page_num }}</a>
                                 </li>
                                 {% else %}
                                 <li class="page-item active">
@@ -537,7 +537,7 @@
 
                         {% if pagination.has_next %}
                         <li class="page-item">
-                            <a class="page-link" href="{{ url_for('items', page=pagination.next_num, search=search_query, category=category_id, status=status_filter, per_page=per_page) }}">Next</a>
+                            <a class="page-link" href="{{ url_for('item.items', page=pagination.next_num, search=search_query, category=category_id, status=status_filter, per_page=per_page) }}">Next</a>
                         </li>
                         {% endif %}
                     </ul>
@@ -548,7 +548,7 @@
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle"></i> No items found. 
                     {% if current_user.has_permission('items', 'create') %}
-                    <a href="{{ url_for('item_new') }}">Add your first item</a>
+                    <a href="{{ url_for('item.item_new') }}">Add your first item</a>
                     {% endif %}
                 </div>
                 {% endif %}
@@ -578,7 +578,7 @@
                         <small class="d-block text-muted" style="font-size: 0.8rem;">Edit multiple items at once</small>
                     </button>
                     
-                    <button class="btn btn-danger btn-lg" disabled>
+                    <button class="btn btn-danger btn-lg" onclick="promptBulkDelete()" id="bulkDeleteBtn">
                         <i class="bi bi-trash"></i> Bulk Delete
                         <small class="d-block text-muted" style="font-size: 0.8rem;">Delete selected items</small>
                     </button>
@@ -590,11 +590,50 @@
                 </div>
                 
                 <div class="alert alert-info mt-3 mb-0">
-                    <small><i class="bi bi-exclamation-circle"></i> These features are coming soon!</small>
+                    <small><i class="bi bi-exclamation-circle"></i> Bulk Edit and Bulk Print QR features are coming soon!</small>
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Password Confirmation Modal for Bulk Delete -->
+<div class="modal fade" id="passwordConfirmModal" tabindex="-1" aria-labelledby="passwordConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="passwordConfirmModalLabel">
+                    <i class="bi bi-shield-lock"></i> Confirm Your Password
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">
+                    <i class="bi bi-exclamation-triangle text-warning"></i> 
+                    You are about to delete <strong id="deleteCount">0</strong> item(s). Please enter your password to confirm.
+                </p>
+                
+                <div class="mb-3">
+                    <label for="confirmPassword" class="form-label">Password</label>
+                    <input type="password" class="form-control" id="confirmPassword" placeholder="Enter your password" required 
+                           oninput="this.classList.remove('is-invalid'); document.getElementById('passwordError').style.display='none';">
+                    <div class="invalid-feedback" id="passwordError" style="display: none;">
+                        Incorrect password. Please try again.
+                    </div>
+                </div>
+                
+                <div class="alert alert-danger mb-0">
+                    <small><i class="bi bi-info-circle"></i> This action cannot be undone!</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="verifyPasswordAndDelete()">
+                    <i class="bi bi-trash"></i> Verify & Continue
+                </button>
             </div>
         </div>
     </div>
@@ -611,7 +650,7 @@ function printItemsList() {
     const viewType = localStorage.getItem('itemsView') || 'table';
     
     // Build print URL with all current parameters
-    const printUrl = new URL('{{ url_for("items_print") }}', window.location.origin);
+    const printUrl = new URL('{{ url_for('item.items_print') }}', window.location.origin);
     
     // Copy all query parameters
     for (const [key, value] of params.entries()) {
@@ -669,6 +708,134 @@ function liveApplyStatusFilter() {
     // Submit the form immediately
     form.submit();
 }
+
+// Bulk Delete Functions
+function promptBulkDelete() {
+    // Get selected items
+    const checkedBoxes = document.querySelectorAll('.item-checkbox:checked');
+    
+    if (checkedBoxes.length === 0) {
+        alert('Please select at least one item to delete.');
+        return;
+    }
+    
+    // Update the delete count in the password modal
+    document.getElementById('deleteCount').textContent = checkedBoxes.length;
+    
+    // Clear previous password input and errors
+    document.getElementById('confirmPassword').value = '';
+    document.getElementById('confirmPassword').classList.remove('is-invalid');
+    
+    // Close bulk operation modal and open password confirmation modal
+    const bulkModal = bootstrap.Modal.getInstance(document.getElementById('bulkOperationModal'));
+    bulkModal.hide();
+    
+    const passwordModal = new bootstrap.Modal(document.getElementById('passwordConfirmModal'));
+    passwordModal.show();
+}
+
+function verifyPasswordAndDelete() {
+    const password = document.getElementById('confirmPassword').value;
+    const checkedBoxes = document.querySelectorAll('.item-checkbox:checked');
+    const itemIds = Array.from(checkedBoxes).map(cb => cb.value);
+    
+    if (!password) {
+        alert('Please enter your password.');
+        return;
+    }
+    
+    // Show loading state
+    const deleteBtn = event.target;
+    const originalText = deleteBtn.innerHTML;
+    deleteBtn.disabled = true;
+    deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Verifying...';
+    
+    // Send request to verify password
+    fetch('{{ url_for('auth.verify_password') }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            password: password
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        deleteBtn.disabled = false;
+        deleteBtn.innerHTML = originalText;
+        
+        if (data.success) {
+            // Password is correct - close modal and ask for final confirmation
+            const passwordModal = bootstrap.Modal.getInstance(document.getElementById('passwordConfirmModal'));
+            passwordModal.hide();
+            
+            // Show confirmation dialog
+            const itemCount = checkedBoxes.length;
+            if (confirm(`Are you sure you want to delete ${itemCount} item(s)?`)) {
+                // User confirmed - proceed with deletion
+                proceedWithBulkDelete(itemIds);
+            }
+        } else {
+            // Show error - incorrect password
+            const passwordInput = document.getElementById('confirmPassword');
+            passwordInput.classList.add('is-invalid');
+            const errorDiv = document.getElementById('passwordError');
+            errorDiv.textContent = data.message || 'Incorrect password. Please try again.';
+            errorDiv.style.display = 'block';
+        }
+    })
+    .catch(error => {
+        deleteBtn.disabled = false;
+        deleteBtn.innerHTML = originalText;
+        alert('An error occurred. Please try again.');
+        console.error('Error:', error);
+    });
+}
+
+function proceedWithBulkDelete(itemIds) {
+    // Show loading indicator
+    const loadingDiv = document.createElement('div');
+    loadingDiv.innerHTML = `
+        <div class="position-fixed top-50 start-50 translate-middle" style="z-index: 9999;">
+            <div class="spinner-border text-danger" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Deleting...</span>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(loadingDiv);
+    
+    // Send request to delete items
+    fetch('{{ url_for('item.bulk_delete_items') }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            item_ids: itemIds
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.body.removeChild(loadingDiv);
+        
+        if (data.success) {
+            // Show success message
+            alert(`Successfully deleted ${data.deleted_count} item(s).`);
+            
+            // Reload the page to refresh the list
+            window.location.reload();
+        } else {
+            alert(data.message || 'An error occurred during deletion.');
+        }
+    })
+    .catch(error => {
+        document.body.removeChild(loadingDiv);
+        alert('An error occurred. Please try again.');
+        console.error('Error:', error);
+    });
+}
+
 
 // Keep old functions for backward compatibility (if needed)
 function applyStatusFilter() {

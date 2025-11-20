@@ -622,3 +622,34 @@ class TemplateParameter(db.Model):
     
     def __repr__(self):
         return f'<TemplateParameter {self.id} for Template {self.template_id}>'
+
+
+class StickerTemplate(db.Model):
+    __tablename__ = 'sticker_templates'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    template_type = db.Column(db.String(20), nullable=False)  # 'Items', 'Location', 'Racks'
+    width_mm = db.Column(db.Float, nullable=False)  # e.g., 30
+    height_mm = db.Column(db.Float, nullable=False)  # e.g., 20
+    layout = db.Column(db.Text, nullable=False)  # JSON array of elements
+    is_default = db.Column(db.Boolean, default=False)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    
+    creator = db.relationship('User', backref='sticker_templates')
+    
+    def get_layout(self):
+        """Parse JSON layout"""
+        try:
+            return json.loads(self.layout) if self.layout else []
+        except json.JSONDecodeError:
+            return []
+    
+    def set_layout(self, layout_data):
+        """Store layout as JSON"""
+        self.layout = json.dumps(layout_data)
+    
+    def __repr__(self):
+        return f'<StickerTemplate {self.name} - {self.template_type}>'

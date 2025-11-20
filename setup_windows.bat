@@ -4,7 +4,9 @@ color 0A
 cls
 
 echo.
-echo ===== Inventory Manager - Windows Setup =====
+echo ==========================================
+echo   Inventory Manager - Windows Setup
+echo ==========================================
 echo.
 
 REM Check Python
@@ -18,8 +20,9 @@ if errorlevel 1 (
 )
 echo [OK] Python found
 
-REM Create venv
+REM Create virtual environment
 if not exist venv (
+    echo [*] Creating virtual environment...
     python -m venv venv
     if errorlevel 1 (
         color 0C
@@ -30,55 +33,47 @@ if not exist venv (
 )
 echo [OK] Virtual environment ready
 
-REM Install dependencies
+REM Activate and upgrade pip
 call venv\Scripts\activate.bat
+python -m pip install --upgrade pip >nul 2>&1
+
+REM Install dependencies
+echo [*] Installing dependencies...
 pip install -q -r requirements.txt
 if errorlevel 1 (
-    pip install -q -r requirements-minimal.txt
+    color 0C
+    echo [ERROR] Failed to install dependencies
+    pause
+    exit /b 1
 )
 echo [OK] Dependencies installed
 
-REM Create .env if needed
+REM Create .env from example
 if not exist .env (
-    copy .env.example .env >nul 2>&1
+    if exist .env.example (
+        echo [*] Creating .env file...
+        copy .env.example .env >nul 2>&1
+    )
 )
 
-REM Ask for demo mode
-echo.
-set /p demo_choice="Set as Demo Mode? (Y/N): "
-if /i "!demo_choice!"=="Y" (
-    setx DEMO_MODE true
-    set DEMO_MODE=true
-    echo [OK] Demo mode enabled
-) else (
-    setx DEMO_MODE false
-    set DEMO_MODE=false
-    echo [OK] Demo mode disabled
-)
+REM Create required directories
+if not exist uploads mkdir uploads
+if not exist uploads\locations mkdir uploads\locations
+if not exist instance mkdir instance
+echo [OK] Directories created
 
-REM Database check and init
+REM Database initialization
 if exist instance\inventory.db (
-    echo [OK] Database exists, skipping init
+    echo [OK] Database exists
     goto :startup
 )
 
-echo [OK] First-time setup - initializing database...
-
+echo [*] Initializing database...
 python init_db.py
-
 if errorlevel 1 (
     color 0C
     echo.
     echo [ERROR] Database initialization failed
-    echo.
-    set /p choice="Delete database and retry? (1=Yes, 2=Exit): "
-    
-    if "!choice!"=="1" (
-        del /f instance\inventory.db >nul 2>&1
-        echo Database deleted. Run setup again.
-        pause
-        exit /b 0
-    )
     pause
     exit /b 1
 )
@@ -86,19 +81,15 @@ if errorlevel 1 (
 :startup
 color 0A
 echo.
-echo ===== Setup Complete! =====
-echo.
-if "!DEMO_MODE!"=="true" (
-    echo DEMO MODE: Enabled
-    echo Demo credentials will be shown on login page
-    echo Admin profile is locked for editing
-) else (
-    echo DEMO MODE: Disabled
-)
+echo ==========================================
+echo   Setup Complete!
+echo ==========================================
 echo.
 echo Default Login:
 echo   Username: admin
 echo   Password: admin123
+echo.
+echo ^!^! CHANGE PASSWORD IMMEDIATELY ^!^!
 echo.
 echo Starting application...
 echo Open browser: http://localhost:5000

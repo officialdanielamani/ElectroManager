@@ -18,7 +18,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <h5 class="mb-0 text-white"><i class="bi bi-geo-alt-fill"></i> General Locations <span class="badge bg-dark">{{ locations|length }}</span></h5>
                     {% if can_edit %}
-                    <a href="{{ url_for('location_new') }}" class="btn btn-dark btn-sm">
+                    <a href="{{ url_for('location_rack.location_new') }}" class="btn btn-dark btn-sm">
                         <i class="bi bi-plus-circle"></i> Add
                     </a>
                     {% endif %}
@@ -48,24 +48,24 @@
                                 </div>
                                 {% if location.picture %}
                                 <div class="ms-2">
-                                    <img src="{{ url_for('location_picture', filepath=location.picture) }}" 
+                                    <img src="{{ url_for('location_rack.location_picture', filepath=location.picture) }}" 
                                          alt="{{ location.name }}" 
                                          style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px; border: 2px solid #dee2e6; cursor: pointer;"
-                                         onclick="showImageModal('{{ url_for('location_picture', filepath=location.picture) }}', '{{ location.name }}')">
+                                         onclick="showImageModal('{{ url_for('location_rack.location_picture', filepath=location.picture) }}', '{{ location.name }}')">
                                 </div>
                                 {% endif %}
                             </div>
                             <div class="mt-2">
-                                <a href="{{ url_for('location_detail', id=location.id) }}" class="btn btn-sm btn-info btn-sm" title="View">
+                                <a href="{{ url_for('location_rack.location_detail', id=location.id) }}" class="btn btn-sm btn-info btn-sm" title="View">
                                     <i class="bi bi-eye"></i>
                                 </a>
                                 {% if can_edit %}
-                                <a href="{{ url_for('location_edit', id=location.id) }}" class="btn btn-sm btn-warning btn-sm" title="Edit">
+                                <a href="{{ url_for('location_rack.location_edit', id=location.id) }}" class="btn btn-sm btn-warning btn-sm" title="Edit">
                                     <i class="bi bi-pencil"></i>
                                 </a>
                                 {% endif %}
                                 {% if can_delete %}
-                                <form method="POST" action="{{ url_for('location_delete', id=location.id) }}" style="display: inline;">
+                                <form method="POST" action="{{ url_for('location_rack.location_delete', id=location.id) }}" style="display: inline;">
                                     <button type="submit" class="btn btn-sm btn-danger btn-sm" onclick="return confirmDeleteLocation({{ location.items|length }}, {{ location.racks|length }})" title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
@@ -89,7 +89,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <h5 class="mb-0 text-white"><i class="bi bi-grid-3x3"></i> Rack Storage <span class="badge bg-dark">{{ racks|length }}</span></h5>
                     {% if can_edit %}
-                    <a href="{{ url_for('rack_new') }}" class="btn btn-dark btn-sm">
+                    <a href="{{ url_for('location_rack.rack_new') }}" class="btn btn-dark btn-sm">
                         <i class="bi bi-plus-circle"></i> Add
                     </a>
                     {% endif %}
@@ -123,24 +123,24 @@
                                 </div>
                                 {% if rack.picture %}
                                 <div class="ms-2">
-                                    <img src="{{ url_for('rack_picture', filepath=rack.picture) }}" 
+                                    <img src="{{ url_for('location_rack.rack_picture', filepath=rack.picture) }}" 
                                          alt="{{ rack.name }}" 
                                          style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px; border: 2px solid #dee2e6; cursor: pointer;"
-                                         onclick="showImageModal('{{ url_for('rack_picture', filepath=rack.picture) }}', '{{ rack.name }}')">
+                                         onclick="showImageModal('{{ url_for('location_rack.rack_picture', filepath=rack.picture) }}', '{{ rack.name }}')">
                                 </div>
                                 {% endif %}
                             </div>
                             <div class="mt-2">
-                                <a href="{{ url_for('rack_detail', id=rack.id) }}" class="btn btn-sm btn-info btn-sm" title="View">
+                                <a href="{{ url_for('location_rack.rack_detail', id=rack.id) }}" class="btn btn-sm btn-info btn-sm" title="View">
                                     <i class="bi bi-eye"></i>
                                 </a>
                                 {% if can_edit %}
-                                <a href="{{ url_for('rack_edit', id=rack.id) }}" class="btn btn-sm btn-warning btn-sm" title="Edit">
+                                <a href="{{ url_for('location_rack.rack_edit', id=rack.id) }}" class="btn btn-sm btn-warning btn-sm" title="Edit">
                                     <i class="bi bi-pencil"></i>
                                 </a>
                                 {% endif %}
                                 {% if can_delete %}
-                                <form method="POST" action="{{ url_for('rack_delete', id=rack.id) }}" style="display: inline;">
+                                <form method="POST" action="{{ url_for('location_rack.rack_delete', id=rack.id) }}" style="display: inline;">
                                     <button type="submit" class="btn btn-sm btn-danger btn-sm" onclick="return confirm('Delete this rack?')" title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>

@@ -13,7 +13,7 @@
                 <h5 class="mb-0">Parameter Details</h5>
             </div>
             <div class="card-body">
-                <form method="POST" action="{{ url_for('magic_parameter_edit', id=parameter.id) }}">
+                <form method="POST" action="{{ url_for('magic_parameter.magic_parameter_edit', id=parameter.id) }}">
                     <div class="mb-3">
                         <label class="form-label">Name</label>
                         <input type="text" name="name" class="form-control" value="{{ parameter.name }}" required>
@@ -44,7 +44,7 @@
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-save"></i> Save Changes
                         </button>
-                        <a href="{{ url_for('magic_parameters') }}" class="btn btn-secondary">
+                        <a href="{{ url_for('magic_parameter.magic_parameters') }}" class="btn btn-secondary">
                             <i class="bi bi-arrow-left"></i> Back to Magic Parameters
                         </a>
                     </div>
@@ -60,7 +60,7 @@
             </div>
             <div class="card-body">
                 <!-- Add Unit Form -->
-                <form method="POST" action="{{ url_for('magic_parameter_add_unit', id=parameter.id) }}" class="mb-3">
+                <form method="POST" action="{{ url_for('magic_parameter.magic_parameter_add_unit', id=parameter.id) }}" class="mb-3">
                     <div class="input-group">
                         <input type="text" name="unit" class="form-control" placeholder="Add new unit (e.g., V, mA, °C)" required>
                         <button type="submit" class="btn btn-primary">
@@ -75,7 +75,7 @@
                     {% for unit in parameter.units %}
                     <div class="list-group-item d-flex justify-content-between align-items-center">
                         <span>{{ unit.unit }}</span>
-                        <form method="POST" action="{{ url_for('magic_parameter_delete_unit', id=parameter.id, unit_id=unit.id) }}" style="display: inline;">
+                        <form method="POST" action="{{ url_for('magic_parameter.magic_parameter_delete_unit', id=parameter.id, unit_id=unit.id) }}" style="display: inline;">
                             <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete unit {{ unit.unit }}?')">
                                 <i class="bi bi-trash"></i>
                             </button>
@@ -97,7 +97,7 @@
             </div>
             <div class="card-body">
                 <!-- Add Option Form -->
-                <form method="POST" action="{{ url_for('magic_parameter_add_option', id=parameter.id) }}" class="mb-3">
+                <form method="POST" action="{{ url_for('magic_parameter.magic_parameter_add_option', id=parameter.id) }}" class="mb-3">
                     <div class="input-group">
                         <input type="text" name="option" class="form-control" placeholder="Add new option" required>
                         <button type="submit" class="btn btn-secondary">
@@ -112,7 +112,7 @@
                     {% for option in parameter.string_options %}
                     <div class="list-group-item d-flex justify-content-between align-items-center">
                         <span>{{ option.value }}</span>
-                        <form method="POST" action="{{ url_for('magic_parameter_delete_option', id=parameter.id, option_id=option.id) }}" style="display: inline;">
+                        <form method="POST" action="{{ url_for('magic_parameter.magic_parameter_delete_option', id=parameter.id, option_id=option.id) }}" style="display: inline;">
                             <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete option {{ option.value }}?')">
                                 <i class="bi bi-trash"></i>
                             </button>
@@ -136,7 +136,7 @@
                 {% if parameter.item_parameters %}
                 <div class="list-group">
                     {% for item_param in parameter.item_parameters %}
-                    <a href="{{ url_for('item_detail', uuid=item_param.item.uuid) }}" class="list-group-item list-group-item-action">
+                    <a href="{{ url_for('item.item_detail', uuid=item_param.item.uuid) }}" class="list-group-item list-group-item-action">
                         <strong>{{ item_param.item.name }}</strong>
                         <br>
                         <small class="text-muted">{{ item_param.get_display_text() }}</small>

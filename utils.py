@@ -227,3 +227,27 @@ def markdown_to_html(text):
         # Fallback if markdown parsing fails
         from markupsafe import escape
         return escape(text).replace('\n', '<br>')
+
+
+def get_item_edit_permissions(user):
+    """Get which item fields a user can edit"""
+    perms = {
+        'can_edit_name': user.has_permission('items', 'edit_name'),
+        'can_edit_sku_type': user.has_permission('items', 'edit_sku_type'),
+        'can_edit_description': user.has_permission('items', 'edit_description'),
+        'can_edit_datasheet': user.has_permission('items', 'edit_datasheet'),
+        'can_edit_upload': user.has_permission('items', 'edit_upload'),
+        'can_edit_lending': user.has_permission('items', 'edit_lending'),
+        'can_edit_price': user.has_permission('items', 'edit_price'),
+        'can_edit_quantity': user.has_permission('items', 'edit_quantity'),
+        'can_edit_location': user.has_permission('items', 'edit_location'),
+        'can_edit_category': user.has_permission('items', 'edit_category'),
+        'can_edit_footprint': user.has_permission('items', 'edit_footprint'),
+        'can_edit_tags': user.has_permission('items', 'edit_tags'),
+        'can_edit_parameters': user.has_permission('items', 'edit_parameters'),
+        'can_create': user.has_permission('items', 'create'),
+        'can_delete': user.has_permission('items', 'delete'),
+        'is_admin': user.is_admin()
+    }
+    return perms
+

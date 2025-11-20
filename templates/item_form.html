@@ -379,7 +379,7 @@
                                             </small>
                                         </div>
                                         <div>
-                                            <a href="{{ url_for('item_edit_parameter', item_id=item.id, param_id=param.id) }}"
+                                            <a href="{{ url_for('item.item_edit_parameter', item_id=item.id, param_id=param.id) }}"
                                                 class="btn btn-sm btn-warning btn-sm" title="Edit"
                                                 {% if item_perms and not item_perms.can_edit_parameters %}onclick="event.preventDefault(); alert('You do not have permission to edit parameters.'); return false;"{% endif %}>
                                                 <i class="bi bi-pencil"></i>
@@ -631,7 +631,7 @@
 
                     <!-- Buttons -->
                     <div class="d-flex justify-content-between">
-                        <a href="{{ url_for('items') }}" class="btn btn-secondary">
+                        <a href="{{ url_for('item.items') }}" class="btn btn-secondary">
                             <i class="bi bi-x-circle"></i> Cancel
                         </a>
                         {{ form.submit(class="btn btn-primary") }}
@@ -834,7 +834,7 @@
         const csrfToken = document.querySelector('input[name="csrf_token"]').value;
         formData.append('csrf_token', csrfToken);
 
-        fetch('{{ url_for("upload_attachment", item_id=item.id) }}', {
+        fetch('{{ url_for("item.upload_attachment", item_id=item.id) }}', {
             method: 'POST',
             body: formData
         })
@@ -1489,7 +1489,7 @@
 <div class="modal fade" id="addParameterModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <form method="POST" action="{{ url_for('item_add_parameter', id=item.id) }}">
+            <form method="POST" action="{{ url_for('item.item_add_parameter', id=item.id) }}">
                 <div class="modal-header">
                     <h5 class="modal-title">Add Magic Parameter</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -1712,7 +1712,7 @@
 <div class="modal fade" id="useTemplateModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="POST" action="{{ url_for('item_populate_template', id=item.id) }}">
+            <form method="POST" action="{{ url_for('item.item_populate_template', id=item.id) }}">
                 <div class="modal-header">
                     <h5 class="modal-title">Use Parameter Template</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
