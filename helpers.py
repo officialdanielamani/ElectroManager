@@ -101,8 +101,7 @@ def jinja_format_amount(amount, decimal_places=None):
 
 
 def markdown_filter(text):
-    """Jinja2 filter for rendering markdown"""
-    if text:
-        import markdown
-        return markdown.markdown(text, extensions=['nl2br', 'fenced_code'])
-    return ''
+    """Jinja2 filter for rendering markdown with safe HTML"""
+    from utils import markdown_to_html
+    from markupsafe import Markup
+    return Markup(markdown_to_html(text))
