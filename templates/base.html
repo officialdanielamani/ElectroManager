@@ -13,21 +13,40 @@
             const theme = '{{ current_theme or "light" }}';
             const userFont = '{{ current_user.user_font or "system" }}';
             
+            // Theme will only be loaded if the CSS file exists
             if (theme && theme !== 'light') {
                 document.documentElement.setAttribute('data-theme', theme);
             }
             
             // Apply font via data attribute
             document.documentElement.setAttribute('data-user-font', userFont);
-            console.log('Font applied (head):', userFont);
+            
+            // Dynamically set font-family CSS variable based on font name
+            // Works for any font - system, project, or custom
+            const fontFamilyMap = {
+                'system': 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                'Arial': 'Arial, sans-serif',
+                'Times New Roman': '"Times New Roman", Times, serif',
+                'Courier New': '"Courier New", Courier, monospace',
+                'Georgia': 'Georgia, serif',
+                'Verdana': 'Verdana, sans-serif',
+                'Comic Sans MS': '"Comic Sans MS", cursive',
+                'Trebuchet MS': '"Trebuchet MS", sans-serif'
+            };
+            
+            // Get font family from map, or use font name directly for custom fonts
+            const fontFamily = fontFamilyMap[userFont] || `'${userFont}', sans-serif`;
+            document.documentElement.style.setProperty('--user-font-family', fontFamily);
+            
+            console.log('Font applied (head):', userFont, 'Family:', fontFamily);
         })();
     </script>
     
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1">
     
-    <!-- Theme CSS - Load immediately for non-light themes -->
+    <!-- Theme CSS - Load immediately for non-light themes (server validates file exists) -->
     {% if current_theme and current_theme != 'light' %}
-    <link id="theme-link" rel="stylesheet" href="{{ url_for('static', filename='css/themes/' + current_theme + '.css') }}?v=1">
+    <link id="theme-link" rel="stylesheet" href="{{ url_for('static', filename='css/themes/' + current_theme + '.css') }}?v=1" onerror="console.warn('Theme CSS failed to load, fallback to light theme')">
     {% else %}
     <link id="theme-link" rel="stylesheet" href="">
     {% endif %}
@@ -55,20 +74,57 @@
         }
         
         /* Font application - use !important to override Bootstrap and other styles */
+        :root {
+            --user-font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        
         html {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
-        }
-        
-        html[data-user-font="open-dyslexic"] {
-            font-family: 'OpenDyslexic', sans-serif !important;
-        }
-        
-        html[data-user-font="courier"] {
-            font-family: 'Courier New', monospace !important;
+            font-family: var(--user-font-family) !important;
         }
         
         html[data-user-font="system"] {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+            --user-font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        
+        html[data-user-font="Arial"] {
+            --user-font-family: Arial, sans-serif;
+        }
+        
+        html[data-user-font="Times New Roman"] {
+            --user-font-family: "Times New Roman", Times, serif;
+        }
+        
+        html[data-user-font="Courier New"] {
+            --user-font-family: "Courier New", Courier, monospace;
+        }
+        
+        html[data-user-font="Georgia"] {
+            --user-font-family: Georgia, serif;
+        }
+        
+        html[data-user-font="Verdana"] {
+            --user-font-family: Verdana, sans-serif;
+        }
+        
+        html[data-user-font="Comic Sans MS"] {
+            --user-font-family: "Comic Sans MS", cursive;
+        }
+        
+        html[data-user-font="Trebuchet MS"] {
+            --user-font-family: "Trebuchet MS", sans-serif;
+        }
+        
+        /* Dynamically handle project fonts - use title-cased version */
+        html[data-user-font="OpenDyslexic"] {
+            --user-font-family: 'OpenDyslexic', sans-serif;
+        }
+        
+        /* Generic fallback for any custom font - will work for any font name */
+        html[data-user-font] {
+            font-family: var(--user-font-family) !important;
+        }
+        html[data-user-font] {
+            /* Let specific rules above take precedence */
         }
         
         /* Ensure all elements inherit the font */

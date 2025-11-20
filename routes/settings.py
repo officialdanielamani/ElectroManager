@@ -23,6 +23,117 @@ logger = logging.getLogger(__name__)
 settings_bp = Blueprint('settings', __name__)
 
 
+def parse_theme_metadata(theme_name):
+    """Parse theme metadata from CSS file header"""
+    import os
+    import re
+    
+    css_file = os.path.join(current_app.root_path, 'static', 'css', 'themes', f'{theme_name}.css')
+    metadata = {
+        'name': theme_name.capitalize(),
+        'description': 'Custom theme',
+        'color': '#667eea'  # Default blue
+    }
+    
+    if not os.path.exists(css_file):
+        return metadata
+    
+    try:
+        with open(css_file, 'r', encoding='utf-8') as f:
+            content = f.read(500)  # Read first 500 chars for metadata
+            
+            # Parse metadata from CSS comments
+            name_match = re.search(r'name:\s*([^\n]+)', content)
+            desc_match = re.search(r'description:\s*([^\n]+)', content)
+            color_match = re.search(r'color:\s*(#[0-9a-fA-F]{6})', content)
+            
+            if name_match:
+                metadata['name'] = name_match.group(1).strip()
+            if desc_match:
+                metadata['description'] = desc_match.group(1).strip()
+            if color_match:
+                metadata['color'] = color_match.group(1).strip()
+    except Exception as e:
+        logger.warning(f"Error parsing theme metadata for {theme_name}: {e}")
+    
+    return metadata
+
+
+def get_available_themes():
+    """Get list of available themes from static/css/themes with metadata"""
+    import os
+    themes_dir = os.path.join(current_app.root_path, 'static', 'css', 'themes')
+    available_themes = []
+    if os.path.exists(themes_dir):
+        for file in os.listdir(themes_dir):
+            if file.endswith('.css'):
+                theme_name = file[:-4]
+                metadata = parse_theme_metadata(theme_name)
+                available_themes.append({
+                    'id': theme_name,
+                    'name': metadata['name'],
+                    'description': metadata['description'],
+                    'color': metadata['color']
+                })
+    return sorted(available_themes, key=lambda x: x['id']) if available_themes else [
+        {'id': 'light', 'name': 'Light', 'description': 'Default bright theme', 'color': '#ffffff'}
+    ]
+
+
+def get_available_fonts():
+    """Get list of available fonts - system fonts + project fonts from static/fonts"""
+    import os
+    
+    # Built-in system fonts (always available)
+    system_fonts = [
+        {'id': 'system', 'name': 'System (Default)', 'type': 'system'},
+        {'id': 'Arial', 'name': 'Arial', 'type': 'system'},
+        {'id': 'Times New Roman', 'name': 'Times New Roman', 'type': 'system'},
+        {'id': 'Courier New', 'name': 'Courier New', 'type': 'system'},
+        {'id': 'Georgia', 'name': 'Georgia', 'type': 'system'},
+        {'id': 'Verdana', 'name': 'Verdana', 'type': 'system'},
+        {'id': 'Comic Sans MS', 'name': 'Comic Sans MS', 'type': 'system'},
+        {'id': 'Trebuchet MS', 'name': 'Trebuchet MS', 'type': 'system'},
+    ]
+    
+    # Project fonts from static/fonts
+    fonts_dir = os.path.join(current_app.root_path, 'static', 'fonts')
+    font_extensions = {'.woff2', '.woff', '.ttf', '.otf'}
+    font_names_set = set()
+    
+    if os.path.exists(fonts_dir):
+        for file in os.listdir(fonts_dir):
+            if os.path.splitext(file)[1].lower() in font_extensions:
+                font_base = os.path.splitext(file)[0]
+                # Extract font name (remove style suffix like -Regular, -Bold, -Italic)
+                font_name = font_base.rsplit('-', 1)[0] if '-' in font_base else font_base
+                font_names_set.add(font_name)
+    
+    # Add project fonts to the list
+    project_fonts = [
+        {'id': name, 'name': name, 'type': 'project'} 
+        for name in sorted(list(font_names_set))
+    ]
+    
+    return system_fonts + project_fonts
+
+
+def validate_user_theme(theme):
+    """Validate theme exists, fallback to 'light' if not"""
+    available = get_available_themes()
+    theme_ids = [t['id'] for t in available]
+    return theme if theme in theme_ids else 'light'
+
+
+def validate_user_font(user_font):
+    """Validate font exists, fallback to 'system' if not"""
+    if user_font == 'system':
+        return 'system'
+    available = get_available_fonts()
+    font_ids = [f['id'] for f in available]
+    return user_font if user_font in font_ids else 'system'
+
+
 @settings_bp.route('/settings', endpoint='settings')
 @login_required
 def settings():
@@ -37,9 +148,18 @@ def settings():
 @settings_bp.route('/settings/general', endpoint='settings_general')
 @login_required
 def settings_general():
-    current_theme = current_user.theme or 'light'
-    current_font = current_user.user_font or 'system'
-    return render_template('settings_general.html', current_theme=current_theme, current_font=current_font)
+    # Validate current user's theme and font - fallback to defaults if missing
+    current_theme = validate_user_theme(current_user.theme or 'light')
+    current_font = validate_user_font(current_user.user_font or 'system')
+    
+    available_themes = get_available_themes()
+    available_fonts = get_available_fonts()
+    
+    return render_template('settings_general.html', 
+                         current_theme=current_theme, 
+                         current_font=current_font,
+                         available_themes=available_themes,
+                         available_fonts=available_fonts)
 
 
 
@@ -48,10 +168,8 @@ def settings_general():
 def save_theme():
     theme = request.form.get('theme', 'light')
     
-    # Validate theme
-    valid_themes = ['light', 'dark', 'blue', 'keqing']
-    if theme not in valid_themes:
-        theme = 'light'
+    # Validate theme - will fallback to 'light' if not available
+    theme = validate_user_theme(theme)
     
     # Save to current user
     current_user.theme = theme
@@ -68,22 +186,15 @@ def save_theme():
 def save_font():
     user_font = request.form.get('user_font', 'system')
     
-    # Validate font
-    valid_fonts = ['system', 'open-dyslexic', 'courier']
-    if user_font not in valid_fonts:
-        user_font = 'system'
+    # Validate font - will fallback to 'system' if not available
+    user_font = validate_user_font(user_font)
     
     # Save to current user
     current_user.user_font = user_font
     db.session.commit()
     
-    font_names = {
-        'system': 'System (Default)',
-        'open-dyslexic': 'OpenDyslexic',
-        'courier': 'Courier New'
-    }
-    
-    flash(f'Your font changed to "{font_names.get(user_font, user_font)}"!', 'success')
+    font_display_name = user_font if user_font == 'system' else user_font.replace('-', ' ').title()
+    flash(f'Your font changed to "{font_display_name}"!', 'success')
     log_audit(current_user.id, 'update', 'user', current_user.id, f'Changed font to {user_font}')
     return redirect(url_for('settings.settings_general'))
 
@@ -93,21 +204,16 @@ def save_font():
 @login_required
 def save_ui_preference():
     """Save both theme and font together"""
-    # Save theme
+    # Save theme with validation
     theme = request.form.get('theme', 'light')
-    valid_themes = ['light', 'dark', 'blue', 'keqing']
-    if theme not in valid_themes:
-        theme = 'light'
-    
+    theme = validate_user_theme(theme)
     current_user.theme = theme
     
-    # Save font
+    # Save font with validation
     user_font = request.form.get('user_font', 'system')
-    valid_fonts = ['system', 'open-dyslexic', 'courier']
-    if user_font not in valid_fonts:
-        user_font = 'system'
-    
+    user_font = validate_user_font(user_font)
     current_user.user_font = user_font
+    
     db.session.commit()
     
     flash(f'Your UI preferences have been saved!', 'success')

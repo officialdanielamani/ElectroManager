@@ -25,65 +25,21 @@
                     <div class="mb-4">
                         <label class="form-label"><strong>Select Theme</strong></label>
                         <div class="row g-3">
-                            <!-- Light Theme -->
+                            {% for theme in available_themes %}
                             <div class="col-md-6">
-                                <input type="radio" class="btn-check" name="theme" id="theme-light" value="light" 
-                                       {% if current_theme == 'light' %}checked{% endif %}>
-                                <label class="btn btn-outline-secondary w-100 p-3" for="theme-light">
+                                <input type="radio" class="btn-check" name="theme" id="theme-{{ theme.id }}" value="{{ theme.id }}" 
+                                       {% if current_theme == theme.id %}checked{% endif %}>
+                                <label class="btn btn-outline-secondary w-100 p-3" for="theme-{{ theme.id }}">
                                     <div class="d-flex align-items-center">
-                                        <div class="theme-preview bg-light border" style="width: 50px; height: 50px; border-radius: 8px;"></div>
+                                        <div class="theme-preview border" style="width: 50px; height: 50px; border-radius: 8px; background-color: {{ theme.color }};"></div>
                                         <div class="ms-3 text-start">
-                                            <strong>Light</strong>
-                                            <br><small class="text-muted">Default bright theme</small>
+                                            <strong>{{ theme.name }}</strong>
+                                            <br><small class="text-muted">{{ theme.description }}</small>
                                         </div>
                                     </div>
                                 </label>
                             </div>
-
-                            <!-- Dark Theme -->
-                            <div class="col-md-6">
-                                <input type="radio" class="btn-check" name="theme" id="theme-dark" value="dark"
-                                       {% if current_theme == 'dark' %}checked{% endif %}>
-                                <label class="btn btn-outline-secondary w-100 p-3" for="theme-dark">
-                                    <div class="d-flex align-items-center">
-                                        <div class="theme-preview bg-dark border" style="width: 50px; height: 50px; border-radius: 8px;"></div>
-                                        <div class="ms-3 text-start">
-                                            <strong>Dark</strong>
-                                            <br><small class="text-muted">Easy on the eyes</small>
-                                        </div>
-                                    </div>
-                                </label>
-                            </div>
-
-                            <!-- Blue Theme -->
-                            <div class="col-md-6">
-                                <input type="radio" class="btn-check" name="theme" id="theme-blue" value="blue"
-                                       {% if current_theme == 'blue' %}checked{% endif %}>
-                                <label class="btn btn-outline-secondary w-100 p-3" for="theme-blue">
-                                    <div class="d-flex align-items-center">
-                                        <div class="theme-preview border" style="width: 50px; height: 50px; border-radius: 8px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
-                                        <div class="ms-3 text-start">
-                                            <strong>Blue</strong>
-                                            <br><small class="text-muted">Cool blue gradient</small>
-                                        </div>
-                                    </div>
-                                </label>
-                            </div>
-
-                            <!-- Keqing Theme -->
-                            <div class="col-md-6">
-                                <input type="radio" class="btn-check" name="theme" id="theme-keqing" value="keqing"
-                                       {% if current_theme == 'keqing' %}checked{% endif %}>
-                                <label class="btn btn-outline-secondary w-100 p-3" for="theme-keqing">
-                                    <div class="d-flex align-items-center">
-                                        <div class="theme-preview border" style="width: 50px; height: 50px; border-radius: 8px; background: linear-gradient(135deg, #2d1b4e 0%, #4a2c6b 50%, #d4af37 100%);"></div>
-                                        <div class="ms-3 text-start">
-                                            <strong>Keqing</strong>
-                                            <br><small class="text-muted">Purple & gold elegance</small>
-                                        </div>
-                                    </div>
-                                </label>
-                            </div>
+                            {% endfor %}
                         </div>
                     </div>
 
@@ -93,15 +49,11 @@
                         <div class="row">
                             <div class="col-md-8">
                                 <select class="form-select" id="user_font" name="user_font">
-                                    <option value="system" {% if current_font == 'system' %}selected{% endif %}>
-                                        System (Default)
+                                    {% for font in available_fonts %}
+                                    <option value="{{ font.id }}" {% if current_font == font.id %}selected{% endif %}>
+                                        {{ font.name }}{% if font.type == 'project' %} (Project){% endif %}
                                     </option>
-                                    <option value="open-dyslexic" {% if current_font == 'open-dyslexic' %}selected{% endif %}>
-                                        OpenDyslexic (Dyslexia-Friendly)
-                                    </option>
-                                    <option value="courier" {% if current_font == 'courier' %}selected{% endif %}>
-                                        Courier New (Monospace)
-                                    </option>
+                                    {% endfor %}
                                 </select>
                             </div>
                         </div>
@@ -110,15 +62,178 @@
                     <!-- Preview Section -->
                     <div class="mb-4">
                         <label class="form-label"><strong>Theme & Font Selection Preview</strong></label>
-                        <!-- Preview Container using iframe to isolate theme CSS -->
-                        <div style="border: 1px solid #dee2e6; border-radius: 0.375rem; overflow: hidden; background: white; min-height: 200px;">
-                            <iframe id="themePreviewIframe" 
-                                    style="width: 100%; height: 250px; border: none; display: block;" 
-                                    sandbox="allow-same-origin"
-                                    title="Theme Preview">
-                            </iframe>
+                        <!-- Direct Preview Card -->
+                        <div class="card" id="previewCard" style="min-height: 250px;">
+                            <div class="card-header">
+                                <h6 class="mb-0" id="previewThemeName">Sample Preview Card</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span>Theme: <strong id="previewTheme">Light</strong></span>
+                                    <span class="badge bg-primary">Badge</span>
+                                </div>
+                                <p class="text-muted mb-3">
+                                    <strong id="previewFont">Font: System (Default)</strong><br>
+                                    The quick brown fox jumps over the lazy dog<br>
+                                    ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789
+                                </p>
+                                <button class="btn btn-primary btn-sm me-2">Primary Button</button>
+                                <button class="btn btn-secondary btn-sm">Secondary Button</button>
+                            </div>
                         </div>
                     </div>
+                    
+                    <style>
+                        /* Scoped theme styles - only apply to #previewCard */
+                        #previewCard[data-preview-theme="light"] {
+                            background-color: #ffffff !important;
+                            color: #212529 !important;
+                            border-color: #dee2e6 !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="light"] .card-header {
+                            background-color: #f8f9fa !important;
+                            border-color: #dee2e6 !important;
+                            color: #212529 !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="light"] .card-body {
+                            background-color: #ffffff !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="dark"] {
+                            background-color: #2d2d2d !important;
+                            color: #e0e0e0 !important;
+                            border-color: #3d3d3d !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="dark"] .card-header {
+                            background-color: #3d3d3d !important;
+                            border-color: #4d4d4d !important;
+                            color: #fff !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="dark"] .card-body {
+                            background-color: #2d2d2d !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="blue"] {
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                            color: #ffffff !important;
+                            border-color: rgba(255, 255, 255, 0.2) !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="blue"] .card-header {
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                            color: #fff !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="blue"] .card-body {
+                            background: rgba(255, 255, 255, 0.95) !important;
+                            color: #212529 !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="keqing"] {
+                            background: linear-gradient(135deg, #1a0d2e 0%, #2d1b4e 100%) !important;
+                            color: #d4af37 !important;
+                            border-color: #444 !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="keqing"] .card-header {
+                            background: linear-gradient(135deg, #2d1b4e 0%, #4a2c6b 100%) !important;
+                            color: #d4af37 !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="keqing"] .card-body {
+                            background-color: #2a2a3a !important;
+                            color: #d4af37 !important;
+                        }
+                        
+                        /* Text and element colors for all themes */
+                        #previewCard[data-preview-theme="light"] .text-muted {
+                            color: #6c757d !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="light"] .btn-primary {
+                            background-color: #007bff !important;
+                            border-color: #007bff !important;
+                            color: #ffffff !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="light"] .btn-secondary {
+                            background-color: #6c757d !important;
+                            border-color: #6c757d !important;
+                            color: #ffffff !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="light"] .badge {
+                            background-color: #007bff !important;
+                            color: #ffffff !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="dark"] .text-muted {
+                            color: #999999 !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="dark"] .btn-primary {
+                            background-color: #0056b3 !important;
+                            border-color: #0056b3 !important;
+                            color: #ffffff !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="dark"] .btn-secondary {
+                            background-color: #555555 !important;
+                            border-color: #555555 !important;
+                            color: #ffffff !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="dark"] .badge {
+                            background-color: #555555 !important;
+                            color: #ffffff !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="blue"] .text-muted {
+                            color: #6c757d !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="blue"] .btn-primary {
+                            background-color: #0066cc !important;
+                            border-color: #0066cc !important;
+                            color: #ffffff !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="blue"] .btn-secondary {
+                            background-color: #4c6f99 !important;
+                            border-color: #4c6f99 !important;
+                            color: #ffffff !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="blue"] .badge {
+                            background-color: #0066cc !important;
+                            color: #ffffff !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="keqing"] .text-muted {
+                            color: #a8a8a8 !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="keqing"] .btn-primary {
+                            background-color: #d4af37 !important;
+                            border-color: #d4af37 !important;
+                            color: #2a2a3a !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="keqing"] .btn-secondary {
+                            background-color: #5f4a6d !important;
+                            border-color: #5f4a6d !important;
+                            color: #d4af37 !important;
+                        }
+                        
+                        #previewCard[data-preview-theme="keqing"] .badge {
+                            background-color: #d4af37 !important;
+                            color: #2a2a3a !important;
+                        }
+                    </style>
 
                     <!-- Action Buttons -->
                     <div class="d-flex justify-content-between">
@@ -325,8 +440,17 @@
 <script>
 // Save both theme and font together
 function saveUIPreference() {
-    const theme = document.querySelector('input[name="theme"]:checked').value;
-    const font = document.getElementById('user_font').value;
+    const themeRadio = document.querySelector('input[name="theme"]:checked');
+    const fontSelect = document.getElementById('user_font');
+    
+    // Safety checks
+    if (!themeRadio || !fontSelect) {
+        console.error('Required form elements not found');
+        return;
+    }
+    
+    const theme = themeRadio.value;
+    const font = fontSelect.value;
     
     // Create a form to submit both values
     const form = document.createElement('form');
@@ -349,95 +473,70 @@ function saveUIPreference() {
     form.submit();
 }
 
-// Update preview with actual theme CSS
+// Update preview with actual theme and font
 function updatePreview() {
-    const theme = document.querySelector('input[name="theme"]:checked').value;
-    const font = document.getElementById('user_font').value;
-    const iframe = document.getElementById('themePreviewIframe');
+    const themeRadio = document.querySelector('input[name="theme"]:checked');
+    const fontSelect = document.getElementById('user_font');
     
-    // Get font family
-    let fontFamily = 'system-ui, -apple-system, sans-serif';
-    switch(font) {
-        case 'open-dyslexic':
-            fontFamily = "'OpenDyslexic', system-ui, sans-serif";
-            break;
-        case 'courier':
-            fontFamily = "'Courier New', monospace";
-            break;
-        case 'system':
-        default:
-            fontFamily = 'system-ui, -apple-system, sans-serif';
+    // Safety checks - return if elements don't exist
+    if (!themeRadio || !fontSelect) {
+        console.warn('Preview elements not found:', { themeRadio, fontSelect });
+        return;
     }
     
-    // Get theme CSS path
-    let themeCssPath = '';
-    if (theme !== 'light') {
-        themeCssPath = `{{ url_for('static', filename='css/themes/') }}${theme}.css`;
+    const theme = themeRadio.value;
+    const font = fontSelect.value;
+    const previewCard = document.getElementById('previewCard');
+    
+    if (!previewCard) {
+        console.warn('Preview card not found');
+        return;
     }
     
-    // Build iframe HTML content
-    const iframeHtml = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-        <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-        ${themeCssPath ? `<link rel="stylesheet" href="${themeCssPath}">` : ''}
-        <style>
-            @font-face {
-                font-family: 'OpenDyslexic';
-                src: 
-                    url('{{ url_for("static", filename="fonts/OpenDyslexic-Regular.woff2") }}') format('woff2'),
-                    url('{{ url_for("static", filename="fonts/OpenDyslexic-Regular.ttf") }}') format('truetype');
-                font-weight: 400;
-                font-display: swap;
-            }
-            @font-face {
-                font-family: 'OpenDyslexic';
-                src: 
-                    url('{{ url_for("static", filename="fonts/OpenDyslexic-Bold.woff2") }}') format('woff2'),
-                    url('{{ url_for("static", filename="fonts/OpenDyslexic-Bold.ttf") }}') format('truetype');
-                font-weight: bold;
-                font-display: swap;
-            }
-            html {
-                font-family: ${fontFamily.includes("'") ? fontFamily : "'" + fontFamily + "'"} !important;
-            }
-            body, body * {
-                font-family: inherit !important;
-            }
-            body {
-                padding: 1rem;
-                margin: 0;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="card">
-            <div class="card-header">
-                <h6 class="mb-0">Sample Preview Card</h6>
-            </div>
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <span>Theme: <strong>${theme.charAt(0).toUpperCase() + theme.slice(1)}</strong></span>
-                    <span class="badge bg-primary">Badge</span>
-                </div>
-                <p class="text-muted mb-3">
-                    <strong>Font: ${font === 'system' ? 'System (Default)' : font === 'open-dyslexic' ? 'OpenDyslexic' : 'Courier New'}</strong><br>
-                    The quick brown fox jumps over the lazy dog<br>
-                    ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789
-                </p>
-                <button class="btn btn-primary btn-sm me-2">Primary Button</button>
-                <button class="btn btn-secondary btn-sm">Secondary Button</button>
-            </div>
-        </div>
-    </body>
-    </html>
+    console.log('Updating preview - Theme:', theme, 'Font:', font);
+    
+    // Update preview theme text
+    document.getElementById('previewTheme').textContent = theme.charAt(0).toUpperCase() + theme.slice(1);
+    
+    // Get font display name from the selected option
+    const selectedOption = fontSelect.options[fontSelect.selectedIndex];
+    const fontDisplayName = selectedOption.text; // Use the displayed text
+    document.getElementById('previewFont').textContent = 'Font: ' + fontDisplayName;
+    
+    // Set data attribute for theme (this applies scoped CSS)
+    previewCard.setAttribute('data-preview-theme', theme);
+    
+    // Define font families with proper CSS syntax
+    const fontFamilies = {
+        'system': 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        'Arial': 'Arial, sans-serif',
+        'Times New Roman': '"Times New Roman", Times, serif',
+        'Courier New': '"Courier New", Courier, monospace',
+        'Georgia': 'Georgia, serif',
+        'Verdana': 'Verdana, sans-serif',
+        'Comic Sans MS': '"Comic Sans MS", cursive',
+        'Trebuchet MS': '"Trebuchet MS", sans-serif'
+    };
+    
+    // Get font family or default to custom name
+    let fontFamily = fontFamilies[font] || `'${font}', sans-serif`;
+    
+    console.log('Applying font family:', fontFamily, 'Theme:', theme);
+    
+    // Create or update dynamic style tag for preview card
+    let styleTag = document.getElementById('preview-font-style');
+    if (!styleTag) {
+        styleTag = document.createElement('style');
+        styleTag.id = 'preview-font-style';
+        document.head.appendChild(styleTag);
+    }
+    
+    styleTag.textContent = `
+        #previewCard,
+        #previewCard * {
+            font-family: ${fontFamily} !important;
+        }
     `;
-    
-    // Set iframe content
-    iframe.srcdoc = iframeHtml;
 }
 
 // Listen for theme changes
@@ -447,12 +546,25 @@ document.querySelectorAll('input[name="theme"]').forEach(radio => {
 
 // Listen for font changes and initialize preview
 document.addEventListener('DOMContentLoaded', function() {
-    const fontSelect = document.getElementById('user_font');
-    if (fontSelect) {
-        fontSelect.addEventListener('change', updatePreview);
-        // Initial preview
+    // Wait for all DOM elements to be ready
+    setTimeout(function() {
+        // Listen for theme changes
+        document.querySelectorAll('input[name="theme"]').forEach(radio => {
+            radio.addEventListener('change', updatePreview);
+        });
+        
+        // Listen for font changes
+        const fontSelect = document.getElementById('user_font');
+        if (fontSelect) {
+            fontSelect.addEventListener('change', function() {
+                console.log('Font changed to:', this.value);
+                updatePreview();
+            });
+        }
+        
+        // Initial preview update
         updatePreview();
-    }
+    }, 100);
 });
 </script>
 
@@ -593,6 +705,7 @@ document.querySelectorAll('input[name="theme"]').forEach(radio => {
 });
 </script>
 
+
 <style>
     @font-face {
         font-family: 'OpenDyslexic';
@@ -613,5 +726,43 @@ document.querySelectorAll('input[name="theme"]').forEach(radio => {
         font-weight: bold;
         font-display: swap;
     }
+    
+    {% for font in available_fonts %}
+    {% if font.type == 'project' %}
+    @font-face {
+        font-family: '{{ font.id }}';
+        src: url('{{ url_for("static", filename="fonts/" + font.id + ".woff2") }}') format('woff2'),
+             url('{{ url_for("static", filename="fonts/" + font.id + "-Regular.woff2") }}') format('woff2'),
+             url('{{ url_for("static", filename="fonts/" + font.id + ".woff") }}') format('woff'),
+             url('{{ url_for("static", filename="fonts/" + font.id + "-Regular.woff") }}') format('woff'),
+             url('{{ url_for("static", filename="fonts/" + font.id + ".ttf") }}') format('truetype'),
+             url('{{ url_for("static", filename="fonts/" + font.id + "-Regular.ttf") }}') format('truetype'),
+             url('{{ url_for("static", filename="fonts/" + font.id + ".otf") }}') format('opentype'),
+             url('{{ url_for("static", filename="fonts/" + font.id + "-Regular.otf") }}') format('opentype');
+        font-weight: 400;
+        font-display: swap;
+    }
+    
+    @font-face {
+        font-family: '{{ font.id }}';
+        src: url('{{ url_for("static", filename="fonts/" + font.id + "-Bold.woff2") }}') format('woff2'),
+             url('{{ url_for("static", filename="fonts/" + font.id + "-Bold.woff") }}') format('woff'),
+             url('{{ url_for("static", filename="fonts/" + font.id + "-Bold.ttf") }}') format('truetype'),
+             url('{{ url_for("static", filename="fonts/" + font.id + "-Bold.otf") }}') format('opentype');
+        font-weight: bold;
+        font-display: swap;
+    }
+    
+    @font-face {
+        font-family: '{{ font.id }}';
+        src: url('{{ url_for("static", filename="fonts/" + font.id + "-Light.woff2") }}') format('woff2'),
+             url('{{ url_for("static", filename="fonts/" + font.id + "-Light.woff") }}') format('woff'),
+             url('{{ url_for("static", filename="fonts/" + font.id + "-Light.ttf") }}') format('truetype'),
+             url('{{ url_for("static", filename="fonts/" + font.id + "-Light.otf") }}') format('opentype');
+        font-weight: 300;
+        font-display: swap;
+    }
+    {% endif %}
+    {% endfor %}
 </style>
 {% endblock %}

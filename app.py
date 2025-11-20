@@ -74,9 +74,28 @@ app.jinja_env.filters['markdown'] = markdown_filter
 
 @app.context_processor
 def inject_theme():
-    """Inject theme settings into all templates"""
+    """Inject validated theme settings into all templates with fallback"""
     if current_user.is_authenticated:
-        return {'current_theme': current_user.theme or 'light'}
+        # Import validation functions
+        import os
+        import re
+        
+        def get_available_themes():
+            themes_dir = os.path.join(app.root_path, 'static', 'css', 'themes')
+            theme_ids = []
+            if os.path.exists(themes_dir):
+                for file in os.listdir(themes_dir):
+                    if file.endswith('.css'):
+                        theme_ids.append(file[:-4])
+            return theme_ids if theme_ids else ['light']
+        
+        def validate_theme(theme):
+            available = get_available_themes()
+            return theme if theme in available else 'light'
+        
+        # Validate user's theme - fallback if file doesn't exist
+        validated_theme = validate_theme(current_user.theme or 'light')
+        return {'current_theme': validated_theme}
     return {'current_theme': 'light'}
 
 

@@ -1,0 +1,11 @@
+/* Theme Metadata
+   name: Light
+   description: Default bright theme
+   color: #ffffff
+*/
+
+/* Light Theme - Default Bootstrap */
+body {
+    background-color: #ffffff;
+    color: #212529;
+}

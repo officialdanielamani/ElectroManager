@@ -1755,16 +1755,15 @@ document.getElementById('grid-step').addEventListener('change', (e) => {
 // User can click "Fit" button if they want to recalculate after resizing
 // This prevents unwanted recalculations from font loading or layout shifts
 
-// Detect current theme and apply appropriate class
+// Detect current theme dynamically and apply appropriate class
 function applyThemeClass() {
     const themeLink = document.getElementById('theme-link');
     if (themeLink && themeLink.href) {
-        if (themeLink.href.includes('dark.css')) {
-            document.body.classList.add('dark-theme');
-        } else if (themeLink.href.includes('keqing.css')) {
-            document.body.classList.add('keqing-theme');
-        } else if (themeLink.href.includes('blue.css')) {
-            document.body.classList.add('blue-theme');
+        // Extract theme name from URL (e.g., '/css/themes/dark.css' -> 'dark')
+        const match = themeLink.href.match(/\/themes\/([^\/]+)\.css/);
+        if (match) {
+            const themeName = match[1];
+            document.body.classList.add(themeName + '-theme');
         }
     }
 }

@@ -1,3 +1,9 @@
+/* Theme Metadata
+   name: Blue
+   description: Cool blue theme
+   color: #667eea
+*/
+
 /* Blue Theme */
 body {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

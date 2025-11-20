@@ -155,15 +155,15 @@ inventory-manager/
 │   ├── qr_template*.html   # QR code template pages
 │   └── [other templates]   # Additional page templates
 │
-├── static/                 # Static assets
-│   ├── css/                # Stylesheets
-│   │   ├── style.css       # Main stylesheet
-│   │   └── themes/         # Theme files
-│   ├── js/                 # JavaScript files
-│   │   ├── script.js       # Main JavaScript
-│   │   └── table-sorter.js # Table sorting functionality
-│   └── fonts/              # Custom fonts
-│       └── OpenDyslexic*   # Accessible fonts
+├── static/                      # Static assets
+│   ├── css/                     # Stylesheets
+│   │   ├── style.css            # Main stylesheet
+│   │   └── themes/              # Theme files
+│   ├── js/                      # JavaScript files
+│   │   ├── script.js            # Main JavaScript
+│   │   └── table-sorter.js      # Table sorting functionality
+│   └── fonts/                   # Fonts files
+│       └── your-fonts.woff2     # Custom fonts
 │
 ├── uploads/                # User-uploaded files (generated at runtime)
 ├── instance/               # Instance-specific files
