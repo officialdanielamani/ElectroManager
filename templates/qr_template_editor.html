@@ -309,17 +309,19 @@
             <!-- Canvas Area -->
             <div id="canvas-container" style="flex: 1; overflow: auto; border: 1px solid var(--bs-gray-300, #ddd); border-radius: 4px; display: flex; align-items: flex-start; justify-content: flex-start; background: #e9ecef; padding: 15px; min-height: 400px; width: 100%;">
                 <div class="canvas-wrapper">
-                    <!-- X Ruler -->
-                    <div class="ruler-x" id="ruler-x" style="margin-left: 20px;"></div>
-                    
-                    <div style="display: flex;">
-                        <!-- Y Ruler -->
-                        <div class="ruler-y" id="ruler-y"></div>
+                    <div style="display: flex; flex-direction: column; width: 100%;">
+                        <!-- X Ruler -->
+                        <div class="ruler-x" id="ruler-x"></div>
                         
-                        <!-- Canvas -->
-                        <div id="canvas" style="width: 800px; 
-                                                height: 600px;
-                                                transform-origin: top left;">
+                        <div style="display: flex;">
+                            <!-- Y Ruler -->
+                            <div class="ruler-y" id="ruler-y"></div>
+                            
+                            <!-- Canvas -->
+                            <div id="canvas" style="width: 800px; 
+                                                    height: 600px;
+                                                    transform-origin: top left;">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -434,7 +436,8 @@
 const templateId = {{ template.id }};
 let templateWidth = {{ template.width_mm }};
 let templateHeight = {{ template.height_mm }};
-const templateType = '{{ template.template_type | default("item") }}' || 'item';  // item, location, or rack
+const templateType = ('{{ template.template_type | default("item") }}' || 'item').toLowerCase();  // item, location, or rack
+console.log(`%c[TEMPLATE TYPE] ${templateType}`, 'color: #ff00ff; font-weight: bold');  // Debug log
 let MM_TO_PX = 3.78;  // Will be recalculated during initialization
 let layout = [];
 let selectedElement = null;
@@ -466,11 +469,14 @@ function createRulers() {
     console.log(`%cCreating rulers: ${canvasWidthPx.toFixed(0)}px × ${canvasHeightPx.toFixed(0)}px (MM_TO_PX: ${MM_TO_PX.toFixed(2)})`, 'color: #00aaff');
     
     const step = toolSettings.rulerStep || 10;
+    const rulerHeight = 20;
     
     // X ruler
     if (toolSettings.showXRuler) {
         rulerX.style.display = 'flex';
         rulerX.style.width = canvasWidthPx + 'px';
+        // Add left margin if Y ruler is visible to align with canvas
+        rulerX.style.marginLeft = toolSettings.showYRuler ? rulerHeight + 'px' : '0px';
         rulerX.innerHTML = '';
         for (let i = 0; i <= templateWidth; i += step) {
             const mark = document.createElement('div');
@@ -977,12 +983,47 @@ function createElementDiv(element, index) {
     
     const resizeHandle = document.createElement('div');
     resizeHandle.className = 'resize-handle';
+    // Hide resize handle if size is locked
+    if (element.fix_size) {
+        resizeHandle.style.display = 'none';
+    }
     div.appendChild(resizeHandle);
+    
+    // Add visual indicator for locked elements
+    if (element.fix_position || element.fix_size) {
+        div.style.opacity = '0.85';
+        const lockIcon = document.createElement('div');
+        lockIcon.style.position = 'absolute';
+        lockIcon.style.top = '2px';
+        lockIcon.style.right = '2px';
+        lockIcon.style.fontSize = '12px';
+        lockIcon.style.color = '#dc3545';
+        lockIcon.innerHTML = '<i class="bi bi-lock-fill"></i>';
+        
+        if (element.fix_position && element.fix_size) {
+            lockIcon.title = 'Position & Size Locked';
+            lockIcon.innerHTML = '<i class="bi bi-lock-fill"></i>';
+        } else if (element.fix_position) {
+            lockIcon.title = 'Position Locked';
+            lockIcon.innerHTML = '<i class="bi bi-pin-fill"></i>';
+        } else if (element.fix_size) {
+            lockIcon.title = 'Size Locked';
+            lockIcon.innerHTML = '<i class="bi bi-lock-fill"></i>';
+        }
+        div.appendChild(lockIcon);
+    }
     
     div.addEventListener('click', (e) => {
         e.stopPropagation();
         selectElement(index, div);
     });
+    
+    // Update cursor based on lock state
+    if (element.fix_position) {
+        div.style.cursor = 'not-allowed';
+    } else {
+        div.style.cursor = 'move';
+    }
     
     makeDraggable(div, element, index);
     makeResizable(div, element, index, resizeHandle);
@@ -1014,7 +1055,7 @@ function updatePropertiesPanel(index) {
     // Define placeholders based on template type context
     const placeholders = {
         item: [
-            { label: '{ItemUUID} - Unique ID', value: '{ItemUUID}' },
+            { label: '{ItemUUID} - item/UUID format', value: '{ItemUUID}' },
             { label: '{ItemName} - Product name', value: '{ItemName}' },
             { label: '{SKU} - Stock code', value: '{SKU}' },
             { label: '{Price} - Price', value: '{Price}' },
@@ -1022,12 +1063,12 @@ function updatePropertiesPanel(index) {
             { label: '{Category} - Category name', value: '{Category}' },
             { label: '{LocationName} - Location', value: '{LocationName}' },
             { label: '{RackName} - Rack name', value: '{RackName}' },
-            { label: '{Drawer} - Drawer ID', value: '{Drawer}' },
+            { label: '{Drawer} - drawer/UUID format', value: '{Drawer}' },
             { label: '{Description} - Description', value: '{Description}' },
             { label: '{MinQuantity} - Min stock', value: '{MinQuantity}' }
         ],
         location: [
-            { label: '{LocationUUID} - Location ID', value: '{LocationUUID}' },
+            { label: '{LocationUUID} - location/UUID format', value: '{LocationUUID}' },
             { label: '{LocationName} - Name', value: '{LocationName}' },
             { label: '{LocationInfo} - Info field', value: '{LocationInfo}' },
             { label: '{Description} - Description', value: '{Description}' },
@@ -1048,65 +1089,94 @@ function updatePropertiesPanel(index) {
         const fontSizeMm = element.font_size_mm || 4;
         const layerName = element.layer_name || `Text${index + 1}`;
         
-        // Filter placeholders based on template type
+        // Filter placeholders based on template type - ONLY show relevant type
         let placeholderOptions = '';
-        placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
-        
-        if (templateType === 'location') {
+        console.log(`%c[TEXT FILTER] templateType="${templateType}"`, 'color: #00ff00');
+        if (templateType.includes('location')) {
             placeholderOptions += `<optgroup label="Locations">${placeholders.location.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
-        } else if (templateType === 'rack') {
+        } else if (templateType.includes('rack')) {
             placeholderOptions += `<optgroup label="Racks">${placeholders.rack.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else {
+            // Default to item template
+            placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         }
         
         html += `
+        <!-- Layer Name -->
         <div class="mb-2">
             <label class="form-label" style="font-size: 12px;"><strong>Layer Name</strong></label>
             <input type="text" class="form-control form-control-sm" id="prop-layername" value="${layerName}" style="font-size: 12px;">
         </div>
+        
+        <!-- Content -->
         <div class="mb-2">
             <label class="form-label" style="font-size: 12px;"><strong>Content</strong></label>
             <textarea class="form-control form-control-sm" rows="3" id="prop-content" style="font-size: 12px; font-family: monospace;">${element.content || ''}</textarea>
             <small class="text-muted" style="font-size: 11px;">Use placeholders from dropdown</small>
         </div>
+        
+        <!-- Placeholder Dropdown with Add Button -->
         <div class="mb-2">
-            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+            <label class="form-label" style="font-size: 12px;"><strong>Placeholder</strong></label>
+            <div style="display: flex; gap: 6px;">
                 <select class="form-select form-select-sm" id="prop-placeholder" style="font-size: 12px; flex: 1;">
                     <option value="">Select placeholder...</option>
                     ${placeholderOptions}
                 </select>
-                <button class="btn btn-sm btn-outline-primary" id="btn-add-placeholder" style="font-size: 12px; padding: 4px 10px;">
+                <button class="btn btn-sm btn-outline-primary" id="btn-add-placeholder" style="font-size: 12px; padding: 4px 10px; white-space: nowrap;">
                     <i class="bi bi-plus"></i> Add
                 </button>
             </div>
         </div>
+        
+        <!-- Font Type (placeholder for future implementation) -->
         <div class="mb-2">
-            <label class="form-label" style="font-size: 12px;"><strong>Font Size (mm)</strong></label>
-            <input type="number" class="form-control form-control-sm" id="prop-fontsize" min="1" max="50" step="0.5" value="${fontSizeMm}" style="font-size: 12px;">
-            <small class="text-muted" style="font-size: 11px;">Range: 1-50mm</small>
-        </div>
-        <div class="mb-2">
-            <label class="form-label" style="font-size: 12px;"><strong>Color</strong></label>
-            <input type="color" class="form-control form-control-color w-100" id="prop-color" value="${element.color || '#000000'}">
-        </div>
-        <div class="mb-2">
-            <label class="form-label" style="font-size: 12px;"><strong>Text Align</strong></label>
-            <select class="form-select form-select-sm" id="prop-textalign" style="font-size: 12px;">
-                <option value="left" ${element.text_align === 'left' || !element.text_align ? 'selected' : ''}>Left</option>
-                <option value="center" ${element.text_align === 'center' ? 'selected' : ''}>Center</option>
-                <option value="right" ${element.text_align === 'right' ? 'selected' : ''}>Right</option>
+            <label class="form-label" style="font-size: 12px;"><strong>Font Type</strong></label>
+            <select class="form-select form-select-sm" id="prop-fonttype" style="font-size: 12px;">
+                <option value="default" selected>Default</option>
             </select>
+        </div>
+        
+        <!-- Text Align, Font Size, Color (single row) -->
+        <div class="mb-2">
+            <label class="form-label" style="font-size: 12px;"><strong>Formatting</strong></label>
+            <div style="display: flex; gap: 6px; align-items: flex-end;">
+                <div style="display: flex; gap: 3px; border: 1px solid #ddd; border-radius: 4px; padding: 2px; background: #f8f9fa; flex-shrink: 0;">
+                    <button class="btn btn-sm" id="btn-align-left" type="button" style="font-size: 12px; padding: 4px 6px; border: none; background: ${element.text_align !== 'center' && element.text_align !== 'right' ? '#007bff' : 'transparent'}; color: ${element.text_align !== 'center' && element.text_align !== 'right' ? '#fff' : '#666'}; cursor: pointer;" title="Align Left">
+                        <i class="bi bi-text-left"></i>
+                    </button>
+                    <button class="btn btn-sm" id="btn-align-center" type="button" style="font-size: 12px; padding: 4px 6px; border: none; background: ${element.text_align === 'center' ? '#007bff' : 'transparent'}; color: ${element.text_align === 'center' ? '#fff' : '#666'}; cursor: pointer;" title="Align Center">
+                        <i class="bi bi-text-center"></i>
+                    </button>
+                    <button class="btn btn-sm" id="btn-align-right" type="button" style="font-size: 12px; padding: 4px 6px; border: none; background: ${element.text_align === 'right' ? '#007bff' : 'transparent'}; color: ${element.text_align === 'right' ? '#fff' : '#666'}; cursor: pointer;" title="Align Right">
+                        <i class="bi bi-text-right"></i>
+                    </button>
+                </div>
+                <div style="flex: 1; display: flex; gap: 6px;">
+                    <div style="flex: 1;">
+                        <label style="font-size: 11px; display: block; margin-bottom: 2px;">Size (mm)</label>
+                        <input type="number" class="form-control form-control-sm" id="prop-fontsize" min="1" max="50" step="0.5" value="${fontSizeMm}" style="font-size: 12px;">
+                    </div>
+                    <div style="flex: 0 0 60px;">
+                        <label style="font-size: 11px; display: block; margin-bottom: 2px;">Color</label>
+                        <input type="color" class="form-control form-control-color" id="prop-color" value="${element.color || '#000000'}" style="height: calc(1.5em + 8px); padding: 2px;">
+                    </div>
+                </div>
+            </div>
         </div>`;
     } else if (element.type === 'qr') {
         const layerName = element.layer_name || `QR${index + 1}`;
         
-        // Filter placeholders based on template type
+        // Filter placeholders based on template type - ONLY show relevant type
         let placeholderOptions = '';
-        placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
-        
-        if (templateType === 'location') {
+        console.log(`%c[QR FILTER] templateType="${templateType}"`, 'color: #00ff00');
+        if (templateType.includes('location')) {
             placeholderOptions += `<optgroup label="Locations">${placeholders.location.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
-        } else if (templateType === 'rack') {
+        } else if (templateType.includes('rack')) {
             placeholderOptions += `<optgroup label="Racks">${placeholders.rack.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else {
+            // Default to item template
+            placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         }
         
         html += `
@@ -1140,14 +1210,16 @@ function updatePropertiesPanel(index) {
     } else if (element.type === 'barcode') {
         const layerName = element.layer_name || `Barcode${index + 1}`;
         
-        // Filter placeholders based on template type
+        // Filter placeholders based on template type - ONLY show relevant type
         let placeholderOptions = '';
-        placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
-        
-        if (templateType === 'location') {
+        console.log(`%c[BARCODE FILTER] templateType="${templateType}"`, 'color: #00ff00');
+        if (templateType.includes('location')) {
             placeholderOptions += `<optgroup label="Locations">${placeholders.location.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
-        } else if (templateType === 'rack') {
+        } else if (templateType.includes('rack')) {
             placeholderOptions += `<optgroup label="Racks">${placeholders.rack.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else {
+            // Default to item template
+            placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         }
         
         html += `
@@ -1191,26 +1263,54 @@ function updatePropertiesPanel(index) {
     html += `
     <hr class="my-2">
     <div class="mb-2"><h6 class="text-secondary" style="font-size: 13px;"><i class="bi bi-arrows-move"></i> Position & Size</h6></div>
-    <div class="row g-2 mb-2">
-        <div class="col-6">
-            <label class="form-label" style="font-size: 12px;"><strong>X</strong> (mm)</label>
-            <input type="number" class="form-control form-control-sm" id="prop-x" value="${element.x_mm.toFixed(1)}" step="0.1" style="font-size: 12px;">
+    
+    <!-- Position Section -->
+    <div class="mb-2">
+        <label style="font-size: 11px; font-weight: 500; display: block; margin-bottom: 6px;">Position (mm)</label>
+        <div class="row g-2 mb-2">
+            <div class="col-6">
+                <label class="form-label" style="font-size: 11px;">X</label>
+                <input type="number" class="form-control form-control-sm" id="prop-x" value="${element.x_mm.toFixed(1)}" step="0.1" style="font-size: 12px;">
+            </div>
+            <div class="col-6">
+                <label class="form-label" style="font-size: 11px;">Y</label>
+                <input type="number" class="form-control form-control-sm" id="prop-y" value="${element.y_mm.toFixed(1)}" step="0.1" style="font-size: 12px;">
+            </div>
         </div>
-        <div class="col-6">
-            <label class="form-label" style="font-size: 12px;"><strong>Y</strong> (mm)</label>
-            <input type="number" class="form-control form-control-sm" id="prop-y" value="${element.y_mm.toFixed(1)}" step="0.1" style="font-size: 12px;">
+        <div style="display: flex; gap: 8px;">
+            <div class="form-check" style="flex: 1;">
+                <input class="form-check-input" type="checkbox" id="prop-fix-pos" ${element.fix_position ? 'checked' : ''}>
+                <label class="form-check-label" style="font-size: 11px;" for="prop-fix-pos">
+                    Fix Position
+                </label>
+            </div>
+            <button class="btn btn-sm btn-outline-primary" id="btn-reset-pos" type="button" style="font-size: 12px; padding: 4px 10px; white-space: nowrap;">
+                <i class="bi bi-arrow-counterclockwise"></i> Reset
+            </button>
         </div>
     </div>
-    <div class="row g-2 mb-2">
-        <div class="col-6">
-            <label class="form-label" style="font-size: 12px;"><strong>Width</strong> (mm)</label>
-            <input type="number" class="form-control form-control-sm" id="prop-w" value="${element.width_mm.toFixed(1)}" step="0.1" min="1" style="font-size: 12px;">
+    
+    <!-- Size Section -->
+    <div class="mb-2">
+        <label style="font-size: 11px; font-weight: 500; display: block; margin-bottom: 6px;">Size (mm)</label>
+        <div class="row g-2 mb-2">
+            <div class="col-6">
+                <label class="form-label" style="font-size: 11px;">Width</label>
+                <input type="number" class="form-control form-control-sm" id="prop-w" value="${element.width_mm.toFixed(1)}" step="0.1" min="1" style="font-size: 12px;">
+            </div>
+            <div class="col-6">
+                <label class="form-label" style="font-size: 11px;">Height</label>
+                <input type="number" class="form-control form-control-sm" id="prop-h" value="${element.height_mm.toFixed(1)}" step="0.1" min="1" style="font-size: 12px;">
+            </div>
         </div>
-        <div class="col-6">
-            <label class="form-label" style="font-size: 12px;"><strong>Height</strong> (mm)</label>
-            <input type="number" class="form-control form-control-sm" id="prop-h" value="${element.height_mm.toFixed(1)}" step="0.1" min="1" style="font-size: 12px;">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="prop-fix-size" ${element.fix_size ? 'checked' : ''}>
+            <label class="form-check-label" style="font-size: 11px;" for="prop-fix-size">
+                Fix Size
+            </label>
         </div>
     </div>
+    
     <button class="btn btn-danger btn-sm w-100" onclick="deleteElement(${index})" style="font-size: 12px;">
         <i class="bi bi-trash"></i> Delete Element
     </button>`;
@@ -1252,6 +1352,20 @@ function attachPropertyListeners(index) {
         updateProp('layer_name', e.target.value);
     });
 
+    // Text alignment buttons
+    document.getElementById('btn-align-left')?.addEventListener('click', e => {
+        e.preventDefault();
+        updateProp('text_align', 'left');
+    });
+    document.getElementById('btn-align-center')?.addEventListener('click', e => {
+        e.preventDefault();
+        updateProp('text_align', 'center');
+    });
+    document.getElementById('btn-align-right')?.addEventListener('click', e => {
+        e.preventDefault();
+        updateProp('text_align', 'right');
+    });
+
     // Position and size fields - only re-render on blur or Enter (not on every keystroke)
     const positionSizeFields = ['prop-x', 'prop-y', 'prop-w', 'prop-h'];
     const fieldMap = { 'prop-x': 'x_mm', 'prop-y': 'y_mm', 'prop-w': 'width_mm', 'prop-h': 'height_mm' };
@@ -1259,15 +1373,65 @@ function attachPropertyListeners(index) {
     positionSizeFields.forEach(fieldId => {
         const field = document.getElementById(fieldId);
         if (field) {
-            field.addEventListener('blur', e => updateProp(fieldMap[fieldId], e.target.value));
+            field.addEventListener('blur', e => {
+                // Check if position or size is locked
+                if ((fieldId === 'prop-x' || fieldId === 'prop-y') && el.fix_position) {
+                    return; // Don't update if position is locked
+                }
+                if ((fieldId === 'prop-w' || fieldId === 'prop-h') && el.fix_size) {
+                    return; // Don't update if size is locked
+                }
+                updateProp(fieldMap[fieldId], e.target.value);
+            });
             field.addEventListener('keydown', e => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
+                    // Check if position or size is locked
+                    if ((fieldId === 'prop-x' || fieldId === 'prop-y') && el.fix_position) {
+                        field.blur();
+                        return;
+                    }
+                    if ((fieldId === 'prop-w' || fieldId === 'prop-h') && el.fix_size) {
+                        field.blur();
+                        return;
+                    }
                     updateProp(fieldMap[fieldId], e.target.value);
                     field.blur();
                 }
             });
+            // Disable field if position or size is locked
+            if ((fieldId === 'prop-x' || fieldId === 'prop-y') && el.fix_position) {
+                field.disabled = true;
+            }
+            if ((fieldId === 'prop-w' || fieldId === 'prop-h') && el.fix_size) {
+                field.disabled = true;
+            }
         }
+    });
+
+    // Fix position checkbox
+    document.getElementById('prop-fix-pos')?.addEventListener('change', e => {
+        el.fix_position = e.target.checked;
+        // Enable/disable X and Y fields
+        document.getElementById('prop-x').disabled = e.target.checked;
+        document.getElementById('prop-y').disabled = e.target.checked;
+    });
+
+    // Fix size checkbox
+    document.getElementById('prop-fix-size')?.addEventListener('change', e => {
+        el.fix_size = e.target.checked;
+        // Enable/disable W and H fields
+        document.getElementById('prop-w').disabled = e.target.checked;
+        document.getElementById('prop-h').disabled = e.target.checked;
+    });
+
+    // Reset position to 0,0 button
+    document.getElementById('btn-reset-pos')?.addEventListener('click', e => {
+        e.preventDefault();
+        updateProp('x_mm', 0);
+        updateProp('y_mm', 0);
+        document.getElementById('prop-x').value = '0.0';
+        document.getElementById('prop-y').value = '0.0';
     });
 
     // Placeholder button handler
@@ -1338,7 +1502,12 @@ function attachPropertyListeners(index) {
         updateProp('font_size_mm', parseFloat(e.target.value));
     });
     document.getElementById('prop-color')?.addEventListener('input', e => updateProp('color', e.target.value));
-    document.getElementById('prop-textalign')?.addEventListener('change', e => updateProp('text_align', e.target.value));
+    
+    // Font type listener (placeholder for future implementation)
+    document.getElementById('prop-fonttype')?.addEventListener('change', e => {
+        // Future implementation for font type handling
+        console.log('Font type changed to:', e.target.value);
+    });
 
     // Source field (QR/Barcode content) - only re-render on blur or Enter (not on every keystroke)
     const sourceField = document.getElementById('prop-source');
@@ -1365,6 +1534,8 @@ function makeDraggable(element, layoutElement, index) {
 
     element.addEventListener('mousedown', (e) => {
         if (e.target.classList.contains('resize-handle')) return;
+        // Check if position is locked
+        if (layoutElement.fix_position) return;
         isDragging = true;
         const rect = canvas.getBoundingClientRect();
         startX = e.clientX - rect.left;
@@ -1422,6 +1593,8 @@ function makeResizable(element, layoutElement, index, handle) {
     let startX, startY, startWidth, startHeight;
 
     handle.addEventListener('mousedown', (e) => {
+        // Check if size is locked
+        if (layoutElement.fix_size) return;
         isResizing = true;
         const rect = canvas.getBoundingClientRect();
         startX = e.clientX - rect.left;
@@ -1698,16 +1871,16 @@ function renderGrid() {
     line1.setAttribute('y1', '0');
     line1.setAttribute('x2', '0');
     line1.setAttribute('y2', (toolSettings.gridStep * MM_TO_PX).toString());
-    line1.setAttribute('stroke', '#e0e0e0');
-    line1.setAttribute('stroke-width', '0.5');
+    line1.setAttribute('stroke', '#c0c0c0');
+    line1.setAttribute('stroke-width', '0.8');
     
     const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     line2.setAttribute('x1', '0');
     line2.setAttribute('y1', '0');
     line2.setAttribute('x2', (toolSettings.gridStep * MM_TO_PX).toString());
     line2.setAttribute('y2', '0');
-    line2.setAttribute('stroke', '#e0e0e0');
-    line2.setAttribute('stroke-width', '0.5');
+    line2.setAttribute('stroke', '#c0c0c0');
+    line2.setAttribute('stroke-width', '0.8');
     
     pattern.appendChild(line1);
     pattern.appendChild(line2);
