@@ -34,7 +34,7 @@
                 'Trebuchet MS': '"Trebuchet MS", sans-serif'
             };
             
-            // Get font family from map, or use font name directly for custom fonts
+            // Get font family from map, or use font name directly for custom/project fonts
             const fontFamily = fontFamilyMap[userFont] || `'${userFont}', sans-serif`;
             document.documentElement.style.setProperty('--user-font-family', fontFamily);
             
@@ -51,8 +51,8 @@
     <link id="theme-link" rel="stylesheet" href="">
     {% endif %}
     
-    <!-- Font Face Definitions (Local Files Only - No CDN) -->
-    <style>
+    <!-- Font Face Definitions (Local Files + Dynamic Project Fonts) -->
+    <style id="project-fonts-style">
         @font-face {
             font-family: 'OpenDyslexic';
             src: 
@@ -73,6 +73,47 @@
             font-display: swap;
         }
         
+        /* Placeholder for dynamic project fonts - will be filled by script below */
+    </style>
+    
+    <!-- Inline script to load and inject all project fonts -->
+    <script>
+        (function() {
+            // Load all available fonts and inject @font-face rules
+            fetch('/api/available-fonts')
+                .then(response => response.json())
+                .then(fonts => {
+                    const projectFonts = fonts.filter(f => f.type === 'project');
+                    if (projectFonts.length > 0) {
+                        const styleEl = document.getElementById('project-fonts-style');
+                        let fontFaceRules = styleEl.textContent;
+                        
+                        projectFonts.forEach(font => {
+                            fontFaceRules += `
+                                @font-face {
+                                    font-family: '${font.id}';
+                                    src: url('{{ url_for("static", filename="fonts/") }}${font.id}.woff2') format('woff2'),
+                                         url('{{ url_for("static", filename="fonts/") }}${font.id}-Regular.woff2') format('woff2'),
+                                         url('{{ url_for("static", filename="fonts/") }}${font.id}.woff') format('woff'),
+                                         url('{{ url_for("static", filename="fonts/") }}${font.id}-Regular.woff') format('woff'),
+                                         url('{{ url_for("static", filename="fonts/") }}${font.id}.ttf') format('truetype'),
+                                         url('{{ url_for("static", filename="fonts/") }}${font.id}-Regular.ttf') format('truetype'),
+                                         url('{{ url_for("static", filename="fonts/") }}${font.id}.otf') format('opentype');
+                                    font-display: swap;
+                                }
+                            `;
+                        });
+                        
+                        styleEl.textContent = fontFaceRules;
+                        console.log(`Loaded ${projectFonts.length} project fonts`);
+                    }
+                })
+                .catch(err => console.log('Could not load project fonts:', err));
+        })();
+    </script>
+    
+    <!-- Font CSS Rules -->
+    <style id="user-font-rules">
         /* Font application - use !important to override Bootstrap and other styles */
         :root {
             --user-font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -123,12 +164,9 @@
         html[data-user-font] {
             font-family: var(--user-font-family) !important;
         }
-        html[data-user-font] {
-            /* Let specific rules above take precedence */
-        }
         
-        /* Ensure all elements inherit the font */
-        body, body * {
+        /* Ensure all elements inherit the font, EXCEPT elements with explicit inline font-family */
+        body, body *:not([style*="font-family"]) {
             font-family: inherit !important;
         }
     </style>

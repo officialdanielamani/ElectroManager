@@ -649,13 +649,57 @@ document.getElementById('btn-fit-screen').addEventListener('click', () => {
     initializeZoom();
 });
 
+let availableFonts = [];
+
 async function loadTemplate() {
     try {
         console.log('%cLoading template...', 'color: #ffff00; font-weight: bold; font-size: 12px');
         const response = await fetch(`/api/qr-template/${templateId}`);
         const data = await response.json();
         layout = data.layout || [];
+        availableFonts = data.available_fonts || [];
         console.log(`Template loaded: ${layout.length} elements`);
+        console.log(`Available fonts: ${availableFonts.map(f => f.name).join(', ')}`);
+        
+        // Normalize elements - ensure all have required properties with defaults
+        layout.forEach((el, idx) => {
+            if (el.type === 'text') {
+                // Set defaults for text elements if not present
+                if (!el.font_family) el.font_family = 'Arial';
+                if (!el.text_align) el.text_align = 'left';
+                if (!el.color) el.color = '#000000';
+                if (!el.font_size_mm) el.font_size_mm = 4;
+                console.log(`[NORMALIZE] Text element ${idx}: font_family='${el.font_family}'`);
+            }
+        });
+        
+        // Inject @font-face for project fonts
+        const projectFonts = availableFonts.filter(f => f.type === 'project');
+        if (projectFonts.length > 0) {
+            const styleSheet = document.createElement('style');
+            styleSheet.id = 'project-fonts-style';
+            let fontFaceRules = '';
+            
+            projectFonts.forEach(font => {
+                // Try multiple font file variants
+                fontFaceRules += `
+                    @font-face {
+                        font-family: '${font.id}';
+                        src: url('{{ url_for("static", filename="fonts/") }}${font.id}.woff2') format('woff2'),
+                             url('{{ url_for("static", filename="fonts/") }}${font.id}-Regular.woff2') format('woff2'),
+                             url('{{ url_for("static", filename="fonts/") }}${font.id}.woff') format('woff'),
+                             url('{{ url_for("static", filename="fonts/") }}${font.id}-Regular.woff') format('woff'),
+                             url('{{ url_for("static", filename="fonts/") }}${font.id}.ttf') format('truetype'),
+                             url('{{ url_for("static", filename="fonts/") }}${font.id}-Regular.ttf') format('truetype'),
+                             url('{{ url_for("static", filename="fonts/") }}${font.id}.otf') format('opentype');
+                    }
+                `;
+            });
+            
+            styleSheet.textContent = fontFaceRules;
+            document.head.appendChild(styleSheet);
+            console.log(`%c[FONTS] Injected ${projectFonts.length} project fonts`, 'color: #00ff00');
+        }
         
         console.log('%cWaiting for DOM to stabilize...', 'color: #ff00ff');
         
@@ -857,12 +901,13 @@ function createElementDiv(element, index) {
         const fontSizeMm = element.font_size_mm || 4;
         const fontSizePx = fontSizeMm * MM_TO_PX;
         const textAlign = element.text_align || 'left';
+        const fontFamily = element.font_family || 'Arial';
         
         // Remove flex properties and use proper text alignment
         div.style.display = 'block';
         div.style.textAlign = textAlign;
         
-        div.innerHTML = `<span style="font-size: ${fontSizePx}px; color: ${element.color || '#000'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; line-height: 1.2; display: inline-block;">${element.content || 'Text'}</span>`;
+        div.innerHTML = `<span style="font-size: ${fontSizePx}px; color: ${element.color || '#000'}; font-family: ${fontFamily}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; line-height: 1.2; display: inline-block;">${element.content || 'Text'}</span>`;
     } else if (element.type === 'qr') {
         // Restore flex for QR
         div.style.display = 'flex';
@@ -1129,11 +1174,14 @@ function updatePropertiesPanel(index) {
             </div>
         </div>
         
-        <!-- Font Type (placeholder for future implementation) -->
+        <!-- Font Type -->
         <div class="mb-2">
-            <label class="form-label" style="font-size: 12px;"><strong>Font Type</strong></label>
+            <label class="form-label" style="font-size: 12px;"><strong>Font</strong></label>
             <select class="form-select form-select-sm" id="prop-fonttype" style="font-size: 12px;">
-                <option value="default" selected>Default</option>
+                ${availableFonts.map(font => {
+                    const isSelected = (element.font_family || 'Arial') === font.id ? 'selected' : '';
+                    return `<option value="${font.id}" ${isSelected}>${font.name} ${font.type === 'project' ? '(Project)' : ''}</option>`;
+                }).join('')}
             </select>
         </div>
         
@@ -1347,10 +1395,18 @@ function attachPropertyListeners(index) {
         }
     };
 
-    // Layer name - immediate update
-    document.getElementById('prop-layername')?.addEventListener('input', e => {
-        updateProp('layer_name', e.target.value);
-    });
+    // Layer name - only re-render on blur or Enter (not on every keystroke)
+    const layerNameField = document.getElementById('prop-layername');
+    if (layerNameField) {
+        layerNameField.addEventListener('blur', e => updateProp('layer_name', e.target.value));
+        layerNameField.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                updateProp('layer_name', e.target.value);
+                layerNameField.blur();
+            }
+        });
+    }
 
     // Text alignment buttons
     document.getElementById('btn-align-left')?.addEventListener('click', e => {
@@ -1503,10 +1559,9 @@ function attachPropertyListeners(index) {
     });
     document.getElementById('prop-color')?.addEventListener('input', e => updateProp('color', e.target.value));
     
-    // Font type listener (placeholder for future implementation)
+    // Font type listener - save selected font family
     document.getElementById('prop-fonttype')?.addEventListener('change', e => {
-        // Future implementation for font type handling
-        console.log('Font type changed to:', e.target.value);
+        updateProp('font_family', e.target.value);
     });
 
     // Source field (QR/Barcode content) - only re-render on blur or Enter (not on every keystroke)
@@ -1670,7 +1725,9 @@ document.getElementById('btn-add-text').addEventListener('click', () => {
         width_mm: Math.max(20, templateWidth * 0.6),
         height_mm: 8,
         font_size_mm: 4,
-        color: '#000000'
+        color: '#000000',
+        font_family: 'Arial',
+        text_align: 'left'
     });
     renderCanvas();
     renderLayers();

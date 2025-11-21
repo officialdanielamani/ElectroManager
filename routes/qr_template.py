@@ -9,6 +9,7 @@ from qr_utils import (
     render_template_to_svg, generate_single_sticker_pdf,
     generate_batch_stickers_pdf, AVAILABLE_PLACEHOLDERS
 )
+from routes.settings import get_available_fonts
 from utils import log_audit, permission_required
 from datetime import datetime, timezone
 import json
@@ -144,7 +145,8 @@ def api_qr_template(template_id):
         'height_mm': template.height_mm,
         'layout': template.get_layout(),
         'dpi': 96,
-        'placeholders': AVAILABLE_PLACEHOLDERS.get(template.template_type, [])
+        'placeholders': AVAILABLE_PLACEHOLDERS.get(template.template_type, []),
+        'available_fonts': get_available_fonts()
     })
 
 @qr_template_bp.route('/api/qr-template/<int:template_id>/preview', methods=['POST'])
@@ -311,3 +313,9 @@ def delete_qr_template(template_id):
         logger.error(f"Error deleting template: {e}")
         flash('Error deleting template', 'danger')
         return redirect(url_for('qr_template.settings_qr'))
+
+
+@qr_template_bp.route('/api/available-fonts')
+def api_available_fonts():
+    """Get list of available fonts (system + project)"""
+    return jsonify(get_available_fonts())

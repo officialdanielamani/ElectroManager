@@ -3,6 +3,7 @@ QR/Barcode Sticker Template Utilities
 """
 import json
 from io import BytesIO
+from flask import current_app
 from datetime import datetime, timezone
 
 # Available placeholders for each template type
@@ -62,11 +63,24 @@ def replace_placeholders(text, data_dict):
         result = result.replace(f'{{{key}}}', str(value))
     return result
 
+def _get_format(ext):
+    """Get font format string from file extension"""
+    formats = {
+        '.woff2': 'woff2',
+        '.woff': 'woff',
+        '.ttf': 'truetype',
+        '.otf': 'opentype'
+    }
+    return formats.get(ext.lower(), 'truetype')
+
 def render_template_to_svg(template, data):
     """
     Convert template layout + data to SVG
     MM to pixels: 1mm = 3.78px (at 96 DPI)
     """
+    import os
+    import base64
+    
     MM_TO_PX = 3.78
     width_px = template.width_mm * MM_TO_PX
     height_px = template.height_mm * MM_TO_PX
@@ -76,7 +90,49 @@ def render_template_to_svg(template, data):
     print(f"[SVG] Layout elements: {len(template.get_layout())}")
     print(f"[SVG] Data keys: {list(data.keys())}")
     
+    # Collect fonts used in this template
+    fonts_used = set()
+    layout = template.get_layout()
+    for element in layout:
+        if element.get('type') == 'text':
+            font = element.get('font_family', 'Arial')
+            if font:
+                fonts_used.add(font)
+    
+    # Build font-face rules for SVG with embedded fonts for project fonts
+    font_styles = ''
+    fonts_dir = os.path.join(current_app.root_path, 'static', 'fonts')
+    system_fonts = {'system', 'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana', 'Comic Sans MS', 'Trebuchet MS'}
+    
+    for font_name in fonts_used:
+        if font_name not in system_fonts:  # Only embed project fonts
+            # Try to find the font file
+            for ext in ['.woff2', '.woff', '.ttf', '.otf']:
+                # Try exact name first, then with -Regular suffix
+                font_path = os.path.join(fonts_dir, font_name + ext)
+                if not os.path.exists(font_path):
+                    font_path = os.path.join(fonts_dir, font_name + '-Regular' + ext)
+                
+                if os.path.exists(font_path):
+                    try:
+                        with open(font_path, 'rb') as f:
+                            font_data = base64.b64encode(f.read()).decode('utf-8')
+                        format_type = _get_format(ext)
+                        font_styles += f'''<style>
+        @font-face {{
+            font-family: '{font_name}';
+            src: url('data:font/{format_type};base64,{font_data}') format('{format_type}');
+            font-display: swap;
+        }}
+    </style>
+'''
+                        print(f"[SVG] Embedded font: {font_name} ({len(font_data)} chars)")
+                        break
+                    except Exception as e:
+                        print(f"[SVG] Failed to embed font {font_name}: {e}")
+    
     svg = f'<svg width="{width_px}" height="{height_px}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width_px} {height_px}">\n'
+    svg += font_styles
     svg += f'  <rect width="{width_px}" height="{height_px}" fill="white" stroke="black" stroke-width="0.5"/>\n'
     
     layout = template.get_layout()
@@ -88,13 +144,15 @@ def render_template_to_svg(template, data):
         h_px = element.get('height_mm', 10) * MM_TO_PX
         
         if element['type'] == 'text':
-            content = replace_placeholders(element['content'], data)
-            print(f"[SVG] Element {idx}: TEXT = '{content}' (template: '{element['content']}')")
+            # Get content, handle missing field
+            content = element.get('content', '')
+            content = replace_placeholders(content, data)
+            print(f"[SVG] Element {idx}: TEXT = '{content}' (template: '{element.get('content', '')}')")
             # Escape XML special characters
             content = content.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
             
             # Use font_size_mm if available, otherwise fallback to old font_size in pixels
-            font_size_mm = element.get('font_size_mm')
+            font_size_mm = element.get('font_size_mm', 4)
             if font_size_mm:
                 font_size = font_size_mm * MM_TO_PX  # Convert mm to pixels
             else:
@@ -102,19 +160,34 @@ def render_template_to_svg(template, data):
             
             color = element.get('color', '#000000')
             text_align = element.get('text_align', 'left')
-            font_family = element.get('font_family', 'Arial')
+            # Get font family with fallback to Arial if not found or empty
+            font_family = element.get('font_family') or 'Arial'
+            if not font_family or font_family == 'default':
+                font_family = 'Arial'
+            
+            # For fonts with spaces, ensure they're quoted in CSS/SVG
+            if ' ' in font_family:
+                font_family_quoted = f"'{font_family}'"
+            else:
+                font_family_quoted = font_family
+            
+            print(f"[SVG] Element {idx}: Font = '{font_family}' (quoted: '{font_family_quoted}')")
             
             anchor = 'start'
+            x_text = x_px
             if text_align == 'center':
                 anchor = 'middle'
-                x_px = x_px + w_px / 2
+                x_text = x_px + w_px / 2
             elif text_align == 'right':
                 anchor = 'end'
-                x_px = x_px + w_px
+                x_text = x_px + w_px
             
-            svg += f'  <text x="{x_px}" y="{y_px + font_size}" font-size="{font_size}" '
-            svg += f'font-family="{font_family}" fill="{color}" text-anchor="{anchor}"'
-            svg += f' width="{w_px}">{content}</text>\n'
+            # Use inline style for font-family to prevent CSS override from base.html
+            svg += f'  <text x="{x_text}" y="{y_px}" font-size="{font_size}" '
+            svg += f'fill="{color}" text-anchor="{anchor}" '
+            svg += f'dominant-baseline="hanging" word-wrap="break-word" '
+            svg += f'style="font-family: {font_family_quoted};">'
+            svg += f'{content}</text>\n'
         
         elif element['type'] == 'qr':
             source_field = element['source_field']
@@ -334,12 +407,103 @@ def generate_single_sticker_pdf(template, data, identifier):
     svg_data = render_template_to_svg(template, data)
     print(f"[PDF] SVG rendered, size: {len(svg_data)} bytes")
     
+    # Get available fonts to inject @font-face rules with embedded fonts
+    import os
+    import base64
+    fonts_dir = os.path.join(current_app.root_path, 'static', 'fonts')
+    
+    # Font face rules for system fonts
+    font_face_rules = '''
+        /* System fonts - already available */
+        /* No @font-face needed for Arial, Times New Roman, Courier New, Georgia, Verdana, Comic Sans MS, Trebuchet MS */
+    '''
+    
+    # Helper function to embed font as base64
+    def embed_font_as_base64(font_path, font_name, format_type):
+        try:
+            with open(font_path, 'rb') as f:
+                font_data = base64.b64encode(f.read()).decode('utf-8')
+            return f"url('data:font/{format_type};base64,{font_data}') format('{format_type}')"
+        except Exception as e:
+            print(f"[PDF] Failed to embed font {font_name}: {e}")
+            return None
+    
+    # Build OpenDyslexic font face with embedded fonts
+    opendyslexic_woff2 = os.path.join(fonts_dir, 'OpenDyslexic-Regular.woff2')
+    opendyslexic_ttf = os.path.join(fonts_dir, 'OpenDyslexic-Regular.ttf')
+    
+    src_urls = []
+    if os.path.exists(opendyslexic_woff2):
+        embedded = embed_font_as_base64(opendyslexic_woff2, 'OpenDyslexic', 'woff2')
+        if embedded:
+            src_urls.append(embedded)
+    if os.path.exists(opendyslexic_ttf):
+        embedded = embed_font_as_base64(opendyslexic_ttf, 'OpenDyslexic', 'truetype')
+        if embedded:
+            src_urls.append(embedded)
+    
+    if src_urls:
+        font_face_rules += f'''
+        @font-face {{
+            font-family: 'OpenDyslexic';
+            src: {', '.join(src_urls)};
+            font-display: swap;
+        }}
+    '''
+    
+    # Add other project fonts if they exist
+    if os.path.exists(fonts_dir):
+        font_extensions = {'.woff2', '.woff', '.ttf', '.otf'}
+        font_names_set = set()
+        
+        for file in os.listdir(fonts_dir):
+            if os.path.splitext(file)[1].lower() in font_extensions:
+                font_base = os.path.splitext(file)[0]
+                font_name = font_base.rsplit('-', 1)[0] if '-' in font_base else font_base
+                if font_name not in ('OpenDyslexic',):  # Skip already defined
+                    font_names_set.add(font_name)
+        
+        for font_name in sorted(font_names_set):
+            # Try to find the best font file (prefer woff2, then woff, then ttf, then otf)
+            src_urls = []
+            for ext in ['.woff2', '.woff', '.ttf', '.otf']:
+                # Try exact name first, then with -Regular suffix
+                font_path = os.path.join(fonts_dir, font_name + ext)
+                if not os.path.exists(font_path):
+                    font_path = os.path.join(fonts_dir, font_name + '-Regular' + ext)
+                
+                if os.path.exists(font_path):
+                    format_type = _get_format(ext)
+                    embedded = embed_font_as_base64(font_path, font_name, format_type)
+                    if embedded:
+                        src_urls.append(embedded)
+            
+            if src_urls:
+                font_face_rules += f'''
+        @font-face {{
+            font-family: '{font_name}';
+            src: {', '.join(src_urls)};
+            font-display: swap;
+        }}
+    '''
+    
+    # Add SVG text CSS - don't override inline styles
+    svg_css = '''
+        svg text {
+            /* SVG text respects its own inline font-family style */
+        }
+    '''
+    
+    font_face_rules += svg_css
+    
     # Create HTML wrapper for PDF with explicit sizing
     html_content = f'''<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <style>
+        {font_face_rules}
+        
         @page {{
             size: {width_in}in {height_in}in;
             margin: 0;

@@ -3,6 +3,9 @@
 {% block title %}QR Sticker - {{ item.name }}{% endblock %}
 
 {% block content %}
+<style>
+    /* Don't override SVG text inline styles - let them use their own font-family */
+</style>
 <div class="container mt-4">
     <div class="row">
         <div class="col-md-10 offset-md-1">
@@ -59,12 +62,13 @@
                 </div>
                 <div class="card-body text-center">
                     <div class="alert alert-info mb-3">
-                        <small><i class="bi bi-info-circle"></i> This preview may not be to exact scale. Print a test to verify.</small>
+                        <small><i class="bi bi-info-circle"></i> This preview automatically scales to fit your screen. Print a test to verify exact size.</small>
                     </div>
-                    <div id="preview-svg" style="border: 2px solid #ddd; padding: 20px; background: #f9f9f9; 
-                                                  display: flex; align-items: center; justify-content: center;
-                                                  max-height: 70vh; overflow: auto; margin: 20px auto;">
-                        <!-- SVG preview inserted here -->
+                    <div id="preview-container" style="width: 100%; min-height: 400px; background: #f0f0f0; border: 2px solid #ddd; border-radius: 4px; 
+                                                      display: flex; align-items: center; justify-content: center; overflow: auto; padding: 20px;">
+                        <div id="preview-svg" style="background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 2px;">
+                            <!-- SVG preview inserted here -->
+                        </div>
                     </div>
                     <div class="mt-3">
                         <small id="preview-dimensions" class="text-muted d-block"></small>
@@ -142,6 +146,47 @@ document.getElementById('btn-load-preview').addEventListener('click', async func
         
         preview.style.display = 'block';
         buttons.style.display = 'flex';
+        
+        // Auto-scale preview to fit available space (like canvas in editor)
+        setTimeout(() => {
+            const previewDiv = document.getElementById('preview-svg');
+            const container = document.getElementById('preview-container');
+            const svgElement = previewDiv ? previewDiv.querySelector('svg') : null;
+            
+            if (!svgElement || !container) {
+                console.warn('SVG element or container not found');
+                return;
+            }
+            
+            // Get container dimensions (accounting for padding)
+            const containerRect = container.getBoundingClientRect();
+            const containerWidth = containerRect.width - 40; // 20px padding each side
+            const containerHeight = containerRect.height - 40;
+            
+            // Get template dimensions in mm
+            const templateWidthMm = data.width_mm;
+            const templateHeightMm = data.height_mm;
+            const aspectRatio = templateWidthMm / templateHeightMm;
+            
+            // Calculate scaled size to fit available space
+            let scaledWidth = containerWidth;
+            let scaledHeight = scaledWidth / aspectRatio;
+            
+            // If height exceeds available space, use height as base
+            if (scaledHeight > containerHeight) {
+                scaledHeight = containerHeight;
+                scaledWidth = scaledHeight * aspectRatio;
+            }
+            
+            // Apply dimensions to SVG
+            svgElement.style.width = scaledWidth + 'px';
+            svgElement.style.height = scaledHeight + 'px';
+            svgElement.style.maxWidth = '100%';
+            svgElement.style.maxHeight = '100%';
+            svgElement.style.display = 'block';
+            
+            console.log(`Preview scaled to: ${scaledWidth.toFixed(0)}px × ${scaledHeight.toFixed(0)}px`);
+        }, 100);
         
     } catch (error) {
         alert('Error: ' + error.message);
@@ -243,6 +288,36 @@ document.getElementById('btn-download-png').addEventListener('click', async func
         console.error(error);
         button.disabled = false;
         button.innerHTML = originalText;
+    }
+});
+
+// Rescale preview when window resizes
+window.addEventListener('resize', () => {
+    if (currentTemplate && document.getElementById('preview-section').style.display === 'block') {
+        setTimeout(() => {
+            const previewDiv = document.getElementById('preview-svg');
+            const container = document.getElementById('preview-container');
+            const svgElement = previewDiv ? previewDiv.querySelector('svg') : null;
+            
+            if (!svgElement || !container) return;
+            
+            const containerRect = container.getBoundingClientRect();
+            const containerWidth = containerRect.width - 40;
+            const containerHeight = containerRect.height - 40;
+            
+            const aspectRatio = currentTemplate.width_mm / currentTemplate.height_mm;
+            
+            let scaledWidth = containerWidth;
+            let scaledHeight = scaledWidth / aspectRatio;
+            
+            if (scaledHeight > containerHeight) {
+                scaledHeight = containerHeight;
+                scaledWidth = scaledHeight * aspectRatio;
+            }
+            
+            svgElement.style.width = scaledWidth + 'px';
+            svgElement.style.height = scaledHeight + 'px';
+        }, 100);
     }
 });
 </script>
