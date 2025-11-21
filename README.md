@@ -1,14 +1,12 @@
 # Inventory Manager
 
-A powerful, feature-rich web-based inventory management system built with Flask. Designed for businesses and organizations that need to efficiently track, organize, and manage physical inventory across multiple locations and storage racks.
+A powerful, feature-rich web-based inventory management system built with Flask. Designed for individual and small organizations that need to efficiently track, organize, and manage physical inventory across multiple locations and storage racks.
 
-### ⚠️ **Not for Production Usage, the app is highly experemental**
+### ⚠️ **Not for Production Usage, the app is highly experimental**
 
 ## Overview
 
-Inventory Manager is a full-featured inventory management solution that combines ease of use with powerful functionality. Whether you're managing a small warehouse or a large-scale operation, this application provides the tools you need to maintain complete visibility over your inventory in real-time.
-
-The application runs entirely within a web browser, making it accessible from any device on your network without requiring client-side installations.
+Inventory Manager is a full-featured inventory management solution that combines ease of use with powerful functionality. This application provides the tools you need to maintain complete visibility over your inventory in real-time, runs entirely within a web browser, making it accessible from any device on your network without requiring client-side installations.
 
 ## ✨ Key Features
 
