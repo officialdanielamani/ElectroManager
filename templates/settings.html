@@ -10,13 +10,13 @@
 </div>
 
 <div class="row">
-    <!-- General Settings (Always accessible) -->
-    <div class="col-md-4 mb-3">
-        <div class="card">
+    <!-- General -->
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card h-100">
             <div class="card-body text-center">
                 <i class="bi bi-palette" style="font-size: 3rem; color: #0d6efd;"></i>
                 <h5 class="card-title mt-3">General</h5>
-                <p class="card-text">UI theme and preferences</p>
+                <p class="card-text small">User preferences and settings</p>
                 <a href="{{ url_for('settings.settings_general') }}" class="btn btn-primary">Configure</a>
             </div>
         </div>
@@ -24,13 +24,13 @@
 
     <!-- System Settings -->
     {% if current_user.has_permission('settings_sections.system_settings', 'view') %}
-    <div class="col-md-4 mb-3">
-        <div class="card border-danger">
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card h-100">
             <div class="card-body text-center">
                 <i class="bi bi-gear-fill" style="font-size: 3rem; color: #dc3545;"></i>
-                <h5 class="card-title mt-3">System Settings</h5>
-                <p class="card-text">Currency, file uploads</p>
-                <a href="{{ url_for('settings.settings_system') }}" class="btn btn-danger">Configure</a>
+                <h5 class="card-title mt-3">System Setting</h5>
+                <p class="card-text small">Server settings</p>
+                <a href="{{ url_for('settings.settings_system') }}" class="btn btn-primary">Configure</a>
             </div>
         </div>
     </div>
@@ -38,27 +38,27 @@
 
     <!-- Reports -->
     {% if current_user.has_permission('settings_sections.reports', 'view') %}
-    <div class="col-md-4 mb-3">
-        <div class="card">
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card h-100">
             <div class="card-body text-center">
-                <i class="bi bi-graph-up" style="font-size: 3rem; color: #198754;"></i>
+                <i class="bi bi-graph-up" style="font-size: 3rem; color: #51cf66;"></i>
                 <h5 class="card-title mt-3">Reports</h5>
-                <p class="card-text">Analytics and low stock alerts</p>
-                <a href="{{ url_for('report.reports') }}" class="btn btn-success">View Reports</a>
+                <p class="card-text small">Analytics dashboard</p>
+                <a href="{{ url_for('report.reports') }}" class="btn btn-primary">View Reports</a>
             </div>
         </div>
     </div>
     {% endif %}
 
-    <!-- Item Management (Categories, Footprints, Tags) -->
+    <!-- Item Management -->
     {% if current_user.has_permission('settings_sections.item_management', 'view') %}
-    <div class="col-md-4 mb-3">
-        <div class="card">
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card h-100">
             <div class="card-body text-center">
                 <i class="bi bi-boxes" style="font-size: 3rem; color: #fd7e14;"></i>
                 <h5 class="card-title mt-3">Item Management</h5>
-                <p class="card-text">Categories, Footprints, Tags</p>
-                <a href="{{ url_for('settings.manage_types') }}" class="btn btn-warning">Manage</a>
+                <p class="card-text small">Categories, Footprints, Tags</p>
+                <a href="{{ url_for('settings.manage_types') }}" class="btn btn-primary">Manage</a>
             </div>
         </div>
     </div>
@@ -66,12 +66,12 @@
 
     <!-- Magic Parameters -->
     {% if current_user.has_permission('settings_sections.magic_parameters', 'view') %}
-    <div class="col-md-4 mb-3">
-        <div class="card">
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card h-100">
             <div class="card-body text-center">
-                <i class="bi bi-magic" style="font-size: 3rem; color: #6f42c1;"></i>
+                <i class="bi bi-magic" style="font-size: 3rem; color: #a78bfa;"></i>
                 <h5 class="card-title mt-3">Magic Parameters</h5>
-                <p class="card-text">Parameters and Templates</p>
+                <p class="card-text small">Parameters and Templates</p>
                 <a href="{{ url_for('magic_parameter.magic_parameters') }}" class="btn btn-primary">Manage</a>
             </div>
         </div>
@@ -80,27 +80,41 @@
 
     <!-- Location Management -->
     {% if current_user.has_permission('settings_sections.location_management', 'view') %}
-    <div class="col-md-4 mb-3">
-        <div class="card">
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card h-100">
             <div class="card-body text-center">
-                <i class="bi bi-geo-alt-fill" style="font-size: 3rem; color: #198754;"></i>
+                <i class="bi bi-geo-alt-fill" style="font-size: 3rem; color: #198754"></i>
                 <h5 class="card-title mt-3">Location Management</h5>
-                <p class="card-text">Locations and rack storage</p>
-                <a href="{{ url_for('location_rack.location_management') }}" class="btn btn-success">Manage</a>
+                <p class="card-text small">Locations and rack storage</p>
+                <a href="{{ url_for('location_rack.location_management') }}" class="btn btn-primary">Manage</a>
             </div>
         </div>
     </div>
     {% endif %}
 
-    <!-- Users -->
+    <!-- Stickers Template -->
+    {% if current_user.has_permission('settings_sections.qr_templates', 'view') %}
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-qr-code" style="font-size: 3rem; color: #2dd4bf;"></i>
+                <h5 class="card-title mt-3">Stickers Template</h5>
+                <p class="card-text small">Design sticker templates</p>
+                <a href="{{ url_for('qr_template.settings_qr') }}" class="btn btn-primary">Manage Templates</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Users & Roles -->
     {% if current_user.has_permission('settings_sections.users_roles', 'view') %}
-    <div class="col-md-4 mb-3">
-        <div class="card">
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card h-100">
             <div class="card-body text-center">
                 <i class="bi bi-people" style="font-size: 3rem; color: #0dcaf0;"></i>
                 <h5 class="card-title mt-3">Users & Roles</h5>
-                <p class="card-text">Manage user accounts and roles</p>
-                <a href="{{ url_for('user_role.users') }}" class="btn btn-info">Manage Users</a>
+                <p class="card-text small">Manage user accounts and roles</p>
+                <a href="{{ url_for('user_role.users') }}" class="btn btn-primary">Manage Users</a>
             </div>
         </div>
     </div>
@@ -108,27 +122,13 @@
 
     <!-- Backup & Restore -->
     {% if current_user.has_permission('settings_sections.backup_restore', 'view') %}
-    <div class="col-md-4 mb-3">
-        <div class="card">
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card h-100">
             <div class="card-body text-center">
                 <i class="bi bi-database" style="font-size: 3rem; color: #6c757d;"></i>
                 <h5 class="card-title mt-3">Backup & Restore</h5>
-                <p class="card-text">Database backup and restore</p>
-                <a href="{{ url_for('backup.backup_restore') }}" class="btn btn-secondary">Manage Backups</a>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- QR/Barcode Stickers -->
-    {% if current_user.has_permission('settings_sections.qr_templates', 'view') %}
-    <div class="col-md-4 mb-3">
-        <div class="card">
-            <div class="card-body text-center">
-                <i class="bi bi-qr-code" style="font-size: 3rem; color: #20c997;"></i>
-                <h5 class="card-title mt-3">QR/Barcode Stickers</h5>
-                <p class="card-text">Design sticker templates</p>
-                <a href="{{ url_for('qr_template.settings_qr') }}" class="btn btn-success">Manage Templates</a>
+                <p class="card-text small">Database backup and restore</p>
+                <a href="{{ url_for('backup.backup_restore') }}" class="btn btn-primary">Manage Backups</a>
             </div>
         </div>
     </div>
