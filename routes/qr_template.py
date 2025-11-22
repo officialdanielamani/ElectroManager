@@ -101,6 +101,7 @@ def api_qr_template(template_id):
             data = request.get_json()
             template.set_layout(data.get('layout', []))
             template.updated_at = datetime.now(timezone.utc)
+            template.updated_by = current_user.id
             db.session.commit()
             return jsonify({'status': 'success'})
         except Exception as e:
@@ -125,6 +126,7 @@ def api_qr_template(template_id):
             template.height_mm = new_height
             template.set_layout(data.get('layout', template.get_layout()))
             template.updated_at = datetime.now(timezone.utc)
+            template.updated_by = current_user.id
             db.session.commit()
             
             log_audit(current_user.id, 'update', 'sticker_template', template_id,
@@ -149,34 +151,42 @@ def api_qr_template(template_id):
         'available_fonts': get_available_fonts()
     })
 
-@qr_template_bp.route('/api/qr-template/<int:template_id>/preview', methods=['POST'])
+@qr_template_bp.route('/api/qr-template/<int:template_id>/preview', methods=['POST', 'GET'])
 @login_required
 def preview_qr_template(template_id):
-    """Preview template with sample data"""
+    """Preview template with sample data or unresolved placeholders"""
     try:
         template = StickerTemplate.query.get_or_404(template_id)
         
-        # Get sample data based on template type
-        if template.template_type == 'Items':
-            sample_item = Item.query.first()
-            if sample_item:
-                data = get_item_data(sample_item)
-            else:
-                data = {ph: f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('Items', [])}
-        elif template.template_type == 'Locations':
-            sample_location = Location.query.first()
-            if sample_location:
-                data = get_location_data(sample_location)
-            else:
-                data = {ph: f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('Locations', [])}
-        elif template.template_type == 'Racks':
-            sample_rack = Rack.query.first()
-            if sample_rack:
-                data = get_rack_data(sample_rack)
-            else:
-                data = {ph: f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('Racks', [])}
+        # Check if unresolved placeholders requested (for settings preview)
+        unresolved = request.args.get('unresolved', '').lower() == 'true'
+        
+        if unresolved:
+            # Show literal unresolved placeholders like {ItemUUID}
+            placeholders = AVAILABLE_PLACEHOLDERS.get(template.template_type, [])
+            data = {ph: f'{{{ph}}}' for ph in placeholders}
         else:
-            data = {}
+            # Get sample data based on template type
+            if template.template_type == 'Items':
+                sample_item = Item.query.first()
+                if sample_item:
+                    data = get_item_data(sample_item)
+                else:
+                    data = {ph: f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('Items', [])}
+            elif template.template_type == 'Locations':
+                sample_location = Location.query.first()
+                if sample_location:
+                    data = get_location_data(sample_location)
+                else:
+                    data = {ph: f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('Locations', [])}
+            elif template.template_type == 'Racks':
+                sample_rack = Rack.query.first()
+                if sample_rack:
+                    data = get_rack_data(sample_rack)
+                else:
+                    data = {ph: f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('Racks', [])}
+            else:
+                data = {}
         
         svg_data = render_template_to_svg(template, data)
         return jsonify({'svg': svg_data})

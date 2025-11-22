@@ -2,6 +2,14 @@
    name: Light
    description: Default bright theme
    color: #ffffff
+   background-color: #ffffff
+   text-color: #212529
+   primary-button: #007bff
+   secondary-button: #6c757d
+   badge: #007bff
+   card-background: #ffffff
+   card-header-background: #f8f9fa
+   header-text: #212529
 */
 
 /* Light Theme - Default Bootstrap */

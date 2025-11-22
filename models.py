@@ -635,10 +635,12 @@ class StickerTemplate(db.Model):
     layout = db.Column(db.Text, nullable=False)  # JSON array of elements
     is_default = db.Column(db.Boolean, default=False)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    updated_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
-    creator = db.relationship('User', backref='sticker_templates')
+    creator = db.relationship('User', backref='sticker_templates', foreign_keys=[created_by])
+    updater = db.relationship('User', foreign_keys=[updated_by])
     
     def get_layout(self):
         """Parse JSON layout"""

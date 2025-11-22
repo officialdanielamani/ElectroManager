@@ -24,14 +24,14 @@
                     <!-- Select Theme Section -->
                     <div class="mb-4">
                         <label class="form-label"><strong>Select Theme</strong></label>
-                        <div class="row g-3">
+                        <div class="row g-3" id="themeSelectContainer">
                             {% for theme in available_themes %}
                             <div class="col-md-6">
-                                <input type="radio" class="btn-check" name="theme" id="theme-{{ theme.id }}" value="{{ theme.id }}" 
+                                <input type="radio" class="btn-check theme-radio" name="theme" id="theme-{{ theme.id }}" value="{{ theme.id }}" data-theme-name="{{ theme.id }}"
                                        {% if current_theme == theme.id %}checked{% endif %}>
-                                <label class="btn btn-outline-secondary w-100 p-3" for="theme-{{ theme.id }}">
+                                <label class="btn btn-outline-secondary w-100 p-3 theme-label" data-theme-name="{{ theme.id }}" for="theme-{{ theme.id }}">
                                     <div class="d-flex align-items-center">
-                                        <div class="theme-preview border" style="width: 50px; height: 50px; border-radius: 8px; background-color: {{ theme.color }};"></div>
+                                        <div class="theme-preview border theme-preview-{{ theme.id }}" style="width: 50px; height: 50px; border-radius: 8px; background-color: var(--theme-{{ theme.id }}-color, #cccccc);"></div>
                                         <div class="ms-3 text-start">
                                             <strong>{{ theme.name }}</strong>
                                             <br><small class="text-muted">{{ theme.description }}</small>
@@ -84,154 +84,60 @@
                     </div>
                     
                     <style>
-                        /* Scoped theme styles - only apply to #previewCard */
-                        #previewCard[data-preview-theme="light"] {
-                            background-color: #ffffff !important;
-                            color: #212529 !important;
-                            border-color: #dee2e6 !important;
+                        /* Theme selector styling */
+                        .theme-label {
+                            transition: all 0.3s ease;
+                            border: 2px solid rgba(200, 200, 200, 0.3) !important;
                         }
                         
-                        #previewCard[data-preview-theme="light"] .card-header {
-                            background-color: #f8f9fa !important;
-                            border-color: #dee2e6 !important;
-                            color: #212529 !important;
+                        .theme-label:hover {
+                            transform: translateY(-2px);
+                            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
                         }
                         
-                        #previewCard[data-preview-theme="light"] .card-body {
-                            background-color: #ffffff !important;
+                        .theme-radio:checked + .theme-label {
+                            border-width: 2px !important;
+                            font-weight: 600;
+                            box-shadow: 0 0 0 3px rgba(100, 100, 100, 0.2);
                         }
                         
-                        #previewCard[data-preview-theme="dark"] {
-                            background-color: #2d2d2d !important;
-                            color: #e0e0e0 !important;
-                            border-color: #3d3d3d !important;
+                        /* Dynamic theme variables for preview */
+                        #previewCard {
+                            background-color: var(--theme-card-bg, #ffffff) !important;
+                            color: var(--theme-text, #212529) !important;
+                            border-color: var(--theme-color, #dee2e6) !important;
                         }
                         
-                        #previewCard[data-preview-theme="dark"] .card-header {
-                            background-color: #3d3d3d !important;
-                            border-color: #4d4d4d !important;
-                            color: #fff !important;
+                        #previewCard .card-header {
+                            background-color: var(--theme-card-header, #f8f9fa) !important;
+                            color: var(--theme-header-text, #212529) !important;
+                            border-color: var(--theme-color, #dee2e6) !important;
                         }
                         
-                        #previewCard[data-preview-theme="dark"] .card-body {
-                            background-color: #2d2d2d !important;
+                        #previewCard .card-body {
+                            background-color: var(--theme-card-bg, #ffffff) !important;
+                            color: var(--theme-text, #212529) !important;
                         }
                         
-                        #previewCard[data-preview-theme="blue"] {
-                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-                            color: #ffffff !important;
-                            border-color: rgba(255, 255, 255, 0.2) !important;
+                        #previewCard .text-muted {
+                            color: var(--theme-muted, #6c757d) !important;
                         }
                         
-                        #previewCard[data-preview-theme="blue"] .card-header {
-                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-                            color: #fff !important;
-                        }
-                        
-                        #previewCard[data-preview-theme="blue"] .card-body {
-                            background: rgba(255, 255, 255, 0.95) !important;
-                            color: #212529 !important;
-                        }
-                        
-                        #previewCard[data-preview-theme="keqing"] {
-                            background: linear-gradient(135deg, #1a0d2e 0%, #2d1b4e 100%) !important;
-                            color: #d4af37 !important;
-                            border-color: #444 !important;
-                        }
-                        
-                        #previewCard[data-preview-theme="keqing"] .card-header {
-                            background: linear-gradient(135deg, #2d1b4e 0%, #4a2c6b 100%) !important;
-                            color: #d4af37 !important;
-                        }
-                        
-                        #previewCard[data-preview-theme="keqing"] .card-body {
-                            background-color: #2a2a3a !important;
-                            color: #d4af37 !important;
-                        }
-                        
-                        /* Text and element colors for all themes */
-                        #previewCard[data-preview-theme="light"] .text-muted {
-                            color: #6c757d !important;
-                        }
-                        
-                        #previewCard[data-preview-theme="light"] .btn-primary {
-                            background-color: #007bff !important;
-                            border-color: #007bff !important;
+                        #previewCard .btn-primary {
+                            background-color: var(--theme-primary, #007bff) !important;
+                            border-color: var(--theme-primary, #007bff) !important;
                             color: #ffffff !important;
                         }
                         
-                        #previewCard[data-preview-theme="light"] .btn-secondary {
-                            background-color: #6c757d !important;
-                            border-color: #6c757d !important;
+                        #previewCard .btn-secondary {
+                            background-color: var(--theme-secondary, #6c757d) !important;
+                            border-color: var(--theme-secondary, #6c757d) !important;
                             color: #ffffff !important;
                         }
                         
-                        #previewCard[data-preview-theme="light"] .badge {
-                            background-color: #007bff !important;
+                        #previewCard .badge {
+                            background-color: var(--theme-badge, #007bff) !important;
                             color: #ffffff !important;
-                        }
-                        
-                        #previewCard[data-preview-theme="dark"] .text-muted {
-                            color: #999999 !important;
-                        }
-                        
-                        #previewCard[data-preview-theme="dark"] .btn-primary {
-                            background-color: #0056b3 !important;
-                            border-color: #0056b3 !important;
-                            color: #ffffff !important;
-                        }
-                        
-                        #previewCard[data-preview-theme="dark"] .btn-secondary {
-                            background-color: #555555 !important;
-                            border-color: #555555 !important;
-                            color: #ffffff !important;
-                        }
-                        
-                        #previewCard[data-preview-theme="dark"] .badge {
-                            background-color: #555555 !important;
-                            color: #ffffff !important;
-                        }
-                        
-                        #previewCard[data-preview-theme="blue"] .text-muted {
-                            color: #6c757d !important;
-                        }
-                        
-                        #previewCard[data-preview-theme="blue"] .btn-primary {
-                            background-color: #0066cc !important;
-                            border-color: #0066cc !important;
-                            color: #ffffff !important;
-                        }
-                        
-                        #previewCard[data-preview-theme="blue"] .btn-secondary {
-                            background-color: #4c6f99 !important;
-                            border-color: #4c6f99 !important;
-                            color: #ffffff !important;
-                        }
-                        
-                        #previewCard[data-preview-theme="blue"] .badge {
-                            background-color: #0066cc !important;
-                            color: #ffffff !important;
-                        }
-                        
-                        #previewCard[data-preview-theme="keqing"] .text-muted {
-                            color: #a8a8a8 !important;
-                        }
-                        
-                        #previewCard[data-preview-theme="keqing"] .btn-primary {
-                            background-color: #d4af37 !important;
-                            border-color: #d4af37 !important;
-                            color: #2a2a3a !important;
-                        }
-                        
-                        #previewCard[data-preview-theme="keqing"] .btn-secondary {
-                            background-color: #5f4a6d !important;
-                            border-color: #5f4a6d !important;
-                            color: #d4af37 !important;
-                        }
-                        
-                        #previewCard[data-preview-theme="keqing"] .badge {
-                            background-color: #d4af37 !important;
-                            color: #2a2a3a !important;
                         }
                     </style>
 
@@ -473,38 +379,21 @@ function saveUIPreference() {
     form.submit();
 }
 
-// Update preview with actual theme and font
-function updatePreview() {
-    const themeRadio = document.querySelector('input[name="theme"]:checked');
+// Update preview font styling
+function updatePreviewFont() {
     const fontSelect = document.getElementById('user_font');
-    
-    // Safety checks - return if elements don't exist
-    if (!themeRadio || !fontSelect) {
-        console.warn('Preview elements not found:', { themeRadio, fontSelect });
-        return;
-    }
-    
-    const theme = themeRadio.value;
-    const font = fontSelect.value;
     const previewCard = document.getElementById('previewCard');
     
-    if (!previewCard) {
-        console.warn('Preview card not found');
+    if (!fontSelect || !previewCard) {
         return;
     }
     
-    console.log('Updating preview - Theme:', theme, 'Font:', font);
-    
-    // Update preview theme text
-    document.getElementById('previewTheme').textContent = theme.charAt(0).toUpperCase() + theme.slice(1);
+    const font = fontSelect.value;
     
     // Get font display name from the selected option
     const selectedOption = fontSelect.options[fontSelect.selectedIndex];
-    const fontDisplayName = selectedOption.text; // Use the displayed text
+    const fontDisplayName = selectedOption.text;
     document.getElementById('previewFont').textContent = 'Font: ' + fontDisplayName;
-    
-    // Set data attribute for theme (this applies scoped CSS)
-    previewCard.setAttribute('data-preview-theme', theme);
     
     // Define font families with proper CSS syntax
     const fontFamilies = {
@@ -518,10 +407,7 @@ function updatePreview() {
         'Trebuchet MS': '"Trebuchet MS", sans-serif'
     };
     
-    // Get font family or default to custom name
     let fontFamily = fontFamilies[font] || `'${font}', sans-serif`;
-    
-    console.log('Applying font family:', fontFamily, 'Theme:', theme);
     
     // Create or update dynamic style tag for preview card
     let styleTag = document.getElementById('preview-font-style');
@@ -539,33 +425,16 @@ function updatePreview() {
     `;
 }
 
-// Listen for theme changes
-document.querySelectorAll('input[name="theme"]').forEach(radio => {
-    radio.addEventListener('change', updatePreview);
-});
-
-// Listen for font changes and initialize preview
-document.addEventListener('DOMContentLoaded', function() {
-    // Wait for all DOM elements to be ready
-    setTimeout(function() {
-        // Listen for theme changes
-        document.querySelectorAll('input[name="theme"]').forEach(radio => {
-            radio.addEventListener('change', updatePreview);
+// Font change listener - will be initialized after DOM loads
+function initializeFontListener() {
+    const fontSelect = document.getElementById('user_font');
+    if (fontSelect) {
+        fontSelect.addEventListener('change', function() {
+            console.log('Font changed to:', this.value);
+            updatePreviewFont();
         });
-        
-        // Listen for font changes
-        const fontSelect = document.getElementById('user_font');
-        if (fontSelect) {
-            fontSelect.addEventListener('change', function() {
-                console.log('Font changed to:', this.value);
-                updatePreview();
-            });
-        }
-        
-        // Initial preview update
-        updatePreview();
-    }, 100);
-});
+    }
+}
 </script>
 
 <script>
@@ -695,13 +564,211 @@ document.querySelector("form[action=\"{{ url_for('settings.save_theme') }}\"]")?
     }, 500);
 });
 
-// Alternative: Listen for theme changes and update immediately with page reload
-document.querySelectorAll('input[name="theme"]').forEach(radio => {
-    radio.addEventListener('change', function() {
-        // Don't submit here, let the form button handle it
-        // But show visual feedback
-        console.log('Theme selected: ' + this.value);
+// Theme radio button listeners - initialize after DOM loads
+function initializeThemeListeners() {
+    document.querySelectorAll('input[name="theme"]').forEach(radio => {
+        radio.addEventListener('change', function(e) {
+            const themeName = this.value;
+            console.log('Theme selected: ' + themeName);
+            updatePreview(themeName);
+        });
     });
+}
+
+// Load all theme colors into CSS variables for selector cards
+async function loadAllThemeColors() {
+    const availableThemes = ['light', 'dark', 'blue', 'keqing'];
+    
+    // Create style tag for theme color variables
+    let styleTag = document.getElementById('theme-colors-style');
+    if (!styleTag) {
+        styleTag = document.createElement('style');
+        styleTag.id = 'theme-colors-style';
+        document.head.appendChild(styleTag);
+    }
+    
+    let css = ':root {\n';
+    
+    for (const themeName of availableThemes) {
+        try {
+            const response = await fetch(`/static/css/themes/${themeName}.css`);
+            if (!response.ok) continue;
+            
+            const cssText = await response.text();
+            const metadataRegex = /\/\*\s*Theme Metadata\s*([\s\S]*?)\*\//;
+            const match = cssText.match(metadataRegex);
+            
+            if (!match) continue;
+            
+            const metadata = {};
+            const lines = match[1].split('\n');
+            
+            lines.forEach(line => {
+                const trimmed = line.trim();
+                if (!trimmed) return;
+                const [key, ...valueParts] = trimmed.split(':');
+                const cleanKey = key.trim();
+                const cleanValue = valueParts.join(':').trim();
+                if (cleanKey && cleanValue) {
+                    metadata[cleanKey] = cleanValue;
+                }
+            });
+            
+            // Add CSS variables for this theme
+            css += `    --theme-${themeName}-color: ${metadata['color'] || '#cccccc'};\n`;
+            css += `    --theme-${themeName}-bg: ${metadata['background-color'] || '#ffffff'};\n`;
+            css += `    --theme-${themeName}-text: ${metadata['text-color'] || '#000000'};\n`;
+            
+        } catch (error) {
+            console.error(`Error loading theme colors for ${themeName}:`, error);
+        }
+    }
+    
+    css += '}\n';
+    styleTag.textContent = css;
+    
+    console.log('All theme colors loaded into CSS variables');
+}
+
+
+// ==== DYNAMIC THEME PREVIEW LOADER ====
+// Load CSS and extract metadata to apply theme colors dynamically
+async function initializeThemePreview() {
+    const previewCard = document.getElementById('previewCard');
+    const availableThemes = ['light', 'dark', 'blue', 'keqing'];
+    
+    // Extract metadata from CSS files
+    async function loadThemeMetadata(themeName) {
+        try {
+            const response = await fetch(`/static/css/themes/${themeName}.css`);
+            const cssText = await response.text();
+            
+            const metadataRegex = /\/\*\s*Theme Metadata\s*([\s\S]*?)\*\//;
+            const match = cssText.match(metadataRegex);
+            
+            if (!match) return null;
+            
+            const metadata = {};
+            const lines = match[1].split('\n');
+            
+            lines.forEach(line => {
+                const trimmed = line.trim();
+                if (!trimmed) return;
+                const [key, ...valueParts] = trimmed.split(':');
+                const cleanKey = key.trim();
+                const cleanValue = valueParts.join(':').trim();
+                if (cleanKey && cleanValue) {
+                    metadata[cleanKey] = cleanValue;
+                }
+            });
+            
+            return metadata;
+        } catch (error) {
+            console.error(`Failed to load theme metadata for ${themeName}:`, error);
+            return null;
+        }
+    }
+    
+    // Apply theme metadata to preview card
+    async function applyThemePreview(themeName) {
+        const metadata = await loadThemeMetadata(themeName);
+        
+        if (!metadata) return;
+        
+        // Set CSS variables on preview card
+        previewCard.style.setProperty('--theme-color', metadata['color'] || '#000');
+        previewCard.style.setProperty('--theme-card-bg', metadata['card-background'] || '#fff');
+        previewCard.style.setProperty('--theme-text', metadata['text-color'] || '#000');
+        previewCard.style.setProperty('--theme-primary', metadata['primary-button'] || '#007bff');
+        previewCard.style.setProperty('--theme-secondary', metadata['secondary-button'] || '#6c757d');
+        previewCard.style.setProperty('--theme-badge', metadata['badge'] || '#007bff');
+        previewCard.style.setProperty('--theme-card-header', metadata['card-header-background'] || '#f8f9fa');
+        previewCard.style.setProperty('--theme-header-text', metadata['header-text'] || '#000');
+        
+        // Update preview text
+        document.getElementById('previewThemeName').textContent = metadata['name'] || 'Sample Preview';
+        document.getElementById('previewTheme').textContent = metadata['name'] || 'Unknown';
+    }
+    
+    // Initialize with current selected theme
+    const currentTheme = document.querySelector('input[name="theme"]:checked')?.value || 'light';
+    await applyThemePreview(currentTheme);
+}
+
+// Helper function to update preview when theme changes
+async function updatePreview(themeName) {
+    if (!themeName) {
+        console.error('Theme name is required');
+        return;
+    }
+    
+    const previewCard = document.getElementById('previewCard');
+    if (!previewCard) {
+        console.error('Preview card element not found');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/static/css/themes/${themeName}.css`);
+        
+        if (!response.ok) {
+            console.error(`Failed to load theme: ${themeName} (${response.status})`);
+            return;
+        }
+        
+        const cssText = await response.text();
+        
+        const metadataRegex = /\/\*\s*Theme Metadata\s*([\s\S]*?)\*\//;
+        const match = cssText.match(metadataRegex);
+        
+        if (!match) {
+            console.warn(`No metadata found in theme: ${themeName}`);
+            return;
+        }
+        
+        const metadata = {};
+        const lines = match[1].split('\n');
+        
+        lines.forEach(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return;
+            const [key, ...valueParts] = trimmed.split(':');
+            const cleanKey = key.trim();
+            const cleanValue = valueParts.join(':').trim();
+            if (cleanKey && cleanValue) {
+                metadata[cleanKey] = cleanValue;
+            }
+        });
+        
+        // Apply CSS variables
+        previewCard.style.setProperty('--theme-color', metadata['color'] || '#000');
+        previewCard.style.setProperty('--theme-card-bg', metadata['card-background'] || '#fff');
+        previewCard.style.setProperty('--theme-text', metadata['text-color'] || '#000');
+        previewCard.style.setProperty('--theme-primary', metadata['primary-button'] || '#007bff');
+        previewCard.style.setProperty('--theme-secondary', metadata['secondary-button'] || '#6c757d');
+        previewCard.style.setProperty('--theme-badge', metadata['badge'] || '#007bff');
+        previewCard.style.setProperty('--theme-card-header', metadata['card-header-background'] || '#f8f9fa');
+        previewCard.style.setProperty('--theme-header-text', metadata['header-text'] || '#000');
+        
+        // Update preview text
+        document.getElementById('previewThemeName').textContent = metadata['name'] || 'Sample Preview';
+        document.getElementById('previewTheme').textContent = metadata['name'] || 'Unknown';
+        
+        console.log(`Theme preview updated: ${metadata['name']}`);
+    } catch (error) {
+        console.error(`Error updating theme preview: ${error.message}`);
+    }
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    const currentTheme = document.querySelector('input[name="theme"]:checked')?.value || 'light';
+    
+    loadAllThemeColors(); // Load all theme colors into CSS variables
+    initializeThemePreview();
+    initializeThemeListeners();
+    initializeFontListener();
+    updatePreviewFont(); // Initialize font on page load
 });
 </script>
 

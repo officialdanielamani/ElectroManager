@@ -89,9 +89,6 @@
                 <h4><i class="bi bi-box"></i> {{ item.name }}</h4>
                 <!-- Only show Edit/Delete if user has edit OR delete permission (not just view) -->
                 <div class="d-flex gap-2">
-                    <a href="{{ url_for('item.items') }}" class="btn btn-secondary btn-sm">
-                        <i class="bi bi-arrow-left"></i> Back
-                    </a>
                     {% if current_user.has_permission('items', 'edit_name') or current_user.has_permission('items', 'edit_sku_type') or current_user.has_permission('items', 'edit_description') or current_user.has_permission('items', 'edit_datasheet') or current_user.has_permission('items', 'edit_upload') or current_user.has_permission('items', 'edit_lending') or current_user.has_permission('items', 'edit_price') or current_user.has_permission('items', 'edit_quantity') or current_user.has_permission('items', 'edit_location') or current_user.has_permission('items', 'edit_category') or current_user.has_permission('items', 'edit_footprint') or current_user.has_permission('items', 'edit_tags') or current_user.has_permission('items', 'edit_parameters') or current_user.has_permission('items', 'delete') %}
                     {% if current_user.has_permission('items', 'edit_name') or current_user.has_permission('items', 'edit_sku_type') or current_user.has_permission('items', 'edit_description') or current_user.has_permission('items', 'edit_datasheet') or current_user.has_permission('items', 'edit_upload') or current_user.has_permission('items', 'edit_lending') or current_user.has_permission('items', 'edit_price') or current_user.has_permission('items', 'edit_quantity') or current_user.has_permission('items', 'edit_location') or current_user.has_permission('items', 'edit_category') or current_user.has_permission('items', 'edit_footprint') or current_user.has_permission('items', 'edit_tags') or current_user.has_permission('items', 'edit_parameters') %}
                     <a href="{{ url_for('item.item_edit', uuid=item.uuid) }}" class="btn btn-warning btn-sm">
@@ -110,10 +107,13 @@
                     {% endif %}
                     {% endif %}
                     {% if qr_templates %}
-                    <a href="{{ url_for('item.item_qr_sticker', uuid=item.uuid) }}" class="btn btn-outline-success btn-sm">
+                    <a href="{{ url_for('item.item_qr_sticker', uuid=item.uuid) }}" class="btn btn-success btn-sm">
                         <i class="bi bi-qr-code"></i> Print QR
                     </a>
                     {% endif %}
+                    <a href="{{ url_for('item.items') }}" class="btn btn-secondary btn-sm">
+                        <i class="bi bi-arrow-left"></i> Back
+                    </a>
                 </div>
             </div>
             <div class="card-body">

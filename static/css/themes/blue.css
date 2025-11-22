@@ -2,6 +2,14 @@
    name: Blue
    description: Cool blue theme
    color: #667eea
+   background-color: #667eea
+   text-color: #ffffff
+   primary-button: #667eea
+   secondary-button: #764ba2
+   badge: #667eea
+   card-background: rgba(255, 255, 255, 0.95)
+   card-header-background: #667eea
+   header-text: #ffffff
 */
 
 /* Blue Theme */
