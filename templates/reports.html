@@ -21,7 +21,7 @@
     <div class="col-md-4">
         <div class="card">
             <div class="card-body text-center">
-                <h3 class="text-success">{{ currency_symbol }}{{ "%.2f"|format(total_value) }}</h3>
+                <h3 class="text-success">{{ total_value|format_amount(2) }}</h3>
                 <p class="mb-0">Total Inventory Value</p>
             </div>
         </div>

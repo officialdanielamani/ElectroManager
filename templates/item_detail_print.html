@@ -355,12 +355,12 @@
     
     <div class="info-row">
         <div class="info-label">Price per Unit:</div>
-        <div class="info-value">{{ currency_symbol }}{{ item.price|format_amount(currency_decimal_places) }}</div>
+        <div class="info-value">{{ item.price|format_amount(currency_decimal_places) }}</div>
     </div>
     
     <div class="info-row">
         <div class="info-label">Total Price:</div>
-        <div class="info-value"><strong>{{ currency_symbol }}{{ item.get_total_price()|format_amount(currency_decimal_places) }}</strong></div>
+        <div class="info-value"><strong>{{ item.get_total_price()|format_amount(currency_decimal_places) }}</strong></div>
     </div>
     
     <!-- Magic Parameters -->

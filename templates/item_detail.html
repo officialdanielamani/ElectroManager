@@ -210,11 +210,11 @@
                         <strong>Min Quantity:</strong> {{ item.min_quantity }}
                     </div>
                     <div class="col-md-4">
-                        <strong>Price per Qty:</strong> {{ currency_symbol }}{{ "%.2f"|format(item.price) }}
+                        <strong>Price per Qty:</strong> {{ item.price|format_amount(currency_decimal_places) }}
                     </div>
                     <div class="col-md-4">
                         <strong>Total Price:</strong> 
-                        <span class="text-success fw-bold">{{ currency_symbol }}{{ "%.2f"|format(item.get_total_price()) }}</span>
+                        <span class="text-success fw-bold">{{ item.get_total_price()|format_amount(currency_decimal_places) }}</span>
                     </div>
                 </div>
 

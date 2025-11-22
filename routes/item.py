@@ -275,13 +275,14 @@ def item_detail(uuid):
     
     attachment_form = AttachmentForm()
     currency_symbol = Setting.get('currency', '$')
+    currency_decimal_places = int(Setting.get('currency_decimal_places', '2'))
     
     # Get available QR sticker templates for Items
     from models import StickerTemplate
     qr_templates = StickerTemplate.query.filter_by(template_type='Items').all()
     
     return render_template('item_detail.html', item=item, attachment_form=attachment_form, 
-                         currency_symbol=currency_symbol, qr_templates=qr_templates)
+                         currency_symbol=currency_symbol, currency_decimal_places=currency_decimal_places, qr_templates=qr_templates)
 
 
 

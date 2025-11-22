@@ -320,7 +320,7 @@
                             {% if col == 'price_per_unit' %}
                                 <td>
                                     {% if item.price %}
-                                        {{ currency_symbol }}{{ item.price|format_amount(currency_decimal_places) }}
+                                        {{ item.price|format_amount(currency_decimal_places) }}
                                     {% else %}
                                         -
                                     {% endif %}
@@ -329,7 +329,7 @@
                             {% if col == 'total_price' %}
                                 <td>
                                     {% if item.get_total_price() %}
-                                        {{ currency_symbol }}{{ item.get_total_price()|format_amount(currency_decimal_places) }}
+                                        {{ item.get_total_price()|format_amount(currency_decimal_places) }}
                                     {% else %}
                                         -
                                     {% endif %}
@@ -435,8 +435,8 @@
                             <span class="badge bg-success" style="font-size: 0.65rem;">OK</span>
                         {% endif %}
                     </p>
-                    <p><strong>Price/Unit:</strong> {{ currency_symbol }}{{ item.price|format_amount(currency_decimal_places) if item.price else '-' }}</p>
-                    <p><strong>Total:</strong> {{ currency_symbol }}{{ item.get_total_price()|format_amount(currency_decimal_places) if item.get_total_price() else '-' }}</p>
+                    <p><strong>Price/Unit:</strong> {{ item.price|format_amount(currency_decimal_places) if item.price else '-' }}</p>
+                    <p><strong>Total:</strong> {{ item.get_total_price()|format_amount(currency_decimal_places) if item.get_total_price() else '-' }}</p>
                 </div>
             </div>
             {% endfor %}
