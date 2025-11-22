@@ -71,7 +71,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <span class="badge bg-info">{{ role.users|length }}</span>
+                                    <span class="badge bg-primary">{{ role.users|length }}</span>
                                 </td>
                                 <td>
                                     {% if role.is_system_role %}
@@ -153,13 +153,9 @@
                                     {% if user.user_role.is_system_role %}
                                         {% if user.user_role.name == 'Admin' %}
                                         <span class="badge bg-danger">{{ user.user_role.name }} <i class="bi bi-star-fill"></i></span>
-                                        {% elif user.user_role.name == 'Manager' %}
-                                        <span class="badge bg-warning text-dark">{{ user.user_role.name }} <i class="bi bi-star-fill"></i></span>
-                                        {% else %}
-                                        <span class="badge bg-secondary">{{ user.user_role.name }} <i class="bi bi-star-fill"></i></span>
                                         {% endif %}
                                     {% else %}
-                                    <span class="badge bg-info">{{ user.user_role.name }}</span>
+                                    <span class="badge bg-primary">{{ user.user_role.name }}</span>
                                     {% endif %}
                                 </td>
                                 <td>
