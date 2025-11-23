@@ -125,10 +125,11 @@ def items():
     items = pagination.items
     
     total_items = Item.query.count()
-    # Low stock: quantity > 0 AND quantity <= min_quantity
-    low_stock_items = Item.query.filter(Item.quantity > 0, Item.quantity <= Item.min_quantity).count()
-    # No stock: quantity = 0
-    no_stock_items = Item.query.filter(Item.quantity == 0).count()
+    
+    # Calculate stock status based on model methods
+    all_items = Item.query.all()
+    low_stock_items = sum(1 for item in all_items if item.is_low_stock())
+    no_stock_items = sum(1 for item in all_items if item.is_no_stock())
     total_categories = Category.query.count()
     
     # Get user's table columns preference

@@ -345,8 +345,8 @@
                                     <td>
                                         {% if item.rack and item.drawer %}
                                         {{ item.rack.name }} - {{ item.drawer }}
-                                        {% elif item.location %}
-                                        {{ item.location.name }}
+                                        {% elif item.general_location %}
+                                        {{ item.general_location.name }}
                                         {% else %}
                                         -
                                         {% endif %}
@@ -471,8 +471,8 @@
                                     <strong>Location:</strong> 
                                     {% if item.rack and item.drawer %}
                                     {{ item.rack.name }} - {{ item.drawer }}
-                                    {% elif item.location %}
-                                    {{ item.location.name }}
+                                    {% elif item.general_location %}
+                                    {{ item.general_location.name }}
                                     {% else %}-{% endif %}
                                 </p>
                                 <p class="mb-1 small">

@@ -2,7 +2,7 @@
 
 ## Version Details
 - **Application**: Inventory Manager
-- **Version**: 1.0.2
+- **Version**: 1.0.3
 - **Release Date**: October 2024
 - **Status**: Beta
 
@@ -19,16 +19,22 @@
 - Item page now on dedicated page
 - Search and locate item at Visual Storage
 
-## Future Plan
-- QR for Locations & Item
+# Experimental
+- QR for Item
 - QR template creator
+- Dynamic CSS and Font file support
+
+## Future Plan
 - Basic Project Management system
 - Revempt the Item Management and log info
 - Auto Backup Database (with system version)
-- Adding more accessibility to Theme (Font, Colour)
 - Branding (logo, server name)
 - API intergation for external application with RBAC
 - SSO login intergation (Google, Github, ~~MyDigital ID *klw dpt rembat SDK dia*~~)
+
+### Known bug
+- UI bug about text colour in different theme
+- Theme preview sometimes show color on current theme not selected preview theme
 
 ------------
 

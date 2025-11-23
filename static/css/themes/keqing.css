@@ -129,6 +129,10 @@ body {
     box-shadow: 0 0 0 0.2rem rgba(212, 175, 55, 0.25) !important;
 }
 
+.form-text {
+    color: #d4af37 !important;
+}
+
 /* Button styling */
 .btn-primary {
     background: #d4af37;

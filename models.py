@@ -344,24 +344,30 @@ class Item(db.Model):
         return self.quantity - (self.lend_quantity or 0)
     
     def is_no_stock(self):
-        # Show "No Stock" if: available=0, min=0, AND warning enabled
+        # Show "No Stock" if: available <= 0 AND warning enabled
         available = self.get_available_quantity()
-        if available == 0 and self.min_quantity == 0 and self.no_stock_warning:
+        if available <= 0 and self.no_stock_warning:
             return True
         return False
     
     def is_low_stock(self):
-        # If it's a "no stock" situation, don't show low stock
-        if self.is_no_stock():
-            return False
-        
-        # If available=0, min=0, but warning disabled - don't show low stock either
+        # Show "Low Stock" if:
+        # 1. available < min_quantity AND available > 0 AND warning disabled (below min but positive stock)
+        # 2. OR available <= 0 AND warning disabled (zero/negative stock with warning off)
         available = self.get_available_quantity()
-        if available == 0 and self.min_quantity == 0 and not self.no_stock_warning:
-            return False
-        
-        # Normal low stock check
-        if available <= self.min_quantity:
+        if available < self.min_quantity:
+            # Below min - check if this should be low stock or no stock
+            if available <= 0 and self.no_stock_warning:
+                # This is no stock, not low stock
+                return False
+            # All other cases below min = low stock
+            return True
+        return False
+    
+    def is_ok_stock(self):
+        # Show "OK" if: available >= min_quantity
+        available = self.get_available_quantity()
+        if available >= self.min_quantity:
             return True
         return False
     
