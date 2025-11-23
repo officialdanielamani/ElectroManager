@@ -14,7 +14,6 @@ python --version >nul 2>&1
 if errorlevel 1 (
     color 0C
     echo [ERROR] Python not installed or not in PATH
-    echo Install Python 3.11+ from https://www.python.org/
     pause
     exit /b 1
 )
@@ -38,7 +37,7 @@ call venv\Scripts\activate.bat
 python -m pip install --upgrade pip >nul 2>&1
 
 REM Install dependencies
-echo [*] Installing dependencies...
+echo [*] Installing Python dependencies...
 pip install -q -r requirements.txt
 if errorlevel 1 (
     color 0C
@@ -46,12 +45,20 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
-echo [OK] Dependencies installed
+echo [OK] Python dependencies installed
+
+REM Initialize offline libraries
+echo [*] Downloading JavaScript libraries...
+python init_libraries.py
+if errorlevel 1 (
+    color 0C
+    echo [WARNING] JavaScript library download failed - Internet may be required
+)
+echo [OK] JavaScript libraries ready
 
 REM Create .env from example
 if not exist .env (
     if exist .env.example (
-        echo [*] Creating .env file...
         copy .env.example .env >nul 2>&1
     )
 )
@@ -72,24 +79,24 @@ echo [*] Initializing database...
 python init_db.py
 if errorlevel 1 (
     color 0C
-    echo.
     echo [ERROR] Database initialization failed
     pause
     exit /b 1
 )
+echo [OK] Database initialized
 
 :startup
 color 0A
 echo.
 echo ==========================================
-echo   Setup Complete!
+echo   Setup Complete
 echo ==========================================
 echo.
 echo Default Login:
 echo   Username: admin
 echo   Password: admin123
 echo.
-echo ^!^! CHANGE PASSWORD IMMEDIATELY ^!^!
+echo WARNING: Change password immediately!
 echo.
 echo Starting application...
 echo Open browser: http://localhost:5000

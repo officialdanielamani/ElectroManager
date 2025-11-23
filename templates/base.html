@@ -4,8 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Inventory Manager{% endblock %}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link href="{{ url_for('static', filename='lib/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='icons/bootstrap-icons.css') }}">
+    
+    <!-- Fix icon font paths to be dynamic -->
+    <style>
+        @font-face {
+            font-family: 'bootstrap-icons';
+            src: url("{{ url_for('static', filename='icons/bootstrap-icons.woff2') }}") format("woff2"),
+                 url("{{ url_for('static', filename='icons/bootstrap-icons.woff') }}") format("woff");
+        }
+    </style>
     
     <!-- Inline script to apply theme BEFORE page renders (prevents flash) -->
     <script>
@@ -254,7 +263,7 @@
         {% block content %}{% endblock %}
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='lib/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     
     <!-- Auto-close alerts based on banner timeout -->

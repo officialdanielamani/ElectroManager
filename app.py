@@ -9,6 +9,22 @@ from helpers import filesize_filter, jinja_format_amount, markdown_filter
 import os
 import logging
 
+# Check library integrity on startup (silent)
+def check_library_integrity():
+    """Silently verify libraries exist, return False if missing"""
+    lib_paths = [
+        'static/lib/bootstrap/css/bootstrap.min.css',
+        'static/lib/bootstrap/js/bootstrap.bundle.min.js',
+        'static/icons/bootstrap-icons.css',
+        'static/icons/bootstrap-icons.woff2',
+        'static/lib/Sortable.min.js'
+    ]
+    return all(os.path.exists(path) for path in lib_paths)
+
+# Verify libraries exist
+if not check_library_integrity():
+    print("[WARNING] Some libraries are missing. Run setup script to download them.")
+
 # Initialize Flask app
 app = Flask(__name__)
 app.config.from_object(Config)

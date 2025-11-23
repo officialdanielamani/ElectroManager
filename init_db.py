@@ -11,7 +11,7 @@ def init_db():
     with app.app_context():
         print("Creating database tables...")
         db.create_all()
-        print("✓ Database tables created!")
+        print("Database tables created!")
         
         # Create default roles
         create_default_roles()
@@ -42,9 +42,9 @@ def init_db():
             admin.set_password(admin_password)
             db.session.add(admin)
             db.session.commit()
-            print("✓ Default admin user created!")
+            print("Default admin user created!")
             print("\n" + "="*50)
-            print("  DEFAULT LOGIN CREDENTIALS")
+            print("DEFAULT LOGIN CREDENTIALS")
             print("="*50)
             print(f"  Username: {admin_username}")
             print(f"  Password: {admin_password}")
@@ -53,21 +53,21 @@ def init_db():
                 print(f"  Mode:     DEMO (User profile is locked)")
             print("="*50)
             if admin_password == 'admin123':
-                print("  ⚠️  CHANGE PASSWORD IMMEDIATELY AFTER FIRST LOGIN!")
+                print("CHANGE PASSWORD IMMEDIATELY AFTER FIRST LOGIN!")
             else:
-                print("  ✓ Custom password set from environment variable")
+                print("Custom password set from environment variable")
             print("="*50 + "\n")
         else:
-            print(f"✓ Admin user '{admin_username}' already exists, skipping creation.")
+            print(f"Admin user '{admin_username}' already exists, skipping creation.")
             if demo_mode and not admin.is_demo_user:
                 admin.is_demo_user = True
                 db.session.commit()
-                print(f"✓ Marked '{admin_username}' as demo user")
+                print(f"Marked '{admin_username}' as demo user")
         
         # Create default settings
         create_default_settings()
         
-        print("✓ Database initialized successfully!")
+        print("Database initialized successfully!")
 
 def create_default_roles():
     """Create default role templates: Admin, Manager, Viewer"""
@@ -108,6 +108,7 @@ def create_default_roles():
                 "item_management": {"view": True, "edit": True, "delete": True},
                 "magic_parameters": {"view": True, "edit": True, "delete": True},
                 "location_management": {"view": True, "edit": True, "delete": True},
+                "qr_templates": {"view": True, "edit": True,"delete": True},
                 "users_roles": {
                     "view": True,
                     "roles_create": True,
@@ -127,7 +128,7 @@ def create_default_roles():
             permissions=json.dumps(admin_perms)
         )
         db.session.add(admin_role)
-        print("✓ Created Admin role")
+        print("Created Admin role")
     
     # Manager Role - Can edit most things except users and settings
     manager_role = Role.query.filter_by(name='Manager').first()
@@ -165,6 +166,7 @@ def create_default_roles():
                 "item_management": {"view": True, "edit": True, "delete": False},
                 "magic_parameters": {"view": True, "edit": True, "delete": False},
                 "location_management": {"view": True, "edit": True, "delete": False},
+                "qr_templates": {"view": True, "edit": True,"delete": False},
                 "users_roles": {
                     "view": False,
                     "roles_create": False,
@@ -184,7 +186,7 @@ def create_default_roles():
             permissions=json.dumps(manager_perms)
         )
         db.session.add(manager_role)
-        print("✓ Created Manager role")
+        print("Created Manager role")
     
     # Viewer Role - Read-only access
     viewer_role = Role.query.filter_by(name='Viewer').first()
@@ -222,6 +224,7 @@ def create_default_roles():
                 "item_management": {"view": True, "edit": False, "delete": False},
                 "magic_parameters": {"view": False, "edit": False, "delete": False},
                 "location_management": {"view": True, "edit": False, "delete": False},
+                "qr_templates": {"view": True, "edit": False,"delete": False},
                 "users_roles": {
                     "view": False,
                     "roles_create": False,
@@ -241,7 +244,7 @@ def create_default_roles():
             permissions=json.dumps(viewer_perms)
         )
         db.session.add(viewer_role)
-        print("✓ Created Viewer role")
+        print("Created Viewer role")
     
     db.session.commit()
 
@@ -262,7 +265,7 @@ def create_default_settings():
             db.session.add(setting)
     
     db.session.commit()
-    print("✓ Default settings created")
+    print( Default settings created")
 
 if __name__ == '__main__':
     init_db()

@@ -18,6 +18,8 @@
 - Now with card view for item
 - Item page now on dedicated page
 - Search and locate item at Visual Storage
+- Now system can run fully offline 
+- (only first startup need online for library download)
 
 # Experimental
 - QR for Item
