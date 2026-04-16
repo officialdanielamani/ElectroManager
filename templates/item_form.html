@@ -226,9 +226,24 @@
                         {% endfor %}
                     </div>
                     {% else %}
-                    <div class="mb-2">
-                        <small class="text-muted"><i class="bi bi-info-circle"></i> After creating the item, you can add batches to track quantities and prices.</small>
+                    {# ---- Pending batches UI (new item only) ---- #}
+                    <div class="mb-2 border rounded p-2" id="pending-batches-section">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label form-label-sm mb-0">
+                                <i class="bi bi-collection"></i> Initial Batches
+                                <small class="text-muted ms-1">(saved when item is created)</small>
+                            </label>
+                            <button type="button" class="btn btn-sm btn-success" onclick="pendingBatchAdd()">
+                                <i class="bi bi-plus-circle"></i> Add Batch
+                            </button>
+                        </div>
+                        <div id="pending-batches-list">
+                            <small class="text-muted" id="pending-batches-empty">
+                                <i class="bi bi-info-circle"></i> No batches added yet. Click "Add Batch" to pre-create batches.
+                            </small>
+                        </div>
                     </div>
+                    <input type="hidden" name="pending_batches" id="pending_batches" value="[]">
                     {% endif %}
                     <input type="hidden" name="quantity" id="quantity" value="{{ item.quantity if item else 0 }}">
                     <input type="hidden" name="price" value="{{ item.price if item else 0 }}">
@@ -732,11 +747,18 @@
                         </div>
                     </div>
 
-                    <div class="d-flex justify-content-between">
+                    <div class="d-flex justify-content-between align-items-center">
                         <a href="{{ url_for('item.items') }}" class="btn btn-secondary">
                             <i class="bi bi-x-circle"></i> Cancel
                         </a>
-                        {{ form.submit(class="btn btn-primary") }}
+                        <div class="d-flex gap-2">
+                            {% if not item %}
+                            <button type="submit" name="save_and_new" value="1" class="btn btn-outline-primary">
+                                <i class="bi bi-plus-square"></i> Save and Create New
+                            </button>
+                            {% endif %}
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
                     </div>
                 </form>
             </div>
@@ -2441,6 +2463,167 @@ function saveEditDetails() {
     </div>
 </div>
 
+{% endif %}
+
+{% if not item %}
+{# ---- Pending Batch Modal (new item only) ---- #}
+<div class="modal fade" id="pendingBatchModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="pendingBatchModalTitle"><i class="bi bi-collection"></i> Add Batch</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="pendingBatchEditIndex" value="">
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Batch Name / Label</label>
+                    <input type="text" class="form-control form-control-sm" id="pbLabel" maxlength="32" placeholder="Optional label">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Type</label>
+                    <select class="form-select form-select-sm" id="pbTracking">
+                        <option value="0">Non-Tracking (simple qty)</option>
+                        <option value="1">Tracking (serial numbers)</option>
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Quantity</label>
+                    <input type="number" class="form-control form-control-sm" id="pbQty" min="0" max="99999" value="0">
+                    <small class="text-muted" id="pbQtyNote"></small>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Date</label>
+                    <input type="date" class="form-control form-control-sm" id="pbDate">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="pendingBatchSave()">
+                    <i class="bi bi-check-circle"></i> Save Batch
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var pendingBatches = [];
+
+    function render() {
+        var list = document.getElementById('pending-batches-list');
+        var empty = document.getElementById('pending-batches-empty');
+        var hidden = document.getElementById('pending_batches');
+        if (!list) return;
+        hidden.value = JSON.stringify(pendingBatches);
+
+        if (pendingBatches.length === 0) {
+            list.innerHTML = '<small class="text-muted" id="pending-batches-empty"><i class="bi bi-info-circle"></i> No batches added yet. Click "Add Batch" to pre-create batches.</small>';
+            return;
+        }
+
+        var html = '<table class="table table-sm table-bordered mb-0" style="font-size:0.83rem;">';
+        html += '<thead class="table-light"><tr><th>#</th><th>Label</th><th>Type</th><th>Qty</th><th>Date</th><th></th></tr></thead><tbody>';
+        pendingBatches.forEach(function(b, i) {
+            html += '<tr>';
+            html += '<td>' + (i + 1) + '</td>';
+            html += '<td>' + (b.label ? escHtml(b.label) : '<span class="text-muted">—</span>') + '</td>';
+            html += '<td>' + (b.sn_tracking ? '<span class="badge bg-dark">Tracking</span>' : '<span class="badge bg-secondary">Non-Tracking</span>') + '</td>';
+            html += '<td>' + b.quantity + '</td>';
+            html += '<td>' + (b.date || '<span class="text-muted">—</span>') + '</td>';
+            html += '<td class="text-nowrap">';
+            html += '<button type="button" class="btn btn-sm btn-outline-warning py-0 px-1 me-1" onclick="pendingBatchEdit(' + i + ')"><i class="bi bi-pencil"></i></button>';
+            html += '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="pendingBatchDelete(' + i + ')"><i class="bi bi-trash"></i></button>';
+            html += '</td></tr>';
+        });
+        html += '</tbody></table>';
+        list.innerHTML = html;
+    }
+
+    function escHtml(str) {
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    window.pendingBatchAdd = function() {
+        document.getElementById('pendingBatchModalTitle').innerHTML = '<i class="bi bi-collection"></i> Add Batch';
+        document.getElementById('pendingBatchEditIndex').value = '';
+        document.getElementById('pbLabel').value = '';
+        document.getElementById('pbTracking').value = '0';
+        document.getElementById('pbQty').value = '0';
+        document.getElementById('pbQty').max = '99999';
+        document.getElementById('pbQtyNote').textContent = '';
+        document.getElementById('pbDate').value = '';
+        var modal = new bootstrap.Modal(document.getElementById('pendingBatchModal'));
+        modal.show();
+    };
+
+    window.pendingBatchEdit = function(idx) {
+        var b = pendingBatches[idx];
+        if (!b) return;
+        document.getElementById('pendingBatchModalTitle').innerHTML = '<i class="bi bi-pencil"></i> Edit Batch';
+        document.getElementById('pendingBatchEditIndex').value = idx;
+        document.getElementById('pbLabel').value = b.label || '';
+        document.getElementById('pbTracking').value = b.sn_tracking ? '1' : '0';
+        document.getElementById('pbQty').value = b.quantity;
+        document.getElementById('pbQty').max = b.sn_tracking ? '100' : '99999';
+        document.getElementById('pbQtyNote').textContent = b.sn_tracking ? 'Max 100 for tracking batches.' : '';
+        document.getElementById('pbDate').value = b.date || '';
+        var modal = new bootstrap.Modal(document.getElementById('pendingBatchModal'));
+        modal.show();
+    };
+
+    window.pendingBatchDelete = function(idx) {
+        pendingBatches.splice(idx, 1);
+        render();
+    };
+
+    window.pendingBatchSave = function() {
+        var label = document.getElementById('pbLabel').value.trim().slice(0, 32);
+        var tracking = document.getElementById('pbTracking').value === '1';
+        var qty = parseInt(document.getElementById('pbQty').value, 10) || 0;
+        var maxQty = tracking ? 100 : 99999;
+        if (qty < 0) qty = 0;
+        if (qty > maxQty) qty = maxQty;
+        var date = document.getElementById('pbDate').value;
+
+        var batch = { label: label, sn_tracking: tracking, quantity: qty, date: date };
+        var editIdx = document.getElementById('pendingBatchEditIndex').value;
+        if (editIdx !== '') {
+            pendingBatches[parseInt(editIdx, 10)] = batch;
+        } else {
+            pendingBatches.push(batch);
+        }
+        render();
+        bootstrap.Modal.getInstance(document.getElementById('pendingBatchModal')).hide();
+    };
+
+    // Update qty max when type changes
+    document.getElementById('pbTracking').addEventListener('change', function() {
+        var tracking = this.value === '1';
+        var qtyInput = document.getElementById('pbQty');
+        var note = document.getElementById('pbQtyNote');
+        if (tracking) {
+            qtyInput.max = '100';
+            note.textContent = 'Max 100 for tracking batches.';
+            if (parseInt(qtyInput.value, 10) > 100) qtyInput.value = '100';
+        } else {
+            qtyInput.max = '99999';
+            note.textContent = '';
+        }
+    });
+
+    // Inject pending_batches into form before submit so the hidden field is up-to-date
+    var form = document.getElementById('itemForm');
+    if (form) {
+        form.addEventListener('submit', function() {
+            document.getElementById('pending_batches').value = JSON.stringify(pendingBatches);
+        });
+    }
+
+    render();
+})();
+</script>
 {% endif %}
 
 {% endblock %}

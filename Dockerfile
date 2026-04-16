@@ -15,17 +15,22 @@ RUN apt-get update && apt-get install -y \
     fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
+# Copy requirements first (separate layer for better caching)
 COPY requirements.txt .
 
-# Install Python dependencies
+# Install Python dependencies (cached unless requirements.txt changes)
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY . .
 
-# Create instance directory for SQLite database
-RUN mkdir -p instance
+# Create required directories
+RUN mkdir -p instance static/custom
+
+# Pre-download JS/CSS dependencies during image build so no network calls are
+# needed at container startup.  Uses --download-only so the database is not
+# touched at this stage.
+RUN python3 startup/init.py --download-only
 
 # Set environment variables
 ENV FLASK_APP=app.py
