@@ -268,7 +268,7 @@
                                                     {% set sn_project_used = sn.id in (batch.get_project_used_sn_ids() if batch.get_project_used_sn_ids is defined else []) %}
                                                     {% if sn_project_used %}
                                                     <span class="badge bg-info">
-                                                        {% for bom in batch.bom_uses if bom.used and bom.serial_numbers %}
+                                                        {% for bom in batch.bom_uses if bom.used_quantity > 0 and bom.serial_numbers %}
                                                             {% set sn_ids = bom.serial_numbers | from_json %}
                                                             {% if sn.id in sn_ids %}{{ bom.project.name }}{% endif %}
                                                         {% endfor %}

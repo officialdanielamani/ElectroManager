@@ -440,19 +440,19 @@ class ItemBatch(db.Model):
         return self.lend_quantity or 0
 
     def get_project_used_quantity(self):
-        """Get total quantity used (marked as used) in projects for this batch"""
+        """Get total used_quantity across all projects for this batch"""
         from models import ProjectBOMItem
-        return db.session.query(db.func.coalesce(db.func.sum(ProjectBOMItem.quantity), 0)).filter(
+        return db.session.query(db.func.coalesce(db.func.sum(ProjectBOMItem.used_quantity), 0)).filter(
             ProjectBOMItem.batch_id == self.id,
-            ProjectBOMItem.used == True
+            ProjectBOMItem.used_quantity > 0
         ).scalar()
 
     def get_project_used_sn_ids(self):
-        """Get set of serial number IDs used in projects"""
+        """Get set of serial number IDs assigned to used_quantity in projects"""
         from models import ProjectBOMItem
         bom_items = ProjectBOMItem.query.filter(
             ProjectBOMItem.batch_id == self.id,
-            ProjectBOMItem.used == True,
+            ProjectBOMItem.used_quantity > 0,
             ProjectBOMItem.serial_numbers.isnot(None)
         ).all()
         ids = set()
@@ -464,11 +464,11 @@ class ItemBatch(db.Model):
         return ids
 
     def get_project_names_for_batch(self):
-        """Get list of project names that use this batch (used=True)"""
+        """Get list of project names that have used_quantity > 0 for this batch"""
         from models import ProjectBOMItem, Project
         bom_items = ProjectBOMItem.query.filter(
             ProjectBOMItem.batch_id == self.id,
-            ProjectBOMItem.used == True
+            ProjectBOMItem.used_quantity > 0
         ).all()
         names = []
         for bom in bom_items:
@@ -909,23 +909,36 @@ class Project(db.Model):
             return User.query.filter(User.id.in_(user_ids)).all()
         except (json.JSONDecodeError, TypeError): return []
     def get_bom_total_cost(self):
+        """Estimated BOM cost based on required_quantity"""
         return sum(b.get_total_cost() for b in self.bom_items)
+    def get_bom_actual_cost(self):
+        """Actual BOM cost based on used_quantity"""
+        return sum(b.get_actual_cost() for b in self.bom_items)
     def get_project_total_cost(self):
         return self.get_bom_total_cost() * (self.quantity or 1)
+    def get_project_actual_cost(self):
+        return self.get_bom_actual_cost() * (self.quantity or 1)
 
 class ProjectBOMItem(db.Model):
     __tablename__ = 'project_bom_items'
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
-    item_id = db.Column(db.Integer, db.ForeignKey('items.id'), nullable=False)
+    item_id = db.Column(db.Integer, db.ForeignKey('items.id'), nullable=True)
     batch_id = db.Column(db.Integer, db.ForeignKey('item_batches.id'), nullable=True)
-    quantity = db.Column(db.Integer, default=1)
-    serial_numbers = db.Column(db.Text)
-    used = db.Column(db.Boolean, default=False)
+    quantity = db.Column(db.Integer, default=1)          # required_quantity (no cap)
+    used_quantity = db.Column(db.Integer, default=0)     # actual used (capped by available stock)
+    serial_numbers = db.Column(db.Text)                  # JSON list of SN IDs assigned to used_quantity
+    item_name_snapshot = db.Column(db.String(300))       # preserved item name if item is deleted
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    item = db.relationship('Item', backref=db.backref('bom_uses', cascade='all, delete-orphan'))
+    # No cascade: deleting an Item preserves BOM entries (item_id becomes a dangling FK, item prop returns None)
+    item = db.relationship('Item', backref=db.backref('bom_uses'))
     batch = db.relationship('ItemBatch', backref='bom_uses')
+    @property
+    def item_display_name(self):
+        if self.item:
+            return self.item.name
+        return self.item_name_snapshot or 'Deleted Item'
     def get_serial_numbers_list(self):
         if not self.serial_numbers: return []
         try:
@@ -935,7 +948,11 @@ class ProjectBOMItem(db.Model):
     def get_cost_per_unit(self):
         return self.batch.price_per_unit if self.batch and self.batch.price_per_unit else 0.0
     def get_total_cost(self):
-        return self.get_cost_per_unit() * self.quantity
+        """Estimated cost based on required quantity"""
+        return self.get_cost_per_unit() * (self.quantity or 0)
+    def get_actual_cost(self):
+        """Actual cost based on used quantity"""
+        return self.get_cost_per_unit() * (self.used_quantity or 0)
 
 class ProjectAttachment(db.Model):
     __tablename__ = 'project_attachments'

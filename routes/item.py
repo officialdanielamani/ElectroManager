@@ -496,12 +496,16 @@ def item_delete(uuid):
         except Exception as e:
             logging.error(f"Error deleting attachment file {attachment.id}: {e}")
 
-    from models import ItemParameter
+    from models import ItemParameter, ProjectBOMItem
     ItemParameter.query.filter_by(item_id=item.id).delete()
+    # Preserve BOM entries: clear item_id reference so entries remain with snapshot name
+    for bom in ProjectBOMItem.query.filter_by(item_id=item.id).all():
+        bom.item_name_snapshot = bom.item_name_snapshot or item_name
+        bom.item_id = None
 
     db.session.delete(item)
     db.session.commit()
-    
+
     log_audit(current_user.id, 'delete', 'item', item.id, f'Deleted item: {item_name}')
     flash(f'Item "{item_name}" deleted successfully!', 'success')
     return redirect(url_for('item.items'))
@@ -555,9 +559,13 @@ def bulk_delete_items():
                     logging.error(f"Error deleting attachment file {attachment.id}: {e}")
             
             # Delete item parameters
-            from models import ItemParameter
+            from models import ItemParameter, ProjectBOMItem
             ItemParameter.query.filter_by(item_id=item.id).delete()
-            
+            # Preserve BOM entries: clear item_id so entries remain with snapshot name
+            for bom in ProjectBOMItem.query.filter_by(item_id=item.id).all():
+                bom.item_name_snapshot = bom.item_name_snapshot or item_name
+                bom.item_id = None
+
             # Delete the item
             db.session.delete(item)
             deleted_items.append(f"{item_name} (ID: {item_id})")
