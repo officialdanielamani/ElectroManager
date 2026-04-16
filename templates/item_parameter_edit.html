@@ -23,7 +23,29 @@
             </div>
         </div>
         
-        <form method="POST">
+        {% if item_param.parameter.param_type == 'number' %}
+        <!-- Number Parameter Constraints Info -->
+        <div class="alert alert-info mb-3">
+            <h6 class="alert-heading"><i class="bi bi-info-circle"></i> Number Parameter Constraints</h6>
+            <ul class="mb-0">
+                <li><strong>Type:</strong> {% if item_param.parameter.is_whole_number %}Whole numbers only{% else %}Decimal (up to {{ item_param.parameter.number_decimal_places }} places){% endif %}</li>
+                {% if item_param.parameter.number_min is not none %}
+                <li><strong>Minimum:</strong> {{ item_param.parameter.number_min }}</li>
+                {% endif %}
+                {% if item_param.parameter.number_max is not none %}
+                <li><strong>Maximum:</strong> {{ item_param.parameter.number_max }}</li>
+                {% endif %}
+                {% if item_param.parameter.number_step is not none %}
+                <li><strong>Step:</strong> {{ item_param.parameter.number_step }} (must be multiple of step)</li>
+                {% endif %}
+                {% if item_param.parameter.number_required %}
+                <li><strong>Required:</strong> Yes</li>
+                {% endif %}
+            </ul>
+        </div>
+        {% endif %}
+        
+        <form method="POST" id="parameterForm">
             {% if item_param.parameter.param_type == 'number' %}
             <!-- Number Type Fields -->
             <div class="mb-3">
@@ -40,13 +62,27 @@
                 <div class="col-md-6">
                     <div class="mb-3">
                         <label class="form-label" id="value1_label">Value</label>
-                        <input type="text" name="value" class="form-control" value="{{ item_param.value or '' }}">
+                        <input type="number" name="value" id="value1Input" class="form-control" 
+                               value="{{ item_param.value or '' }}"
+                               step="{% if item_param.parameter.is_whole_number %}1{% else %}any{% endif %}"
+                               {% if item_param.parameter.number_min is not none %}min="{{ item_param.parameter.number_min }}"{% endif %}
+                               {% if item_param.parameter.number_max is not none %}max="{{ item_param.parameter.number_max }}"{% endif %}
+                               onchange="validateNumberInput(this, 'value1')">
+                        <small class="text-muted" id="value1Help"></small>
+                        <small class="text-danger" id="value1Error" style="display: none;"></small>
                     </div>
                 </div>
                 <div class="col-md-6" id="value2_group" style="{% if item_param.operation != 'range' %}display: none;{% endif %}">
                     <div class="mb-3">
                         <label class="form-label">Max Value</label>
-                        <input type="text" name="value2" class="form-control" value="{{ item_param.value2 or '' }}">
+                        <input type="number" name="value2" id="value2Input" class="form-control" 
+                               value="{{ item_param.value2 or '' }}"
+                               step="{% if item_param.parameter.is_whole_number %}1{% else %}any{% endif %}"
+                               {% if item_param.parameter.number_min is not none %}min="{{ item_param.parameter.number_min }}"{% endif %}
+                               {% if item_param.parameter.number_max is not none %}max="{{ item_param.parameter.number_max }}"{% endif %}
+                               onchange="validateNumberInput(this, 'value2')">
+                        <small class="text-muted" id="value2Help"></small>
+                        <small class="text-danger" id="value2Error" style="display: none;"></small>
                     </div>
                 </div>
             </div>
@@ -106,7 +142,7 @@
             </div>
             
             <div class="form-group">
-                <button type="submit" class="btn btn-primary">Save Changes</button>
+                <button type="submit" class="btn btn-primary" id="submitBtn">Save Changes</button>
                 <a href="{{ url_for('item.item_edit', uuid=item.uuid) }}" class="btn btn-secondary">Cancel</a>
             </div>
         </form>
@@ -114,6 +150,84 @@
 </div>
 
 <script>
+// Store parameter constraints
+const paramConstraints = {
+    isWholeNumber: {{ 'true' if item_param.parameter.param_type == 'number' and item_param.parameter.is_whole_number else 'false' }},
+    decimalPlaces: {{ item_param.parameter.number_decimal_places if item_param.parameter.param_type == 'number' else 0 }},
+    min: {{ item_param.parameter.number_min if item_param.parameter.param_type == 'number' and item_param.parameter.number_min is not none else 'null' }},
+    max: {{ item_param.parameter.number_max if item_param.parameter.param_type == 'number' and item_param.parameter.number_max is not none else 'null' }},
+    step: {{ item_param.parameter.number_step if item_param.parameter.param_type == 'number' and item_param.parameter.number_step is not none else 'null' }},
+    paramType: '{{ item_param.parameter.param_type }}'
+};
+
+function validateNumberInput(input, fieldId) {
+    if (paramConstraints.paramType !== 'number') return true;
+    
+    const value = input.value.trim();
+    const errorElement = document.getElementById(fieldId + 'Error');
+    const helpElement = document.getElementById(fieldId + 'Help');
+    
+    if (!value) {
+        errorElement.style.display = 'none';
+        helpElement.textContent = '';
+        return true;
+    }
+    
+    try {
+        const numValue = parseFloat(value);
+        
+        // Check if whole number
+        if (paramConstraints.isWholeNumber && numValue !== parseInt(numValue)) {
+            errorElement.textContent = 'Must be a whole number';
+            errorElement.style.display = 'block';
+            return false;
+        }
+        
+        // Check decimal places
+        if (!paramConstraints.isWholeNumber) {
+            const decimalPart = value.split('.')[1];
+            if (decimalPart && decimalPart.length > paramConstraints.decimalPlaces) {
+                errorElement.textContent = `Maximum ${paramConstraints.decimalPlaces} decimal places allowed`;
+                errorElement.style.display = 'block';
+                return false;
+            }
+        }
+        
+        // Check min
+        if (paramConstraints.min !== null && numValue < paramConstraints.min) {
+            errorElement.textContent = `Value must be >= ${paramConstraints.min}`;
+            errorElement.style.display = 'block';
+            return false;
+        }
+        
+        // Check max
+        if (paramConstraints.max !== null && numValue > paramConstraints.max) {
+            errorElement.textContent = `Value must be <= ${paramConstraints.max}`;
+            errorElement.style.display = 'block';
+            return false;
+        }
+        
+        // Check step
+        if (paramConstraints.step && paramConstraints.step > 0) {
+            const base = paramConstraints.min !== null ? paramConstraints.min : 0;
+            const remainder = Math.abs((numValue - base) % paramConstraints.step);
+            if (remainder > 0.0001 && remainder < (paramConstraints.step - 0.0001)) {
+                errorElement.textContent = `Value must be a multiple of ${paramConstraints.step} from base ${base}`;
+                errorElement.style.display = 'block';
+                return false;
+            }
+        }
+        
+        errorElement.style.display = 'none';
+        helpElement.textContent = '✓ Valid';
+        return true;
+    } catch (e) {
+        errorElement.textContent = 'Invalid number format';
+        errorElement.style.display = 'block';
+        return false;
+    }
+}
+
 function updateFields() {
     const operation = document.getElementById('operation').value;
     const value2Group = document.getElementById('value2_group');
@@ -138,6 +252,48 @@ function updateFields() {
         }
     }
 }
+
+// Form submission validation
+document.getElementById('parameterForm').addEventListener('submit', function(e) {
+    if (paramConstraints.paramType === 'number') {
+        const value1 = document.getElementById('value1Input').value.trim();
+        const operation = document.getElementById('operation').value;
+        
+        if (!value1) {
+            e.preventDefault();
+            alert('Value is required');
+            return false;
+        }
+        
+        if (!validateNumberInput(document.getElementById('value1Input'), 'value1')) {
+            e.preventDefault();
+            alert('Please fix the errors in Value field');
+            return false;
+        }
+        
+        if (operation === 'range') {
+            const value2 = document.getElementById('value2Input').value.trim();
+            if (!value2) {
+                e.preventDefault();
+                alert('Max Value is required for range operation');
+                return false;
+            }
+            
+            if (!validateNumberInput(document.getElementById('value2Input'), 'value2')) {
+                e.preventDefault();
+                alert('Please fix the errors in Max Value field');
+                return false;
+            }
+            
+            // Check that value1 < value2
+            if (parseFloat(value1) >= parseFloat(value2)) {
+                e.preventDefault();
+                alert('Min Value must be less than Max Value');
+                return false;
+            }
+        }
+    }
+});
 </script>
 
 {% endblock %}

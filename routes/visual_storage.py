@@ -38,26 +38,45 @@ def visual_storage():
     # Check if user can access location management (for Manage Racks button)
     can_manage_racks = current_user.has_permission('settings_sections.location_management', 'view')
     
-    rack_id = request.args.get('rack', type=int)
-    location_id = request.args.get('location', type=int)
+    rack_uuid = request.args.get('rack', type=str)
+    location_uuid = request.args.get('location', type=str)
+    page = request.args.get('page', 1, type=int)
+    
+    # Pagination settings
+    racks_per_page = 5
     
     # Get racks for display (filtered by location if selected)
-    if location_id:
+    if location_uuid:
         # Filter by location
-        location = Location.query.get_or_404(location_id)
+        location = Location.query.filter_by(uuid=location_uuid).first_or_404()
         racks_to_display = location.racks
     else:
         # All racks
         racks_to_display = Rack.query.order_by(Rack.name).all()
     
     # Then filter by specific rack if requested
-    if rack_id:
-        racks_query = [r for r in racks_to_display if r.id == rack_id]
+    if rack_uuid:
+        racks_query = [r for r in racks_to_display if r.uuid == rack_uuid]
     else:
         racks_query = racks_to_display
     
+    # Paginate the racks
+    total_racks = len(racks_query)
+    total_pages = (total_racks + racks_per_page - 1) // racks_per_page
+    
+    # Ensure page is valid
+    if page < 1:
+        page = 1
+    elif page > total_pages and total_pages > 0:
+        page = total_pages
+    
+    # Get racks for current page
+    start_idx = (page - 1) * racks_per_page
+    end_idx = start_idx + racks_per_page
+    racks_for_page = racks_query[start_idx:end_idx]
+    
     rack_data = []
-    for rack in racks_query:
+    for rack in racks_for_page:
         items = Item.query.filter_by(rack_id=rack.id).all()
         
         drawers = {}
@@ -79,6 +98,7 @@ def visual_storage():
         
         rack_data.append({
             'id': rack.id,
+            'uuid': rack.uuid,
             'name': rack.name,
             'description': rack.description,
             'physical_location': rack.physical_location,
@@ -96,19 +116,24 @@ def visual_storage():
                           racks=rack_data, 
                           all_racks=all_racks_for_dropdown, 
                           locations=locations, 
-                          current_location_id=location_id, 
-                          current_rack_id=rack_id, 
+                          current_location_uuid=location_uuid, 
+                          current_rack_uuid=rack_uuid,
+                          current_page=page,
+                          total_pages=total_pages,
+                          total_racks=total_racks,
                           can_edit_visual_storage=can_edit,
-                          can_manage_racks=can_manage_racks)
+                          can_manage_racks=can_manage_racks,
+                          max=max,
+                          min=min)
 
 
 
-@visual_storage_bp.route('/api/drawer/<int:rack_id>/<path:drawer_id>')
+@visual_storage_bp.route('/api/drawer/<string:rack_uuid>/<path:drawer_id>')
 @login_required
-def get_drawer_contents(rack_id, drawer_id):
+def get_drawer_contents(rack_uuid, drawer_id):
     """API endpoint to get drawer contents"""
-    rack = Rack.query.get_or_404(rack_id)
-    items = Item.query.filter_by(rack_id=rack_id, drawer=drawer_id).all()
+    rack = Rack.query.filter_by(uuid=rack_uuid).first_or_404()
+    items = Item.query.filter_by(rack_id=rack.id, drawer=drawer_id).all()
     
     items_data = []
     for item in items:
@@ -116,7 +141,7 @@ def get_drawer_contents(rack_id, drawer_id):
             'id': item.id,
             'name': item.name,
             'sku': item.sku or 'N/A',
-            'quantity': item.quantity,
+            'quantity': item.get_overall_quantity(),
             'available': item.get_available_quantity(),
             'uuid': item.uuid
         })
@@ -140,11 +165,11 @@ def toggle_drawer_availability():
     """Toggle drawer availability status"""
     try:
         data = request.get_json()
-        rack_id = data.get('rack_id')
+        rack_uuid = data.get('rack_id')  # Now receives UUID instead of ID
         drawer_id = data.get('drawer_id')
         is_unavailable = data.get('is_unavailable', False)
         
-        rack = Rack.query.get_or_404(rack_id)
+        rack = Rack.query.filter_by(uuid=rack_uuid).first_or_404()
         unavailable = rack.get_unavailable_drawers()
         
         if is_unavailable:
@@ -177,48 +202,57 @@ def move_drawer_items():
     """Move all items from a drawer to a new location"""
     try:
         data = request.get_json()
-        rack_id = data.get('rack_id')
+        rack_uuid = data.get('rack_id')  # Now receives UUID
         drawer_id = data.get('drawer_id')
         location_type = data.get('location_type')  # 'general' or 'drawer'
         
+        # Get rack by UUID to get ID for queries
+        rack = Rack.query.filter_by(uuid=rack_uuid).first_or_404()
+        
         # Get all items in the drawer
-        items = Item.query.filter_by(rack_id=rack_id, drawer=drawer_id).all()
+        items = Item.query.filter_by(rack_id=rack.id, drawer=drawer_id).all()
         
         if not items:
             return jsonify({'success': False, 'error': 'No items in this drawer'})
         
         # Move items based on location type
         if location_type == 'general':
-            new_location_id = data.get('location_id')
-            if not new_location_id or new_location_id == 0:
+            new_location_uuid = data.get('location_id')
+            if not new_location_uuid or new_location_uuid == 0:
                 return jsonify({'success': False, 'error': 'Please select a general location'})
             
+            new_location = Location.query.filter_by(uuid=new_location_uuid).first_or_404()
+            
             for item in items:
-                item.location_id = new_location_id
+                item.location_id = new_location.id
                 item.rack_id = None
                 item.drawer = None
         else:  # drawer
-            new_rack_id = data.get('new_rack_id')
+            new_rack_uuid = data.get('new_rack_id')
             new_drawer = data.get('new_drawer')
             
-            if not new_rack_id or new_rack_id == 0 or not new_drawer:
+            if not new_rack_uuid or new_rack_uuid == 0 or not new_drawer:
                 return jsonify({'success': False, 'error': 'Please select a rack and drawer'})
+            
+            new_rack = Rack.query.filter_by(uuid=new_rack_uuid).first_or_404()
             
             for item in items:
                 item.location_id = None
-                item.rack_id = new_rack_id
+                item.rack_id = new_rack.id
                 item.drawer = new_drawer
         
         db.session.commit()
         
         log_audit(current_user.id, 'bulk_update', 'item', None,
-                 f'Moved {len(items)} items from Rack {rack_id} Drawer {drawer_id}')
+                 f'Moved {len(items)} items from Rack {rack.uuid} Drawer {drawer_id}')
 
         return jsonify({'success': True, 'items_moved': len(items)})
     except Exception as e:
         db.session.rollback()
-        logging.error(f"Error moving drawer items: {str(e)}")
-        return jsonify({'success': False, 'error': 'An error occurred while moving drawer items'})
+        import traceback
+        logger.error(f"Error moving drawer items: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({'success': False, 'error': f'An error occurred: {str(e)}'})
 
 # ============= ERROR HANDLERS =============
 

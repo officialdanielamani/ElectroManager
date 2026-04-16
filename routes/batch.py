@@ -1,0 +1,653 @@
+"""
+Batch Routes Blueprint - Manages item batches, transfers, and serial numbers
+"""
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
+from flask_login import login_required, current_user
+from models import db, Item, ItemBatch, BatchSerialNumber, Setting
+from utils import log_audit
+from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
+
+batch_bp = Blueprint('batch', __name__)
+
+
+@batch_bp.route('/item/<string:uuid>/batch/add', methods=['POST'])
+@login_required
+def add_batch(uuid):
+    """Add a new batch to an item"""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    
+    if not current_user.has_permission('items', 'edit_batch'):
+        flash('You do not have permission to manage batches.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    batch_label = request.form.get('batch_label', '').strip()[:32]
+    quantity = int(request.form.get('quantity', 0))
+    price_per_unit = float(request.form.get('price_per_unit', 0))
+    purchase_date_str = request.form.get('purchase_date', '')
+    note = request.form.get('note', '').strip()[:128]
+    lend_to = request.form.get('lend_to', '').strip()
+    lend_quantity = int(request.form.get('lend_quantity', 0))
+    sn_tracking = request.form.get('sn_tracking', '') == 'on'
+    
+    if quantity < 0:
+        flash('Quantity cannot be negative.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    # Limit per batch: 100 if tracking, otherwise 99999
+    max_qty = 100 if sn_tracking else 99999
+    if quantity > max_qty:
+        quantity = max_qty
+    
+    purchase_date = None
+    if purchase_date_str:
+        try:
+            purchase_date = datetime.strptime(purchase_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            pass
+    
+    batch_number = item.get_next_batch_number()
+    
+    batch = ItemBatch(
+        item_id=item.id,
+        batch_number=batch_number,
+        batch_label=batch_label or None,
+        quantity=quantity,
+        price_per_unit=price_per_unit,
+        purchase_date=purchase_date,
+        note=note or None,
+        lend_to=lend_to or '',
+        lend_quantity=min(lend_quantity, quantity),
+        sn_tracking_enabled=sn_tracking
+    )
+    db.session.add(batch)
+    db.session.flush()  # Get batch id
+    
+    # Generate serial numbers if tracking is enabled for this batch
+    if sn_tracking:
+        batch.generate_serial_numbers()
+    
+    # Recalculate item totals
+    item.recalculate_from_batches()
+    item.updated_by = current_user.id
+    
+    db.session.commit()
+    
+    log_audit(current_user.id, 'create', 'batch', batch.id,
+              f'Added batch #{batch_number} to item: {item.name} (qty: {quantity}, price: {price_per_unit})')
+    flash(f'Batch "{batch.get_display_label()}" added successfully!', 'success')
+    return redirect(url_for('item.item_edit', uuid=uuid) + '#batches-section')
+
+
+@batch_bp.route('/item/<string:uuid>/batch/<int:batch_id>/edit', methods=['POST'])
+@login_required
+def edit_batch(uuid, batch_id):
+    """Edit an existing batch"""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    batch = ItemBatch.query.get_or_404(batch_id)
+    
+    if batch.item_id != item.id:
+        flash('Batch does not belong to this item.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    if not current_user.has_permission('items', 'edit_batch'):
+        flash('You do not have permission to manage batches.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    old_qty = batch.quantity
+    
+    batch.batch_label = (request.form.get('batch_label', '').strip()[:32]) or None
+    new_qty = int(request.form.get('quantity', 0))
+    # If tracking enabled, quantity is controlled by Add/Delete, use hidden field value
+    if batch.sn_tracking_enabled:
+        batch.quantity = old_qty  # Keep current, ignore form value
+    else:
+        batch.quantity = min(new_qty, 99999)
+    batch.price_per_unit = float(request.form.get('price_per_unit', 0))
+    batch.note = (request.form.get('note', '').strip()[:128]) or None
+    
+    # Lend fields (only when SN tracking is off)
+    if not batch.sn_tracking_enabled:
+        batch.lend_to = request.form.get('lend_to', '').strip()
+        batch.lend_quantity = min(int(request.form.get('lend_quantity', 0)), batch.quantity)
+    
+    purchase_date_str = request.form.get('purchase_date', '')
+    if purchase_date_str:
+        try:
+            batch.purchase_date = datetime.strptime(purchase_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            pass
+    else:
+        batch.purchase_date = None
+    
+    # Regenerate serial numbers if quantity changed and tracking enabled on this batch
+    if batch.sn_tracking_enabled and batch.quantity != old_qty:
+        batch.generate_serial_numbers()
+    
+    item.recalculate_from_batches()
+    item.updated_by = current_user.id
+    
+    db.session.commit()
+    
+    log_audit(current_user.id, 'update', 'batch', batch.id,
+              f'Updated batch #{batch.batch_number} of item: {item.name}')
+    flash(f'Batch "{batch.get_display_label()}" updated successfully!', 'success')
+    return redirect(url_for('item.item_edit', uuid=uuid) + '#batches-section')
+
+
+@batch_bp.route('/item/<string:uuid>/batch/<int:batch_id>/delete', methods=['POST'])
+@login_required
+def delete_batch(uuid, batch_id):
+    """Delete a batch"""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    batch = ItemBatch.query.get_or_404(batch_id)
+    
+    if batch.item_id != item.id:
+        flash('Batch does not belong to this item.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    if not current_user.has_permission('items', 'edit_batch'):
+        flash('You do not have permission to manage batches.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    batch_label = batch.get_display_label()
+    db.session.delete(batch)
+    
+    item.recalculate_from_batches()
+    item.updated_by = current_user.id
+    
+    db.session.commit()
+    
+    log_audit(current_user.id, 'delete', 'batch', batch_id,
+              f'Deleted batch "{batch_label}" from item: {item.name}')
+    flash(f'Batch "{batch_label}" deleted successfully!', 'success')
+    return redirect(url_for('item.item_edit', uuid=uuid) + '#batches-section')
+
+
+@batch_bp.route('/item/<string:uuid>/batch/bulk-delete', methods=['POST'])
+@login_required
+def bulk_delete_batches(uuid):
+    """Bulk delete batches"""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    
+    if not current_user.has_permission('items', 'edit_batch'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    batch_ids = data.get('batch_ids', [])
+    
+    if not batch_ids:
+        return jsonify({'success': False, 'message': 'No batches selected'}), 400
+    
+    deleted = 0
+    for bid in batch_ids:
+        batch = ItemBatch.query.get(int(bid))
+        if batch and batch.item_id == item.id:
+            db.session.delete(batch)
+            deleted += 1
+    
+    item.recalculate_from_batches()
+    item.updated_by = current_user.id
+    db.session.commit()
+    
+    log_audit(current_user.id, 'bulk_delete', 'batch', None,
+              f'Bulk deleted {deleted} batches from item: {item.name}')
+    
+    return jsonify({'success': True, 'deleted_count': deleted})
+
+
+@batch_bp.route('/item/<string:uuid>/batch/transfer', methods=['POST'])
+@login_required
+def transfer_batch(uuid):
+    """Transfer quantity between batches"""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    
+    if not current_user.has_permission('items', 'edit_batch'):
+        flash('You do not have permission to manage batches.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    from_batch_id = int(request.form.get('from_batch_id', 0))
+    to_batch_id = int(request.form.get('to_batch_id', 0))
+    transfer_qty = int(request.form.get('transfer_quantity', 0))
+    
+    if from_batch_id == to_batch_id:
+        flash('Cannot transfer to the same batch.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    from_batch = ItemBatch.query.get_or_404(from_batch_id)
+    to_batch = ItemBatch.query.get_or_404(to_batch_id)
+    
+    if from_batch.item_id != item.id or to_batch.item_id != item.id:
+        flash('Batches do not belong to this item.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    if transfer_qty <= 0:
+        flash('Transfer quantity must be positive.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    # Use max available quantity check instead of strictly absolute quantity
+    available_qty = from_batch.get_available_quantity()
+    if transfer_qty > available_qty:
+        flash(f'Cannot transfer more than available quantity ({available_qty}). Ensure items are not lent or used in projects.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    # Block transfer from Tracking ON to Non-tracking (would lose SN data)
+    if from_batch.sn_tracking_enabled and not to_batch.sn_tracking_enabled:
+        flash('Cannot transfer from a tracked batch to a non-tracked batch. Serial number data would be lost.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    # Block transfer from Tracking ON via qty-based route (should use SN-based transfer)
+    if from_batch.sn_tracking_enabled:
+        flash('For tracked batches, use the Transfer button in the serial number table to select specific items.', 'warning')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    # Check destination batch won't exceed its limit
+    dest_max = 100 if to_batch.sn_tracking_enabled else 99999
+    if to_batch.quantity + transfer_qty > dest_max:
+        flash(f'Destination batch would exceed limit of {dest_max}.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    from_batch.quantity -= transfer_qty
+    to_batch.quantity += transfer_qty
+    
+    # If target has tracking enabled, generate new ISNs for the transferred qty
+    if to_batch.sn_tracking_enabled:
+        max_seq = db.session.query(db.func.max(BatchSerialNumber.sequence_number)).filter_by(batch_id=to_batch.id).scalar() or 0
+        date_str = to_batch.purchase_date.strftime('%Y%m%d') if to_batch.purchase_date else '00000000'
+        label = to_batch.batch_label or f"B{to_batch.batch_number}"
+        for i in range(1, transfer_qty + 1):
+            seq = max_seq + i
+            isn = f"{item.uuid}-{date_str}-{label}-{seq:03d}"
+            sn = BatchSerialNumber(
+                batch_id=to_batch.id,
+                sequence_number=seq,
+                internal_serial_number=isn,
+                serial_number='',
+                info='',
+                lend_to=''
+            )
+            db.session.add(sn)
+    
+    item.recalculate_from_batches()
+    item.updated_by = current_user.id
+    db.session.commit()
+    
+    log_audit(current_user.id, 'transfer', 'batch', None,
+              f'Transferred {transfer_qty} from batch #{from_batch.batch_number} to #{to_batch.batch_number} in item: {item.name}')
+    flash(f'Transferred {transfer_qty} units from "{from_batch.get_display_label()}" to "{to_batch.get_display_label()}".', 'success')
+    return redirect(url_for('item.item_detail', uuid=uuid))
+
+
+@batch_bp.route('/item/<string:uuid>/sn/toggle', methods=['POST'])
+@login_required
+def toggle_serial_numbers(uuid):
+    """Legacy route - tracking is now per-batch. Redirect to item detail."""
+    flash('Serial Number tracking is now configured per-batch when adding or editing batches.', 'info')
+    return redirect(url_for('item.item_detail', uuid=uuid))
+
+
+@batch_bp.route('/item/<string:uuid>/batch/<int:batch_id>/sn/update', methods=['POST'])
+@login_required
+def update_serial_numbers(uuid, batch_id):
+    """Update user-editable serial numbers for a batch"""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    batch = ItemBatch.query.get_or_404(batch_id)
+    
+    if batch.item_id != item.id:
+        flash('Batch does not belong to this item.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    if not current_user.has_permission('items', 'edit_serial'):
+        flash('You do not have permission to manage serial numbers.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    # Update serial numbers from form
+    for sn in batch.serial_numbers:
+        new_sn = request.form.get(f'sn_{sn.id}', '').strip()
+        sn.serial_number = new_sn
+    
+    db.session.commit()
+    
+    log_audit(current_user.id, 'update', 'serial_numbers', batch.id,
+              f'Updated serial numbers for batch #{batch.batch_number} of item: {item.name}')
+    flash(f'Serial numbers updated for "{batch.get_display_label()}".', 'success')
+    return redirect(url_for('item.item_detail', uuid=uuid))
+
+
+@batch_bp.route('/item/<string:uuid>/batch/<int:batch_id>/sn/update-info', methods=['POST'])
+@login_required
+def update_serial_info(uuid, batch_id):
+    """Update info field for serial numbers in a batch"""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    batch = ItemBatch.query.get_or_404(batch_id)
+    
+    if batch.item_id != item.id:
+        flash('Batch does not belong to this item.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    if not current_user.has_permission('items', 'edit_serial'):
+        flash('You do not have permission to manage serial numbers.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    for sn in batch.serial_numbers:
+        new_info = request.form.get(f'info_{sn.id}', '').strip()[:32]
+        sn.info = new_info
+    
+    db.session.commit()
+    
+    log_audit(current_user.id, 'update', 'serial_info', batch.id,
+              f'Updated serial info for batch #{batch.batch_number} of item: {item.name}')
+    flash(f'Info updated for "{batch.get_display_label()}".', 'success')
+    return redirect(url_for('item.item_detail', uuid=uuid))
+
+
+@batch_bp.route('/item/<string:uuid>/batch/<int:batch_id>/sn/update-lend', methods=['POST'])
+@login_required
+def update_serial_lend(uuid, batch_id):
+    """Update lend_to field for serial numbers in a batch"""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    batch = ItemBatch.query.get_or_404(batch_id)
+    
+    if batch.item_id != item.id:
+        flash('Batch does not belong to this item.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    if not current_user.has_permission('items', 'edit_lending'):
+        flash('You do not have permission to manage lending.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    
+    for sn in batch.serial_numbers:
+        new_lend = request.form.get(f'lend_{sn.id}', '').strip()
+        sn.lend_to = new_lend
+    
+    db.session.commit()
+    
+    log_audit(current_user.id, 'update', 'serial_lend', batch.id,
+              f'Updated lending info for batch #{batch.batch_number} of item: {item.name}')
+    flash(f'Lending info updated for "{batch.get_display_label()}".', 'success')
+    return redirect(url_for('item.item_detail', uuid=uuid))
+
+
+@batch_bp.route('/item/<string:uuid>/batch/sn/inline-update', methods=['POST'])
+@login_required
+def inline_update_sn(uuid):
+    """Inline update a single SN field (sn, info, or lend)"""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    data = request.get_json()
+    sn_id = data.get('sn_id')
+    field = data.get('field')  # 'sn', 'info', 'lend'
+    value = data.get('value', '')
+
+    sn = BatchSerialNumber.query.get(sn_id)
+    if not sn or sn.batch.item_id != item.id:
+        return jsonify({'success': False, 'message': 'Invalid serial number'}), 400
+
+    if field == 'sn':
+        if not current_user.has_permission('items', 'edit_serial'):
+            return jsonify({'success': False, 'message': 'Permission denied'}), 403
+        sn.serial_number = value
+    elif field == 'info':
+        if not current_user.has_permission('items', 'edit_serial'):
+            return jsonify({'success': False, 'message': 'Permission denied'}), 403
+        sn.info = value[:32]
+    elif field == 'lend':
+        if not current_user.has_permission('items', 'edit_lending'):
+            return jsonify({'success': False, 'message': 'Permission denied'}), 403
+        sn.lend_to = value
+    else:
+        return jsonify({'success': False, 'message': 'Invalid field'}), 400
+
+    db.session.commit()
+    log_audit(current_user.id, 'update', 'serial_number', sn.id,
+              f'Inline updated {field} for SN #{sn.sequence_number} in item: {item.name}')
+    return jsonify({'success': True})
+
+
+@batch_bp.route('/item/<string:uuid>/batch/sn/bulk-update', methods=['POST'])
+@login_required
+def bulk_update_sn(uuid):
+    """Bulk apply same values to multiple selected serial numbers"""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    data = request.get_json()
+    sn_ids = data.get('sn_ids', [])
+    fields = data.get('fields', {})
+
+    can_edit_serial = current_user.has_permission('items', 'edit_serial')
+    can_edit_lending = current_user.has_permission('items', 'edit_lending')
+
+    count = 0
+    for sn_id in sn_ids:
+        sn = BatchSerialNumber.query.get(sn_id)
+        if not sn or sn.batch.item_id != item.id:
+            continue
+
+        if 'sn' in fields and can_edit_serial:
+            sn.serial_number = fields['sn']
+            count += 1
+        if 'info' in fields and can_edit_serial:
+            sn.info = fields['info'][:32]
+            count += 1
+        if 'lend' in fields and can_edit_lending:
+            sn.lend_to = fields['lend']
+            count += 1
+
+    db.session.commit()
+    log_audit(current_user.id, 'bulk_update', 'serial_numbers', None,
+              f'Bulk updated {len(sn_ids)} SNs in item: {item.name}')
+    return jsonify({'success': True, 'updated': count})
+
+
+@batch_bp.route('/item/<string:uuid>/batch/sn/delete-selected', methods=['POST'])
+@login_required
+def delete_selected_sn(uuid):
+    """Delete selected serial numbers and reduce batch quantity"""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+
+    if not current_user.has_permission('items', 'edit_batch'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+
+    data = request.get_json()
+    sn_ids = data.get('sn_ids', [])
+    batch_id = data.get('batch_id')
+
+    batch = ItemBatch.query.get(batch_id)
+    if not batch or batch.item_id != item.id:
+        return jsonify({'success': False, 'message': 'Invalid batch'}), 400
+
+    deleted = 0
+    for sn_id in sn_ids:
+        sn = BatchSerialNumber.query.get(sn_id)
+        if sn and sn.batch_id == batch.id:
+            db.session.delete(sn)
+            deleted += 1
+
+    # Update batch quantity
+    batch.quantity = max(batch.quantity - deleted, 0)
+
+    # Re-sequence the remaining serial numbers
+    remaining = BatchSerialNumber.query.filter_by(batch_id=batch.id).order_by(BatchSerialNumber.sequence_number).all()
+    for idx, sn in enumerate(remaining, 1):
+        sn.sequence_number = idx
+
+    item.recalculate_from_batches()
+    item.updated_by = current_user.id
+    db.session.commit()
+
+    log_audit(current_user.id, 'delete', 'serial_numbers', batch.id,
+              f'Deleted {deleted} SNs from batch #{batch.batch_number} of item: {item.name}')
+    return jsonify({'success': True, 'deleted': deleted})
+
+
+@batch_bp.route('/item/<string:uuid>/batch/sn/transfer-selected', methods=['POST'])
+@login_required
+def transfer_selected_sn(uuid):
+    """Transfer selected serial numbers to another batch (ISN kept as-is)"""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+
+    if not current_user.has_permission('items', 'edit_batch'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+
+    data = request.get_json()
+    sn_ids = data.get('sn_ids', [])
+    from_batch_id = data.get('from_batch_id')
+    to_batch_id = data.get('to_batch_id')
+
+    from_batch = ItemBatch.query.get(from_batch_id)
+    to_batch = ItemBatch.query.get(to_batch_id)
+
+    if not from_batch or not to_batch or from_batch.item_id != item.id or to_batch.item_id != item.id:
+        return jsonify({'success': False, 'message': 'Invalid batch'}), 400
+
+    if from_batch_id == to_batch_id:
+        return jsonify({'success': False, 'message': 'Cannot transfer to same batch'}), 400
+
+    # Block transfer from Tracking ON to Non-tracking (would lose SN data)
+    if from_batch.sn_tracking_enabled and not to_batch.sn_tracking_enabled:
+        return jsonify({'success': False, 'message': 'Cannot transfer from a tracked batch to a non-tracked batch. Serial number data would be lost.'}), 400
+
+    # Check if target batch can accept all selected items
+    if to_batch.quantity >= 100:
+        return jsonify({'success': False, 'message': f'Target batch "{to_batch.get_display_label()}" is full (100/100).'}), 400
+
+    space_available = 100 - to_batch.quantity
+    if len(sn_ids) > space_available:
+        return jsonify({'success': False, 'message': f'Target batch can only accept {space_available} more item(s). You selected {len(sn_ids)}.'}), 400
+
+    # Collect existing ISNs in target batch to detect collisions
+    existing_isns = set(
+        s.internal_serial_number for s in BatchSerialNumber.query.filter_by(batch_id=to_batch.id).all()
+    )
+
+    # Find the max ISN suffix number in target batch for collision resolution
+    import re
+    max_suffix = 0
+    for s in BatchSerialNumber.query.filter_by(batch_id=to_batch.id).all():
+        match = re.search(r'-(\d+)$', s.internal_serial_number)
+        if match:
+            max_suffix = max(max_suffix, int(match.group(1)))
+
+    transferred = 0
+    for sn_id in sn_ids:
+        sn = BatchSerialNumber.query.get(sn_id)
+        if sn and sn.batch_id == from_batch.id:
+            sn.batch_id = to_batch.id
+            # Assign next sequence number in target batch
+            max_seq = db.session.query(db.func.max(BatchSerialNumber.sequence_number)).filter_by(batch_id=to_batch.id).scalar() or 0
+            sn.sequence_number = max_seq + 1
+
+            # Keep original ISN, but if collision, generate new ISN with max+1 suffix
+            if sn.internal_serial_number in existing_isns:
+                to_date_str = to_batch.purchase_date.strftime('%Y%m%d') if to_batch.purchase_date else '00000000'
+                to_label = to_batch.batch_label or f"B{to_batch.batch_number}"
+                max_suffix += 1
+                sn.internal_serial_number = f"{item.uuid}-{to_date_str}-{to_label}-{max_suffix:03d}"
+
+            existing_isns.add(sn.internal_serial_number)
+            # Enable tracking on target if not already
+            if not to_batch.sn_tracking_enabled:
+                to_batch.sn_tracking_enabled = True
+            transferred += 1
+
+    # Update quantities
+    from_batch.quantity = max(from_batch.quantity - transferred, 0)
+    to_batch.quantity = to_batch.quantity + transferred
+
+    # Re-sequence source batch (row numbers only, keep ISNs as-is)
+    remaining = BatchSerialNumber.query.filter_by(batch_id=from_batch.id).order_by(BatchSerialNumber.sequence_number).all()
+    for idx, sn in enumerate(remaining, 1):
+        sn.sequence_number = idx
+
+    # Re-sequence target batch (row numbers only, keep ISNs as-is)
+    target_sns = BatchSerialNumber.query.filter_by(batch_id=to_batch.id).order_by(BatchSerialNumber.sequence_number).all()
+    for idx, sn in enumerate(target_sns, 1):
+        sn.sequence_number = idx
+
+    item.recalculate_from_batches()
+    item.updated_by = current_user.id
+    db.session.commit()
+
+    log_audit(current_user.id, 'transfer', 'serial_numbers', None,
+              f'Transferred {transferred} SNs from batch #{from_batch.batch_number} to #{to_batch.batch_number} in item: {item.name}')
+    return jsonify({'success': True, 'transferred': transferred})
+
+
+@batch_bp.route('/item/<string:uuid>/batch/sn/add', methods=['POST'])
+@login_required
+def add_sn_to_batch(uuid):
+    """Add new serial numbers to a batch (appends to end)"""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+
+    if not current_user.has_permission('items', 'edit_batch'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+
+    data = request.get_json()
+    batch_id = data.get('batch_id')
+    qty = data.get('quantity', 0)
+
+    batch = ItemBatch.query.get(batch_id)
+    if not batch or batch.item_id != item.id:
+        return jsonify({'success': False, 'message': 'Invalid batch'}), 400
+
+    if batch.quantity + qty > 100:
+        return jsonify({'success': False, 'message': f'Would exceed max 100. Can add up to {100 - batch.quantity}.'}), 400
+
+    # Get current max sequence
+    max_seq = db.session.query(db.func.max(BatchSerialNumber.sequence_number)).filter_by(batch_id=batch.id).scalar() or 0
+
+    date_str = batch.purchase_date.strftime('%Y%m%d') if batch.purchase_date else '00000000'
+    label = batch.batch_label or f"B{batch.batch_number}"
+
+    for i in range(1, qty + 1):
+        seq = max_seq + i
+        isn = f"{item.uuid}-{date_str}-{label}-{seq:03d}"
+        sn = BatchSerialNumber(
+            batch_id=batch.id,
+            sequence_number=seq,
+            internal_serial_number=isn,
+            serial_number='',
+            info='',
+            lend_to=''
+        )
+        db.session.add(sn)
+
+    batch.quantity += qty
+    item.recalculate_from_batches()
+    item.updated_by = current_user.id
+    db.session.commit()
+
+    log_audit(current_user.id, 'create', 'serial_numbers', batch.id,
+              f'Added {qty} SNs to batch #{batch.batch_number} of item: {item.name}')
+    return jsonify({'success': True, 'added': qty})
+
+
+@batch_bp.route('/item/<string:uuid>/batch/sn/remap-isn', methods=['POST'])
+@login_required
+def remap_isn(uuid):
+    """Regenerate ISN sequence for a batch while keeping SN, info, lend_to"""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+
+    if not current_user.has_permission('items', 'edit_serial'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+
+    data = request.get_json()
+    batch_id = data.get('batch_id')
+
+    batch = ItemBatch.query.get(batch_id)
+    if not batch or batch.item_id != item.id:
+        return jsonify({'success': False, 'message': 'Invalid batch'}), 400
+
+    date_str = batch.purchase_date.strftime('%Y%m%d') if batch.purchase_date else '00000000'
+    label = batch.batch_label or f"B{batch.batch_number}"
+
+    sns = BatchSerialNumber.query.filter_by(batch_id=batch.id).order_by(BatchSerialNumber.sequence_number).all()
+    for idx, sn in enumerate(sns, 1):
+        sn.sequence_number = idx
+        sn.internal_serial_number = f"{item.uuid}-{date_str}-{label}-{idx:03d}"
+
+    db.session.commit()
+
+    log_audit(current_user.id, 'update', 'serial_numbers', batch.id,
+              f'Remapped ISN for batch #{batch.batch_number} of item: {item.name}')
+    return jsonify({'success': True, 'remapped': len(sns)})

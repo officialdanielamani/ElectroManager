@@ -176,7 +176,7 @@ def item_new():
     # Also check if user has ANY edit permission (in case someone tries to create with form directly)
     if not (perms.get('can_edit_name') or perms.get('can_edit_sku_type') or 
             perms.get('can_edit_description') or perms.get('can_edit_datasheet') or
-            perms.get('can_edit_upload') or perms.get('can_edit_lending') or
+            perms.get('can_edit_upload') or
             perms.get('can_edit_price') or perms.get('can_edit_quantity') or
             perms.get('can_edit_location') or perms.get('can_edit_category') or
             perms.get('can_edit_footprint') or perms.get('can_edit_tags') or
@@ -192,14 +192,21 @@ def item_new():
                    'unavailable_drawers': r.get_unavailable_drawers()} for r in racks]
     all_tags = [{'id': t.id, 'name': t.name, 'color': t.color} for t in Tag.query.order_by(Tag.name).all()]
     
-    prefill_rack_id = request.args.get('rack_id', type=int)
+    prefill_rack_uuid = request.args.get('rack_id', type=str)
     prefill_drawer = request.args.get('drawer')
+    
+    # Convert rack UUID to ID for prefill
+    prefill_rack_id = None
+    if prefill_rack_uuid:
+        rack = Rack.query.filter_by(uuid=prefill_rack_uuid).first()
+        if rack:
+            prefill_rack_id = rack.id
     
     if form.validate_on_submit():
         # For view-only users, check if they're trying to edit
         if not (perms.get('can_edit_name') or perms.get('can_edit_sku_type') or 
                 perms.get('can_edit_description') or perms.get('can_edit_datasheet') or
-                perms.get('can_edit_upload') or perms.get('can_edit_lending') or
+                perms.get('can_edit_upload') or
                 perms.get('can_edit_price') or perms.get('can_edit_quantity') or
                 perms.get('can_edit_location') or perms.get('can_edit_category') or
                 perms.get('can_edit_footprint') or perms.get('can_edit_tags') or
@@ -229,13 +236,14 @@ def item_new():
         tags_json = json.dumps([int(t) for t in selected_tags if t])
         
         # Create item with role-based restrictions
+        # Note: quantity and price are managed through batches, not direct input
         item = Item(
             name=form.name.data if perms['can_edit_name'] else 'New Item',
             sku=form.sku.data if form.sku.data and perms['can_edit_sku_type'] else None,
             info=form.info.data if perms['can_edit_sku_type'] else None,
             description=form.description.data if perms['can_edit_description'] else None,
-            quantity=form.quantity.data if perms['can_edit_quantity'] else 0,
-            price=form.price.data if form.price.data and perms['can_edit_price'] else 0.0,
+            quantity=0,
+            price=0.0,
             location_id=location_id_value,
             rack_id=rack_id_value,
             drawer=drawer_value,
@@ -244,8 +252,6 @@ def item_new():
             category_id=form.category_id.data if form.category_id.data and form.category_id.data > 0 and perms['can_edit_category'] else None,
             footprint_id=form.footprint_id.data if form.footprint_id.data and form.footprint_id.data > 0 and perms['can_edit_footprint'] else None,
             tags=tags_json,
-            lend_to=form.lend_to.data if perms['can_edit_lending'] else None,
-            lend_quantity=form.lend_quantity.data if form.lend_quantity.data and perms['can_edit_lending'] else 0,
             datasheet_urls=form.datasheet_urls.data if perms['can_edit_datasheet'] else None,
             created_by=current_user.id,
             updated_by=current_user.id
@@ -286,6 +292,23 @@ def item_detail(uuid):
                          currency_symbol=currency_symbol, currency_decimal_places=currency_decimal_places, qr_templates=qr_templates)
 
 
+@item_bp.route('/item/<string:uuid>/qr', endpoint='item_qr_svg')
+@login_required
+def item_qr_svg(uuid):
+    """Generate QR code SVG for item detail page"""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    
+    # Check if user has view permission
+    if not current_user.has_permission('items', 'view'):
+        abort(403)
+    
+    from qr_utils import generate_qr_svg
+    
+    qr_data = f'/item/{item.uuid}'
+    qr_svg = generate_qr_svg(qr_data, 160, 160, error_correction='M')
+    
+    return qr_svg, 200, {'Content-Type': 'image/svg+xml'}
+
 
 @item_bp.route('/item/<string:uuid>/edit', endpoint='item_edit', methods=['GET', 'POST'])
 @login_required
@@ -303,7 +326,7 @@ def item_edit(uuid):
     # Check if user has any edit permissions
     if not (perms.get('can_edit_name') or perms.get('can_edit_sku_type') or 
             perms.get('can_edit_description') or perms.get('can_edit_datasheet') or
-            perms.get('can_edit_upload') or perms.get('can_edit_lending') or
+            perms.get('can_edit_upload') or
             perms.get('can_edit_price') or perms.get('can_edit_quantity') or
             perms.get('can_edit_location') or perms.get('can_edit_category') or
             perms.get('can_edit_footprint') or perms.get('can_edit_tags') or
@@ -323,7 +346,7 @@ def item_edit(uuid):
         # Check if user has permission to edit anything
         if not (perms.get('can_edit_name') or perms.get('can_edit_sku_type') or 
                 perms.get('can_edit_description') or perms.get('can_edit_datasheet') or
-                perms.get('can_edit_upload') or perms.get('can_edit_lending') or
+                perms.get('can_edit_upload') or
                 perms.get('can_edit_price') or perms.get('can_edit_quantity') or
                 perms.get('can_edit_location') or perms.get('can_edit_category') or
                 perms.get('can_edit_footprint') or perms.get('can_edit_tags') or
@@ -345,15 +368,9 @@ def item_edit(uuid):
         if perms['can_edit_datasheet']:
             item.datasheet_urls = form.datasheet_urls.data
         
-        if perms['can_edit_lending']:
-            item.lend_to = form.lend_to.data
-            item.lend_quantity = form.lend_quantity.data or 0
-        
-        if perms['can_edit_price']:
-            item.price = form.price.data
-        
+        # Note: price and quantity are managed through batches
+        # Only min_quantity and no_stock_warning are editable here
         if perms['can_edit_quantity']:
-            item.quantity = form.quantity.data
             item.min_quantity = form.min_quantity.data
             item.no_stock_warning = form.no_stock_warning.data
         
@@ -753,6 +770,40 @@ def item_add_parameter(id):
         flash('Invalid parameter selected!', 'danger')
         return redirect(url_for('item.item_edit', uuid=item.uuid))
     
+    # Validate number parameters if type is number
+    errors = []
+    if param_type == 'number':
+        # Check if required
+        if parameter.number_required and not value:
+            errors.append('This number parameter is required')
+        
+        # Validate value if provided
+        if value:
+            is_valid, error_msg = parameter.validate_number_value(value, False)
+            if not is_valid:
+                errors.append(f"Value: {error_msg}")
+        
+        # Validate value2 for range if provided
+        if value2 and operation == 'range':
+            is_valid, error_msg = parameter.validate_number_value(value2, True)
+            if not is_valid:
+                errors.append(f"Value2: {error_msg}")
+        
+        # Cross-check min/max for range operation
+        if operation == 'range' and value and value2:
+            try:
+                val1 = float(value)
+                val2 = float(value2)
+                if val1 >= val2:
+                    errors.append('Range start must be less than range end')
+            except ValueError:
+                pass
+    
+    if errors:
+        for error in errors:
+            flash(error, 'danger')
+        return redirect(url_for('item.item_edit', uuid=item.uuid))
+    
     # Create new item parameter
     item_param = ItemParameter(
         item_id=id,
@@ -816,10 +867,50 @@ def item_edit_parameter(item_id, param_id):
         return redirect(url_for('item.item_edit', uuid=item.uuid))
     
     if request.method == 'POST':
+        # Validate number parameters if type is number
+        param = item_param.parameter
+        operation = request.form.get('operation')
+        value = request.form.get('value', '').strip()
+        value2 = request.form.get('value2', '').strip() if operation in ['range', 'duration'] else None
+        
+        errors = []
+        
+        if param.param_type == 'number':
+            # Check if required
+            if param.number_required and not value:
+                errors.append('This number parameter is required')
+            
+            # Validate value if provided
+            if value:
+                is_valid, error_msg = param.validate_number_value(value, False)
+                if not is_valid:
+                    errors.append(f"Value: {error_msg}")
+            
+            # Validate value2 for range/duration if provided
+            if value2 and operation in ['range', 'duration']:
+                is_valid, error_msg = param.validate_number_value(value2, True)
+                if not is_valid:
+                    errors.append(f"Value2: {error_msg}")
+            
+            # Cross-check min/max for range operation
+            if operation == 'range' and value and value2:
+                try:
+                    val1 = float(value)
+                    val2 = float(value2)
+                    if val1 >= val2:
+                        errors.append('Range start must be less than range end')
+                except ValueError:
+                    pass
+        
+        if errors:
+            for error in errors:
+                flash(error, 'danger')
+            return redirect(url_for('item.item_edit_parameter', item_id=item_id, param_id=param_id))
+        
         # Update parameter values
-        item_param.operation = request.form.get('operation')
-        item_param.value = request.form.get('value', '').strip()
-        item_param.value2 = request.form.get('value2', '').strip() if request.form.get('operation') in ['range', 'duration'] else None
+        item_param.operation = operation
+        item_param.value = value
+        item_param.value2 = value2
         item_param.unit = request.form.get('unit', '').strip()
         item_param.string_option = request.form.get('string_option', '').strip()
         item_param.description = request.form.get('description', '').strip()

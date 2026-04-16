@@ -26,7 +26,9 @@ report_bp = Blueprint('report', __name__)
 @report_bp.route('/low-stock', endpoint='low_stock')
 @login_required
 def low_stock():
-    items = Item.query.filter(Item.quantity <= Item.min_quantity).order_by(Item.quantity).all()
+    all_items = Item.query.all()
+    items = [i for i in all_items if i.is_low_stock() or i.is_no_stock()]
+    items.sort(key=lambda x: x.get_overall_quantity())
     return render_template('low_stock.html', items=items)
 
 
@@ -40,8 +42,10 @@ def reports():
         return redirect(url_for('settings.settings'))
     
     total_items = Item.query.count()
-    total_value = db.session.query(db.func.sum(Item.price * Item.quantity)).scalar() or 0
-    low_stock_count = Item.query.filter(Item.quantity <= Item.min_quantity).count()
+    # Calculate total value from batches
+    from models import ItemBatch
+    total_value = db.session.query(db.func.sum(ItemBatch.price_per_unit * ItemBatch.quantity)).scalar() or 0
+    low_stock_count = sum(1 for item in Item.query.all() if item.is_low_stock())
     
     category_stats = db.session.query(
         Category.name,

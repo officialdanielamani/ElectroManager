@@ -31,7 +31,7 @@
                         <select id="locationFilter" class="form-select form-select-sm" onchange="filterByLocation(this.value)" style="min-width: 200px;">
                             <option value="">All Locations</option>
                             {% for loc in locations %}
-                            <option value="{{ loc.id }}" {% if current_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+                            <option value="{{ loc.uuid }}" {% if current_location_uuid == loc.uuid %}selected{% endif %}>{{ loc.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -40,7 +40,7 @@
                         <select id="rackFilter" class="form-select form-select-sm" onchange="filterRack(this.value)" style="min-width: 200px;">
                             <option value="">All Racks</option>
                             {% for r in all_racks %}
-                            <option value="{{ r.id }}" {% if current_rack_id == r.id %}selected{% endif %}>{{ r.name }}{% if r.physical_location %} - {{ r.physical_location.name }}{% endif %}</option>
+                            <option value="{{ r.uuid }}" {% if current_rack_uuid == r.uuid %}selected{% endif %}>{{ r.name }}{% if r.physical_location %} - {{ r.physical_location.name }}{% endif %}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -71,10 +71,44 @@
 </div>
 {% endif %}
 
+<!-- Top Pagination -->
+{% if total_pages > 1 %}
+<div class="row mb-2">
+    <div class="col-md-12">
+        <nav aria-label="Racks pagination">
+            <ul class="pagination pagination-sm justify-content-center mb-0">
+                <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
+                    <a class="page-link" href="?page=1{% if current_location_uuid %}&location={{ current_location_uuid }}{% endif %}{% if current_rack_uuid %}&rack={{ current_rack_uuid }}{% endif %}" aria-label="First page">&laquo;&laquo;</a>
+                </li>
+                <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
+                    <a class="page-link" href="?page={{ current_page - 1 }}{% if current_location_uuid %}&location={{ current_location_uuid }}{% endif %}{% if current_rack_uuid %}&rack={{ current_rack_uuid }}{% endif %}" aria-label="Previous page">&lt;</a>
+                </li>
+                
+                {% for p in range(max(1, current_page - 2), min(total_pages + 1, current_page + 3)) %}
+                <li class="page-item {% if p == current_page %}active{% endif %}">
+                    <a class="page-link" href="?page={{ p }}{% if current_location_uuid %}&location={{ current_location_uuid }}{% endif %}{% if current_rack_uuid %}&rack={{ current_rack_uuid }}{% endif %}">{{ p }}</a>
+                </li>
+                {% endfor %}
+                
+                <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
+                    <a class="page-link" href="?page={{ current_page + 1 }}{% if current_location_uuid %}&location={{ current_location_uuid }}{% endif %}{% if current_rack_uuid %}&rack={{ current_rack_uuid }}{% endif %}" aria-label="Next page">&gt;</a>
+                </li>
+                <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
+                    <a class="page-link" href="?page={{ total_pages }}{% if current_location_uuid %}&location={{ current_location_uuid }}{% endif %}{% if current_rack_uuid %}&rack={{ current_rack_uuid }}{% endif %}" aria-label="Last page">&raquo;&raquo;</a>
+                </li>
+            </ul>
+            <div class="text-center text-muted small mt-1">
+                Page {{ current_page }} of {{ total_pages }}
+            </div>
+        </nav>
+    </div>
+</div>
+{% endif %}
+
 <!-- Visual Rack System -->
 <div id="rackContainer">
     {% for rack in racks %}
-    <div class="rack-section mb-4" data-rack-id="{{ rack.id }}">
+    <div class="rack-section mb-4" data-rack-id="{{ rack.uuid }}">
         <div class="card">
             <div class="card-header bg-dark text-white">
                 <div class="d-flex justify-content-between align-items-start mb-2">
@@ -92,7 +126,7 @@
                         <div><small><i class="bi bi-geo-alt"></i> {{ rack.location }}</small></div>
                         {% endif %}
                     </div>
-                    <a href="{{ url_for('location_rack.rack_detail', id=rack.id) }}" class="btn btn-sm btn-info" title="View Rack Details">
+                    <a href="{{ url_for('location_rack.rack_detail', uuid=rack.uuid) }}" class="btn btn-sm btn-info" title="View Rack Details">
                         <i class="bi bi-eye"></i> View
                     </a>
                 </div>
@@ -107,8 +141,8 @@
                         {% set is_unavailable = drawer_id in rack.unavailable_drawers %}
                         <div class="drawer-cell {% if is_unavailable %}unavailable{% elif drawer_data %}has-items{% else %}empty{% endif %}" 
                              data-drawer="{{ drawer_id }}"
-                             data-rack="{{ rack.id }}"
-                             onclick="openDrawer('{{ rack.name }}', '{{ drawer_id }}', {{ rack.id }})">
+                             data-rack="{{ rack.uuid }}"
+                             onclick="openDrawer('{{ rack.name }}', '{{ drawer_id }}', '{{ rack.uuid }}')">
                             <div class="drawer-label">{{ drawer_id }}</div>
                             <div class="drawer-count">
                                 {% if is_unavailable and drawer_data %}
@@ -145,6 +179,40 @@
     {% endfor %}
 </div>
 
+<!-- Bottom Pagination -->
+{% if total_pages > 1 %}
+<div class="row mt-2">
+    <div class="col-md-12">
+        <nav aria-label="Racks pagination">
+            <ul class="pagination pagination-sm justify-content-center mb-0">
+                <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
+                    <a class="page-link" href="?page=1{% if current_location_uuid %}&location={{ current_location_uuid }}{% endif %}{% if current_rack_uuid %}&rack={{ current_rack_uuid }}{% endif %}" aria-label="First page">&laquo;&laquo;</a>
+                </li>
+                <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
+                    <a class="page-link" href="?page={{ current_page - 1 }}{% if current_location_uuid %}&location={{ current_location_uuid }}{% endif %}{% if current_rack_uuid %}&rack={{ current_rack_uuid }}{% endif %}" aria-label="Previous page">&lt;</a>
+                </li>
+                
+                {% for p in range(max(1, current_page - 2), min(total_pages + 1, current_page + 3)) %}
+                <li class="page-item {% if p == current_page %}active{% endif %}">
+                    <a class="page-link" href="?page={{ p }}{% if current_location_uuid %}&location={{ current_location_uuid }}{% endif %}{% if current_rack_uuid %}&rack={{ current_rack_uuid }}{% endif %}">{{ p }}</a>
+                </li>
+                {% endfor %}
+                
+                <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
+                    <a class="page-link" href="?page={{ current_page + 1 }}{% if current_location_uuid %}&location={{ current_location_uuid }}{% endif %}{% if current_rack_uuid %}&rack={{ current_rack_uuid }}{% endif %}" aria-label="Next page">&gt;</a>
+                </li>
+                <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
+                    <a class="page-link" href="?page={{ total_pages }}{% if current_location_uuid %}&location={{ current_location_uuid }}{% endif %}{% if current_rack_uuid %}&rack={{ current_rack_uuid }}{% endif %}" aria-label="Last page">&raquo;&raquo;</a>
+                </li>
+            </ul>
+            <div class="text-center text-muted small mt-1">
+                Page {{ current_page }} of {{ total_pages }}
+            </div>
+        </nav>
+    </div>
+</div>
+{% endif %}
+
 <!-- Drawer Detail Modal -->
 <div class="modal fade" id="drawerModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -173,10 +241,10 @@
                 
                 <!-- Location Type Toggle -->
                 <div class="btn-group btn-group-sm w-100 mb-3" role="group">
-                    <input type="radio" class="btn-check" name="move_location_type" id="move_type_general" value="general" checked>
+                    <input type="radio" class="btn-check" name="move_location_type" id="move_type_general" value="general" checked onchange="toggleMoveLocationType('general')">
                     <label class="btn btn-outline-primary" for="move_type_general">General Location</label>
                     
-                    <input type="radio" class="btn-check" name="move_location_type" id="move_type_drawer" value="drawer">
+                    <input type="radio" class="btn-check" name="move_location_type" id="move_type_drawer" value="drawer" onchange="toggleMoveLocationType('drawer')">
                     <label class="btn btn-outline-primary" for="move_type_drawer">Drawer Storage</label>
                 </div>
                 
@@ -187,7 +255,7 @@
                         <select id="move_location_id" class="form-select">
                             <option value="0">-- Select Location --</option>
                             {% for location in locations %}
-                            <option value="{{ location.id }}">{{ location.name }}</option>
+                            <option value="{{ location.uuid }}">{{ location.name }}</option>
                             {% endfor %}
                         </select>
                         <button type="button" class="btn btn-success" title="Add to this location">
@@ -204,7 +272,7 @@
                             <select id="move_location_filter" class="form-select form-select-sm" onchange="updateMoveRackSelect()">
                                 <option value="">All</option>
                                 {% for location in locations %}
-                                <option value="{{ location.id }}">{{ location.name }}</option>
+                                <option value="{{ location.uuid }}">{{ location.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -213,7 +281,7 @@
                             <select id="move_rack_id" class="form-select form-select-sm" onchange="updateMoveDrawerGrid()">
                                 <option value="0">Select</option>
                                 {% for rack in all_racks %}
-                                <option value="{{ rack.id }}" data-rows="{{ rack.rows }}" data-cols="{{ rack.cols }}" data-location="{{ rack.physical_location.id if rack.physical_location else '' }}">
+                                <option value="{{ rack.uuid }}" data-rows="{{ rack.rows }}" data-cols="{{ rack.cols }}" data-location="{{ rack.physical_location.uuid if rack.physical_location else '' }}">
                                     {{ rack.name }}
                                 </option>
                                 {% endfor %}
@@ -478,8 +546,8 @@ function searchItem() {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             search: searchValue,
-            location_id: locationId ? parseInt(locationId) : null,
-            rack_id: rackId ? parseInt(rackId) : null,
+            location_uuid: locationId || null,
+            rack_uuid: rackId || null,
             exact_match: exactMatch
         })
     })
@@ -512,7 +580,7 @@ function displaySearchResults(data, searchTerm) {
             if (item.type === 'rack') {
                 // Item found in rack/drawer
                 html += `
-                    <div class="search-result-item" onclick="highlightAndNavigateToDrawer(${item.rack_id}, '${item.drawer}', true)">
+                    <div class="search-result-item" onclick="navigateToItemOnPage(${item.page}, '${item.rack_uuid}', '${item.drawer}', true)">
                         <div>
                             <strong>${item.name}</strong>
                             <span class="badge bg-success ms-2">${item.quantity}</span>
@@ -527,7 +595,7 @@ function displaySearchResults(data, searchTerm) {
                 
                 // Highlight the drawer
                 setTimeout(() => {
-                    const drawer = document.querySelector(`.drawer-cell[data-drawer="${item.drawer}"][data-rack="${item.rack_id}"]`);
+                    const drawer = document.querySelector(`.drawer-cell[data-drawer="${item.drawer}"][data-rack="${item.rack_uuid}"]`);
                     if (drawer) {
                         drawer.classList.add('search-highlighted');
                     }
@@ -574,6 +642,39 @@ function closeSearchModal() {
     }
 }
 
+function navigateToItemOnPage(page, rackUuid, drawer, closeModal = false) {
+    // Close modal if requested
+    if (closeModal) {
+        const searchResultsModal = document.getElementById('searchResultsModal');
+        const instance = bootstrap.Modal.getInstance(searchResultsModal);
+        if (instance) {
+            instance.hide();
+        }
+    }
+    
+    // Get current location and rack filters
+    const locationId = document.getElementById('locationFilter').value || '';
+    const rackId = document.getElementById('rackFilter').value || '';
+    
+    // Build URL with page parameter
+    let url = `?page=${page}`;
+    if (locationId) {
+        url += `&location=${locationId}`;
+    }
+    if (rackId) {
+        url += `&rack=${rackId}`;
+    }
+    
+    // Navigate to the page, then highlight the drawer
+    window.location.href = url;
+    // Note: After page load, we need to trigger the highlight
+    // This is handled by the onload handler below
+    sessionStorage.setItem('pendingHighlight', JSON.stringify({
+        rackUuid: rackUuid,
+        drawer: drawer
+    }));
+}
+
 function highlightAndNavigateToDrawer(rackId, drawer, closeModal = false) {
     // Close modal if requested
     if (closeModal) {
@@ -618,7 +719,12 @@ function openDrawer(rackName, drawerId, rackId) {
     document.getElementById('drawerModalBody').innerHTML = '<div class="text-center"><div class="spinner-border"></div><p>Loading...</p></div>';
     
     fetch(`/api/drawer/${rackId}/${encodeURIComponent(drawerId)}`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}, URL: /api/drawer/${rackId}/${encodeURIComponent(drawerId)}`);
+            }
+            return response.json();
+        })
         .then(data => {
             let html = '';
 
@@ -675,7 +781,8 @@ function openDrawer(rackName, drawerId, rackId) {
             document.getElementById('drawerModalBody').innerHTML = html;
         })
         .catch(error => {
-            document.getElementById('drawerModalBody').innerHTML = '<div class="alert alert-danger">Error loading drawer contents.</div>';
+            console.error('Drawer load error:', error);
+            document.getElementById('drawerModalBody').innerHTML = `<div class="alert alert-danger">Error loading drawer contents: ${error.message}</div>`;
         });
     
     drawerModal.show();
@@ -707,10 +814,32 @@ function toggleDrawerAvailability() {
     });
 }
 
+function toggleMoveLocationType(type) {
+    if (type === 'general') {
+        document.getElementById('move_general_section').style.display = 'block';
+        document.getElementById('move_drawer_section').style.display = 'none';
+    } else {
+        document.getElementById('move_general_section').style.display = 'none';
+        document.getElementById('move_drawer_section').style.display = 'block';
+    }
+}
+
 function showMoveItemsModal() {
     // Close drawer modal
     const drawerModal = bootstrap.Modal.getInstance(document.getElementById('drawerModal'));
-    drawerModal.hide();
+    if (drawerModal) {
+        drawerModal.hide();
+    }
+    
+    // Reset form to "General Location" by default
+    document.getElementById('move_type_general').checked = true;
+    document.getElementById('move_general_section').style.display = 'block';
+    document.getElementById('move_drawer_section').style.display = 'none';
+    document.getElementById('move_location_id').value = '0';
+    document.getElementById('move_location_filter').value = '';
+    document.getElementById('move_rack_id').value = '0';
+    document.getElementById('move_drawer').value = '';
+    document.getElementById('move_drawer_grid_container').innerHTML = '';
     
     // Show move items modal
     const moveModal = new bootstrap.Modal(document.getElementById('moveItemsModal'));
@@ -752,14 +881,16 @@ function moveAllItems() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert(`Successfully moved ${data.items_moved} items`);
+            alert(`Successfully moved ${data.items_moved} item(s)`);
             location.reload();
         } else {
             alert('Error: ' + (data.error || 'Failed to move items'));
+            console.error('Move items error:', data);
         }
     })
     .catch(error => {
-        alert('Error: ' + error);
+        alert('Error: ' + error.message);
+        console.error('Move items fetch error:', error);
     });
 }
 
@@ -915,5 +1046,17 @@ function selectMoveDrawer(drawerId) {
     });
     event.target.classList.add('selected');
 }
+
+// Handle pending highlight after page load (for search results on different pages)
+document.addEventListener('DOMContentLoaded', function() {
+    const pending = sessionStorage.getItem('pendingHighlight');
+    if (pending) {
+        sessionStorage.removeItem('pendingHighlight');
+        const data = JSON.parse(pending);
+        setTimeout(() => {
+            highlightAndNavigateToDrawer(data.rackUuid, data.drawer, false);
+        }, 500);
+    }
+});
 </script>
 {% endblock %}

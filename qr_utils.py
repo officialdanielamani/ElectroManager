@@ -26,8 +26,8 @@ def get_item_data(item):
         'ItemUUID': f"item/{item.uuid}",
         'ItemName': item.name,
         'SKU': item.sku or '',
-        'Price': f"${item.price:.2f}" if item.price else '',
-        'Quantity': str(item.quantity),
+        'Price': f"${item.get_average_price():.2f}" if item.get_average_price() else '',
+        'Quantity': str(item.get_overall_quantity()),
         'Category': item.category.name if item.category else '',
         'LocationName': item.general_location.name if item.general_location else '',
         'RackName': item.rack.name if item.rack else '',
@@ -90,21 +90,23 @@ def render_template_to_svg(template, data):
     print(f"[SVG] Layout elements: {len(template.get_layout())}")
     print(f"[SVG] Data keys: {list(data.keys())}")
     
-    # Collect fonts used in this template
-    fonts_used = set()
+    # Collect fonts used in this template (for text elements only)
+    # Icon fonts are no longer needed as icons are rendered as SVG paths
+    text_fonts_used = set()
     layout = template.get_layout()
     for element in layout:
         if element.get('type') == 'text':
             font = element.get('font_family', 'Arial')
             if font:
-                fonts_used.add(font)
+                text_fonts_used.add(font)
     
     # Build font-face rules for SVG with embedded fonts for project fonts
     font_styles = ''
     fonts_dir = os.path.join(current_app.root_path, 'static', 'fonts')
     system_fonts = {'system', 'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana', 'Comic Sans MS', 'Trebuchet MS'}
     
-    for font_name in fonts_used:
+    # Embed text fonts
+    for font_name in text_fonts_used:
         if font_name not in system_fonts:  # Only embed project fonts
             # Try to find the font file
             for ext in ['.woff2', '.woff', '.ttf', '.otf']:
@@ -126,10 +128,10 @@ def render_template_to_svg(template, data):
         }}
     </style>
 '''
-                        print(f"[SVG] Embedded font: {font_name} ({len(font_data)} chars)")
+                        print(f"[SVG] Embedded text font: {font_name}")
                         break
                     except Exception as e:
-                        print(f"[SVG] Failed to embed font {font_name}: {e}")
+                        print(f"[SVG] Failed to embed text font {font_name}: {e}")
     
     svg = f'<svg width="{width_px}" height="{height_px}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width_px} {height_px}">\n'
     svg += font_styles
@@ -224,6 +226,30 @@ def render_template_to_svg(template, data):
                 svg += f'fill="lightgray" stroke="red" stroke-width="1"/>\n'
                 svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" '
                 svg += f'text-anchor="middle">Barcode Error</text>\n'
+        
+        elif element['type'] == 'icon':
+            icon_name = element.get('icon_name', '')
+            icon_package = element.get('icon_package', 'bootstrap-icons')
+            icon_color = element.get('icon_color', '#000000')
+            
+            # Scale icon to fit container (80% of container size)
+            icon_size_px = min(w_px, h_px) * 0.8
+            
+            if icon_name:
+                print(f"[SVG] Element {idx}: ICON = '{icon_name}' from '{icon_package}' (container: {w_px}×{h_px}px, scaled size: {icon_size_px}px, color: {icon_color})")
+                try:
+                    # Generate icon SVG using the icon font
+                    icon_svg = generate_icon_svg(icon_name, icon_package, int(icon_size_px), icon_color, int(w_px), int(h_px))
+                    svg += f'  <g transform="translate({x_px}, {y_px})">{icon_svg}</g>\n'
+                except Exception as e:
+                    print(f"[SVG] Icon generation error: {e}")
+                    # Fallback: just show a placeholder
+                    svg += f'  <rect x="{x_px}" y="{y_py}" width="{w_px}" height="{h_px}" '
+                    svg += f'fill="lightgray" stroke="red" stroke-width="1"/>\n'
+                    svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" '
+                    svg += f'text-anchor="middle">Icon Error</text>\n'
+            else:
+                print(f"[SVG] Element {idx}: ICON - No icon name specified")
     
     svg += '</svg>\n'
     print(f"[SVG] Complete! SVG size: {len(svg)} bytes")
@@ -388,6 +414,191 @@ def generate_barcode_svg(data, format_type, width, height, show_label=False):
         print(f"[BARCODE] Returning placeholder")
         return placeholder
 
+def generate_icon_svg(icon_name, icon_package, icon_size, icon_color, container_width, container_height):
+    """Generate icon as actual SVG <path> extracted from the icon font file.
+    
+    Previously used @font-face text rendering which fails in browser previews
+    because inline SVG @font-face rules don't reliably load when the SVG is
+    inserted via innerHTML. Extracting the glyph outline as an SVG path works
+    everywhere: browser preview, PDF, SVG download, PNG export.
+    """
+    print(f"[ICON] Generating icon: {icon_name} from {icon_package} (size: {icon_size}px, color: {icon_color})")
+    
+    try:
+        center_x = container_width / 2
+        center_y = container_height / 2
+        
+        # Get the SVG path data from the font file
+        path_data, glyph_bounds, units_per_em = get_icon_path(icon_name, icon_package)
+        
+        if not path_data:
+            print(f"[ICON] Warning: Could not extract path for {icon_name}")
+            svg = f'<circle cx="{center_x}" cy="{center_y}" r="{min(container_width, container_height) * 0.3}" fill="{icon_color}" opacity="0.5"/>'
+            return svg
+        
+        # Scale the glyph path to fit the icon_size within the container
+        if glyph_bounds:
+            gx_min, gy_min, gx_max, gy_max = glyph_bounds
+        else:
+            gx_min, gy_min, gx_max, gy_max = 0, 0, units_per_em, units_per_em
+        
+        glyph_width = gx_max - gx_min
+        glyph_height = gy_max - gy_min
+        
+        if glyph_width == 0 or glyph_height == 0:
+            print(f"[ICON] Warning: Zero-size glyph for {icon_name}")
+            svg = f'<circle cx="{center_x}" cy="{center_y}" r="{min(container_width, container_height) * 0.3}" fill="{icon_color}" opacity="0.5"/>'
+            return svg
+        
+        # Calculate scale to fit icon_size
+        scale = icon_size / max(glyph_width, glyph_height)
+        
+        # Calculate translation to center the icon in the container
+        # Font Y-axis goes up, SVG Y-axis goes down, so we flip Y via negative scale
+        scaled_width = glyph_width * scale
+        scaled_height = glyph_height * scale
+        
+        tx = center_x - (gx_min * scale) - (scaled_width / 2)
+        ty = center_y + (gy_max * scale) - (scaled_height / 2)
+        
+        svg = f'<path d="{path_data}" fill="{icon_color}" transform="translate({tx:.2f}, {ty:.2f}) scale({scale:.6f}, {-scale:.6f})"/>'
+        
+        print(f"[ICON] Success! Generated icon SVG path, {len(svg)} bytes")
+        return svg
+        
+    except Exception as e:
+        print(f"[ICON] ERROR: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        placeholder = f'<rect width="{container_width}" height="{container_height}" fill="lightgray" stroke="red" stroke-width="2"/><text x="{container_width/2}" y="{container_height/2}" font-size="12" text-anchor="middle" dominant-baseline="middle">Icon Error</text>'
+        return placeholder
+
+
+# Cache for loaded font data to avoid re-reading font files repeatedly
+_font_cache = {}
+
+def get_icon_path(icon_name, icon_package):
+    """Extract SVG path data for an icon from its font file using fontTools.
+    
+    Returns: (path_data, bounds, units_per_em) or (None, None, None)
+    """
+    import os
+    
+    try:
+        from fontTools.ttLib import TTFont
+        from fontTools.pens.svgPathPen import SVGPathPen
+        from fontTools.pens.boundsPen import BoundsPen
+    except ImportError:
+        print("[ICON] fontTools not available, cannot extract icon paths")
+        return None, None, None
+    
+    try:
+        # Get unicode codepoint for the icon from CSS
+        icon_unicode_char = get_icon_unicode(icon_name, icon_package)
+        if not icon_unicode_char:
+            return None, None, None
+        
+        codepoint = ord(icon_unicode_char)
+        
+        # Load font (cached)
+        if icon_package not in _font_cache:
+            icons_dir = os.path.join(current_app.root_path, 'static', 'icons')
+            font_path = None
+            for ext in ['.woff2', '.woff', '.ttf', '.otf']:
+                candidate = os.path.join(icons_dir, icon_package + ext)
+                if os.path.exists(candidate):
+                    font_path = candidate
+                    break
+            
+            if not font_path:
+                print(f"[ICON] No font file found for {icon_package}")
+                return None, None, None
+            
+            _font_cache[icon_package] = TTFont(font_path)
+            print(f"[ICON] Loaded and cached font: {font_path}")
+        
+        font = _font_cache[icon_package]
+        cmap = font.getBestCmap()
+        units_per_em = font['head'].unitsPerEm
+        
+        if codepoint not in cmap:
+            print(f"[ICON] Codepoint U+{codepoint:04X} not in font cmap")
+            return None, None, None
+        
+        glyph_name = cmap[codepoint]
+        glyph_set = font.getGlyphSet()
+        glyph = glyph_set[glyph_name]
+        
+        # Extract SVG path
+        pen = SVGPathPen(glyph_set)
+        glyph.draw(pen)
+        path_data = pen.getCommands()
+        
+        # Get bounds
+        bpen = BoundsPen(glyph_set)
+        glyph.draw(bpen)
+        bounds = bpen.bounds
+        
+        if not path_data:
+            print(f"[ICON] Empty path for glyph '{glyph_name}'")
+            return None, None, None
+        
+        print(f"[ICON] Extracted path for '{icon_name}' (glyph: {glyph_name}, U+{codepoint:04X}, bounds: {bounds})")
+        return path_data, bounds, units_per_em
+        
+    except Exception as e:
+        print(f"[ICON] Error extracting path: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None, None
+
+def get_icon_unicode(icon_name, icon_package):
+    """Extract unicode character for icon from CSS file"""
+    import os
+    import re
+    
+    try:
+        css_path = os.path.join(current_app.root_path, 'static', 'icons', f'{icon_package}.css')
+        
+        if not os.path.exists(css_path):
+            print(f"[ICON] CSS file not found: {css_path}")
+            return None
+        
+        with open(css_path, 'r', encoding='utf-8') as f:
+            css_content = f.read()
+        
+        # First, try to detect the prefix by looking at the first icon class
+        # Pattern: .prefix-something::before
+        prefix_match = re.search(r'\.([a-z]+)-[a-z0-9\-]+::before', css_content)
+        
+        if not prefix_match:
+            print(f"[ICON] Could not detect CSS prefix in {icon_package}.css")
+            return None
+        
+        prefix = prefix_match.group(1)
+        print(f"[ICON] Detected prefix '{prefix}' from CSS file")
+        
+        # Now look for the specific icon with the detected prefix
+        pattern = rf'\.{prefix}-{re.escape(icon_name)}::before\s*{{\s*content:\s*"(\\[0-9a-fA-F]+)";'
+        match = re.search(pattern, css_content)
+        
+        if match:
+            unicode_escape = match.group(1)
+            # Convert \f123 to actual unicode character
+            unicode_value = int(unicode_escape[1:], 16)
+            unicode_char = chr(unicode_value)
+            print(f"[ICON] Found unicode for {icon_name}: U+{unicode_value:04X}")
+            return unicode_char
+        
+        print(f"[ICON] Could not find icon '{icon_name}' with prefix '{prefix}' in CSS")
+        return None
+        
+    except Exception as e:
+        print(f"[ICON] Error getting unicode: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
 def generate_single_sticker_pdf(template, data, identifier):
     """Generate a PDF with a single sticker"""
     print(f"[PDF] Generating PDF for template: {template.name}, item: {identifier}")
@@ -407,148 +618,49 @@ def generate_single_sticker_pdf(template, data, identifier):
     svg_data = render_template_to_svg(template, data)
     print(f"[PDF] SVG rendered, size: {len(svg_data)} bytes")
     
-    # Get available fonts to inject @font-face rules with embedded fonts
-    import os
+    # Convert SVG to base64 and embed as image in HTML
+    # This avoids font embedding issues in PDF rendering
     import base64
-    fonts_dir = os.path.join(current_app.root_path, 'static', 'fonts')
+    svg_base64 = base64.b64encode(svg_data.encode()).decode('utf-8')
     
-    # Font face rules for system fonts
-    font_face_rules = '''
-        /* System fonts - already available */
-        /* No @font-face needed for Arial, Times New Roman, Courier New, Georgia, Verdana, Comic Sans MS, Trebuchet MS */
-    '''
+    # Create simple HTML that embeds SVG as image
+    html_content = f'''<html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            @page {{
+                size: {width_in}in {height_in}in;
+                margin: 0;
+                padding: 0;
+            }}
+            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+            body {{ margin: 0; padding: 0; }}
+            .sticker {{
+                width: {width_in}in;
+                height: {height_in}in;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: white;
+            }}
+            img {{ max-width: 100%; max-height: 100%; width: 100%; height: 100%; }}
+        </style>
+    </head>
+    <body>
+        <div class="sticker">
+            <img src="data:image/svg+xml;base64,{svg_base64}" alt="sticker"/>
+        </div>
+    </body>
+</html>'''
     
-    # Helper function to embed font as base64
-    def embed_font_as_base64(font_path, font_name, format_type):
-        try:
-            with open(font_path, 'rb') as f:
-                font_data = base64.b64encode(f.read()).decode('utf-8')
-            return f"url('data:font/{format_type};base64,{font_data}') format('{format_type}')"
-        except Exception as e:
-            print(f"[PDF] Failed to embed font {font_name}: {e}")
-            return None
+    print(f"[PDF] HTML created with embedded SVG image")
     
-    # Build OpenDyslexic font face with embedded fonts
-    opendyslexic_woff2 = os.path.join(fonts_dir, 'OpenDyslexic-Regular.woff2')
-    opendyslexic_ttf = os.path.join(fonts_dir, 'OpenDyslexic-Regular.ttf')
-    
-    src_urls = []
-    if os.path.exists(opendyslexic_woff2):
-        embedded = embed_font_as_base64(opendyslexic_woff2, 'OpenDyslexic', 'woff2')
-        if embedded:
-            src_urls.append(embedded)
-    if os.path.exists(opendyslexic_ttf):
-        embedded = embed_font_as_base64(opendyslexic_ttf, 'OpenDyslexic', 'truetype')
-        if embedded:
-            src_urls.append(embedded)
-    
-    if src_urls:
-        font_face_rules += f'''
-        @font-face {{
-            font-family: 'OpenDyslexic';
-            src: {', '.join(src_urls)};
-            font-display: swap;
-        }}
-    '''
-    
-    # Add other project fonts if they exist
-    if os.path.exists(fonts_dir):
-        font_extensions = {'.woff2', '.woff', '.ttf', '.otf'}
-        font_names_set = set()
-        
-        for file in os.listdir(fonts_dir):
-            if os.path.splitext(file)[1].lower() in font_extensions:
-                font_base = os.path.splitext(file)[0]
-                font_name = font_base.rsplit('-', 1)[0] if '-' in font_base else font_base
-                if font_name not in ('OpenDyslexic',):  # Skip already defined
-                    font_names_set.add(font_name)
-        
-        for font_name in sorted(font_names_set):
-            # Try to find the best font file (prefer woff2, then woff, then ttf, then otf)
-            src_urls = []
-            for ext in ['.woff2', '.woff', '.ttf', '.otf']:
-                # Try exact name first, then with -Regular suffix
-                font_path = os.path.join(fonts_dir, font_name + ext)
-                if not os.path.exists(font_path):
-                    font_path = os.path.join(fonts_dir, font_name + '-Regular' + ext)
-                
-                if os.path.exists(font_path):
-                    format_type = _get_format(ext)
-                    embedded = embed_font_as_base64(font_path, font_name, format_type)
-                    if embedded:
-                        src_urls.append(embedded)
-            
-            if src_urls:
-                font_face_rules += f'''
-        @font-face {{
-            font-family: '{font_name}';
-            src: {', '.join(src_urls)};
-            font-display: swap;
-        }}
-    '''
-    
-    # Add SVG text CSS - don't override inline styles
-    svg_css = '''
-        svg text {
-            /* SVG text respects its own inline font-family style */
-        }
-    '''
-    
-    font_face_rules += svg_css
-    
-    # Create HTML wrapper for PDF with explicit sizing
-    html_content = f'''<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <style>
-        {font_face_rules}
-        
-        @page {{
-            size: {width_in}in {height_in}in;
-            margin: 0;
-            padding: 0;
-        }}
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        html, body {{ width: 100%; height: 100%; margin: 0; padding: 0; }}
-        body {{ margin: 0; padding: 0; }}
-        .sticker {{
-            width: {width_in}in;
-            height: {height_in}in;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            page-break-after: avoid;
-            background: white;
-        }}
-        svg {{ max-width: 100%; max-height: 100%; }}
-    </style>
-</head>
-<body>
-    <div class="sticker">
-        {svg_data}
-    </div>
-</body>
-</html>
-'''
-    
-    try:
-        print("[PDF] Creating HTML document...")
-        doc = HTML(string=html_content)
-        
-        print("[PDF] Writing to PDF (this may take a moment)...")
-        pdf_output = BytesIO()
-        doc.write_pdf(pdf_output, timeout=30)  # 30 second timeout
-        pdf_output.seek(0)
-        
-        print(f"[PDF] PDF generated successfully, size: {len(pdf_output.getvalue())} bytes")
-        return pdf_output
-        
-    except Exception as e:
-        print(f"[PDF] PDF generation error: {e}")
-        print("[PDF] Returning SVG as fallback")
-        # Return SVG fallback with proper content type
-        return BytesIO(svg_data.encode())
+    doc = HTML(string=html_content)
+    pdf_output = BytesIO()
+    doc.write_pdf(pdf_output)
+    pdf_output.seek(0)
+    print(f"[PDF] PDF generated successfully")
+    return pdf_output
 
 def generate_batch_stickers_pdf(template, records, data_getter):
     """
@@ -559,11 +671,13 @@ def generate_batch_stickers_pdf(template, records, data_getter):
     except ImportError:
         raise ImportError("WeasyPrint not installed")
     
+    import base64
+    
     MM_TO_IN = 1 / 25.4
     width_in = template.width_mm * MM_TO_IN
     height_in = template.height_mm * MM_TO_IN
     
-    # Create HTML with multiple stickers
+    # Create HTML with multiple stickers - embed SVGs as images
     html_content = f'''<html>
     <head>
         <meta charset="UTF-8">
@@ -584,7 +698,7 @@ def generate_batch_stickers_pdf(template, records, data_getter):
                 page-break-after: always;
                 background: white;
             }}
-            svg {{ max-width: 100%; max-height: 100%; }}
+            img {{ max-width: 100%; max-height: 100%; width: 100%; height: 100%; }}
         </style>
     </head>
     <body>
@@ -593,7 +707,9 @@ def generate_batch_stickers_pdf(template, records, data_getter):
     for record in records:
         data = data_getter(record)
         svg = render_template_to_svg(template, data)
-        html_content += f'<div class="sticker">{svg}</div>'
+        # Embed SVG as base64 image
+        svg_base64 = base64.b64encode(svg.encode()).decode('utf-8')
+        html_content += f'<div class="sticker"><img src="data:image/svg+xml;base64,{svg_base64}" alt="sticker"/></div>'
     
     html_content += '</body></html>'
     

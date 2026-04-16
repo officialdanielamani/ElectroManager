@@ -1,454 +1,366 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ item.name }} - Print</title>
-    <link href="{{ url_for('static', filename='lib/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='icons/bootstrap-icons.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    
-    <!-- Fix icon font paths to be dynamic -->
     <style>
-        @font-face {
-            font-family: 'bootstrap-icons';
-            src: url("{{ url_for('static', filename='icons/bootstrap-icons.woff2') }}") format("woff2"),
-                 url("{{ url_for('static', filename='icons/bootstrap-icons.woff') }}") format("woff");
-        }
-    </style>
-    <style>
+        /* ── Print margins fix ── */
+        @page { margin: 0; size: A4; }
+
+        /* ── Base ── */
+        :root { --fs: 12px; }
         body {
-            font-family: Arial, sans-serif;
-            font-size: 12px;
-            padding: 20px 40px;
-            margin: 20px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: var(--fs);
+            color: #333;
+            margin: 0;
+            padding: 16px;
         }
-        
-        .page-container {
-            max-width: 100%;
-            margin: 0 auto;
+
+        /* ── Global page-break prevention ──
+           .avoid-break  : never split this block across pages
+           .section-block: title stays glued to its first child content */
+        .avoid-break {
+            page-break-inside: avoid;
+            break-inside: avoid;
         }
-        
+        /* Prevent orphan section titles */
+        .section-title {
+            font-weight: bold;
+            font-size: 1.15em;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 3px;
+            margin: 14px 0 7px 0;
+            page-break-after: avoid;
+            break-after: avoid;
+        }
+        /* Each table row never splits */
+        tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        /* ── Toolbar (no-print) ── */
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 8px 10px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+        .toolbar button {
+            padding: 5px 12px;
+            cursor: pointer;
+            border: 1px solid #aaa;
+            border-radius: 4px;
+            background: #fff;
+            font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .toolbar button:hover { background: #e0e0e0; }
+        .toolbar button.active { background: #0d6efd; color: #fff; border-color: #0d6efd; }
+        .toolbar .sep { width: 1px; background: #bbb; align-self: stretch; margin: 0 2px; }
+        .font-size-display { font-size: 12px; color: #555; min-width: 46px; text-align: center; }
+
+        /* ── Header ── */
         .print-header {
-            margin-bottom: 20px;
             border-bottom: 2px solid #333;
             padding-bottom: 10px;
-        }
-        
-        .print-header h1 {
-            font-size: 24px;
-            margin: 0;
-        }
-        
-        .info-row {
+            margin-bottom: 14px;
             display: flex;
-            margin-bottom: 8px;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
             page-break-inside: avoid;
+            break-inside: avoid;
         }
-        
-        .info-label {
-            font-weight: 600;
-            width: 150px;
-            flex-shrink: 0;
-        }
-        
-        .info-value {
-            flex: 1;
-        }
-        
-        .section-title {
-            font-size: 16px;
-            font-weight: 600;
-            margin-top: 20px;
-            margin-bottom: 10px;
-            border-bottom: 1px solid #dee2e6;
-            padding-bottom: 5px;
-        }
-        
-        .description-content {
-            background-color: #f8f9fa;
-            padding: 15px;
-            border-left: 4px solid #0dcaf0;
+        .header-left { flex: 1; min-width: 0; }
+        .item-title { font-size: 1.6em; font-weight: bold; }
+        .uuid-code { font-family: monospace; background: #f0f0f0; padding: 2px 6px; border-radius: 3px; }
+
+        /* ── QR block ── */
+        .qr-block { flex-shrink: 0; text-align: center; }
+        .qr-block img { width: 150px; height: 150px; display: block; border: 1px solid #ddd; padding: 3px; border-radius: 3px; }
+        .qr-block .qr-label { font-size: 0.75em; color: #777; margin-top: 3px; }
+
+        /* ── Info grid ── */
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin-bottom: 14px; }
+        .info-item { padding: 3px 0; }
+        .info-label { font-weight: bold; color: #555; }
+        .info-value { margin-top: 2px; }
+
+        /* ── Tables ── */
+        .batch-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+        .batch-table th, .batch-table td { border: 1px solid #ccc; padding: 4px 7px; text-align: left; font-size: 0.9em; }
+        .batch-table th { background: #f0f0f0; font-weight: bold; }
+        .sn-table { width: 100%; border-collapse: collapse; font-size: 0.85em; margin-top: 5px; }
+        .sn-table th, .sn-table td { border: 1px solid #ddd; padding: 2px 6px; }
+        .sn-table th { background: #f5f5f5; }
+
+        /* ── Summary ── */
+        .summary-box {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 9px 12px;
             border-radius: 4px;
-            margin-bottom: 15px;
-            overflow-x: auto;
-            max-width: 100%;
-            box-sizing: border-box;
+            margin-bottom: 14px;
+            page-break-inside: avoid;
+            break-inside: avoid;
         }
-        
-        .description-content table {
-            width: 100%;
-            table-layout: fixed;
-        }
-        
-        .description-content table th,
-        .description-content table td {
-            word-wrap: break-word;
-            word-break: break-word;
-            overflow-wrap: break-word;
-            padding: 6px;
-        }
-        
-        .description-content pre {
-            max-width: 100%;
-            overflow-x: auto;
-        }
-        
-        .description-content code {
-            word-wrap: break-word;
-        }
-        
-        .badge {
-            font-size: 10px;
-            padding: 3px 6px;
-            display: inline-block;
-            margin-right: 4px;
-        }
-        
+
+        /* ── Badges ── */
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 0.9em; font-weight: bold; }
+        .badge-danger  { background: #f8d7da; color: #842029; }
+        .badge-warning { background: #fff3cd; color: #664d03; }
+        .badge-success { background: #d1e7dd; color: #0f5132; }
+
+        /* ── Images ── */
         .image-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: 10px;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
-        
-        .image-item {
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            overflow: hidden;
-            aspect-ratio: 1;
-        }
-        
-        .image-item img {
+        .image-grid img {
             width: 100%;
-            height: 100%;
+            height: 180px;
             object-fit: contain;
-            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            background: #fafafa;
         }
-        
-        .file-list {
-            list-style: none;
-            padding: 0;
-        }
-        
-        .file-list li {
-            padding: 8px;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            margin-bottom: 5px;
-            page-break-inside: avoid;
-        }
-        
-        .url-list {
-            list-style: none;
-            padding: 0;
-        }
-        
-        .url-list li {
-            padding: 8px;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            margin-bottom: 5px;
-            word-break: break-all;
-            page-break-inside: avoid;
-        }
-        
-        .url-list a {
-            color: #0d6efd;
-            text-decoration: none;
-        }
-        
-        .url-list a:hover {
-            text-decoration: underline;
-        }
-        
-        .file-url {
-            color: #6c757d;
-            font-size: 10px;
-        }
-        
-        .param-item {
-            padding: 8px;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            margin-bottom: 5px;
-            background-color: #f8f9fa;
-            page-break-inside: avoid;
-        }
-        
+        .image-caption { font-size: 0.8em; color: #666; text-align: center; margin-top: 2px; word-break: break-all; }
+
+        /* ── Footer ── */
         .print-footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
+            border-top: 1px solid #ccc;
+            padding-top: 7px;
+            margin-top: 18px;
+            font-size: 0.85em;
+            color: #999;
             text-align: center;
-            font-size: 9px;
-            color: #666;
-            padding: 10px 0;
-            border-top: 1px solid #dee2e6;
-            background-color: white;
+            page-break-inside: avoid;
+            break-inside: avoid;
         }
-        
+
+        /* ── Print media ── */
         @media print {
-            body {
-                padding: 15mm 15mm;
-                margin: 0;
-            }
-            
-            .print-footer {
-                position: fixed;
-                bottom: 0;
-            }
-            
-            .no-print {
-                display: none !important;
-            }
-            
-            .page-break {
-                page-break-before: always;
-            }
-            
-            @page {
-                margin: 0;
-                @bottom-center {
-                    content: counter(page);
-                }
-            }
-            
-            /* Ensure colors print */
-            * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-                color-adjust: exact !important;
-            }
-            
-            /* Make links visible in print */
-            a[href]:after {
-                content: "";
-            }
-        }
-        
-        @media screen {
-            body {
-                padding-bottom: 80px;
-                max-width: 800px;
-                margin: 20mm auto;
-                box-shadow: 0 0 10px rgba(0,0,0,0.1);
-                background-color: white;
-            }
-            
-            .print-footer {
-                position: relative;
-                margin-top: 30px;
-            }
+            body { padding: 10mm; }
+            .no-print { display: none !important; }
         }
     </style>
 </head>
 <body>
-    <!-- Print Header -->
+
+    <!-- Toolbar -->
+    <div class="toolbar no-print">
+        <button onclick="changeFontSize(-1)" title="Decrease font size">A&minus;</button>
+        <span class="font-size-display" id="fsDisplay">12px</span>
+        <button onclick="changeFontSize(1)" title="Increase font size">A+</button>
+        <div class="sep"></div>
+        <button id="btnQR" class="active" onclick="toggleSection('qr-block', 'btnQR')">&#128247; QR</button>
+        <button id="btnImg" class="active" onclick="toggleSection('images-wrapper', 'btnImg')">&#128444; Images</button>
+        <div class="sep"></div>
+        <button onclick="window.print()">&#128438; Print / Save PDF</button>
+        <button onclick="window.close()">&#10005; Close</button>
+    </div>
+
+    <!-- Header -->
     <div class="print-header">
-        <h1>{{ item.name }}</h1>
-    </div>
-    
-    <!-- Print Button (hidden in print mode) -->
-    <div class="no-print mb-3">
-        <button onclick="window.print()" class="btn btn-primary btn-sm">
-            <i class="bi bi-printer"></i> Print / Save as PDF
-        </button>
-        <button onclick="window.close()" class="btn btn-secondary btn-sm">
-            <i class="bi bi-x-circle"></i> Close
-        </button>
-    </div>
-    
-    <!-- Basic Information -->
-    <div class="section-title">Basic Information</div>
-    
-    <div class="info-row">
-        <div class="info-label">UUID:</div>
-        <div class="info-value"><code>{{ item.uuid }}</code></div>
-    </div>
-    
-    <div class="info-row">
-        <div class="info-label">SKU:</div>
-        <div class="info-value">{{ item.sku or 'N/A' }}</div>
-    </div>
-    
-    <div class="info-row">
-        <div class="info-label">Type / Model:</div>
-        <div class="info-value">{{ item.info or 'N/A' }}</div>
-    </div>
-    
-    <div class="info-row">
-        <div class="info-label">Category:</div>
-        <div class="info-value">
-            {% if item.category %}
-                <span class="badge" style="background-color: {{ item.category.color }}; color: white;">{{ item.category.name }}</span>
-            {% else %}
-                None
-            {% endif %}
+        <div class="header-left">
+            <div class="item-title">{{ item.name }}</div>
+            <div>UUID: <span class="uuid-code">{{ item.uuid }}</span></div>
+            {% if item.sku %}<div>SKU: {{ item.sku }}</div>{% endif %}
+            {% if item.info %}<div>Type/Model: {{ item.info }}</div>{% endif %}
+        </div>
+        <div class="qr-block" id="qr-block">
+            <img src="{{ url_for('item.item_qr_svg', uuid=item.uuid) }}" alt="QR Code">
+            <div class="qr-label">{{ item.uuid }}</div>
         </div>
     </div>
-    
-    <div class="info-row">
-        <div class="info-label">Footprint:</div>
-        <div class="info-value">{{ item.footprint.name if item.footprint else 'None' }}</div>
-    </div>
-    
-    <div class="info-row">
-        <div class="info-label">Location:</div>
-        <div class="info-value">{{ item.get_full_location() }}</div>
-    </div>
-    
-    <div class="info-row">
-        <div class="info-label">Tags:</div>
-        <div class="info-value">
-            {% if item.get_tags_list() %}
-                {% for tag in item.get_tags_list() %}
-                    <span class="badge" style="background-color: {{ tag.color }}; color: white;">{{ tag.name }}</span>
-                {% endfor %}
-            {% else %}
-                None
-            {% endif %}
+
+    <!-- Basic info -->
+    <div class="info-grid avoid-break">
+        <div class="info-item">
+            <div class="info-label">Category</div>
+            <div class="info-value">{{ item.category.name if item.category else 'None' }}</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Footprint</div>
+            <div class="info-value">{{ item.footprint.name if item.footprint else 'None' }}</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Location</div>
+            <div class="info-value">{{ item.get_full_location() }}</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Tags</div>
+            <div class="info-value">
+                {% for tag in item.get_tags_list() %}{{ tag.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+                {% if not item.get_tags_list() %}None{% endif %}
+            </div>
         </div>
     </div>
-    
-    <!-- Description -->
-    {% if item.description %}
-    <div class="section-title">Description</div>
-    <div class="description-content markdown-content">
-        {{ item.description|markdown }}
-    </div>
-    {% endif %}
-    
-    <!-- Quantity and Price -->
-    <div class="section-title">Quantity & Pricing</div>
-    
-    <div class="info-row">
-        <div class="info-label">Total Quantity:</div>
-        <div class="info-value"><strong>{{ item.quantity }}</strong></div>
-    </div>
-    
-    {% if item.lend_to %}
-    <div class="info-row">
-        <div class="info-label">Lent:</div>
-        <div class="info-value"><strong>{{ item.lend_quantity }}</strong> to {{ item.lend_to }}</div>
-    </div>
-    <div class="info-row">
-        <div class="info-label">Available:</div>
-        <div class="info-value"><strong>{{ item.get_available_quantity() }}</strong></div>
-    </div>
-    {% else %}
-    <div class="info-row">
-        <div class="info-label">Available:</div>
-        <div class="info-value"><strong>{{ item.quantity }}</strong></div>
-    </div>
-    {% endif %}
-    
-    <div class="info-row">
-        <div class="info-label">Min Quantity:</div>
-        <div class="info-value">{{ item.min_quantity }}</div>
-    </div>
-    
-    <div class="info-row">
-        <div class="info-label">Status:</div>
-        <div class="info-value">
-            {% if item.is_no_stock() %}
-                <span class="badge bg-danger">No Stock</span>
-            {% elif item.is_low_stock() %}
-                <span class="badge bg-warning text-dark">Low Stock (Min: {{ item.min_quantity }})</span>
-            {% else %}
-                <span class="badge bg-success">OK</span>
+
+    <!-- Summary -->
+    <div class="summary-box">
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">Overall Quantity</div>
+                <div class="info-value"><strong>{{ item.get_overall_quantity() }}</strong></div>
+            </div>
+            {% if item.get_total_lend_quantity() > 0 %}
+            <div class="info-item">
+                <div class="info-label">Lending</div>
+                <div class="info-value"><strong>{{ item.get_total_lend_quantity() }}</strong></div>
+            </div>
             {% endif %}
+            <div class="info-item">
+                <div class="info-label">Available</div>
+                <div class="info-value"><strong>{{ item.get_available_quantity() }}</strong></div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Min Quantity</div>
+                <div class="info-value">{{ item.min_quantity }}</div>
+            </div>
         </div>
-    </div>
-    
-    <div class="info-row">
-        <div class="info-label">Price per Unit:</div>
-        <div class="info-value">{{ item.price|format_amount(currency_decimal_places) }}</div>
-    </div>
-    
-    <div class="info-row">
-        <div class="info-label">Total Price:</div>
-        <div class="info-value"><strong>{{ item.get_total_price()|format_amount(currency_decimal_places) }}</strong></div>
-    </div>
-    
-    <!-- Magic Parameters -->
-    {% if item.magic_parameters %}
-    <div class="section-title">Magic Parameters</div>
-    {% for param in item.magic_parameters %}
-    <div class="param-item">
-        <strong>{{ param.parameter.name }}</strong>
-        {% if param.parameter.param_type == 'number' %}
-            {% if param.operation == 'min' %}MIN{% elif param.operation == 'max' %}MAX{% elif param.operation == 'range' %}RANGE{% elif param.operation == 'value' %}VALUE{% endif %}:
-            {{ param.value }} {% if param.operation == 'range' %}- {{ param.value2 }}{% endif %} {{ param.unit }}
-        {% elif param.parameter.param_type == 'date' %}
-            {% if param.operation == 'start' %}START{% elif param.operation == 'end' %}END{% elif param.operation == 'duration' %}DURATION{% endif %}
-            {% if param.operation != 'value' %}on {% endif %}{{ param.value }} {% if param.operation == 'duration' %}to {{ param.value2 }}{% endif %}
-        {% elif param.parameter.param_type == 'string' %}
-            {{ param.string_option }}
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">Overall Total Price</div>
+                <div class="info-value"><strong>{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(item.get_overall_total_price()) }}</strong></div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Average Price/Unit</div>
+                <div class="info-value">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(item.get_average_price()) }}</div>
+            </div>
+        </div>
+        {% if item.is_no_stock() %}
+            <span class="badge badge-danger">No Stock</span>
+        {% elif item.is_low_stock() %}
+            <span class="badge badge-warning">Low Stock (Min: {{ item.min_quantity }})</span>
+        {% else %}
+            <span class="badge badge-success">OK</span>
         {% endif %}
-        {% if param.description %}<br><small>{{ param.description }}</small>{% endif %}
     </div>
+
+    <!-- Batches -->
+    {% if item.batches %}
+    <div class="avoid-break">
+        <div class="section-title">Batches ({{ item.batches|length }})</div>
+        <table class="batch-table">
+            <thead>
+                <tr><th>#</th><th>Label</th><th>Qty</th><th>Price/Unit</th><th>Total</th><th>Date</th><th>Note</th></tr>
+            </thead>
+            <tbody>
+                {% for batch in item.batches %}
+                <tr>
+                    <td>{{ batch.batch_number }}</td>
+                    <td>{{ batch.get_display_label() }}</td>
+                    <td>{{ batch.quantity }}</td>
+                    <td>{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.price_per_unit) }}</td>
+                    <td>{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_price()) }}</td>
+                    <td>{{ batch.purchase_date.strftime('%d/%m/%Y') if batch.purchase_date else '-' }}</td>
+                    <td>{{ batch.note or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Serial Numbers — each batch in its own avoid-break block -->
+    {% for batch in item.batches %}
+    {% if batch.sn_tracking_enabled and batch.serial_numbers|length > 0 %}
+    <div class="avoid-break" style="margin-top: 8px; margin-bottom: 12px;">
+        <strong>{{ batch.get_display_label() }} &mdash; Serial Numbers</strong>
+        <table class="sn-table">
+            <thead><tr><th>No</th><th>SN</th><th>ISN</th></tr></thead>
+            <tbody>
+                {% for sn in batch.serial_numbers %}
+                <tr>
+                    <td>{{ sn.sequence_number }}</td>
+                    <td>{{ sn.serial_number or '-' }}</td>
+                    <td style="font-family: monospace; font-size: 0.85em;">{{ sn.internal_serial_number }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
     {% endfor %}
     {% endif %}
-    
+
+    <!-- Description -->
+    {% if item.description %}
+    <div class="avoid-break">
+        <div class="section-title">Description</div>
+        <div style="padding: 5px 0;">{{ item.description }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Magic Parameters -->
+    {% if item.magic_parameters %}
+    <div class="avoid-break">
+        <div class="section-title">Magic Parameters</div>
+        {% for param in item.magic_parameters %}
+        <div style="padding: 2px 0; font-size: 0.9em;">{{ param.get_display_text() }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Datasheets -->
+    {% if datasheets %}
+    <div class="avoid-break">
+        <div class="section-title">Datasheets</div>
+        {% for ds in datasheets %}
+        <div style="padding: 2px 0; font-size: 0.9em;">
+            {{ ds.title or ds.url }}{% if ds.info %} &mdash; {{ ds.info }}{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <!-- Images -->
     {% set images = item.attachments | selectattr('file_type', 'in', ['png', 'jpg', 'jpeg', 'gif', 'webp']) | list %}
     {% if images %}
-    <div class="section-title">Images ({{ images|length }})</div>
-    <div class="image-grid">
-        {% for att in images %}
-        <div class="image-item">
-            <img src="{{ url_for('uploaded_file', filename=att.filename) }}" alt="{{ att.original_filename }}">
+    <div id="images-wrapper">
+        <div class="section-title">Images ({{ images|length }})</div>
+        <div class="image-grid">
+            {% for att in images %}
+            <div class="avoid-break">
+                <img src="{{ url_for('uploaded_file', filename=att.filename) }}" alt="{{ att.original_filename }}">
+                <div class="image-caption">{{ att.original_filename }}</div>
+            </div>
+            {% endfor %}
         </div>
-        {% endfor %}
     </div>
     {% endif %}
-    
-    <!-- Other Files -->
-    {% set other_files = item.attachments | rejectattr('file_type', 'in', ['png', 'jpg', 'jpeg', 'gif', 'webp']) | list %}
-    {% if other_files %}
-    <div class="section-title">Other Files ({{ other_files|length }})</div>
-    <ul class="file-list">
-        {% for att in other_files %}
-        <li>
-            <i class="bi bi-file-earmark-{% if att.file_type == 'pdf' %}pdf{% elif att.file_type in ['doc', 'docx'] %}word{% elif att.file_type in ['xls', 'xlsx'] %}excel{% elif att.file_type == 'txt' %}text{% else %}fill{% endif %}"></i>
-            <strong>{{ att.original_filename }}</strong><br>
-            <small>{{ att.file_type.upper() }} - {{ "%.2f"|format(att.file_size / 1024 / 1024) }} MB</small><br>
-            <a href="{{ url_for('uploaded_file', filename=att.filename, _external=True) }}" class="file-url" target="_blank">{{ url_for('uploaded_file', filename=att.filename, _external=True) }}</a>
-        </li>
-        {% endfor %}
-    </ul>
-    {% endif %}
-    
-    <!-- Datasheet URLs -->
-    {% if datasheets %}
-    <div class="section-title">Datasheets</div>
-    <ul class="url-list">
-        {% for ds in datasheets %}
-        <li>
-            {% if ds.title %}<strong>{{ ds.title }}</strong><br>{% endif %}
-            {% if ds.info %}<small>{{ ds.info }}</small><br>{% endif %}
-            <a href="{{ ds.url }}" target="_blank">{{ ds.url }}</a>
-        </li>
-        {% endfor %}
-    </ul>
-    {% endif %}
-    
-    <!-- Timestamps -->
-    <div class="section-title">Timestamps</div>
-    <div class="info-row">
-        <div class="info-label">Created:</div>
-        <div class="info-value">{{ item.created_at.strftime('%Y-%m-%d %H:%M:%S') if item.created_at else 'N/A' }}</div>
-    </div>
-    <div class="info-row">
-        <div class="info-label">Last Updated:</div>
-        <div class="info-value">{{ item.updated_at.strftime('%Y-%m-%d %H:%M:%S') if item.updated_at else 'N/A' }}</div>
-    </div>
-    
-    <!-- Print Footer -->
+
+    <!-- Footer -->
     <div class="print-footer">
-        The data is printed by {{ current_user.username }} at {{ current_datetime }}. This data may change in future.
+        Printed: {{ current_datetime }} | {{ item.name }} ({{ item.uuid }}) | {{ current_user.username }}
     </div>
+
+    <script>
+        var currentFs = 12;
+        function changeFontSize(delta) {
+            currentFs = Math.min(20, Math.max(8, currentFs + delta));
+            document.documentElement.style.setProperty('--fs', currentFs + 'px');
+            document.getElementById('fsDisplay').textContent = currentFs + 'px';
+        }
+        function toggleSection(sectionId, btnId) {
+            var el = document.getElementById(sectionId);
+            var btn = document.getElementById(btnId);
+            if (!el) return;
+            var hidden = el.style.display === 'none';
+            el.style.display = hidden ? '' : 'none';
+            if (btn) btn.classList.toggle('active', hidden);
+        }
+    </script>
 </body>
 </html>

@@ -21,10 +21,8 @@ class Setting(db.Model):
     
     @staticmethod
     def get(key, default=None):
-        """Get setting value by key"""
         setting = Setting.query.filter_by(key=key).first()
         if setting:
-            # Convert string to boolean for boolean settings
             if setting.value in ['true', 'false']:
                 return setting.value == 'true'
             return setting.value
@@ -32,7 +30,6 @@ class Setting(db.Model):
     
     @staticmethod
     def set(key, value, description=None):
-        """Set setting value"""
         setting = Setting.query.filter_by(key=key).first()
         if setting:
             setting.value = str(value).lower() if isinstance(value, bool) else str(value)
@@ -51,15 +48,14 @@ class Location(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     uuid = db.Column(db.String(12), unique=True, nullable=False)
-    name = db.Column(db.String(100), nullable=False)  # No longer unique - allows duplicate names
+    name = db.Column(db.String(100), nullable=False)
     info = db.Column(db.String(500))
     description = db.Column(db.Text)
-    picture = db.Column(db.String(200))  # Now stores {location_uuid}/{picture_uuid}.ext
-    color = db.Column(db.String(7), default='#6c757d')  # hex color
+    picture = db.Column(db.String(200))
+    color = db.Column(db.String(7), default='#6c757d')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
-    # Relationships
     racks = db.relationship('Rack', backref='physical_location', lazy=True, foreign_keys='Rack.location_id')
     items = db.relationship('Item', backref='general_location', lazy=True, foreign_keys='Item.location_id')
     
@@ -79,43 +75,26 @@ class Role(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
     description = db.Column(db.Text)
-    is_system_role = db.Column(db.Boolean, default=False)  # True for Admin, Manager, Viewer templates
-    
-    # Permissions JSON structure: {"items": {"view": true, "edit": true, "delete": true}, ...}
+    is_system_role = db.Column(db.Boolean, default=False)
     permissions = db.Column(db.Text, default='{}', nullable=False)
-    
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    
-    # Relationships
     users = db.relationship('User', backref='user_role', lazy=True)
     
     def get_permissions(self):
-        """Get permissions as dictionary"""
         try:
             return json.loads(self.permissions) if self.permissions else {}
         except (json.JSONDecodeError, TypeError):
             return {}
     
     def set_permissions(self, perms):
-        """Set permissions from dictionary"""
         json_str = json.dumps(perms)
         self.permissions = json_str
-        # Mark the column as modified to ensure SQLAlchemy detects the change
         from sqlalchemy.orm import attributes
         attributes.flag_modified(self, 'permissions')
     
     def has_permission(self, resource, action):
-        """Check if role has specific permission
-        
-        Handles both old and new permission structures:
-        - items.view -> perms['items']['view']
-        - pages.visual_storage.view -> perms['pages']['visual_storage']['view']
-        - settings_sections.reports.view -> perms['settings_sections']['reports']['view']
-        """
         perms = self.get_permissions()
-        
-        # Handle nested resources (e.g., "pages.visual_storage" or "settings_sections.reports")
         if '.' in resource:
             parts = resource.split('.')
             current = perms
@@ -123,10 +102,7 @@ class Role(db.Model):
                 if not isinstance(current, dict) or part not in current:
                     return False
                 current = current[part]
-            # Now check the action in the final nested dict
             return current.get(action, False) if isinstance(current, dict) else False
-        
-        # Handle simple resources (e.g., "items")
         return perms.get(resource, {}).get(action, False)
     
     def __repr__(self):
@@ -142,19 +118,20 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'), nullable=False)
     theme = db.Column(db.String(20), default='light')
-    user_font = db.Column(db.String(50), default='system')  # Font family selection (system, open-dyslexic, courier)
-    table_columns_view = db.Column(db.Text, default='["name", "category", "tags", "type_model", "sku", "footprint", "quantity", "total_price", "price_per_unit", "location", "uuid", "status"]')  # JSON array of column names
+    user_font = db.Column(db.String(50), default='system')
+    table_columns_view = db.Column(db.Text, default='["name", "category", "tags", "type_model", "sku", "footprint", "quantity", "total_price", "price_per_unit", "location", "uuid", "status"]')
+    project_table_columns_view = db.Column(db.Text, default='["project_name", "info", "categories", "tags", "date_start", "dateline", "total_cost", "status", "users", "group", "project_id"]')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     is_active = db.Column(db.Boolean, default=True)
     is_demo_user = db.Column(db.Boolean, default=False)
-    max_login_attempts = db.Column(db.Integer, default=0)  # 0 = unlimited attempts
-    allow_password_reset = db.Column(db.Boolean, default=True)  # User can reset own password
-    profile_photo = db.Column(db.String(255))  # Filename of profile photo
-    allow_profile_picture_change = db.Column(db.Boolean, default=True)  # User can change own profile picture
-    failed_login_attempts = db.Column(db.Integer, default=0)  # Counter for failed attempts
-    account_locked_until = db.Column(db.DateTime)  # Timestamp when account will be unlocked
-    auto_unlock_enabled = db.Column(db.Boolean, default=True)  # Auto-unlock after time enabled
-    auto_unlock_minutes = db.Column(db.Integer, default=15)  # Minutes to unlock (5, 15, 30, 60, 360, 720, 1440, 4320)
+    max_login_attempts = db.Column(db.Integer, default=0)
+    allow_password_reset = db.Column(db.Boolean, default=True)
+    profile_photo = db.Column(db.String(255))
+    allow_profile_picture_change = db.Column(db.Boolean, default=True)
+    failed_login_attempts = db.Column(db.Integer, default=0)
+    account_locked_until = db.Column(db.DateTime)
+    auto_unlock_enabled = db.Column(db.Boolean, default=True)
+    auto_unlock_minutes = db.Column(db.Integer, default=15)
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -163,14 +140,11 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, password)
     
     def is_admin(self):
-        """Check if user has admin role"""
         return self.user_role and self.user_role.name == 'Admin'
     
     def is_editor(self):
-        """Check if user has editor permission (can edit items)"""
         if self.is_admin():
-            return True  # Admin can edit
-        # Can edit if user has create, edit_name, or any edit_ permission for items
+            return True
         return self.has_permission('items', 'view') and (
             self.has_permission('items', 'create') or 
             self.has_permission('items', 'edit_name') or 
@@ -179,24 +153,32 @@ class User(UserMixin, db.Model):
             self.has_permission('items', 'edit_quantity') or
             self.has_permission('items', 'edit_location') or
             self.has_permission('items', 'edit_classification') or
-            self.has_permission('items', 'edit_parameters')
+            self.has_permission('items', 'edit_parameters') or
+            self.has_permission('items', 'edit_batch')
         )
     
     def has_permission(self, resource, action):
-        """Check if user has specific permission"""
         if self.is_admin():
-            return True  # Admin has all permissions
+            return True
         return self.user_role and self.user_role.has_permission(resource, action)
     
     def get_table_columns(self):
-        """Get user's preferred table columns as list"""
         try:
             return json.loads(self.table_columns_view)
         except (json.JSONDecodeError, TypeError):
             return ["name", "category", "tags", "type_model", "sku", "footprint", "quantity", "total_price", "price_per_unit", "location", "uuid", "status"]
     
     def set_table_columns(self, columns):
-        """Set user's preferred table columns"""
+        self.table_columns_view = json.dumps(columns)
+
+    def get_project_table_columns(self):
+        try:
+            return json.loads(self.project_table_columns_view)
+        except (json.JSONDecodeError, TypeError):
+            return ["project_name", "info", "categories", "tags", "date_start", "dateline", "total_cost", "status", "users", "group", "project_id"]
+
+    def set_project_table_columns(self, columns):
+        self.project_table_columns_view = json.dumps(columns)
         self.table_columns_view = json.dumps(columns)
     
     def __repr__(self):
@@ -205,66 +187,56 @@ class User(UserMixin, db.Model):
 
 class Category(db.Model):
     __tablename__ = 'categories'
-    
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
     description = db.Column(db.Text)
     color = db.Column(db.String(7), default='#6c757d')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    
     items = db.relationship('Item', backref='category', lazy=True)
-    
     def __repr__(self):
         return f'<Category {self.name}>'
 
 
 class Footprint(db.Model):
     __tablename__ = 'footprints'
-    
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
     description = db.Column(db.Text)
     color = db.Column(db.String(7), default='#6c757d')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    
     items = db.relationship('Item', backref='footprint', lazy=True)
-    
     def __repr__(self):
         return f'<Footprint {self.name}>'
 
 
 class Tag(db.Model):
     __tablename__ = 'tags'
-    
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
     description = db.Column(db.Text)
     color = db.Column(db.String(7), default='#6c757d')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    
     def __repr__(self):
         return f'<Tag {self.name}>'
 
 
 class Rack(db.Model):
     __tablename__ = 'racks'
-    
     id = db.Column(db.Integer, primary_key=True)
     uuid = db.Column(db.String(12), unique=True, nullable=False)
-    name = db.Column(db.String(100), nullable=False)  # No longer unique - allows duplicate names
+    name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
-    picture = db.Column(db.String(200))  # filename
-    color = db.Column(db.String(7), default='#6c757d')  # hex color
+    picture = db.Column(db.String(200))
+    color = db.Column(db.String(7), default='#6c757d')
     rows = db.Column(db.Integer, default=5)
     cols = db.Column(db.Integer, default=5)
-    unavailable_drawers = db.Column(db.Text)  # JSON array of unavailable drawer IDs like ["R1-C1", "R2-C3"]
+    unavailable_drawers = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    
     items = db.relationship('Item', backref='rack', lazy=True)
     
     def __init__(self, **kwargs):
@@ -274,7 +246,6 @@ class Rack(db.Model):
             self.uuid = ''.join(secrets.choice(chars) for _ in range(12))
     
     def get_unavailable_drawers(self):
-        """Get list of unavailable drawer IDs"""
         if not self.unavailable_drawers:
             return []
         try:
@@ -283,8 +254,12 @@ class Rack(db.Model):
             return []
     
     def is_drawer_unavailable(self, drawer_id):
-        """Check if a drawer is marked as unavailable"""
         return drawer_id in self.get_unavailable_drawers()
+    
+    def get_drawer_uuid(self, row, col):
+        row_str = f"R{int(row):02d}"
+        col_str = f"C{int(col):02d}"
+        return f"{self.uuid}{row_str}{col_str}"
     
     def __repr__(self):
         return f'<Rack {self.name}>'
@@ -299,6 +274,8 @@ class Item(db.Model):
     sku = db.Column(db.String(100))
     info = db.Column(db.String(500))
     description = db.Column(db.Text)
+    
+    # Kept for backward compat - recalculated from batches
     quantity = db.Column(db.Integer, default=0)
     price = db.Column(db.Float, default=0.0)
     
@@ -311,10 +288,16 @@ class Item(db.Model):
     footprint_id = db.Column(db.Integer, db.ForeignKey('footprints.id'))
     tags = db.Column(db.Text)
     
-    lend_to = db.Column(db.String(200))
-    lend_quantity = db.Column(db.Integer, default=0)
     datasheet_urls = db.Column(db.Text)
     no_stock_warning = db.Column(db.Boolean, default=True)
+    
+    # Serial number tracking is now per-batch; item-level field kept for backward compat
+    sn_tracking_enabled = db.Column(db.Boolean, default=False)
+    
+    @property
+    def has_any_tracking(self):
+        """True if any batch has SN tracking enabled"""
+        return any(b.sn_tracking_enabled for b in self.batches)
     
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -325,6 +308,7 @@ class Item(db.Model):
     updater = db.relationship('User', foreign_keys=[updated_by], backref='items_updated')
     
     attachments = db.relationship('Attachment', backref='item', lazy=True, cascade='all, delete-orphan')
+    batches = db.relationship('ItemBatch', backref='item', lazy=True, cascade='all, delete-orphan', order_by='ItemBatch.batch_number')
     
     def __init__(self, **kwargs):
         super(Item, self).__init__(**kwargs)
@@ -341,39 +325,64 @@ class Item(db.Model):
         return 'Not specified'
     
     def get_available_quantity(self):
-        return self.quantity - (self.lend_quantity or 0)
+        return sum(b.get_available_quantity() for b in self.batches)
+    
+    def get_total_lend_quantity(self):
+        """Total lent quantity across all batches"""
+        return sum(b.get_lend_quantity() for b in self.batches)
+    
+    def get_overall_quantity(self):
+        """Total quantity across all batches"""
+        return sum(b.quantity for b in self.batches)
+    
+    def get_overall_total_price(self):
+        """Total price across all batches"""
+        return sum(b.get_batch_total_price() for b in self.batches)
+    
+    def get_average_price(self):
+        """Average price per unit"""
+        total_qty = self.get_overall_quantity()
+        if total_qty == 0:
+            return 0.0
+        return self.get_overall_total_price() / total_qty
+    
+    def recalculate_from_batches(self):
+        """Sync quantity/price fields from batches"""
+        self.quantity = self.get_overall_quantity()
+        total = self.get_overall_total_price()
+        if self.quantity > 0:
+            self.price = total / self.quantity
+        else:
+            self.price = 0.0
     
     def is_no_stock(self):
-        # Show "No Stock" if: available <= 0 AND warning enabled
         available = self.get_available_quantity()
-        if available <= 0 and self.no_stock_warning:
-            return True
-        return False
+        return available <= 0 and self.no_stock_warning
     
     def is_low_stock(self):
-        # Show "Low Stock" if:
-        # 1. available < min_quantity AND available > 0 AND warning disabled (below min but positive stock)
-        # 2. OR available <= 0 AND warning disabled (zero/negative stock with warning off)
         available = self.get_available_quantity()
         if available < self.min_quantity:
-            # Below min - check if this should be low stock or no stock
             if available <= 0 and self.no_stock_warning:
-                # This is no stock, not low stock
                 return False
-            # All other cases below min = low stock
             return True
         return False
     
     def is_ok_stock(self):
-        # Show "OK" if: available >= min_quantity
-        available = self.get_available_quantity()
-        if available >= self.min_quantity:
-            return True
-        return False
+        return self.get_available_quantity() >= self.min_quantity
+    
+    def get_drawer_uuid(self):
+        if not self.rack or not self.drawer:
+            return None
+        import re
+        match = re.match(r'R(\d+)-C(\d+)', self.drawer)
+        if not match:
+            return None
+        row = int(match.group(1))
+        col = int(match.group(2))
+        return self.rack.get_drawer_uuid(row, col)
     
     def get_total_price(self):
-        """Calculate total price (price per qty * quantity)"""
-        return self.price * self.quantity if self.price else 0.0
+        return self.get_overall_total_price()
     
     def get_tags_list(self):
         if not self.tags:
@@ -387,13 +396,146 @@ class Item(db.Model):
     def get_tags(self):
         return self.get_tags_list()
     
+    def get_next_batch_number(self):
+        max_batch = db.session.query(db.func.max(ItemBatch.batch_number)).filter_by(item_id=self.id).scalar()
+        return (max_batch or 0) + 1
+    
     def __repr__(self):
         return f'<Item {self.name}>'
 
 
+class ItemBatch(db.Model):
+    """A batch/purchase of an item"""
+    __tablename__ = 'item_batches'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    item_id = db.Column(db.Integer, db.ForeignKey('items.id'), nullable=False)
+    batch_number = db.Column(db.Integer, nullable=False)
+    batch_label = db.Column(db.String(32))
+    quantity = db.Column(db.Integer, default=0)
+    price_per_unit = db.Column(db.Float, default=0.0)
+    purchase_date = db.Column(db.Date)
+    note = db.Column(db.String(128))
+    lend_to = db.Column(db.String(200), default='')
+    lend_quantity = db.Column(db.Integer, default=0)
+    sn_tracking_enabled = db.Column(db.Boolean, default=False)
+    
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    
+    serial_numbers = db.relationship('BatchSerialNumber', backref='batch', lazy=True, cascade='all, delete-orphan', order_by='BatchSerialNumber.sequence_number')
+    
+    def get_batch_total_price(self):
+        return self.price_per_unit * self.quantity if self.price_per_unit else 0.0
+    
+    def get_display_label(self):
+        if self.batch_label:
+            return self.batch_label
+        return f"Batch {self.batch_number}"
+    
+    def get_lend_quantity(self):
+        """Get total lend quantity - from individual SNs if tracking enabled, else from batch field"""
+        if self.sn_tracking_enabled:
+            return sum(1 for sn in self.serial_numbers if sn.lend_to and sn.lend_to.strip())
+        return self.lend_quantity or 0
+
+    def get_project_used_quantity(self):
+        """Get total quantity used (marked as used) in projects for this batch"""
+        from models import ProjectBOMItem
+        return db.session.query(db.func.coalesce(db.func.sum(ProjectBOMItem.quantity), 0)).filter(
+            ProjectBOMItem.batch_id == self.id,
+            ProjectBOMItem.used == True
+        ).scalar()
+
+    def get_project_used_sn_ids(self):
+        """Get set of serial number IDs used in projects"""
+        from models import ProjectBOMItem
+        bom_items = ProjectBOMItem.query.filter(
+            ProjectBOMItem.batch_id == self.id,
+            ProjectBOMItem.used == True,
+            ProjectBOMItem.serial_numbers.isnot(None)
+        ).all()
+        ids = set()
+        for bom in bom_items:
+            try:
+                ids.update(json.loads(bom.serial_numbers))
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return ids
+
+    def get_project_names_for_batch(self):
+        """Get list of project names that use this batch (used=True)"""
+        from models import ProjectBOMItem, Project
+        bom_items = ProjectBOMItem.query.filter(
+            ProjectBOMItem.batch_id == self.id,
+            ProjectBOMItem.used == True
+        ).all()
+        names = []
+        for bom in bom_items:
+            if bom.project and bom.project.name not in names:
+                names.append(bom.project.name)
+        return names
+
+    def get_available_quantity(self):
+        return self.quantity - self.get_lend_quantity() - self.get_project_used_quantity()
+    
+    def generate_serial_numbers(self):
+        """Generate ISN serial numbers for all units in this batch"""
+        item = Item.query.get(self.item_id)
+        if not item:
+            return
+        # Preserve existing info/lend_to data
+        existing_data = {}
+        for sn in self.serial_numbers:
+            existing_data[sn.sequence_number] = {
+                'serial_number': sn.serial_number,
+                'info': sn.info or '',
+                'lend_to': sn.lend_to or ''
+            }
+        BatchSerialNumber.query.filter_by(batch_id=self.id).delete()
+        qty = min(self.quantity, 100)
+        date_str = self.purchase_date.strftime('%Y%m%d') if self.purchase_date else '00000000'
+        label = self.batch_label or f"B{self.batch_number}"
+        for i in range(1, qty + 1):
+            isn = f"{item.uuid}-{date_str}-{label}-{i:03d}"
+            old = existing_data.get(i, {})
+            sn = BatchSerialNumber(
+                batch_id=self.id,
+                sequence_number=i,
+                internal_serial_number=isn,
+                serial_number=old.get('serial_number', ''),
+                info=old.get('info', ''),
+                lend_to=old.get('lend_to', '')
+            )
+            db.session.add(sn)
+    
+    def regenerate_serial_numbers_if_enabled(self):
+        if self.sn_tracking_enabled:
+            self.generate_serial_numbers()
+    
+    def __repr__(self):
+        return f'<ItemBatch #{self.batch_number} for Item {self.item_id}>'
+
+
+class BatchSerialNumber(db.Model):
+    """Serial number tracking for individual units in a batch"""
+    __tablename__ = 'batch_serial_numbers'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    batch_id = db.Column(db.Integer, db.ForeignKey('item_batches.id'), nullable=False)
+    sequence_number = db.Column(db.Integer, nullable=False)
+    serial_number = db.Column(db.String(200), default='')
+    internal_serial_number = db.Column(db.String(200), nullable=False)
+    info = db.Column(db.String(32), default='')
+    lend_to = db.Column(db.String(200), default='')
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    
+    def __repr__(self):
+        return f'<BatchSerialNumber {self.internal_serial_number}>'
+
+
 class Attachment(db.Model):
     __tablename__ = 'attachments'
-    
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(255), nullable=False)
     original_filename = db.Column(db.String(255), nullable=False)
@@ -403,14 +545,12 @@ class Attachment(db.Model):
     item_id = db.Column(db.Integer, db.ForeignKey('items.id'), nullable=False)
     uploaded_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     uploaded_by = db.Column(db.Integer, db.ForeignKey('users.id'))
-    
     def __repr__(self):
         return f'<Attachment {self.original_filename}>'
 
 
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
-    
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     action = db.Column(db.String(50), nullable=False)
@@ -418,41 +558,71 @@ class AuditLog(db.Model):
     entity_id = db.Column(db.Integer)
     details = db.Column(db.Text)
     timestamp = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    
     user = db.relationship('User', backref='audit_logs')
-    
     def __repr__(self):
         return f'<AuditLog {self.action} {self.entity_type}>'
 
 
-# Magic Parameter Models
 class MagicParameter(db.Model):
     __tablename__ = 'magic_parameters'
-    
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), unique=True, nullable=False)
-    param_type = db.Column(db.String(50), nullable=False)  # 'number', 'date', 'string'
+    param_type = db.Column(db.String(50), nullable=False)
     description = db.Column(db.Text)
-    notify_enabled = db.Column(db.Boolean, default=False)  # For date type
+    notify_enabled = db.Column(db.Boolean, default=False)
+    is_whole_number = db.Column(db.Boolean, default=True)
+    number_min = db.Column(db.Float)
+    number_max = db.Column(db.Float)
+    number_step = db.Column(db.Float)
+    number_decimal_places = db.Column(db.Integer, default=0)
+    number_required = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    
-    # Relationships
     units = db.relationship('ParameterUnit', backref='parameter', lazy=True, cascade='all, delete-orphan')
     string_options = db.relationship('ParameterStringOption', backref='parameter', lazy=True, cascade='all, delete-orphan')
     item_parameters = db.relationship('ItemParameter', backref='parameter', lazy=True, cascade='all, delete-orphan')
     
     def get_units_list(self):
-        """Get list of units for number type parameters"""
         if self.param_type == 'number':
             return [unit.unit for unit in self.units]
         return []
     
     def get_string_options_list(self):
-        """Get list of string options for string type parameters"""
         if self.param_type == 'string':
             return [option.value for option in self.string_options]
         return []
+    
+    def validate_number_value(self, value, is_range_start=False):
+        if self.param_type != 'number':
+            return True, None
+        try:
+            num_value = float(value)
+        except (ValueError, TypeError):
+            return False, f"Invalid number format: {value}"
+        if self.is_whole_number:
+            if num_value != int(num_value):
+                return False, f"Must be a whole number, got {value}"
+            num_value = int(num_value)
+        else:
+            decimal_str = str(value).split('.')
+            if len(decimal_str) > 1 and len(decimal_str[1]) > self.number_decimal_places:
+                return False, f"Maximum {self.number_decimal_places} decimal places allowed"
+        if self.number_min is not None:
+            if num_value < self.number_min:
+                return False, f"Value must be >= {self.number_min}"
+        if self.number_max is not None:
+            if num_value > self.number_max:
+                return False, f"Value must be <= {self.number_max}"
+        if self.number_step and self.number_step > 0:
+            base = self.number_min if self.number_min is not None else 0
+            if self.is_whole_number:
+                if abs((num_value - base) % int(self.number_step)) > 0.0001:
+                    return False, f"Value must be a multiple of {int(self.number_step)} from base {int(base)}"
+            else:
+                remainder = abs((num_value - base) % self.number_step)
+                if remainder > 0.0001 and remainder < (self.number_step - 0.0001):
+                    return False, f"Value must be a multiple of {self.number_step} from base {base}"
+        return True, None
     
     def __repr__(self):
         return f'<MagicParameter {self.name} ({self.param_type})>'
@@ -460,58 +630,45 @@ class MagicParameter(db.Model):
 
 class ParameterUnit(db.Model):
     __tablename__ = 'parameter_units'
-    
     id = db.Column(db.Integer, primary_key=True)
     parameter_id = db.Column(db.Integer, db.ForeignKey('magic_parameters.id'), nullable=False)
     unit = db.Column(db.String(50), nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    
-    # Unique constraint for parameter_id and unit combination
     __table_args__ = (db.UniqueConstraint('parameter_id', 'unit', name='_parameter_unit_uc'),)
-    
     def __repr__(self):
         return f'<ParameterUnit {self.unit}>'
 
 
 class ParameterStringOption(db.Model):
     __tablename__ = 'parameter_string_options'
-    
     id = db.Column(db.Integer, primary_key=True)
     parameter_id = db.Column(db.Integer, db.ForeignKey('magic_parameters.id'), nullable=False)
     value = db.Column(db.String(200), nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    
-    # Unique constraint for parameter_id and value combination
     __table_args__ = (db.UniqueConstraint('parameter_id', 'value', name='_parameter_value_uc'),)
-    
     def __repr__(self):
         return f'<ParameterStringOption {self.value}>'
 
 
 class ItemParameter(db.Model):
     __tablename__ = 'item_parameters'
-    
     id = db.Column(db.Integer, primary_key=True)
     item_id = db.Column(db.Integer, db.ForeignKey('items.id'), nullable=False)
     parameter_id = db.Column(db.Integer, db.ForeignKey('magic_parameters.id'), nullable=False)
-    operation = db.Column(db.String(50))  # 'min', 'max', 'value', 'range', 'start', 'end', 'duration'
-    value = db.Column(db.String(200))  # For single values
-    value2 = db.Column(db.String(200))  # For range/duration second value
-    unit = db.Column(db.String(50))  # Unit for number type
-    string_option = db.Column(db.String(200))  # Selected option for string type
+    operation = db.Column(db.String(50))
+    value = db.Column(db.String(200))
+    value2 = db.Column(db.String(200))
+    unit = db.Column(db.String(50))
+    string_option = db.Column(db.String(200))
     description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    
-    # Relationship
-    item = db.relationship('Item', backref='magic_parameters', lazy=True)
+    item = db.relationship('Item', backref=db.backref('magic_parameters', cascade='all, delete-orphan', lazy=True))
     
     def get_display_text(self):
-        """Generate display text for the parameter"""
         param = self.parameter
         if not param:
             return "Unknown Parameter"
-        
         if param.param_type == 'number':
             if self.operation == 'min':
                 return f"MIN: {param.name} {self.value} {self.unit or ''} {self.description or ''}".strip()
@@ -519,9 +676,8 @@ class ItemParameter(db.Model):
                 return f"MAX: {param.name} {self.value} {self.unit or ''} {self.description or ''}".strip()
             elif self.operation == 'range':
                 return f"RANGE: {param.name} {self.value} {self.unit or ''} - {self.value2} {self.unit or ''} {self.description or ''}".strip()
-            else:  # value
+            else:
                 return f"VALUE: {param.name} {self.value} {self.unit or ''} {self.description or ''}".strip()
-        
         elif param.param_type == 'date':
             if self.operation == 'start':
                 return f"START: {param.name} on {self.value} {self.description or ''}".strip()
@@ -529,16 +685,13 @@ class ItemParameter(db.Model):
                 return f"END: {param.name} on {self.value} {self.description or ''}".strip()
             elif self.operation == 'duration':
                 return f"DURATION: {param.name} {self.value} to {self.value2} {self.description or ''}".strip()
-            else:  # value
+            else:
                 return f"{param.name} on {self.value} {self.description or ''}".strip()
-        
         elif param.param_type == 'string':
             return f"{param.name}: {self.string_option} {self.description or ''}".strip()
-        
         return "Invalid Parameter"
     
     def check_notification(self):
-        """Check if this parameter should trigger a notification (for date type)"""
         if self.parameter.param_type == 'date' and self.parameter.notify_enabled:
             from datetime import datetime
             try:
@@ -563,44 +716,35 @@ class ItemParameter(db.Model):
 
 class ParameterTemplate(db.Model):
     __tablename__ = 'parameter_templates'
-    
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), unique=True, nullable=False)
     description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    
-    # Relationships
     template_parameters = db.relationship('TemplateParameter', backref='template', lazy=True, cascade='all, delete-orphan')
-    
     def __repr__(self):
         return f'<ParameterTemplate {self.name}>'
 
 
 class TemplateParameter(db.Model):
     __tablename__ = 'template_parameters'
-    
     id = db.Column(db.Integer, primary_key=True)
     template_id = db.Column(db.Integer, db.ForeignKey('parameter_templates.id'), nullable=False)
     parameter_id = db.Column(db.Integer, db.ForeignKey('magic_parameters.id'), nullable=False)
-    operation = db.Column(db.String(50))  # 'min', 'max', 'value', 'range', 'start', 'end', 'duration'
-    value = db.Column(db.String(200))  # For single values
-    value2 = db.Column(db.String(200))  # For range/duration second value
-    unit = db.Column(db.String(50))  # Unit for number type
-    string_option = db.Column(db.String(200))  # Selected option for string type
+    operation = db.Column(db.String(50))
+    value = db.Column(db.String(200))
+    value2 = db.Column(db.String(200))
+    unit = db.Column(db.String(50))
+    string_option = db.Column(db.String(200))
     description = db.Column(db.Text)
     display_order = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    
-    # Relationship
     parameter = db.relationship('MagicParameter', backref='template_uses', lazy=True)
     
     def get_display_text(self):
-        """Generate display text for the template parameter"""
         param = self.parameter
         if not param:
             return "Unknown Parameter"
-        
         if param.param_type == 'number':
             if self.operation == 'min':
                 return f"MIN: {param.name} {self.value} {self.unit or ''} {self.description or ''}".strip()
@@ -608,9 +752,8 @@ class TemplateParameter(db.Model):
                 return f"MAX: {param.name} {self.value} {self.unit or ''} {self.description or ''}".strip()
             elif self.operation == 'range':
                 return f"RANGE: {param.name} {self.value} {self.unit or ''} - {self.value2} {self.unit or ''} {self.description or ''}".strip()
-            else:  # value
+            else:
                 return f"VALUE: {param.name} {self.value} {self.unit or ''} {self.description or ''}".strip()
-        
         elif param.param_type == 'date':
             if self.operation == 'start':
                 return f"START: {param.name} on {self.value} {self.description or ''}".strip()
@@ -618,12 +761,10 @@ class TemplateParameter(db.Model):
                 return f"END: {param.name} on {self.value} {self.description or ''}".strip()
             elif self.operation == 'duration':
                 return f"DURATION: {param.name} {self.value} to {self.value2} {self.description or ''}".strip()
-            else:  # value
+            else:
                 return f"{param.name} on {self.value} {self.description or ''}".strip()
-        
         elif param.param_type == 'string':
             return f"{param.name}: {self.string_option} {self.description or ''}".strip()
-        
         return "Invalid Parameter"
     
     def __repr__(self):
@@ -632,32 +773,188 @@ class TemplateParameter(db.Model):
 
 class StickerTemplate(db.Model):
     __tablename__ = 'sticker_templates'
-    
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    template_type = db.Column(db.String(20), nullable=False)  # 'Items', 'Location', 'Racks'
-    width_mm = db.Column(db.Float, nullable=False)  # e.g., 30
-    height_mm = db.Column(db.Float, nullable=False)  # e.g., 20
-    layout = db.Column(db.Text, nullable=False)  # JSON array of elements
+    template_type = db.Column(db.String(20), nullable=False)
+    width_mm = db.Column(db.Float, nullable=False)
+    height_mm = db.Column(db.Float, nullable=False)
+    layout = db.Column(db.Text, nullable=False)
     is_default = db.Column(db.Boolean, default=False)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     updated_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    
     creator = db.relationship('User', backref='sticker_templates', foreign_keys=[created_by])
     updater = db.relationship('User', foreign_keys=[updated_by])
     
     def get_layout(self):
-        """Parse JSON layout"""
         try:
             return json.loads(self.layout) if self.layout else []
         except json.JSONDecodeError:
             return []
     
     def set_layout(self, layout_data):
-        """Store layout as JSON"""
         self.layout = json.dumps(layout_data)
     
     def __repr__(self):
         return f'<StickerTemplate {self.name} - {self.template_type}>'
+
+
+# ==================== PROJECT MODELS ====================
+
+class ProjectCategory(db.Model):
+    __tablename__ = 'project_categories'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    description = db.Column(db.Text)
+    color = db.Column(db.String(7), default='#6c757d')
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+class ProjectTag(db.Model):
+    __tablename__ = 'project_tags'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    description = db.Column(db.Text)
+    color = db.Column(db.String(7), default='#6c757d')
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+class ProjectStatus(db.Model):
+    __tablename__ = 'project_statuses'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    color = db.Column(db.String(7), default='#6c757d')
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+class ProjectPerson(db.Model):
+    __tablename__ = 'project_persons'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    email = db.Column(db.String(200))
+    organization = db.Column(db.String(200))
+    tel = db.Column(db.String(50))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+class ProjectGroup(db.Model):
+    __tablename__ = 'project_groups'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), unique=True, nullable=False)
+    description = db.Column(db.Text)
+    color = db.Column(db.String(7), default='#6c757d')
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    members = db.relationship('ProjectGroupMember', backref='group', lazy=True, cascade='all, delete-orphan')
+    def get_users(self):
+        return [m for m in self.members if m.user_id is not None]
+    def get_persons(self):
+        return [m for m in self.members if m.person_id is not None]
+
+class ProjectGroupMember(db.Model):
+    __tablename__ = 'project_group_members'
+    id = db.Column(db.Integer, primary_key=True)
+    group_id = db.Column(db.Integer, db.ForeignKey('project_groups.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    person_id = db.Column(db.Integer, db.ForeignKey('project_persons.id'), nullable=True)
+    user = db.relationship('User', backref='project_group_memberships')
+    person = db.relationship('ProjectPerson', backref='group_memberships')
+
+class Project(db.Model):
+    __tablename__ = 'projects'
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.String(11), unique=True, nullable=False)
+    name = db.Column(db.String(300), nullable=False)
+    info = db.Column(db.String(500))
+    description = db.Column(db.Text)
+    category_id = db.Column(db.Integer, db.ForeignKey('project_categories.id'))
+    tags = db.Column(db.Text)
+    status_id = db.Column(db.Integer, db.ForeignKey('project_statuses.id'))
+    date_start = db.Column(db.Date)
+    date_end = db.Column(db.Date)
+    quantity = db.Column(db.Integer, default=1)
+    group_id = db.Column(db.Integer, db.ForeignKey('project_groups.id'))
+    users = db.Column(db.Text)
+    enable_dateline_notification = db.Column(db.Boolean, default=False)
+    notify_before_days = db.Column(db.Integer, default=3)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    updated_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    category = db.relationship('ProjectCategory', backref='projects')
+    status = db.relationship('ProjectStatus', backref='projects')
+    group = db.relationship('ProjectGroup', backref='projects')
+    creator = db.relationship('User', foreign_keys=[created_by], backref='projects_created')
+    updater = db.relationship('User', foreign_keys=[updated_by], backref='projects_updated')
+    bom_items = db.relationship('ProjectBOMItem', backref='project', lazy=True, cascade='all, delete-orphan')
+    attachments = db.relationship('ProjectAttachment', backref='project', lazy=True, cascade='all, delete-orphan')
+    urls = db.relationship('ProjectURL', backref='project', lazy=True, cascade='all, delete-orphan')
+    def __init__(self, **kwargs):
+        super(Project, self).__init__(**kwargs)
+        if not self.project_id:
+            chars = string.ascii_uppercase + string.digits
+            self.project_id = 'P' + ''.join(secrets.choice(chars) for _ in range(10))
+    def get_tags_list(self):
+        if not self.tags: return []
+        try:
+            tag_ids = json.loads(self.tags)
+            return ProjectTag.query.filter(ProjectTag.id.in_(tag_ids)).all()
+        except (json.JSONDecodeError, TypeError): return []
+    def get_users_list(self):
+        if not self.users: return []
+        try:
+            user_ids = json.loads(self.users)
+            return User.query.filter(User.id.in_(user_ids)).all()
+        except (json.JSONDecodeError, TypeError): return []
+    def get_bom_total_cost(self):
+        return sum(b.get_total_cost() for b in self.bom_items)
+    def get_project_total_cost(self):
+        return self.get_bom_total_cost() * (self.quantity or 1)
+
+class ProjectBOMItem(db.Model):
+    __tablename__ = 'project_bom_items'
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    item_id = db.Column(db.Integer, db.ForeignKey('items.id'), nullable=False)
+    batch_id = db.Column(db.Integer, db.ForeignKey('item_batches.id'), nullable=True)
+    quantity = db.Column(db.Integer, default=1)
+    serial_numbers = db.Column(db.Text)
+    used = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    item = db.relationship('Item', backref=db.backref('bom_uses', cascade='all, delete-orphan'))
+    batch = db.relationship('ItemBatch', backref='bom_uses')
+    def get_serial_numbers_list(self):
+        if not self.serial_numbers: return []
+        try:
+            sn_ids = json.loads(self.serial_numbers)
+            return BatchSerialNumber.query.filter(BatchSerialNumber.id.in_(sn_ids)).all()
+        except (json.JSONDecodeError, TypeError): return []
+    def get_cost_per_unit(self):
+        return self.batch.price_per_unit if self.batch and self.batch.price_per_unit else 0.0
+    def get_total_cost(self):
+        return self.get_cost_per_unit() * self.quantity
+
+class ProjectAttachment(db.Model):
+    __tablename__ = 'project_attachments'
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    filename = db.Column(db.String(255), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    file_path = db.Column(db.String(500), nullable=False)
+    file_type = db.Column(db.String(50))
+    file_size = db.Column(db.Integer)
+    attachment_type = db.Column(db.String(50), default='document')
+    uploaded_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    uploaded_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+class ProjectURL(db.Model):
+    __tablename__ = 'project_urls'
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    url = db.Column(db.String(1000), nullable=False)
+    title = db.Column(db.String(300))
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))

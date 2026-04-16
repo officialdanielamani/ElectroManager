@@ -34,8 +34,8 @@ ENV PYTHONUNBUFFERED=1
 # Expose port
 EXPOSE 5000
 
-# Make startup script executable
-RUN chmod +x startup.sh
+# Make startup scripts executable
+RUN chmod +x startup/start.sh startup/docker.sh
 
 # Run the application via startup script
-CMD ["./startup.sh"]
+CMD ["./startup/docker.sh"]

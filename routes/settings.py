@@ -296,7 +296,7 @@ def upload_profile_photo():
     # Delete old photo if exists
     if current_user.profile_photo:
         old_file = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', current_user.profile_photo)
-        if is_safe_file_path(old_file) and os.path.exists(old_file):
+        if is_safe_file_path(old_file, os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture')) and os.path.exists(old_file):
             os.remove(old_file)
 
     # Save with username as filename - sanitize extension
@@ -320,7 +320,7 @@ def delete_profile_photo():
     """Delete user profile photo"""
     if current_user.profile_photo:
         filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', current_user.profile_photo)
-        if is_safe_file_path(filepath) and os.path.exists(filepath):
+        if is_safe_file_path(filepath, os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture')) and os.path.exists(filepath):
             os.remove(filepath)
         
         current_user.profile_photo = None
@@ -343,7 +343,7 @@ def save_table_columns_view():
         columns = json.loads(columns_json)
         
         # Validate columns
-        valid_columns = ['type_model', 'sku', 'category', 'tags', 'footprint', 'quantity', 'total_price', 'price_per_unit', 'location', 'uuid', 'status']
+        valid_columns = ['type_model', 'sku', 'category', 'tags', 'footprint', 'quantity', 'available_quantity', 'total_price', 'price_per_unit', 'location', 'uuid', 'status']
         columns = [col for col in columns if col in valid_columns]
         
         # Save to current user
@@ -458,6 +458,19 @@ def settings_system():
             Setting.set('max_drawer_cols', max_drawer_cols, 'Maximum drawer columns (1-32)')
             Setting.set('banner_timeout', banner_timeout, 'Banner auto-dismiss timeout in seconds (0=permanent)')
             
+
+            # Location upload settings
+            if not current_app.config.get('DEMO_MODE', False):
+                loc_ext = request.form.get('location_upload_extensions', 'webp,png,svg,jpeg,jpg').strip()
+                loc_size = request.form.get('location_upload_max_size', '10')
+                Setting.set('location_upload_extensions', loc_ext, 'Location upload allowed extensions')
+                Setting.set('location_upload_max_size', loc_size, 'Location upload max size MB')
+                for ptype in ['picture', 'document', 'schematic', '2d_design', '3d_design']:
+                    pext = request.form.get(f'project_upload_{ptype}_extensions', '').strip()
+                    psize = request.form.get(f'project_upload_{ptype}_max_size', '10')
+                    if pext: Setting.set(f'project_upload_{ptype}_extensions', pext)
+                    if psize: Setting.set(f'project_upload_{ptype}_max_size', psize)
+
             # Update app config dynamically
             current_app.config['MAX_CONTENT_LENGTH'] = max_file_size * 1024 * 1024
             
@@ -503,7 +516,16 @@ def settings_system():
                           max_drawer_cols=max_drawer_cols,
                           banner_timeout=banner_timeout,
                           verinfo_content=verinfo_content,
-                          demo_mode=current_app.config.get('DEMO_MODE', False))
+                          demo_mode=current_app.config.get('DEMO_MODE', False),
+                          location_upload_extensions=Setting.get('location_upload_extensions', 'webp,png,svg,jpeg,jpg'),
+                          location_upload_max_size=Setting.get('location_upload_max_size', '10'),
+                          project_upload_settings={
+                              'picture': {'extensions': Setting.get('project_upload_picture_extensions', 'webp,png,svg,jpeg,jpg'), 'max_size': Setting.get('project_upload_picture_max_size', '10')},
+                              'document': {'extensions': Setting.get('project_upload_document_extensions', 'txt,doc,docx,pdf'), 'max_size': Setting.get('project_upload_document_max_size', '10')},
+                              'schematic': {'extensions': Setting.get('project_upload_schematic_extensions', 'pdf,zip'), 'max_size': Setting.get('project_upload_schematic_max_size', '20')},
+                              '2d_design': {'extensions': Setting.get('project_upload_2d_design_extensions', 'pdf,zip'), 'max_size': Setting.get('project_upload_2d_design_max_size', '20')},
+                              '3d_design': {'extensions': Setting.get('project_upload_3d_design_extensions', 'pdf,zip,stl,step'), 'max_size': Setting.get('project_upload_3d_design_max_size', '50')},
+                          })
 
 
 # ============= FOOTPRINTS =============

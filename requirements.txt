@@ -13,3 +13,5 @@ qrcode>=7.4.2
 python-barcode>=0.15.1
 weasyprint>=60.0
 reportlab>=4.0.0
+fonttools>=4.0.0
+brotli>=1.0.0

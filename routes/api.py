@@ -29,8 +29,8 @@ def search_item():
     """API endpoint to search for items in visual storage"""
     data = request.get_json()
     search_term = data.get('search', '').strip()
-    location_id = data.get('location_id')
-    rack_id = data.get('rack_id')
+    location_uuid = data.get('location_uuid')
+    rack_uuid = data.get('rack_uuid')
     exact_match = data.get('exact_match', False)
     
     if not search_term:
@@ -56,11 +56,15 @@ def search_item():
     
     for item in items:
         # Apply location and rack filters if specified
-        if location_id and item.location_id != location_id:
-            continue
+        if location_uuid:
+            location = Location.query.filter_by(uuid=location_uuid).first()
+            if not location or item.location_id != location.id:
+                continue
         
-        if rack_id and item.rack_id != rack_id:
-            continue
+        if rack_uuid:
+            rack = Rack.query.filter_by(uuid=rack_uuid).first()
+            if not rack or item.rack_id != rack.id:
+                continue
         
         # Check if item is in a rack (drawer storage)
         if item.rack_id and item.drawer:
@@ -74,9 +78,10 @@ def search_item():
                 'id': item.id,
                 'name': item.name,
                 'uuid': item.uuid,
-                'quantity': item.quantity,
+                'quantity': item.get_overall_quantity(),
                 'sku': item.sku or 'N/A',
                 'rack_id': item.rack_id,
+                'rack_uuid': rack.uuid if rack else None,
                 'rack_name': rack.name if rack else 'Unknown Rack',
                 'drawer': item.drawer,
                 'location_name': location_name
@@ -89,15 +94,46 @@ def search_item():
                 'id': item.id,
                 'name': item.name,
                 'uuid': item.uuid,
-                'quantity': item.quantity,
+                'quantity': item.get_overall_quantity(),
                 'sku': item.sku or 'N/A',
                 'location_id': item.location_id,
+                'location_uuid': location.uuid if location else None,
                 'location_name': location.name if location else 'Unknown Location'
             })
     
     # Sort: rack items first, then general location items
     rack_items = [item for item in results if item['type'] == 'rack']
     general_items = [item for item in results if item['type'] == 'general']
+    
+    # Calculate which page each item is on
+    racks_per_page = 5
+    
+    # Get all racks to calculate positions
+    if rack_uuid:
+        rack = Rack.query.filter_by(uuid=rack_uuid).first()
+        if rack:
+            all_racks = [rack]
+        else:
+            all_racks = []
+    elif location_uuid:
+        location = Location.query.filter_by(uuid=location_uuid).first()
+        all_racks = location.racks if location else []
+    else:
+        all_racks = Rack.query.order_by(Rack.name).all()
+    
+    # Create a mapping of rack UUID to page number
+    rack_to_page = {}
+    for idx, rack in enumerate(all_racks):
+        page_num = (idx // racks_per_page) + 1
+        rack_to_page[rack.uuid] = page_num
+    
+    # Add page number to results
+    for item in rack_items:
+        item['page'] = rack_to_page.get(item['rack_uuid'], 1)
+    
+    # General location items are not paginated, but we can add page=1
+    for item in general_items:
+        item['page'] = 1
     
     return jsonify({'items': rack_items + general_items})
 

@@ -4,7 +4,6 @@
 
 {% block content %}
 
-<!-- Check if user has view permission -->
 {% if not current_user.has_permission('items', 'view') %}
 <div class="alert alert-danger" role="alert">
     <strong><i class="bi bi-exclamation-triangle"></i> Access Denied</strong><br>
@@ -12,14 +11,12 @@
 </div>
 {% else %}
 <style>
-/* Image grid styling */
 .image-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 10px;
     margin-bottom: 20px;
 }
-
 .image-grid-item {
     position: relative;
     aspect-ratio: 1;
@@ -29,68 +26,37 @@
     border: 2px solid #e0e0e0;
     transition: transform 0.2s, box-shadow 0.2s;
 }
-
 .image-grid-item:hover {
     transform: scale(1.05);
     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
-
 .image-grid-item img {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
-
 .image-delete-btn {
     position: absolute;
     top: 5px;
     right: 5px;
     z-index: 10;
 }
-
-/* Responsive grid */
-@media (max-width: 576px) {
-    .image-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (min-width: 577px) and (max-width: 768px) {
-    .image-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
-
-@media (min-width: 769px) and (max-width: 992px) {
-    .image-grid {
-        grid-template-columns: repeat(4, 1fr);
-    }
-}
-
-@media (min-width: 993px) {
-    .image-grid {
-        grid-template-columns: repeat(4, 1fr);
-    }
-}
-
-/* Modal styling */
-.modal-dialog-centered img {
-    max-height: 80vh;
-    width: auto;
-    max-width: 100%;
-}
+@media (max-width: 576px) { .image-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 577px) and (max-width: 768px) { .image-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 769px) { .image-grid { grid-template-columns: repeat(4, 1fr); } }
+.modal-dialog-centered img { max-height: 80vh; width: auto; max-width: 100%; }
+.batch-card { border-left: 4px solid #0d6efd; margin-bottom: 12px; }
+.batch-card .card-header { background: #f8f9fa; cursor: pointer; }
+.sn-table th, .sn-table td { padding: 4px 8px; font-size: 0.85rem; }
 </style>
 
 <div class="row justify-content-center">
-    <!-- Item Details -->
-    <div class="col-md-8">
+    <div class="col-md-10">
         <div class="card mb-3">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h4><i class="bi bi-box"></i> {{ item.name }}</h4>
-                <!-- Only show Edit/Delete if user has edit OR delete permission (not just view) -->
-                <div class="d-flex gap-2">
-                    {% if current_user.has_permission('items', 'edit_name') or current_user.has_permission('items', 'edit_sku_type') or current_user.has_permission('items', 'edit_description') or current_user.has_permission('items', 'edit_datasheet') or current_user.has_permission('items', 'edit_upload') or current_user.has_permission('items', 'edit_lending') or current_user.has_permission('items', 'edit_price') or current_user.has_permission('items', 'edit_quantity') or current_user.has_permission('items', 'edit_location') or current_user.has_permission('items', 'edit_category') or current_user.has_permission('items', 'edit_footprint') or current_user.has_permission('items', 'edit_tags') or current_user.has_permission('items', 'edit_parameters') or current_user.has_permission('items', 'delete') %}
-                    {% if current_user.has_permission('items', 'edit_name') or current_user.has_permission('items', 'edit_sku_type') or current_user.has_permission('items', 'edit_description') or current_user.has_permission('items', 'edit_datasheet') or current_user.has_permission('items', 'edit_upload') or current_user.has_permission('items', 'edit_lending') or current_user.has_permission('items', 'edit_price') or current_user.has_permission('items', 'edit_quantity') or current_user.has_permission('items', 'edit_location') or current_user.has_permission('items', 'edit_category') or current_user.has_permission('items', 'edit_footprint') or current_user.has_permission('items', 'edit_tags') or current_user.has_permission('items', 'edit_parameters') %}
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h4 class="mb-0"><i class="bi bi-box"></i> {{ item.name }}</h4>
+                <div class="d-flex gap-2 flex-wrap">
+                    {% if current_user.has_permission('items', 'edit_name') or current_user.has_permission('items', 'edit_sku_type') or current_user.has_permission('items', 'edit_description') or current_user.has_permission('items', 'edit_datasheet') or current_user.has_permission('items', 'edit_upload') or current_user.has_permission('items', 'edit_location') or current_user.has_permission('items', 'edit_category') or current_user.has_permission('items', 'edit_footprint') or current_user.has_permission('items', 'edit_tags') or current_user.has_permission('items', 'edit_parameters') %}
                     <a href="{{ url_for('item.item_edit', uuid=item.uuid) }}" class="btn btn-warning btn-sm">
                         <i class="bi bi-pencil"></i> Edit
                     </a>
@@ -105,7 +71,6 @@
                         </button>
                     </form>
                     {% endif %}
-                    {% endif %}
                     {% if qr_templates %}
                     <a href="{{ url_for('item.item_qr_sticker', uuid=item.uuid) }}" class="btn btn-success btn-sm">
                         <i class="bi bi-qr-code"></i> Print QR
@@ -117,33 +82,29 @@
                 </div>
             </div>
             <div class="card-body">
-                <!-- Header with Name, UUID, SKU -->
-                <div class="mb-3">
-                    <strong>UUID:</strong> <code>{{ item.uuid }}</code>
-                    &nbsp;&nbsp;
-                    <strong>SKU:</strong> {{ item.sku or 'N/A' }}
-                </div>
-
-                <div class="mb-3">
-                    <strong>Type / Model:</strong> {{ item.info or 'N/A' }}
+                <!-- Header with QR Code -->
+                <div class="mb-3 d-flex justify-content-start align-items-flex-start gap-4">
+                    <div style="flex-shrink: 0;">
+                        <div style="background-color: white; padding: 8px; border-radius: 4px; display: inline-block;">
+                            <img src="{{ url_for('item.item_qr_svg', uuid=item.uuid) }}" alt="QR Code" width="160" height="160" style="border: 2px solid #ddd; padding: 5px; border-radius: 4px; display: block;">
+                        </div>
+                    </div>
+                    <div style="flex: 1;">
+                        <div class="mb-2"><strong>UUID:</strong> <code>{{ item.uuid }}</code></div>
+                        <div class="mb-2"><strong>SKU:</strong> {{ item.sku or 'N/A' }}</div>
+                        <div><strong>Type / Model:</strong> {{ item.info or 'N/A' }}</div>
+                    </div>
                 </div>
 
                 <hr>
 
                 <!-- Category, Footprint, Location, Tags -->
                 <div class="row mb-3">
-                    <div class="col-md-6">
-                        <strong>Category:</strong> {{ item.category.name if item.category else 'None' }}
-                    </div>
-                    <div class="col-md-6">
-                        <strong>Footprint:</strong> {{ item.footprint.name if item.footprint else 'None' }}
-                    </div>
+                    <div class="col-md-6"><strong>Category:</strong> {{ item.category.name if item.category else 'None' }}</div>
+                    <div class="col-md-6"><strong>Footprint:</strong> {{ item.footprint.name if item.footprint else 'None' }}</div>
                 </div>
-
                 <div class="row mb-3">
-                    <div class="col-md-6">
-                        <strong>Location:</strong> {{ item.get_full_location() }}
-                    </div>
+                    <div class="col-md-6"><strong>Location:</strong> {{ item.get_full_location() }}</div>
                     <div class="col-md-6">
                         {% if item.get_tags_list() %}
                         <strong>Tags:</strong>
@@ -156,10 +117,10 @@
 
                 <hr>
 
-                <!-- Description (Collapsible) -->
+                <!-- Description -->
                 {% if item.description %}
                 <div class="mb-3">
-                    <button class="btn btn-link p-0" type="button" data-bs-toggle="collapse" data-bs-target="#descriptionCollapse" aria-expanded="false" aria-controls="descriptionCollapse">
+                    <button class="btn btn-link p-0" type="button" data-bs-toggle="collapse" data-bs-target="#descriptionCollapse" aria-expanded="false">
                         <strong><i class="bi bi-chevron-down"></i> Description</strong>
                     </button>
                     <div class="collapse" id="descriptionCollapse">
@@ -171,51 +132,183 @@
                 <hr>
                 {% endif %}
 
-                <!-- Quantity and Price Section -->
+                <!-- Overall Summary -->
                 <div class="row mb-3">
-                    <div class="col-md-4">
-                        <strong>Total Quantity:</strong>
-                        <h3 class="text-primary">{{ item.quantity }}</h3>
+                    <div class="col-md-3">
+                        <strong>Overall Quantity:</strong>
+                        <h3 class="text-primary">{{ item.get_overall_quantity() }}</h3>
                     </div>
-                    {% if item.lend_to %}
-                    <div class="col-md-4">
-                        <strong>Lent:</strong>
-                        <h3 class="text-warning">{{ item.lend_quantity }}</h3>
-                        <small>to {{ item.lend_to }}</small>
+                    {% if item.get_total_lend_quantity() > 0 %}
+                    <div class="col-md-3">
+                        <strong>Lending:</strong>
+                        <h3 class="text-warning">{{ item.get_total_lend_quantity() }}</h3>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <strong>Available:</strong>
                         <h3 class="text-success">{{ item.get_available_quantity() }}</h3>
                     </div>
                     {% else %}
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <strong>Available:</strong>
-                        <h3 class="text-success">{{ item.quantity }}</h3>
+                        <h3 class="text-success">{{ item.get_overall_quantity() }}</h3>
                     </div>
                     {% endif %}
+                    <div class="col-md-3">
+                        <strong>Overall Total Price:</strong>
+                        <h4 class="text-success">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(item.get_overall_total_price()) }}</h4>
+                        <small class="text-muted">Avg: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(item.get_average_price()) }}/unit</small>
+                    </div>
                 </div>
 
                 {% if item.is_no_stock() %}
-                <div class="alert alert-danger">
-                    <i class="bi bi-exclamation-circle-fill"></i> No Stock!
-                </div>
+                <div class="alert alert-danger"><i class="bi bi-exclamation-circle-fill"></i> No Stock!</div>
                 {% elif item.is_low_stock() %}
-                <div class="alert alert-warning">
-                    <i class="bi bi-exclamation-triangle"></i> Low Stock! (Min: {{ item.min_quantity }})
-                </div>
+                <div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> Low Stock! (Min: {{ item.min_quantity }})</div>
                 {% endif %}
 
-                <div class="row mb-3">
-                    <div class="col-md-4">
-                        <strong>Min Quantity:</strong> {{ item.min_quantity }}
+                <div class="mb-3">
+                    <small class="text-muted">Min Quantity: {{ item.min_quantity }}</small>
+                </div>
+
+                <hr>
+
+                <!-- ========== BATCHES SECTION ========== -->
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0"><i class="bi bi-collection"></i> Batches ({{ item.batches|length }})</h5>
                     </div>
-                    <div class="col-md-4">
-                        <strong>Price per Qty:</strong> {{ item.price|format_amount(currency_decimal_places) }}
+
+                    {% if item.batches|length == 0 %}
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> No batches yet. Add a batch to start tracking quantities and prices.
                     </div>
-                    <div class="col-md-4">
-                        <strong>Total Price:</strong> 
-                        <span class="text-success fw-bold">{{ item.get_total_price()|format_amount(currency_decimal_places) }}</span>
+                    {% endif %}
+
+                    <!-- Batch Cards -->
+                    {% for batch in item.batches %}
+                    <div class="card batch-card">
+                        <div class="card-header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#batchCollapse{{ batch.id }}">
+                            <div>
+                                <strong><i class="bi bi-box-seam"></i> {{ batch.get_display_label() }}</strong>
+                                <span class="badge bg-primary ms-2">Qty: {{ batch.quantity }}</span>
+                                {% if batch.sn_tracking_enabled %}
+                                <span class="badge bg-dark ms-1"><i class="bi bi-upc-scan"></i> Tracking</span>
+                                {% endif %}
+                                <span class="badge bg-success ms-1">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.price_per_unit) }}/unit</span>
+                                <span class="badge bg-info ms-1">Total: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_price()) }}</span>
+                                {% if batch.purchase_date %}
+                                <small class="text-muted ms-2"><i class="bi bi-calendar"></i> {{ batch.purchase_date.strftime('%d/%m/%Y') }}</small>
+                                {% endif %}
+                                {% if batch.note %}
+                                <small class="text-muted ms-2"><i class="bi bi-sticky"></i> {{ batch.note }}</small>
+                                {% endif %}
+                            </div>
+                            <i class="bi bi-chevron-down"></i>
+                        </div>
+                        <div class="collapse" id="batchCollapse{{ batch.id }}">
+                            <div class="card-body">
+                                <div class="row mb-2">
+                                    <div class="col-md-3"><strong>Batch #:</strong> {{ batch.batch_number }}</div>
+                                    <div class="col-md-3"><strong>Quantity:</strong> {{ batch.quantity }}</div>
+                                    <div class="col-md-3"><strong>Price/Unit:</strong> {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.price_per_unit) }}</div>
+                                    <div class="col-md-3"><strong>Total Price:</strong> {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_price()) }}</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-md-3"><strong>Lending:</strong> {{ batch.get_lend_quantity() }}</div>
+                                    <div class="col-md-3"><strong>Available Qty:</strong> {{ batch.get_available_quantity() }}</div>
+                                    {% if not batch.sn_tracking_enabled and batch.lend_to %}
+                                    <div class="col-md-3"><strong>Lend to:</strong> {{ batch.lend_to }}</div>
+                                    {% endif %}
+                                    <div class="col-md-3"><strong>Date:</strong> {{ batch.purchase_date.strftime('%d/%m/%Y') if batch.purchase_date else 'N/A' }}</div>
+                                </div>
+                                {% set proj_names = batch.get_project_names_for_batch() %}
+                                {% if proj_names %}
+                                <div class="row mb-2">
+                                    <div class="col-md-12"><strong>Project:</strong> {% for pn in proj_names %}<span class="badge bg-info">{{ pn }}</span> {% endfor %} <small class="text-muted">({{ batch.get_project_used_quantity() }} used)</small></div>
+                                </div>
+                                {% endif %}
+                                <div class="row mb-2">
+                                    <div class="col-md-12"><strong>Note:</strong> {{ batch.note or 'N/A' }}</div>
+                                </div>
+
+                                <!-- Serial Numbers Table (if enabled) -->
+                                {% if batch.sn_tracking_enabled and batch.serial_numbers|length > 0 %}
+                                <hr>
+                                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                    <strong><i class="bi bi-upc-scan"></i> Serial Numbers</strong>
+                                </div>
+                                <!-- SN edit actions moved to Item Edit page -->
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered sn-table" id="snTable{{ batch.id }}">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width:30px"><input type="checkbox" class="form-check-input" onclick="toggleAllSn(this, {{ batch.id }})"></th>
+                                                <th style="width:40px">No</th>
+                                                <th>Serial Number (SN)</th>
+                                                <th>Internal Serial Number (ISN)</th>
+                                                <th>Info</th>
+                                                <th>Project</th>
+                                                <th>Lend to</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for sn in batch.serial_numbers %}
+                                            <tr data-sn-id="{{ sn.id }}">
+                                                <td><input type="checkbox" class="form-check-input sn-check-{{ batch.id }}" value="{{ sn.id }}"></td>
+                                                <td>{{ sn.sequence_number }}</td>
+                                                <td>
+                                                    <span class="sn-val" id="snVal{{ sn.id }}">{{ sn.serial_number or '-' }}</span>
+                                                </td>
+                                                <td><code style="font-size:0.8rem">{{ sn.internal_serial_number }}</code></td>
+                                                <td>
+                                                    <span class="info-val" id="infoVal{{ sn.id }}">{{ sn.info or '-' }}</span>
+                                                </td>
+                                                <td>
+                                                    {% set sn_project_used = sn.id in (batch.get_project_used_sn_ids() if batch.get_project_used_sn_ids is defined else []) %}
+                                                    {% if sn_project_used %}
+                                                    <span class="badge bg-info">
+                                                        {% for bom in batch.bom_uses if bom.used and bom.serial_numbers %}
+                                                            {% set sn_ids = bom.serial_numbers | from_json %}
+                                                            {% if sn.id in sn_ids %}{{ bom.project.name }}{% endif %}
+                                                        {% endfor %}
+                                                    </span>
+                                                    {% else %}-{% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if sn_project_used %}
+                                                    <span class="text-muted" style="opacity:0.5">{{ sn.lend_to or '-' }}</span>
+                                                    {% else %}
+                                                    <span class="lend-val" id="lendVal{{ sn.id }}">{{ sn.lend_to or '-' }}</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
+
+                                <!-- Add SN when tracking enabled but batch empty -->
+                                {% if batch.sn_tracking_enabled and batch.serial_numbers|length == 0 and current_user.has_permission('items', 'edit_batch') %}
+                                <hr>
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <strong><i class="bi bi-upc-scan"></i> Serial Numbers</strong>
+                                    <div class="input-group input-group-sm" style="width:auto">
+                                        <span class="input-group-text">Add</span>
+                                        <input type="number" class="form-control" id="addSnQty{{ batch.id }}" min="1" max="100" value="1" style="width:60px">
+                                        <button class="btn btn-outline-success" type="button" onclick="addSnToBatch({{ batch.id }}, 0)"><i class="bi bi-plus"></i></button>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <!-- Batch Actions moved to Item Edit page -->
+                            </div>
+                        </div>
                     </div>
+
+                    <!-- Batch edit/add moved to Edit Item page -->
+                    {% endfor %}
                 </div>
 
                 <hr>
@@ -247,9 +340,6 @@
                                         {% if param.parameter.param_type == 'date' and param.parameter.notify_enabled %}
                                         <i class="bi bi-bell-fill text-warning" title="Notifications enabled"></i>
                                         {% endif %}
-                                        {% if param.check_notification() %}
-                                        <span class="badge bg-danger">{{ param.check_notification() }}</span>
-                                        {% endif %}
                                     </small>
                                 </div>
                             </div>
@@ -276,7 +366,7 @@
                 <hr>
                 {% endif %}
 
-                <!-- Other Files (non-images) -->
+                <!-- Other Files -->
                 {% set other_files = item.attachments | rejectattr('file_type', 'in', ['png', 'jpg', 'jpeg', 'gif', 'webp']) | list %}
                 {% if other_files %}
                 <div class="mb-3">
@@ -287,8 +377,7 @@
                             <div>
                                 <i class="bi bi-file-earmark-{% if att.file_type == 'pdf' %}pdf{% elif att.file_type in ['doc', 'docx'] %}word{% elif att.file_type in ['xls', 'xlsx'] %}excel{% elif att.file_type == 'txt' %}text{% else %}fill{% endif %}"></i>
                                 <strong>{{ att.original_filename }}</strong>
-                                <br>
-                                <small class="text-muted">{{ att.file_type.upper() }} - {{ "%.2f"|format(att.file_size / 1024 / 1024) }} MB</small>
+                                <br><small class="text-muted">{{ att.file_type.upper() }} - {{ "%.2f"|format(att.file_size / 1024 / 1024) }} MB</small>
                             </div>
                             <i class="bi bi-download"></i>
                         </a>
@@ -309,56 +398,167 @@
 
 <script>
 {% if item.datasheet_urls %}
-// Initialize datasheets
 let datasheets = [];
 try {
     datasheets = JSON.parse(`{{ item.datasheet_urls|safe }}`);
 } catch(e) {
-    // Fallback: old format (plain URLs)
     const oldUrls = `{{ item.datasheet_urls|safe }}`.split('\n').filter(u => u.trim());
     datasheets = oldUrls.map(url => ({url: url.trim(), title: '', info: ''}));
 }
-
 function renderDatasheets() {
     const container = document.getElementById('datasheet-display');
     if (!container) return;
-    
     if (datasheets.length === 0) {
         container.innerHTML = '<p class="text-muted small">No datasheets available.</p>';
         return;
     }
-    
     let html = '<div class="list-group">';
-    datasheets.forEach((ds, index) => {
+    datasheets.forEach((ds) => {
         const displayTitle = ds.title || ds.url;
-        
         html += `<div class="list-group-item list-group-item-action p-2">`;
         html += `<i class="bi bi-link-45deg text-primary"></i> `;
         html += `<a href="${ds.url}" target="_blank" class="text-decoration-none"><strong>${displayTitle}</strong></a>`;
-        if (ds.info) {
-            html += ` <span class="text-muted">- ${ds.info}</span>`;
-        }
+        if (ds.info) { html += ` <span class="text-muted">- ${ds.info}</span>`; }
         html += `</div>`;
     });
     html += '</div>';
-    
     container.innerHTML = html;
 }
-
-// Initial render
-document.addEventListener('DOMContentLoaded', function() {
-    renderDatasheets();
-});
+document.addEventListener('DOMContentLoaded', function() { renderDatasheets(); });
 {% endif %}
 </script>
 
-                <!-- Info (Created & Updated) -->
+                <!-- Info -->
                 <div class="mb-3">
                     <small class="text-muted">
                         Created: {{ item.created_at.strftime('%Y-%m-%d %H:%M') }}{% if item.creator %} - by {{ item.creator.username }}{% endif %}<br>
                         Updated: {{ item.updated_at.strftime('%Y-%m-%d %H:%M') }}{% if item.updater %} - by {{ item.updater.username }}{% endif %}
                     </small>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Batch operations are on the Edit Item page -->
+
+<!-- Transfer SN Modal (tracking enabled - move selected SNs to another batch) -->
+{% if current_user.has_permission('items', 'edit_batch') and item.has_any_tracking and item.batches|length >= 2 %}
+<div class="modal fade" id="transferSnModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Transfer Selected Serial Numbers</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">Moving <strong><span id="transferSnCount">0</span></strong> selected item(s). ISN kept as-is (renamed only if collision detected).</p>
+                <div class="alert alert-info p-2 small">
+                    <i class="bi bi-info-circle"></i> Serial numbers can only be transferred to batches with tracking enabled.
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Transfer to Batch</label>
+                    <select class="form-select" id="transferSnTarget">
+                        {% for b in item.batches %}
+                        {% if b.sn_tracking_enabled %}
+                        <option value="{{ b.id }}" data-tracking="1">{{ b.get_display_label() }} (Qty: {{ b.quantity }}) [Tracking]</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info" onclick="doTransferSn()"><i class="bi bi-arrow-left-right"></i> Transfer</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Transfer Modal (quantity based - for non-tracking batches) -->
+{% if current_user.has_permission('items', 'edit_batch') and item.batches|length >= 2 %}
+<div class="modal fade" id="transferModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('batch.transfer_batch', uuid=item.uuid) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Transfer Between Batches</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info p-2 small">
+                        <i class="bi bi-info-circle"></i> Qty-based transfer is from non-tracked batches only. Tracked batches use the SN Transfer button.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">From Batch</label>
+                        <select class="form-select" name="from_batch_id" required>
+                            {% for b in item.batches %}
+                            {% if not b.sn_tracking_enabled %}
+                            <option value="{{ b.id }}">{{ b.get_display_label() }} (Qty: {{ b.quantity }})</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">To Batch</label>
+                        <select class="form-select" name="to_batch_id" required>
+                            {% for b in item.batches %}
+                            <option value="{{ b.id }}">{{ b.get_display_label() }} (Qty: {{ b.quantity }}){% if b.sn_tracking_enabled %} [Tracking]{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Transfer Quantity</label>
+                        <input type="number" class="form-control" name="transfer_quantity" min="1" value="1" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-info"><i class="bi bi-arrow-left-right"></i> Transfer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Edit Details Modal (bulk apply same values to selected serial numbers) -->
+<div class="modal fade" id="editDetailsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Edit Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-2">Applying to <strong><span id="editDetailsCount">0</span></strong> selected item(s).</p>
+                <div class="mb-3">
+                    <label class="form-label">Serial Number (SN)</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control" id="bulkSn" placeholder="Leave empty to keep current">
+                        <button class="btn btn-outline-danger" type="button" onclick="clearField('bulkSn')" title="Clear value for selected items"><i class="bi bi-x-circle"></i> Clear</button>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Info <small class="text-muted">(max 32 chars)</small></label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control" id="bulkInfo" placeholder="Leave empty to keep current" maxlength="32">
+                        <button class="btn btn-outline-danger" type="button" onclick="clearField('bulkInfo')" title="Clear value for selected items"><i class="bi bi-x-circle"></i> Clear</button>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Lend to</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control" id="bulkLend" placeholder="Leave empty to keep current">
+                        <button class="btn btn-outline-danger" type="button" onclick="clearField('bulkLend')" title="Clear value for selected items"><i class="bi bi-x-circle"></i> Clear</button>
+                    </div>
+                </div>
+                <small class="text-muted">Leave a field empty to keep current value. Use Clear to reset a field to empty.</small>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveEditDetails()"><i class="bi bi-save"></i> Save</button>
             </div>
         </div>
     </div>
@@ -390,6 +590,248 @@ function printItemDetail() {
     const printUrl = "{{ url_for('item.item_detail_print', uuid=item.uuid) }}";
     window.open(printUrl, '_blank');
 }
+
+/* ── Inline single-cell edit ── */
+function inlineEdit(icon, snId, field, currentVal, batchId) {
+    const spanId = field === 'sn' ? 'snVal' : field === 'info' ? 'infoVal' : 'lendVal';
+    const span = document.getElementById(spanId + snId);
+    if (!span) return;
+    const td = span.parentElement;
+    const val = currentVal === '-' ? '' : currentVal;
+    const maxLen = field === 'info' ? 32 : 200;
+    td.innerHTML = '<div class="d-flex align-items-center gap-1">' +
+        '<input type="text" class="form-control form-control-sm" id="inlineInput' + field + snId + '" value="' + val.replace(/"/g,'&quot;') + '" maxlength="' + maxLen + '" style="min-width:80px">' +
+        '<button class="btn btn-success btn-sm px-1 py-0" onclick="saveInlineEdit(' + snId + ',\'' + field + '\',' + batchId + ')" title="Save"><i class="bi bi-check-lg"></i></button>' +
+        '<button class="btn btn-secondary btn-sm px-1 py-0" onclick="location.reload()" title="Cancel"><i class="bi bi-x-lg"></i></button>' +
+        '</div>';
+    document.getElementById('inlineInput' + field + snId).focus();
+}
+
+function saveInlineEdit(snId, field, batchId) {
+    const input = document.getElementById('inlineInput' + field + snId);
+    if (!input) return;
+    fetch('{{ url_for("batch.inline_update_sn", uuid=item.uuid) }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sn_id: snId, field: field, value: input.value.trim() })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) { location.reload(); }
+        else { alert(data.message || 'Error'); }
+    })
+    .catch(e => alert('Error: ' + e));
+}
+
+/* ── Select-all checkbox ── */
+function toggleAllSn(source, batchId) {
+    document.querySelectorAll('.sn-check-' + batchId).forEach(function(cb) { cb.checked = source.checked; });
+}
+
+/* ── Bulk Edit Details modal ── */
+let editDetailsSelectedIds = [];
+
+function clearField(inputId) {
+    const inp = document.getElementById(inputId);
+    if (!confirm('This will clear this field to empty for all selected items. Continue?')) return;
+    inp.value = '';
+    inp.dataset.cleared = 'true';
+    inp.placeholder = '(will be cleared)';
+    inp.classList.add('border-danger');
+}
+
+function openEditDetailsModal(batchId) {
+    const checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
+    if (checked.length === 0) {
+        alert('Please select at least one serial number.');
+        return;
+    }
+    editDetailsSelectedIds = [];
+    checked.forEach(function(cb) { editDetailsSelectedIds.push(parseInt(cb.value)); });
+    document.getElementById('editDetailsCount').textContent = editDetailsSelectedIds.length;
+
+    // Reset fields
+    ['bulkSn', 'bulkInfo', 'bulkLend'].forEach(function(id) {
+        var inp = document.getElementById(id);
+        inp.value = '';
+        inp.dataset.cleared = '';
+        inp.placeholder = 'Leave empty to keep current';
+        inp.classList.remove('border-danger');
+    });
+
+    new bootstrap.Modal(document.getElementById('editDetailsModal')).show();
+}
+
+function saveEditDetails() {
+    var snVal = document.getElementById('bulkSn');
+    var infoVal = document.getElementById('bulkInfo');
+    var lendVal = document.getElementById('bulkLend');
+
+    var payload = { sn_ids: editDetailsSelectedIds, fields: {} };
+
+    // Only include fields that user typed into or explicitly cleared
+    if (snVal.value.trim() !== '' || snVal.dataset.cleared === 'true') {
+        payload.fields.sn = snVal.value.trim();
+    }
+    if (infoVal.value.trim() !== '' || infoVal.dataset.cleared === 'true') {
+        payload.fields.info = infoVal.value.trim();
+    }
+    if (lendVal.value.trim() !== '' || lendVal.dataset.cleared === 'true') {
+        payload.fields.lend = lendVal.value.trim();
+    }
+
+    if (Object.keys(payload.fields).length === 0) {
+        alert('No changes to save. Enter a value or use Clear.');
+        return;
+    }
+
+    fetch('{{ url_for("batch.bulk_update_sn", uuid=item.uuid) }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) { location.reload(); }
+        else { alert(data.message || 'Error'); }
+    })
+    .catch(e => alert('Error: ' + e));
+}
+
+/* ── Delete selected SNs ── */
+function deleteSelectedSn(batchId) {
+    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
+    if (checked.length === 0) { alert('Please select at least one serial number.'); return; }
+    if (!confirm('Delete ' + checked.length + ' selected serial number(s)? Quantity will be reduced accordingly.')) return;
+    var ids = [];
+    checked.forEach(function(cb) { ids.push(parseInt(cb.value)); });
+    fetch('{{ url_for("batch.delete_selected_sn", uuid=item.uuid) }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sn_ids: ids, batch_id: batchId })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { if (data.success) location.reload(); else alert(data.message || 'Error'); })
+    .catch(function(e) { alert('Error: ' + e); });
+}
+
+/* ── Transfer selected SNs modal ── */
+var transferSnFromBatchId = null;
+var transferSnIds = [];
+function openTransferSnModal(batchId) {
+    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
+    if (checked.length === 0) { alert('Please select at least one serial number.'); return; }
+    transferSnFromBatchId = batchId;
+    transferSnIds = [];
+    checked.forEach(function(cb) { transferSnIds.push(parseInt(cb.value)); });
+    document.getElementById('transferSnCount').textContent = transferSnIds.length;
+    // Hide the source batch from target options
+    var sel = document.getElementById('transferSnTarget');
+    for (var i = 0; i < sel.options.length; i++) {
+        sel.options[i].style.display = (parseInt(sel.options[i].value) === batchId) ? 'none' : '';
+        if (parseInt(sel.options[i].value) !== batchId) sel.selectedIndex = i;
+    }
+    new bootstrap.Modal(document.getElementById('transferSnModal')).show();
+}
+function doTransferSn() {
+    var targetId = parseInt(document.getElementById('transferSnTarget').value);
+    if (targetId === transferSnFromBatchId) { alert('Cannot transfer to same batch.'); return; }
+    fetch('{{ url_for("batch.transfer_selected_sn", uuid=item.uuid) }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sn_ids: transferSnIds, from_batch_id: transferSnFromBatchId, to_batch_id: targetId })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { if (data.success) location.reload(); else alert(data.message || 'Error'); })
+    .catch(function(e) { alert('Error: ' + e); });
+}
+
+/* ── Add SNs to batch ── */
+function addSnToBatch(batchId, currentQty) {
+    var input = document.getElementById('addSnQty' + batchId);
+    var qty = parseInt(input.value) || 0;
+    if (qty < 1) { alert('Enter at least 1.'); return; }
+    if (currentQty + qty > 100) { alert('Maximum 100 per batch. Can add up to ' + (100 - currentQty) + '.'); return; }
+    fetch('{{ url_for("batch.add_sn_to_batch", uuid=item.uuid) }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batch_id: batchId, quantity: qty })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { if (data.success) location.reload(); else alert(data.message || 'Error'); })
+    .catch(function(e) { alert('Error: ' + e); });
+}
+
+/* ── Remap ISN ── */
+function remapIsn(batchId) {
+    if (!confirm('Regenerate ISN sequence for this batch? Existing ISN values will be replaced with new sequential numbers. SN, Info, and Lend to will be kept.')) return;
+    fetch('{{ url_for("batch.remap_isn", uuid=item.uuid) }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batch_id: batchId })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { if (data.success) location.reload(); else alert(data.message || 'Error'); })
+    .catch(function(e) { alert('Error: ' + e); });
+}
+
+function confirmDisableSn() {
+    const clearCheck = document.getElementById('clearSnsCheck');
+    if (clearCheck && clearCheck.checked) {
+        return confirm('Are you sure you want to CLEAR ALL serial number data? This action cannot be undone!');
+    }
+    return true;
+}
+
+/* ── Add Batch tracking toggle ── */
+function toggleAddBatchTracking() {
+    var on = document.getElementById('addBatchSnTracking').checked;
+    var qtyInput = document.getElementById('addBatchQtyInput');
+    var hint = document.getElementById('addBatchQtyHint');
+    var info = document.getElementById('addBatchTrackingInfo');
+    var warn = document.getElementById('addBatchTrackingWarn');
+    var lendSection = document.getElementById('addBatchLendSection');
+    if (on) {
+        qtyInput.max = 100;
+        if (parseInt(qtyInput.value) > 100) qtyInput.value = 100;
+        hint.textContent = '(max 100)';
+        info.innerHTML = '<strong>ON:</strong> Each unit gets a Serial Number (SN) and Internal Serial Number (ISN). Max 100 per batch. Use Add/Delete/Transfer to manage individually.';
+        warn.classList.remove('d-none');
+        lendSection.style.display = 'none';
+    } else {
+        qtyInput.max = 99999;
+        hint.textContent = '(no limit)';
+        info.innerHTML = '<strong>OFF:</strong> Simple batch — unlimited quantity, manual lending fields.';
+        warn.classList.add('d-none');
+        lendSection.style.display = 'block';
+    }
+}
+
+/* ── Auto-open batch card after reload ── */
+document.addEventListener('DOMContentLoaded', function() {
+    // Store which batch was open before any action
+    var hash = window.location.hash;
+    if (hash && hash.startsWith('#batch-')) {
+        var collapseId = hash.replace('#batch-', 'batchCollapse');
+        var el = document.getElementById(collapseId);
+        if (el) {
+            new bootstrap.Collapse(el, {toggle: true});
+            setTimeout(function() { el.scrollIntoView({behavior: 'smooth', block: 'start'}); }, 300);
+        }
+    }
+    // Track which batch card is opened
+    document.querySelectorAll('[id^="batchCollapse"]').forEach(function(collapse) {
+        collapse.addEventListener('shown.bs.collapse', function() {
+            var batchId = this.id.replace('batchCollapse', '');
+            history.replaceState(null, null, '#batch-' + batchId);
+        });
+        collapse.addEventListener('hidden.bs.collapse', function() {
+            if (window.location.hash.includes(this.id.replace('batchCollapse', ''))) {
+                history.replaceState(null, null, window.location.pathname);
+            }
+        });
+    });
+});
 </script>
 {% endif %}
 {% endblock %}

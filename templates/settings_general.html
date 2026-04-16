@@ -190,6 +190,35 @@
             </div>
         </div>
 
+
+        <!-- Project Table Columns View Customization -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5><i class="bi bi-table"></i> Project Table View Customization</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-3">
+                    <i class="bi bi-info-circle"></i> <strong>Note:</strong> Customize which columns appear in the project table.
+                    Checkbox, Project Name, and Action are always shown.
+                </div>
+                <form method="POST" action="{{ url_for('project.save_project_table_columns') }}" id="projectTableColumnsForm">
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Available Columns</strong></label>
+                        <p class="text-muted small mb-2">Drag the handle <i class="bi bi-grip-vertical"></i> to reorder.</p>
+                        <div id="projectColumnsContainer" class="columns-container"></div>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <button type="button" class="btn btn-warning" onclick="resetProjectTableColumns()">
+                            <i class="bi bi-arrow-clockwise"></i> Reset to Default
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Save Columns
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <!-- Account Management -->
         {% if current_user.allow_password_reset or current_user.allow_profile_picture_change %}
         <div class="card mt-3">
@@ -445,7 +474,8 @@ const allColumns = [
     { id: 'category', label: 'Category', required: false },
     { id: 'tags', label: 'Tags', required: false },
     { id: 'footprint', label: 'Footprint', required: false },
-    { id: 'quantity', label: 'Quantity', required: false },
+    { id: 'quantity', label: 'Overall Quantity', required: false },
+    { id: 'available_quantity', label: 'Available Quantity', required: false },
     { id: 'total_price', label: 'Total Price', required: false },
     { id: 'price_per_unit', label: 'Price Per Unit', required: false },
     { id: 'location', label: 'Location', required: false },
@@ -555,6 +585,59 @@ function resetTableColumns() {
 document.getElementById('tableColumnsForm').addEventListener('submit', function(e) {
     updateSelectedColumns();
 });
+
+
+// ==================== Project Table Columns ====================
+const allProjectColumns = [
+    { id: 'info', label: 'Short Info' },
+    { id: 'categories', label: 'Categories' },
+    { id: 'tags', label: 'Tags' },
+    { id: 'date_start', label: 'Date Start' },
+    { id: 'dateline', label: 'Dateline' },
+    { id: 'total_cost', label: 'Total Cost' },
+    { id: 'status', label: 'Status' },
+    { id: 'users', label: 'Users' },
+    { id: 'group', label: 'Group' },
+    { id: 'project_id', label: 'Project ID' }
+];
+const defaultProjectColumns = ['info', 'categories', 'tags', 'date_start', 'dateline', 'total_cost', 'status', 'users', 'group', 'project_id'];
+
+document.addEventListener('DOMContentLoaded', function() {
+    const c = document.getElementById('projectColumnsContainer');
+    if (!c) return;
+    const userProjCols = {{ current_user.get_project_table_columns() | tojson }};
+    renderProjectColumnsContainer(userProjCols);
+});
+
+function renderProjectColumnsContainer(sel) {
+    const c = document.getElementById('projectColumnsContainer');
+    if (!c) return;
+    if (!sel) sel = defaultProjectColumns;
+    let h = '<div class="mb-2 p-2 rounded border column-header-info"><small class="text-muted"><strong>Always shown:</strong> Checkbox, Project Name, Action</small></div>';
+    h += '<div id="sortableProjectColumns" style="display: flex; flex-direction: column; gap: 8px;">';
+    sel.forEach(id => { const col = allProjectColumns.find(c => c.id === id); if (col) h += createProjColItem(col, true); });
+    allProjectColumns.forEach(col => { if (!sel.includes(col.id)) h += createProjColItem(col, false); });
+    h += '</div>';
+    c.innerHTML = h;
+    Sortable.create(c.querySelector('#sortableProjectColumns'), { handle: '.grip-handle', ghostClass: 'sortable-ghost', animation: 150, onEnd: updateProjSelectedColumns });
+}
+
+function createProjColItem(col, on) {
+    return '<div class="column-item p-2 rounded border-start border-start-4" style="border-left-color: ' + (on ? '#28a745' : 'var(--bs-border-color, #dee2e6)') + ';" data-column-id="' + col.id + '"><div class="d-flex align-items-center gap-2"><i class="bi bi-grip-vertical grip-handle text-muted" style="cursor: grab;"></i><input type="checkbox" class="proj-col-cb form-check-input" value="' + col.id + '" ' + (on ? 'checked' : '') + ' onchange="updateProjSelectedColumns()"><label class="flex-grow-1 mb-0" style="cursor: pointer;">' + col.label + '</label></div></div>';
+}
+
+function updateProjSelectedColumns() {
+    const items = document.querySelectorAll('#sortableProjectColumns .column-item');
+    const sel = [];
+    items.forEach(item => { const cb = item.querySelector('.proj-col-cb'); if (cb && cb.checked) sel.push(cb.value); });
+    let inp = document.getElementById('projTableColsInput');
+    if (!inp) { inp = document.createElement('input'); inp.type = 'hidden'; inp.id = 'projTableColsInput'; inp.name = 'columns'; document.getElementById('projectTableColumnsForm').appendChild(inp); }
+    inp.value = JSON.stringify(sel);
+}
+
+function resetProjectTableColumns() { if (confirm('Reset project table columns to default?')) { renderProjectColumnsContainer(defaultProjectColumns); updateProjSelectedColumns(); } }
+
+document.getElementById('projectTableColumnsForm')?.addEventListener('submit', function() { updateProjSelectedColumns(); });
 
 // Theme form submit - reload page after save to apply theme
 document.querySelector("form[action=\"{{ url_for('settings.save_theme') }}\"]")?.addEventListener('submit', function(e) {

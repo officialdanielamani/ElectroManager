@@ -2,6 +2,10 @@
 Create Admin User Script
 Run this if the setup script failed to create an admin user
 """
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from app import app, db
 from models import User
 

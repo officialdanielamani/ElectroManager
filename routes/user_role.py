@@ -447,7 +447,8 @@ def role_edit(id):
             # Items permissions (granular)
             item_actions = ['view', 'create', 'delete', 'edit_name', 'edit_sku_type', 'edit_description', 
                            'edit_datasheet', 'edit_upload', 'edit_lending', 'edit_price', 'edit_quantity', 
-                           'edit_location', 'edit_category', 'edit_footprint', 'edit_tags', 'edit_parameters']
+                           'edit_location', 'edit_category', 'edit_footprint', 'edit_tags', 'edit_parameters',
+                           'edit_batch', 'edit_serial']
             for action in item_actions:
                 checkbox_name = f'items_{action}'
                 perms['items'][action] = checkbox_name in request.form
@@ -459,6 +460,14 @@ def role_edit(id):
             }
             perms['pages']['notifications'] = {
                 'view': 'pages_notifications_view' in request.form
+            }
+            
+            # Project permissions
+            perms['projects'] = {
+                'view': 'projects_view' in request.form,
+                'create': 'projects_create' in request.form,
+                'edit': 'projects_edit' in request.form,
+                'delete': 'projects_delete' in request.form
             }
             
             # Settings sections permissions
@@ -517,6 +526,12 @@ def role_edit(id):
                 'view': 'settings_sections_backup_restore_view' in request.form,
                 'upload_export': 'settings_sections_backup_restore_upload_export' in request.form,
                 'delete': 'settings_sections_backup_restore_delete' in request.form
+            }
+            
+            perms['settings_sections']['project_settings'] = {
+                'view': 'settings_sections_project_settings_view' in request.form,
+                'edit': 'settings_sections_project_settings_edit' in request.form,
+                'delete': 'settings_sections_project_settings_delete' in request.form
             }
             
             role.set_permissions(perms)

@@ -1,0 +1,467 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Inventory Manager{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-kanban"></i> {{ title }}</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="projectForm">
+
+                    {% if project and project.project_id %}
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm">Project ID</label>
+                        <input type="text" class="form-control form-control-sm" value="{{ project.project_id }}" disabled>
+                    </div>
+                    {% endif %}
+
+                    <!-- Row 1: Name -->
+                    <div class="row mb-2">
+                        <div class="col-8">
+                            <label class="form-label form-label-sm">Project Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-sm" name="name" value="{{ project.name if project else '' }}" required>
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label form-label-sm">Quantity</label>
+                            <input type="number" class="form-control form-control-sm" name="quantity" value="{{ project.quantity if project else 1 }}" min="1">
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Short Info -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm">Short Info</label>
+                        <input type="text" class="form-control form-control-sm" name="info" value="{{ project.info if project else '' }}" maxlength="500">
+                    </div>
+
+                    <!-- Row 3: Category & Status -->
+                    <div class="row mb-2">
+                        <div class="col-6">
+                            <label class="form-label form-label-sm">Category</label>
+                            <select class="form-select form-select-sm" name="category_id">
+                                <option value="">-- Select --</option>
+                                {% for cat in categories %}
+                                <option value="{{ cat.id }}" {% if project and project.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label form-label-sm">Status</label>
+                            <select class="form-select form-select-sm" name="status_id">
+                                <option value="">-- Select --</option>
+                                {% for st in statuses %}
+                                <option value="{{ st.id }}" {% if project and project.status_id == st.id %}selected{% endif %}>{{ st.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Row 4: Dates -->
+                    <div class="row mb-2">
+                        <div class="col-6">
+                            <label class="form-label form-label-sm">Date Start</label>
+                            <input type="date" class="form-control form-control-sm" name="date_start" value="{{ project.date_start.strftime('%Y-%m-%d') if project and project.date_start else '' }}">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label form-label-sm">Date End (Dateline)</label>
+                            <input type="date" class="form-control form-control-sm" name="date_end" value="{{ project.date_end.strftime('%Y-%m-%d') if project and project.date_end else '' }}">
+                        </div>
+                    </div>
+
+                    <!-- Row 5: Tags -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm">Tags</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% set selected_tags = project.get_tags_list() if project else [] %}
+                            {% set selected_tag_ids = selected_tags | map(attribute='id') | list %}
+                            {% for tag in tags %}
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" name="tags" value="{{ tag.id }}" id="tag_{{ tag.id }}" {% if tag.id in selected_tag_ids %}checked{% endif %}>
+                                <label class="form-check-label" for="tag_{{ tag.id }}"><span class="badge" style="background-color: {{ tag.color }}">{{ tag.name }}</span></label>
+                            </div>
+                            {% endfor %}
+                            {% if not tags %}<small class="text-muted">No tags. Create in Settings > Project Settings.</small>{% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Row 6: Users & Group -->
+                    <div class="row mb-2">
+                        <div class="col-8">
+                            <label class="form-label form-label-sm">Users</label>
+                            {% set selected_user_ids = [] %}
+                            {% if project and project.users %}{% set selected_user_ids = project.users | from_json %}{% endif %}
+                            <select class="form-select form-select-sm" name="users" multiple size="4">
+                                {% for u in users %}
+                                <option value="{{ u.id }}" {% if u.id in selected_user_ids %}selected{% endif %}>{{ u.username }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple</small>
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label form-label-sm">Group</label>
+                            <select class="form-select form-select-sm" name="group_id">
+                                <option value="">-- Select --</option>
+                                {% for grp in groups %}
+                                <option value="{{ grp.id }}" {% if project and project.group_id == grp.id %}selected{% endif %}>{{ grp.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    {% if project %}
+                    <!-- Description (edit only) -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm">Description <small class="text-muted">(Markdown)</small></label>
+                        <textarea class="form-control form-control-sm" name="description" rows="4">{{ project.description or '' }}</textarea>
+                    </div>
+
+                    <!-- Dateline Notification (edit only) -->
+                    <div class="row mb-2">
+                        <div class="col-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="enable_dateline_notification" name="enable_dateline_notification" {% if project.enable_dateline_notification %}checked{% endif %}>
+                                <label class="form-check-label form-label-sm" for="enable_dateline_notification">Enable Dateline Notification</label>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label form-label-sm">Notify before X days</label>
+                            <input type="number" class="form-control form-control-sm" name="notify_before_days" value="{{ project.notify_before_days }}" min="0">
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Actions -->
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <a href="{% if project %}{{ url_for('project.project_detail', project_id=project.project_id) }}{% else %}{{ url_for('project.projects') }}{% endif %}" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> {{ 'Save Changes' if project else 'Create Project' }}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if project %}
+        <!-- URLs (edit page only) -->
+        <div class="card mt-3">
+            <div class="card-header"><h5 class="mb-0"><i class="bi bi-link-45deg"></i> URLs</h5></div>
+            <div class="card-body">
+                {% for purl in project.urls %}
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div><a href="{{ purl.url }}" target="_blank">{{ purl.title or purl.url }}</a>{% if purl.description %}<br><small class="text-muted">{{ purl.description }}</small>{% endif %}</div>
+                    <form method="POST" action="{{ url_for('project.project_url_delete', url_id=purl.id) }}" style="display:inline;">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove?')"><i class="bi bi-trash"></i></button>
+                    </form>
+                </div>
+                {% endfor %}
+                <form method="POST" action="{{ url_for('project.project_url_add', project_id=project.project_id) }}" class="row g-2 mt-2">
+                    <div class="col-5"><input type="url" class="form-control form-control-sm" name="url" placeholder="https://..." required></div>
+                    <div class="col-3"><input type="text" class="form-control form-control-sm" name="title" placeholder="Title"></div>
+                    <div class="col-3"><input type="text" class="form-control form-control-sm" name="url_description" placeholder="Description"></div>
+                    <div class="col-1"><button type="submit" class="btn btn-sm btn-success"><i class="bi bi-plus"></i></button></div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Attachments (edit page only) -->
+        {% set att_types = [('picture', 'Pictures', 'bi-image'), ('document', 'Documents', 'bi-file-text'), ('schematic', 'Schematics', 'bi-cpu'), ('2d_design', '2D Designs', 'bi-pencil-square'), ('3d_design', '3D Designs', 'bi-box')] %}
+        <div class="card mt-3">
+            <div class="card-header"><h5 class="mb-0"><i class="bi bi-paperclip"></i> Attachments</h5></div>
+            <div class="card-body">
+                {% for att_type, att_label, att_icon in att_types %}
+                <div class="mb-3">
+                    <h6><i class="bi {{ att_icon }}"></i> {{ att_label }}</h6>
+                    {% for att in attachments[att_type] %}
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <div>
+                            {% if att_type == 'picture' and att.file_type in ['png','jpg','jpeg','webp','svg'] %}
+                            <img src="{{ url_for('uploaded_file', filename=att.file_path) }}" alt="" style="max-height: 40px; max-width: 60px;" class="me-2 rounded">
+                            {% endif %}
+                            <a href="{{ url_for('uploaded_file', filename=att.file_path) }}" target="_blank">{{ att.original_filename }}</a>
+                            <small class="text-muted">({{ (att.file_size / 1024) | round(1) }} KB)</small>
+                        </div>
+                        <form method="POST" action="{{ url_for('project.project_attachment_delete', att_id=att.id) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete?')"><i class="bi bi-trash"></i></button>
+                        </form>
+                    </div>
+                    {% endfor %}
+                    <form method="POST" action="{{ url_for('project.project_upload', project_id=project.project_id, attachment_type=att_type) }}" enctype="multipart/form-data" class="mt-1">
+                        <div class="input-group input-group-sm">
+                            <input type="file" class="form-control form-control-sm" name="files" multiple>
+                            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-upload"></i></button>
+                        </div>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- BOM -->
+        <div class="card mt-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-list-check"></i> Bill of Materials (BOM)</h5>
+                <strong>Total: {{ currency }} {{ '{:,.{}f}'.format(project.get_bom_total_cost(), currency_decimal) }}</strong>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover" id="bomTable">
+                        <thead><tr><th>Item</th><th>Batch</th><th>Serial Numbers</th><th>Qty</th><th>Cost/Unit</th><th>Total</th><th>Used</th><th>Actions</th></tr></thead>
+                        <tbody>
+                            {% for bom in bom_items %}
+                            <tr id="bom-row-{{ bom.id }}">
+                                <td><a href="{{ url_for('item.item_detail', uuid=bom.item.uuid) }}" target="_blank">{{ bom.item.name }}</a></td>
+                                <td>{{ bom.batch.get_display_label() if bom.batch else '-' }}</td>
+                                <td>{% if bom.serial_numbers %}{% for sn in bom.get_serial_numbers_list() %}<small>{% if sn.serial_number %}<strong>SN:</strong> {{ sn.serial_number }}<br>{% endif %}<code title="Internal Serial Number">ISN: {{ sn.internal_serial_number }}</code></small><br>{% endfor %}{% else %}-{% endif %}</td>
+                                <td>
+                                    {% if not bom.serial_numbers %}
+                                    <div class="input-group input-group-sm" style="width:100px;">
+                                        <input type="number" class="form-control form-control-sm" id="bomQty{{ bom.id }}" value="{{ bom.quantity }}" min="1" max="{{ bom.batch.get_available_quantity() + bom.quantity if bom.batch else 9999 }}">
+                                        <button class="btn btn-outline-primary" onclick="updateBOMQty({{ bom.id }})" title="Save qty"><i class="bi bi-check"></i></button>
+                                    </div>
+                                    {% else %}
+                                    {{ bom.quantity }}
+                                    {% endif %}
+                                </td>
+                                <td>{{ currency }} {{ '{:,.{}f}'.format(bom.get_cost_per_unit(), currency_decimal) }}</td>
+                                <td>{{ currency }} {{ '{:,.{}f}'.format(bom.get_total_cost(), currency_decimal) }}</td>
+                                <td><input type="checkbox" class="form-check-input bom-used-toggle" data-bom-id="{{ bom.id }}" {% if bom.used %}checked{% endif %}></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-warning" onclick="openEditBOMModal({{ bom.id }}, {{ bom.item_id }}, {{ bom.batch_id or 'null' }}, {{ bom.quantity }}, this.dataset.itemname)" data-itemname="{{ bom.item.name|e }}" title="Edit BOM Item"><i class="bi bi-pencil"></i></button>
+                                    <a href="{{ url_for('item.item_detail', uuid=bom.item.uuid) }}" target="_blank" class="btn btn-sm btn-outline-info" title="Item Info"><i class="bi bi-info-circle"></i></a>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteBOM({{ bom.id }})" title="Remove"><i class="bi bi-trash"></i></button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <hr>
+                <h6><i class="bi bi-plus-circle"></i> Add Item to BOM</h6>
+                <div class="row g-2 mb-2">
+                    <div class="col-md-6"><input type="text" class="form-control form-control-sm" id="bomSearchInput" placeholder="Search items..." oninput="searchBOMItems()"></div>
+                    <div class="col-md-4">
+                        <select class="form-select form-select-sm" id="bomCategoryFilter" onchange="searchBOMItems()">
+                            <option value="0">All Categories</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="bomSearchResults" class="border rounded p-2" style="max-height: 350px; overflow-y: auto; display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Duplicate Save/Back at bottom -->
+        <div class="card mt-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <a href="{{ url_for('project.project_detail', project_id=project.project_id) }}" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+                    <button type="submit" form="projectForm" class="btn btn-primary"><i class="bi bi-save"></i> Save Changes</button>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if project %}
+<!-- Edit BOM Item Modal -->
+<div class="modal fade" id="editBOMModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit BOM Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label"><strong>Current Item:</strong> <span id="editBomCurrentItem"></span></label>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Change Item (search to replace)</label>
+                    <input type="text" class="form-control form-control-sm" id="editBomSearchInput" placeholder="Search items... (leave empty to keep current)" oninput="searchEditBOMItems()">
+                </div>
+                <div id="editBomSearchResults" class="border rounded p-2 mb-3" style="max-height: 300px; overflow-y: auto; display: none;"></div>
+                <div id="editBomSelectedInfo" class="alert alert-info" style="display: none;">
+                    <strong>New selection:</strong> <span id="editBomSelectedText"></span>
+                </div>
+                <input type="hidden" id="editBomId" value="">
+                <input type="hidden" id="editBomNewItemId" value="">
+                <input type="hidden" id="editBomNewBatchId" value="">
+                <input type="hidden" id="editBomNewQty" value="">
+                <input type="hidden" id="editBomNewSnIds" value="">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveEditBOM()"><i class="bi bi-save"></i> Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let editBomSearchTimeout;
+let editBomOrigItemId = null;
+let editBomOrigBatchId = null;
+
+function openEditBOMModal(bomId, itemId, batchId, qty, itemName) {
+    if (!itemName) itemName = "Unknown";
+    document.getElementById('editBomId').value = bomId;
+    document.getElementById('editBomCurrentItem').textContent = itemName;
+    document.getElementById('editBomSearchInput').value = '';
+    document.getElementById('editBomSearchResults').style.display = 'none';
+    document.getElementById('editBomSelectedInfo').style.display = 'none';
+    document.getElementById('editBomNewItemId').value = '';
+    document.getElementById('editBomNewBatchId').value = '';
+    document.getElementById('editBomNewQty').value = '';
+    document.getElementById('editBomNewSnIds').value = '';
+    editBomOrigItemId = itemId;
+    editBomOrigBatchId = batchId;
+    new bootstrap.Modal(document.getElementById('editBOMModal')).show();
+}
+
+function searchEditBOMItems() {
+    clearTimeout(editBomSearchTimeout);
+    editBomSearchTimeout = setTimeout(() => {
+        const q = document.getElementById('editBomSearchInput').value;
+        if (q.length < 1) { document.getElementById('editBomSearchResults').style.display = 'none'; return; }
+        fetch(`{{ url_for('project.bom_search_items', project_id=project.project_id) }}?q=${encodeURIComponent(q)}`)
+            .then(r => r.json()).then(items => {
+                const div = document.getElementById('editBomSearchResults');
+                div.style.display = 'block';
+                if (!items.length) { div.innerHTML = '<p class="text-muted small">No items found.</p>'; return; }
+                let html = '';
+                items.forEach(item => {
+                    html += `<div class="card mb-2"><div class="card-body p-2"><strong>${item.name}</strong> <small class="text-muted">${item.category}</small>`;
+                    item.batches.forEach(batch => {
+                        html += `<div class="ms-3 mt-1 p-2 border rounded"><strong>${batch.label}</strong> - Avail: ${batch.available}/${batch.quantity} - $${batch.price}/unit`;
+                        if (batch.sn_tracking && batch.serial_numbers.length) {
+                            html += `<div class="mt-1 table-responsive"><table class="table table-sm table-bordered mb-1" style="font-size:0.82rem;"><thead class="table-light"><tr><th style="width:30px"><input type="checkbox" class="form-check-input" onclick="this.closest('table').querySelectorAll('.edit-sn-check[data-item=\\'${item.id}\\'][data-batch=\\'${batch.id}\\']').forEach(c=>c.checked=this.checked)"></th><th>ISN</th><th>SN</th></tr></thead><tbody>`;
+                            batch.serial_numbers.forEach(sn => {
+                                html += `<tr><td><input class="form-check-input edit-sn-check" type="checkbox" value="${sn.id}" data-item="${item.id}" data-batch="${batch.id}"></td><td><code style="font-size:0.78rem">${sn.isn}</code></td><td>${sn.sn !== sn.isn ? sn.sn : '-'}</td></tr>`;
+                            });
+                            html += `</tbody></table><button class="btn btn-sm btn-outline-success" onclick="selectEditBOMWithSN(${item.id}, ${batch.id}, '${item.name}', '${batch.label}')"><i class="bi bi-check"></i> Select</button></div>`;
+                        } else {
+                            html += `<div class="input-group input-group-sm mt-1" style="max-width:250px;"><input type="number" class="form-control" id="editqty-${item.id}-${batch.id}" value="1" min="1" max="${batch.available}"><button class="btn btn-outline-success" onclick="selectEditBOM(${item.id}, ${batch.id}, '${item.name}', '${batch.label}')"><i class="bi bi-check"></i> Select</button></div>`;
+                        }
+                        html += `</div>`;
+                    });
+                    html += `</div></div>`;
+                });
+                div.innerHTML = html;
+            });
+    }, 300);
+}
+
+function selectEditBOM(itemId, batchId, itemName, batchLabel) {
+    const qty = parseInt(document.getElementById(`editqty-${itemId}-${batchId}`).value) || 1;
+    document.getElementById('editBomNewItemId').value = itemId;
+    document.getElementById('editBomNewBatchId').value = batchId;
+    document.getElementById('editBomNewQty').value = qty;
+    document.getElementById('editBomNewSnIds').value = '';
+    document.getElementById('editBomSelectedText').textContent = `${itemName} / ${batchLabel} × ${qty}`;
+    document.getElementById('editBomSelectedInfo').style.display = 'block';
+    document.getElementById('editBomSearchResults').style.display = 'none';
+}
+
+function selectEditBOMWithSN(itemId, batchId, itemName, batchLabel) {
+    const ids = Array.from(document.querySelectorAll(`.edit-sn-check[data-item="${itemId}"][data-batch="${batchId}"]:checked`)).map(c => parseInt(c.value));
+    if (!ids.length) { alert('Select at least one SN.'); return; }
+    document.getElementById('editBomNewItemId').value = itemId;
+    document.getElementById('editBomNewBatchId').value = batchId;
+    document.getElementById('editBomNewQty').value = ids.length;
+    document.getElementById('editBomNewSnIds').value = JSON.stringify(ids);
+    document.getElementById('editBomSelectedText').textContent = `${itemName} / ${batchLabel} × ${ids.length} SNs`;
+    document.getElementById('editBomSelectedInfo').style.display = 'block';
+    document.getElementById('editBomSearchResults').style.display = 'none';
+}
+
+function saveEditBOM() {
+    const bomId = document.getElementById('editBomId').value;
+    const newItemId = document.getElementById('editBomNewItemId').value;
+    const newBatchId = document.getElementById('editBomNewBatchId').value;
+    const newQty = document.getElementById('editBomNewQty').value;
+    const newSnIds = document.getElementById('editBomNewSnIds').value;
+
+    if (!newItemId) { alert('Please search and select a new item/batch, or cancel.'); return; }
+
+    const payload = {
+        item_id: parseInt(newItemId),
+        batch_id: parseInt(newBatchId),
+        quantity: parseInt(newQty)
+    };
+    if (newSnIds) {
+        payload.serial_number_ids = JSON.parse(newSnIds);
+    }
+
+    fetch(`/project/{{ project.project_id }}/bom/${bomId}/edit`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    }).then(r => r.json()).then(d => {
+        if (d.success) location.reload();
+        else alert(d.error || 'Error');
+    });
+}
+
+let searchTimeout;
+function searchBOMItems() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        const q = document.getElementById('bomSearchInput').value;
+        const cat = document.getElementById('bomCategoryFilter').value;
+        if (q.length < 1) { document.getElementById('bomSearchResults').style.display = 'none'; return; }
+        fetch(`{{ url_for('project.bom_search_items', project_id=project.project_id) }}?q=${encodeURIComponent(q)}&category=${cat}`)
+            .then(r => r.json()).then(items => {
+                const div = document.getElementById('bomSearchResults');
+                div.style.display = 'block';
+                if (!items.length) { div.innerHTML = '<p class="text-muted small">No items found.</p>'; return; }
+                let html = '';
+                items.forEach(item => {
+                    html += `<div class="card mb-2"><div class="card-body p-2"><strong>${item.name}</strong> <small class="text-muted">${item.category}</small>`;
+                    item.batches.forEach(batch => {
+                        html += `<div class="ms-3 mt-1 p-2 border rounded"><strong>${batch.label}</strong> - Avail: ${batch.available}/${batch.quantity} - $${batch.price}/unit`;
+                        if (batch.sn_tracking && batch.serial_numbers.length) {
+                            html += `<div class="mt-1 table-responsive"><table class="table table-sm table-bordered mb-1" style="font-size:0.82rem;"><thead class="table-light"><tr><th style="width:30px"><input type="checkbox" class="form-check-input" onclick="this.closest('table').querySelectorAll('.sn-check[data-item=\\'${item.id}\\'][data-batch=\\'${batch.id}\\']').forEach(c=>c.checked=this.checked)"></th><th>ISN</th><th>SN</th></tr></thead><tbody>`;
+                            batch.serial_numbers.forEach(sn => {
+                                html += `<tr><td><input class="form-check-input sn-check" type="checkbox" value="${sn.id}" data-item="${item.id}" data-batch="${batch.id}"></td><td><code style="font-size:0.78rem">${sn.isn}</code></td><td>${sn.sn !== sn.isn ? sn.sn : '-'}</td></tr>`;
+                            });
+                            html += `</tbody></table><button class="btn btn-sm btn-success" onclick="addBOMWithSN(${item.id}, ${batch.id})"><i class="bi bi-plus"></i> Add Selected</button></div>`;
+                        } else {
+                            html += `<div class="input-group input-group-sm mt-1" style="max-width:220px;"><input type="number" class="form-control" id="qty-${item.id}-${batch.id}" value="1" min="1" max="${batch.available}"><button class="btn btn-success" onclick="addBOM(${item.id}, ${batch.id})"><i class="bi bi-plus"></i></button></div>`;
+                        }
+                        html += `</div>`;
+                    });
+                    if (!item.batches.length) html += `<div class="ms-3 text-muted"><small>No batches</small></div>`;
+                    html += `</div></div>`;
+                });
+                div.innerHTML = html;
+            });
+    }, 300);
+}
+function addBOM(itemId, batchId) {
+    const qty = parseInt(document.getElementById(`qty-${itemId}-${batchId}`).value) || 1;
+    fetch(`{{ url_for('project.bom_add', project_id=project.project_id) }}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({item_id: itemId, batch_id: batchId, quantity: qty}) }).then(r => r.json()).then(d => { if (d.success) location.reload(); else alert(d.error); });
+}
+function addBOMWithSN(itemId, batchId) {
+    const ids = Array.from(document.querySelectorAll(`.sn-check[data-item="${itemId}"][data-batch="${batchId}"]:checked`)).map(c => parseInt(c.value));
+    if (!ids.length) { alert('Select at least one SN.'); return; }
+    fetch(`{{ url_for('project.bom_add', project_id=project.project_id) }}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({item_id: itemId, batch_id: batchId, serial_number_ids: ids}) }).then(r => r.json()).then(d => { if (d.success) location.reload(); else alert(d.error); });
+}
+function updateBOMQty(bomId) {
+    const qty = parseInt(document.getElementById('bomQty' + bomId).value) || 1;
+    fetch(`/project/{{ project.project_id }}/bom/${bomId}/edit`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({quantity: qty}) }).then(r => r.json()).then(d => { if (d.success) location.reload(); else alert(d.error || 'Error'); });
+}
+function deleteBOM(bomId) {
+    if (!confirm('Remove from BOM?')) return;
+    fetch(`/project/{{ project.project_id }}/bom/${bomId}/delete`, {method: 'POST'}).then(r => r.json()).then(d => { if (d.success) location.reload(); });
+}
+document.querySelectorAll('.bom-used-toggle').forEach(cb => {
+    cb.addEventListener('change', function() {
+        fetch(`/project/{{ project.project_id }}/bom/${this.dataset.bomId}/toggle-used`, {method: 'POST'}).then(r => r.json()).then(d => { if (!d.success) this.checked = !this.checked; });
+    });
+});
+</script>
+{% endif %}
+{% endblock %}

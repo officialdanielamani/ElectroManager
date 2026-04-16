@@ -144,78 +144,52 @@
                         <i class="bi bi-lock"></i> <strong>File size and type cannot be changed for security purpose. Disable Demo Mode to enable this feature.</strong>
                     </div>
                     {% else %}
-                    <div class="mb-3">
-                        <label for="max_file_size" class="form-label">Maximum File Size (MB) <span class="text-danger">*</span></label>
-                        <input type="number" 
-                               class="form-control" 
-                               id="max_file_size" 
-                               name="max_file_size" 
-                               value="{{ max_file_size }}" 
-                               min="1" 
-                               max="100" 
-                               required>
-                        <div class="form-text">
-                            <i class="bi bi-info-circle"></i> Maximum size per file in megabytes (1-100 MB)
+
+                    <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-box"></i> Item Uploads</h6>
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label for="max_file_size" class="form-label">Max File Size (MB) <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="max_file_size" name="max_file_size" value="{{ max_file_size }}" min="1" max="100" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="allowed_extensions" class="form-label">Allowed File Types <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="allowed_extensions" name="allowed_extensions" value="{{ allowed_extensions }}" required placeholder="pdf,png,jpg,jpeg,gif,txt,doc,docx">
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="allowed_extensions" class="form-label">Allowed File Types <span class="text-danger">*</span></label>
-                        <input type="text" 
-                               class="form-control" 
-                               id="allowed_extensions" 
-                               name="allowed_extensions" 
-                               value="{{ allowed_extensions }}" 
-                               required
-                               placeholder="pdf,png,jpg">
-                        <div class="form-text">
-                            <i class="bi bi-info-circle"></i> Comma-separated list of allowed file extensions (without dots)
+                    <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-geo-alt"></i> Location / Rack Uploads</h6>
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label">Max File Size (MB) <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" name="location_upload_max_size" value="{{ location_upload_max_size }}" min="1" max="100" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Allowed File Types <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="location_upload_extensions" value="{{ location_upload_extensions }}" required placeholder="webp,png,svg,jpeg,jpg">
                         </div>
                     </div>
 
-                    <div class="alert alert-warning mb-0">
-                        <i class="bi bi-exclamation-triangle"></i> <strong>Common file types:</strong><br>
-                        <small>
-                            <strong>Images:</strong> png, jpg, jpeg, gif, webp, bmp<br>
-                            <strong>Documents:</strong> pdf, doc, docx, txt, rtf<br>
-                            <strong>Spreadsheets:</strong> xls, xlsx, csv<br>
-                            <strong>Archives:</strong> zip, rar, 7z<br>
-                            <strong>Example:</strong> pdf,png,jpg (allows only PDF and PNG/JPG images)
-                        </small>
+                    <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-kanban"></i> Project Uploads</h6>
+                    {% set proj_types = [('picture', 'Pictures', 'webp,png,svg,jpeg,jpg'), ('document', 'Documents', 'txt,doc,docx,pdf'), ('schematic', 'Schematics', 'pdf,zip'), ('2d_design', '2D Design', 'pdf,zip'), ('3d_design', '3D Design', 'pdf,zip,stl,step')] %}
+                    {% for ptype, plabel, pdefault in proj_types %}
+                    <div class="row mb-2">
+                        <div class="col-md-3"><label class="form-label small fw-bold">{{ plabel }}</label></div>
+                        <div class="col-md-5">
+                            <input type="text" class="form-control form-control-sm" name="project_upload_{{ ptype }}_extensions" value="{{ project_upload_settings.get(ptype, {}).get('extensions', pdefault) }}" required placeholder="{{ pdefault }}">
+                            <small class="text-muted">Allowed types</small>
+                        </div>
+                        <div class="col-md-4">
+                            <input type="number" class="form-control form-control-sm" name="project_upload_{{ ptype }}_max_size" value="{{ project_upload_settings.get(ptype, {}).get('max_size', '10') }}" min="1" max="200" required>
+                            <small class="text-muted">Max MB</small>
+                        </div>
                     </div>
+                    {% endfor %}
+
                     {% endif %}
                 </div>
             </div>
 
-            <!-- Current Settings Display -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Current Settings</h5>
-                </div>
-                <div class="card-body">
-                    <dl class="row mb-0 small">
-                        <dt class="col-sm-6">Banner Timeout:</dt>
-                        <dd class="col-sm-6"><span class="badge bg-info">{{ banner_timeout }}s</span></dd>
 
-                        <dt class="col-sm-6">Currency:</dt>
-                        <dd class="col-sm-6"><span class="badge bg-primary">{{ currency }}</span></dd>
-                        
-                        <dt class="col-sm-6">Max Drawer Size:</dt>
-                        <dd class="col-sm-6"><span class="badge bg-warning text-dark">{{ max_drawer_rows }} × {{ max_drawer_cols }}</span></dd>
-
-                        <dt class="col-sm-6">Max File Size:</dt>
-                        <dd class="col-sm-6"><span class="badge bg-success">{{ max_file_size }} MB</span></dd>
-                        
-                        <dt class="col-sm-12">Allowed Types:</dt>
-                        <dd class="col-sm-12">
-                            {% set extensions = allowed_extensions.split(',') %}
-                            {% for ext in extensions %}
-                                <span class="badge bg-secondary">{{ ext.strip() }}</span>
-                            {% endfor %}
-                        </dd>
-                    </dl>
-                </div>
-            </div>
 
             <!-- Action Buttons -->
             <div class="card">

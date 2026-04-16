@@ -99,8 +99,6 @@ class ItemAddForm(FlaskForm):
     category_id = SelectField('Category', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
     footprint_id = SelectField('Footprint', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
     
-    lend_to = StringField('Lend To', validators=[Optional(), Length(max=200)], render_kw={"class": "form-control form-control-sm"})
-    lend_quantity = IntegerField('Lend Quantity', validators=[Optional(), NumberRange(min=0)], default=0, render_kw={"class": "form-control form-control-sm"})
     no_stock_warning = BooleanField('No Stock Warning', default=True)
     datasheet_urls = TextAreaField('Datasheet URLs', validators=[Optional()], render_kw={"class": "form-control form-control-sm"})
     
@@ -126,8 +124,6 @@ class ItemAddForm(FlaskForm):
             'info': 'can_edit_sku_type',
             'description': 'can_edit_description',
             'datasheet_urls': 'can_edit_datasheet',
-            'lend_to': 'can_edit_lending',
-            'lend_quantity': 'can_edit_lending',
             'price': 'can_edit_price',
             'quantity': 'can_edit_quantity',
             'min_quantity': 'can_edit_quantity',
@@ -167,8 +163,6 @@ class ItemEditForm(FlaskForm):
     category_id = SelectField('Category', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
     footprint_id = SelectField('Footprint', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
     
-    lend_to = StringField('Lend To', validators=[Optional(), Length(max=200)], render_kw={"class": "form-control form-control-sm"})
-    lend_quantity = IntegerField('Lend Quantity', validators=[Optional(), NumberRange(min=0)], default=0, render_kw={"class": "form-control form-control-sm"})
     no_stock_warning = BooleanField('No Stock Warning', default=True)
     datasheet_urls = TextAreaField('Datasheet URLs', validators=[Optional()], render_kw={"class": "form-control form-control-sm"})
     
@@ -194,8 +188,6 @@ class ItemEditForm(FlaskForm):
             'info': 'can_edit_sku_type',
             'description': 'can_edit_description',
             'datasheet_urls': 'can_edit_datasheet',
-            'lend_to': 'can_edit_lending',
-            'lend_quantity': 'can_edit_lending',
             'price': 'can_edit_price',
             'quantity': 'can_edit_quantity',
             'min_quantity': 'can_edit_quantity',

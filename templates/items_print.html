@@ -274,7 +274,8 @@
                             {% if col == 'category' %}<th>Category</th>{% endif %}
                             {% if col == 'tags' %}<th>Tags</th>{% endif %}
                             {% if col == 'footprint' %}<th>Footprint</th>{% endif %}
-                            {% if col == 'quantity' %}<th>Quantity</th>{% endif %}
+                            {% if col == 'quantity' %}<th>Overall Qty</th>{% endif %}
+                            {% if col == 'available_quantity' %}<th>Available Qty</th>{% endif %}
                             {% if col == 'price_per_unit' %}<th>Price/Unit</th>{% endif %}
                             {% if col == 'total_price' %}<th>Total Price</th>{% endif %}
                             {% if col == 'location' %}<th>Location</th>{% endif %}
@@ -321,12 +322,15 @@
                                 </td>
                             {% endif %}
                             {% if col == 'quantity' %}
-                                <td>{{ item.quantity }}</td>
+                                <td>{{ item.get_overall_quantity() }}</td>
+                            {% endif %}
+                            {% if col == 'available_quantity' %}
+                                <td>{{ item.get_available_quantity() }}</td>
                             {% endif %}
                             {% if col == 'price_per_unit' %}
                                 <td>
-                                    {% if item.price %}
-                                        {{ item.price|format_amount(currency_decimal_places) }}
+                                    {% if item.get_average_price() %}
+                                        {{ item.get_average_price()|format_amount(currency_decimal_places) }}
                                     {% else %}
                                         -
                                     {% endif %}
@@ -432,7 +436,7 @@
                         {% endif %}
                     </p>
                     <p>
-                        <strong>Quantity:</strong> {{ item.quantity }}
+                        <strong>Quantity:</strong> {{ item.get_overall_quantity() }}
                         {% if item.is_no_stock() %}
                             <span class="badge bg-danger" style="font-size: 0.65rem;">No Stock</span>
                         {% elif item.is_low_stock() %}
@@ -441,7 +445,7 @@
                             <span class="badge bg-success" style="font-size: 0.65rem;">OK</span>
                         {% endif %}
                     </p>
-                    <p><strong>Price/Unit:</strong> {{ item.price|format_amount(currency_decimal_places) if item.price else '-' }}</p>
+                    <p><strong>Price/Unit:</strong> {{ item.get_average_price()|format_amount(currency_decimal_places) if item.get_average_price() else '-' }}</p>
                     <p><strong>Total:</strong> {{ item.get_total_price()|format_amount(currency_decimal_places) if item.get_total_price() else '-' }}</p>
                 </div>
             </div>

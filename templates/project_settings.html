@@ -1,0 +1,392 @@
+{% extends "base.html" %}
+
+{% block title %}Project Settings - Inventory Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2><i class="bi bi-kanban"></i> Project Settings</h2>
+        <p class="text-muted">Manage project categories, tags, and statuses</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Categories -->
+    <div class="col-lg-4 col-md-12 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-warning">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-white"><i class="bi bi-tags"></i> Categories <span class="badge bg-dark">{{ categories|length }}</span></h5>
+                    {% if can_edit %}
+                    <button class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#addCategoryModal"><i class="bi bi-plus-circle"></i> Add</button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                {% for cat in categories %}
+                <div class="card mb-2 border">
+                    <div class="card-body p-2">
+                        <h6 class="card-title mb-1"><span class="badge" style="background-color: {{ cat.color }}">{{ cat.name }}</span></h6>
+                        <p class="card-text text-muted small mb-1">{{ cat.description or 'No description' }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted"><i class="bi bi-kanban"></i> {{ cat.projects|length }} projects</small>
+                            <div>
+                                {% if can_edit %}
+                                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editCat{{ cat.id }}"><i class="bi bi-pencil"></i></button>
+                                {% endif %}
+                                {% if can_delete %}
+                                <form method="POST" action="{{ url_for('project.project_category_delete', id=cat.id) }}" style="display:inline;"><button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')"><i class="bi bi-trash"></i></button></form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal fade" id="editCat{{ cat.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+                    <form method="POST" action="{{ url_for('project.project_category_edit', id=cat.id) }}">
+                        <div class="modal-header"><h5 class="modal-title">Edit Category</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                        <div class="modal-body">
+                            <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" value="{{ cat.name }}" required></div>
+                            <div class="mb-3"><label class="form-label">Description</label><input type="text" class="form-control" name="description" value="{{ cat.description or '' }}"></div>
+                            <div class="mb-3"><label class="form-label">Color</label><input type="color" class="form-control form-control-color" name="color" value="{{ cat.color }}"></div>
+                        </div>
+                        <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
+                    </form>
+                </div></div></div>
+                {% endfor %}
+                {% if not categories %}<p class="text-center text-muted">No categories</p>{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Tags -->
+    <div class="col-lg-4 col-md-12 mb-4">
+        <div class="card h-100">
+            <div class="card-header" style="background-color: #d63384;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-white"><i class="bi bi-tag"></i> Tags <span class="badge bg-dark">{{ tags|length }}</span></h5>
+                    {% if can_edit %}
+                    <button class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#addTagModal"><i class="bi bi-plus-circle"></i> Add</button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                {% for tag in tags %}
+                <div class="card mb-2 border">
+                    <div class="card-body p-2 text-center">
+                        <span class="badge" style="background-color: {{ tag.color }}">{{ tag.name }}</span>
+                        <div class="mt-2">
+                            {% if can_edit %}
+                            <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editTag{{ tag.id }}"><i class="bi bi-pencil"></i></button>
+                            {% endif %}
+                            {% if can_delete %}
+                            <form method="POST" action="{{ url_for('project.project_tag_delete', id=tag.id) }}" style="display:inline;"><button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')"><i class="bi bi-trash"></i></button></form>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="modal fade" id="editTag{{ tag.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+                    <form method="POST" action="{{ url_for('project.project_tag_edit', id=tag.id) }}">
+                        <div class="modal-header"><h5 class="modal-title">Edit Tag</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                        <div class="modal-body">
+                            <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" value="{{ tag.name }}" required></div>
+                            <div class="mb-3"><label class="form-label">Description</label><input type="text" class="form-control" name="description" value="{{ tag.description or '' }}"></div>
+                            <div class="mb-3"><label class="form-label">Color</label><input type="color" class="form-control form-control-color" name="color" value="{{ tag.color }}"></div>
+                        </div>
+                        <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
+                    </form>
+                </div></div></div>
+                {% endfor %}
+                {% if not tags %}<p class="text-center text-muted">No tags</p>{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Statuses -->
+    <div class="col-lg-4 col-md-12 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-success">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-white"><i class="bi bi-flag"></i> Statuses <span class="badge bg-dark">{{ statuses|length }}</span></h5>
+                    {% if can_edit %}
+                    <button class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#addStatusModal"><i class="bi bi-plus-circle"></i> Add</button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                {% for st in statuses %}
+                <div class="card mb-2 border">
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge" style="background-color: {{ st.color }}">{{ st.name }}</span>
+                                {% if st.description %}<br><small class="text-muted">{{ st.description }}</small>{% endif %}
+                            </div>
+                            <div>
+                                {% if can_edit %}
+                                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editSt{{ st.id }}"><i class="bi bi-pencil"></i></button>
+                                {% endif %}
+                                {% if can_delete %}
+                                <form method="POST" action="{{ url_for('project.project_status_delete', id=st.id) }}" style="display:inline;"><button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')"><i class="bi bi-trash"></i></button></form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal fade" id="editSt{{ st.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+                    <form method="POST" action="{{ url_for('project.project_status_edit', id=st.id) }}">
+                        <div class="modal-header"><h5 class="modal-title">Edit Status</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                        <div class="modal-body">
+                            <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" value="{{ st.name }}" required></div>
+                            <div class="mb-3"><label class="form-label">Color</label><input type="color" class="form-control form-control-color" name="color" value="{{ st.color }}"></div>
+                            <div class="mb-3"><label class="form-label">Description</label><input type="text" class="form-control" name="description" value="{{ st.description or '' }}"></div>
+                        </div>
+                        <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
+                    </form>
+                </div></div></div>
+                {% endfor %}
+                {% if not statuses %}<p class="text-center text-muted">No statuses</p>{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Persons & Groups -->
+<div class="row">
+    <!-- Persons -->
+    <div class="col-lg-6 col-md-12 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-secondary">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-white"><i class="bi bi-person"></i> Persons (External) <span class="badge bg-dark">{{ persons|length }}</span></h5>
+                    {% if can_edit %}
+                    <button class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#addPersonModal"><i class="bi bi-plus-circle"></i> Add</button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                {% for p in persons %}
+                <div class="card mb-2 border">
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ p.name }}</strong>{% if p.organization %} <small class="text-muted">- {{ p.organization }}</small>{% endif %}
+                                {% if p.email %}<br><small><i class="bi bi-envelope"></i> {{ p.email }}</small>{% endif %}
+                                {% if p.tel %} <small><i class="bi bi-phone"></i> {{ p.tel }}</small>{% endif %}
+                            </div>
+                            <div>
+                                {% if can_edit %}<button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editPerson{{ p.id }}"><i class="bi bi-pencil"></i></button>{% endif %}
+                                {% if can_delete %}<form method="POST" action="{{ url_for('project.project_person_delete', id=p.id) }}" style="display:inline;"><button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')"><i class="bi bi-trash"></i></button></form>{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal fade" id="editPerson{{ p.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+                    <form method="POST" action="{{ url_for('project.project_person_edit', id=p.id) }}">
+                        <div class="modal-header"><h5 class="modal-title">Edit Person</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                        <div class="modal-body">
+                            <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" value="{{ p.name }}" required></div>
+                            <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email" value="{{ p.email or '' }}"></div>
+                            <div class="mb-3"><label class="form-label">Organization</label><input type="text" class="form-control" name="organization" value="{{ p.organization or '' }}"></div>
+                            <div class="mb-3"><label class="form-label">Tel</label><input type="text" class="form-control" name="tel" value="{{ p.tel or '' }}"></div>
+                        </div>
+                        <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
+                    </form>
+                </div></div></div>
+                {% endfor %}
+                {% if not persons %}<p class="text-center text-muted">No persons added yet</p>{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Groups -->
+    <div class="col-lg-6 col-md-12 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-primary">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-white"><i class="bi bi-people"></i> Groups <span class="badge bg-dark">{{ groups|length }}</span></h5>
+                    {% if can_edit %}
+                    <button class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#addGroupModal"><i class="bi bi-plus-circle"></i> Add</button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                {% for grp in groups %}
+                <div class="card mb-3 border">
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <strong>{{ grp.name }}</strong>
+                                {% if grp.description %}<br><small class="text-muted">{{ grp.description }}</small>{% endif %}
+                            </div>
+                            <div>
+                                {% if can_edit %}<button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editGrp{{ grp.id }}"><i class="bi bi-pencil"></i></button>{% endif %}
+                                {% if can_delete %}<form method="POST" action="{{ url_for('project.project_group_delete', id=grp.id) }}" style="display:inline;"><button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete group and all members?')"><i class="bi bi-trash"></i></button></form>{% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Users list -->
+                        <div class="mb-1"><small class="fw-bold text-muted">Users:</small></div>
+                        <div class="mb-2">
+                            {% for m in grp.get_users() %}
+                            <span class="badge bg-secondary me-1 mb-1">
+                                {{ m.user.username }}
+                                {% if can_edit %}
+                                <form method="POST" action="{{ url_for('project.project_group_remove_member', member_id=m.id) }}" style="display:inline;">
+                                    <button type="submit" class="btn-close btn-close-white ms-1" style="font-size:0.5rem;" onclick="return confirm('Remove {{ m.user.username }}?')"></button>
+                                </form>
+                                {% endif %}
+                            </span>
+                            {% endfor %}
+                            {% if not grp.get_users() %}<small class="text-muted">None</small>{% endif %}
+                        </div>
+
+                        <!-- Persons list -->
+                        <div class="mb-1"><small class="fw-bold text-muted">Persons:</small></div>
+                        <div class="mb-2">
+                            {% for m in grp.get_persons() %}
+                            <span class="badge bg-dark me-1 mb-1">
+                                {{ m.person.name }}
+                                {% if can_edit %}
+                                <form method="POST" action="{{ url_for('project.project_group_remove_member', member_id=m.id) }}" style="display:inline;">
+                                    <button type="submit" class="btn-close btn-close-white ms-1" style="font-size:0.5rem;" onclick="return confirm('Remove {{ m.person.name }}?')"></button>
+                                </form>
+                                {% endif %}
+                            </span>
+                            {% endfor %}
+                            {% if not grp.get_persons() %}<small class="text-muted">None</small>{% endif %}
+                        </div>
+
+                        <!-- Add member -->
+                        {% if can_edit %}
+                        <hr class="my-2">
+                        <form method="POST" action="{{ url_for('project.project_group_add_member', id=grp.id) }}" class="row g-1 align-items-end">
+                            <div class="col-3">
+                                <label class="form-label small mb-0">Type</label>
+                                <select class="form-select form-select-sm" name="member_type" onchange="toggleMemberSelect(this, {{ grp.id }})">
+                                    <option value="user">User</option>
+                                    <option value="person">Person</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small mb-0">Select</label>
+                                <!-- User select (shown by default) -->
+                                <select class="form-select form-select-sm grp-user-select" id="grpUserSelect{{ grp.id }}" name="member_id">
+                                    {% for u in users %}
+                                    <option value="{{ u.id }}">{{ u.username }} ({{ u.email }})</option>
+                                    {% endfor %}
+                                </select>
+                                <!-- Person select (hidden by default) -->
+                                <select class="form-select form-select-sm grp-person-select" id="grpPersonSelect{{ grp.id }}" name="member_id" style="display:none;" disabled>
+                                    {% for p in persons %}
+                                    <option value="{{ p.id }}">{{ p.name }}{% if p.organization %} - {{ p.organization }}{% endif %}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-3">
+                                <button type="submit" class="btn btn-sm btn-success w-100"><i class="bi bi-plus"></i> Add</button>
+                            </div>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+                <!-- Edit Group Modal -->
+                <div class="modal fade" id="editGrp{{ grp.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+                    <form method="POST" action="{{ url_for('project.project_group_edit', id=grp.id) }}">
+                        <div class="modal-header"><h5 class="modal-title">Edit Group</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                        <div class="modal-body">
+                            <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" value="{{ grp.name }}" required></div>
+                            <div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" rows="2">{{ grp.description or '' }}</textarea></div>
+                        </div>
+                        <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
+                    </form>
+                </div></div></div>
+                {% endfor %}
+                {% if not groups %}<p class="text-center text-muted">No groups created yet</p>{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Modals -->
+<div class="modal fade" id="addCategoryModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <form method="POST" action="{{ url_for('project.project_category_add') }}">
+        <div class="modal-header"><h5 class="modal-title">Add Category</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required></div>
+            <div class="mb-3"><label class="form-label">Description</label><input type="text" class="form-control" name="description"></div>
+            <div class="mb-3"><label class="form-label">Color</label><input type="color" class="form-control form-control-color" name="color" value="#6c757d"></div>
+        </div>
+        <div class="modal-footer"><button type="submit" class="btn btn-success"><i class="bi bi-plus-circle"></i> Add Category</button></div>
+    </form>
+</div></div></div>
+
+<div class="modal fade" id="addTagModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <form method="POST" action="{{ url_for('project.project_tag_add') }}">
+        <div class="modal-header"><h5 class="modal-title">Add Tag</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required></div>
+            <div class="mb-3"><label class="form-label">Description</label><input type="text" class="form-control" name="description"></div>
+            <div class="mb-3"><label class="form-label">Color</label><input type="color" class="form-control form-control-color" name="color" value="#6c757d"></div>
+        </div>
+        <div class="modal-footer"><button type="submit" class="btn btn-success"><i class="bi bi-plus-circle"></i> Add Tag</button></div>
+    </form>
+</div></div></div>
+
+<div class="modal fade" id="addStatusModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <form method="POST" action="{{ url_for('project.project_status_add') }}">
+        <div class="modal-header"><h5 class="modal-title">Add Status</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required></div>
+            <div class="mb-3"><label class="form-label">Color</label><input type="color" class="form-control form-control-color" name="color" value="#6c757d"></div>
+            <div class="mb-3"><label class="form-label">Description</label><input type="text" class="form-control" name="description"></div>
+        </div>
+        <div class="modal-footer"><button type="submit" class="btn btn-success"><i class="bi bi-plus-circle"></i> Add Status</button></div>
+    </form>
+</div></div></div>
+
+<div class="modal fade" id="addPersonModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <form method="POST" action="{{ url_for('project.project_person_add') }}">
+        <div class="modal-header"><h5 class="modal-title">Add Person</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required></div>
+            <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email"></div>
+            <div class="mb-3"><label class="form-label">Organization</label><input type="text" class="form-control" name="organization"></div>
+            <div class="mb-3"><label class="form-label">Tel</label><input type="text" class="form-control" name="tel"></div>
+        </div>
+        <div class="modal-footer"><button type="submit" class="btn btn-success"><i class="bi bi-plus-circle"></i> Add Person</button></div>
+    </form>
+</div></div></div>
+
+<div class="modal fade" id="addGroupModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <form method="POST" action="{{ url_for('project.project_group_add') }}">
+        <div class="modal-header"><h5 class="modal-title">Create Group</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="mb-3"><label class="form-label">Group Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required></div>
+            <div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" rows="2"></textarea></div>
+        </div>
+        <div class="modal-footer"><button type="submit" class="btn btn-success"><i class="bi bi-plus-circle"></i> Create Group</button></div>
+    </form>
+</div></div></div>
+
+<script>
+function toggleMemberSelect(selectEl, grpId) {
+    const userSel = document.getElementById('grpUserSelect' + grpId);
+    const personSel = document.getElementById('grpPersonSelect' + grpId);
+    if (selectEl.value === 'user') {
+        userSel.style.display = '';
+        userSel.disabled = false;
+        userSel.name = 'member_id';
+        personSel.style.display = 'none';
+        personSel.disabled = true;
+        personSel.name = '';
+    } else {
+        userSel.style.display = 'none';
+        userSel.disabled = true;
+        userSel.name = '';
+        personSel.style.display = '';
+        personSel.disabled = false;
+        personSel.name = 'member_id';
+    }
+}
+</script>
+{% endblock %}

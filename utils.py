@@ -245,6 +245,8 @@ def get_item_edit_permissions(user):
         'can_edit_footprint': user.has_permission('items', 'edit_footprint'),
         'can_edit_tags': user.has_permission('items', 'edit_tags'),
         'can_edit_parameters': user.has_permission('items', 'edit_parameters'),
+        'can_edit_batch': user.has_permission('items', 'edit_batch'),
+        'can_edit_serial': user.has_permission('items', 'edit_serial'),
         'can_create': user.has_permission('items', 'create'),
         'can_delete': user.has_permission('items', 'delete'),
         'is_admin': user.is_admin()

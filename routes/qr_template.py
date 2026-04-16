@@ -297,6 +297,15 @@ def preview_element(template_id):
             from qr_utils import generate_barcode_svg
             svg = generate_barcode_svg(preview_content, barcode_format, width, height, show_label)
             return jsonify({'svg': svg, 'success': True})
+        elif element_type == 'icon':
+            from qr_utils import generate_icon_svg
+            icon_name = data.get('icon_name', '')
+            icon_package = data.get('icon_package', 'bootstrap-icons')
+            icon_color = data.get('icon_color', '#000000')
+            # Scale icon to fit container (80% of minimum dimension)
+            icon_size = min(width, height) * 0.8
+            svg = generate_icon_svg(icon_name, icon_package, int(icon_size), icon_color, width, height)
+            return jsonify({'svg': svg, 'success': True})
         else:
             return jsonify({'error': 'Unknown element type', 'success': False}), 400
     except Exception as e:
@@ -329,3 +338,52 @@ def delete_qr_template(template_id):
 def api_available_fonts():
     """Get list of available fonts (system + project)"""
     return jsonify(get_available_fonts())
+
+@qr_template_bp.route('/api/icon-packages')
+def api_icon_packages():
+    """Get list of available icon packages"""
+    import os
+    import re
+    
+    icons_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'icons')
+    packages = []
+    
+    # Look for CSS files that define icon packages
+    if os.path.exists(icons_dir):
+        for file in os.listdir(icons_dir):
+            if file.endswith('.css'):
+                # Extract package name (e.g., bootstrap-icons.css -> bootstrap-icons)
+                package_name = file.replace('.css', '')
+                packages.append({
+                    'id': package_name,
+                    'name': package_name.replace('-', ' ').title()
+                })
+    
+    return jsonify(packages)
+
+@qr_template_bp.route('/api/icons/<package>')
+def api_get_icons(package):
+    """Get icons from a specific package"""
+    import os
+    import re
+    
+    icons_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'icons')
+    css_file = os.path.join(icons_dir, f'{package}.css')
+    
+    if not os.path.exists(css_file):
+        return jsonify([])
+    
+    try:
+        with open(css_file, 'r', encoding='utf-8') as f:
+            css_content = f.read()
+        
+        # Extract icon names from CSS
+        # Look for patterns like .bi-icon-name::before (double colon)
+        pattern = r'\.bi-([a-z0-9\-]+)::before'
+        icons = sorted(set(re.findall(pattern, css_content)))
+        
+        return jsonify([{'name': icon, 'class': f'bi bi-{icon}'} for icon in icons])
+    except Exception as e:
+        logger.error(f"Error reading icons from {package}: {e}")
+        return jsonify([])
+

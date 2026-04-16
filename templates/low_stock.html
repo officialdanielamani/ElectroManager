@@ -29,7 +29,7 @@
                         </thead>
                         <tbody>
                             {% for item in items %}
-                            <tr class="{% if item.quantity == 0 %}table-danger{% else %}table-warning{% endif %}">
+                            <tr class="{% if item.get_overall_quantity() == 0 %}table-danger{% else %}table-warning{% endif %}">
                                 <td>{{ item.sku or '-' }}</td>
                                 <td>
                                     <a href="{{ url_for('item.item_detail', uuid=item.uuid) }}">{{ item.name }}</a>
@@ -41,7 +41,7 @@
                                     <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ item.quantity }} {{ item.unit }}</td>
+                                <td>{{ item.get_overall_quantity() }}</td>
                                 <td>{{ item.min_quantity }} {{ item.unit }}</td>
                                 <td>
                                     <span class="badge bg-danger">

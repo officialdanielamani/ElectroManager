@@ -66,6 +66,14 @@ def magic_parameter_new():
     string_option = request.form.get('string_option', '').strip()
     notify_enabled = 'notify_enabled' in request.form
     
+    # Number type fields
+    is_whole_number = 'is_whole_number' in request.form
+    number_min = request.form.get('number_min', '')
+    number_max = request.form.get('number_max', '')
+    number_step = request.form.get('number_step', '')
+    number_decimal_places = request.form.get('number_decimal_places', 0, type=int)
+    number_required = 'number_required' in request.form
+    
     # Validation
     errors = []
     
@@ -80,6 +88,52 @@ def magic_parameter_new():
         if existing:
             errors.append(f'Parameter "{name}" already exists')
     
+    # Validate number fields if type is number
+    if param_type == 'number':
+        if number_min and number_max:
+            try:
+                min_val = float(number_min)
+                max_val = float(number_max)
+                if min_val > max_val:
+                    errors.append('Min value cannot be greater than max value')
+                
+                # Check if min/max are whole numbers when is_whole_number is True
+                if is_whole_number:
+                    if min_val != int(min_val):
+                        errors.append('Minimum value must be a whole number')
+                    if max_val != int(max_val):
+                        errors.append('Maximum value must be a whole number')
+            except ValueError:
+                errors.append('Min and max must be valid numbers')
+        elif number_min:
+            try:
+                min_val = float(number_min)
+                if is_whole_number and min_val != int(min_val):
+                    errors.append('Minimum value must be a whole number')
+            except ValueError:
+                errors.append('Min must be a valid number')
+        elif number_max:
+            try:
+                max_val = float(number_max)
+                if is_whole_number and max_val != int(max_val):
+                    errors.append('Maximum value must be a whole number')
+            except ValueError:
+                errors.append('Max must be a valid number')
+        
+        if number_step:
+            try:
+                step_val = float(number_step)
+                if step_val <= 0:
+                    errors.append('Step must be greater than 0')
+                # Check if step is a whole number when is_whole_number is True
+                if is_whole_number and step_val != int(step_val):
+                    errors.append('Step must be a whole number')
+            except ValueError:
+                errors.append('Step must be a valid number')
+        
+        if is_whole_number and number_decimal_places > 0:
+            errors.append('Decimal places should be 0 for whole numbers')
+    
     # If there are errors, return them as JSON
     if errors:
         return jsonify({
@@ -92,7 +146,13 @@ def magic_parameter_new():
             name=name,
             param_type=param_type,
             description=description,
-            notify_enabled=notify_enabled if param_type == 'date' else False
+            notify_enabled=notify_enabled if param_type == 'date' else False,
+            is_whole_number=is_whole_number if param_type == 'number' else True,
+            number_min=int(float(number_min)) if number_min and is_whole_number else (float(number_min) if number_min else None),
+            number_max=int(float(number_max)) if number_max and is_whole_number else (float(number_max) if number_max else None),
+            number_step=int(float(number_step)) if number_step and is_whole_number else (float(number_step) if number_step else None),
+            number_decimal_places=number_decimal_places if param_type == 'number' else 0,
+            number_required=number_required if param_type == 'number' else False
         )
         db.session.add(parameter)
         db.session.flush()
@@ -137,8 +197,74 @@ def magic_parameter_edit(id):
     
     parameter.name = request.form.get('name', '').strip()
     parameter.description = request.form.get('description', '').strip()
+    
     if parameter.param_type == 'date':
         parameter.notify_enabled = 'notify_enabled' in request.form
+    
+    # Update number validation fields if type is number
+    if parameter.param_type == 'number':
+        parameter.is_whole_number = 'is_whole_number' in request.form
+        number_min = request.form.get('number_min', '')
+        number_max = request.form.get('number_max', '')
+        number_step = request.form.get('number_step', '')
+        number_decimal_places = request.form.get('number_decimal_places', 0, type=int)
+        
+        # Validation
+        errors = []
+        if number_min and number_max:
+            try:
+                min_val = float(number_min)
+                max_val = float(number_max)
+                if min_val > max_val:
+                    errors.append('Min value cannot be greater than max value')
+                
+                # Check if min/max are whole numbers when is_whole_number is True
+                if parameter.is_whole_number:
+                    if min_val != int(min_val):
+                        errors.append('Minimum value must be a whole number')
+                    if max_val != int(max_val):
+                        errors.append('Maximum value must be a whole number')
+            except ValueError:
+                errors.append('Min and max must be valid numbers')
+        elif number_min:
+            try:
+                min_val = float(number_min)
+                if parameter.is_whole_number and min_val != int(min_val):
+                    errors.append('Minimum value must be a whole number')
+            except ValueError:
+                errors.append('Min must be a valid number')
+        elif number_max:
+            try:
+                max_val = float(number_max)
+                if parameter.is_whole_number and max_val != int(max_val):
+                    errors.append('Maximum value must be a whole number')
+            except ValueError:
+                errors.append('Max must be a valid number')
+        
+        if number_step:
+            try:
+                step_val = float(number_step)
+                if step_val <= 0:
+                    errors.append('Step must be greater than 0')
+                # Check if step is a whole number when is_whole_number is True
+                if parameter.is_whole_number and step_val != int(step_val):
+                    errors.append('Step must be a whole number')
+            except ValueError:
+                errors.append('Step must be a valid number')
+        
+        if parameter.is_whole_number and number_decimal_places > 0:
+            errors.append('Decimal places should be 0 for whole numbers')
+        
+        if errors:
+            for error in errors:
+                flash(error, 'danger')
+            return redirect(url_for('magic_parameter.magic_parameter_manage', id=parameter.id))
+        
+        parameter.number_min = int(float(number_min)) if number_min and parameter.is_whole_number else (float(number_min) if number_min else None)
+        parameter.number_max = int(float(number_max)) if number_max and parameter.is_whole_number else (float(number_max) if number_max else None)
+        parameter.number_step = int(float(number_step)) if number_step and parameter.is_whole_number else (float(number_step) if number_step else None)
+        parameter.number_decimal_places = number_decimal_places if not parameter.is_whole_number else 0
+        parameter.number_required = 'number_required' in request.form
     
     db.session.commit()
     
@@ -316,6 +442,12 @@ def api_magic_parameters(type):
         
         if type == 'number':
             data['units'] = param.get_units_list()
+            data['is_whole_number'] = param.is_whole_number
+            data['number_min'] = param.number_min
+            data['number_max'] = param.number_max
+            data['number_step'] = param.number_step
+            data['number_decimal_places'] = param.number_decimal_places
+            data['number_required'] = param.number_required
         elif type == 'string':
             data['options'] = param.get_string_options_list()
         

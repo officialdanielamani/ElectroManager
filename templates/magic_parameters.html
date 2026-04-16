@@ -76,9 +76,29 @@
                         <div class="card-body p-2">
                             <h6 class="card-title mb-1">{{ param.name }}</h6>
                             <p class="card-text text-muted small mb-1">{{ param.description or 'No description' }}</p>
+                            
+                            <!-- Min | Max | Step (one line) -->
+                            {% if param.number_min is not none or param.number_max is not none or param.number_step is not none %}
+                            <div class="small mb-1">
+                                {% if param.number_min is not none %}<span class="badge bg-secondary">Min: {% if param.is_whole_number %}{{ param.number_min|int }}{% else %}{{ param.number_min }}{% endif %}</span>{% endif %}
+                                {% if param.number_max is not none %}<span class="badge bg-secondary">Max: {% if param.is_whole_number %}{{ param.number_max|int }}{% else %}{{ param.number_max }}{% endif %}</span>{% endif %}
+                                {% if param.number_step is not none %}<span class="badge bg-secondary">Step: {% if param.is_whole_number %}{{ param.number_step|int }}{% else %}{{ param.number_step }}{% endif %}</span>{% endif %}
+                            </div>
+                            {% endif %}
+                            
+                            <!-- Whole Number | Required (one line) -->
+                            <div class="small mb-1">
+                                <span class="badge {% if param.is_whole_number %}bg-success{% else %}bg-info{% endif %}">
+                                    {% if param.is_whole_number %}Whole Number{% else %}Decimal ({{ param.number_decimal_places }} places){% endif %}
+                                </span>
+                                {% if param.number_required %}<span class="badge bg-danger">Required</span>{% endif %}
+                            </div>
+                            
+                            <!-- Units -->
                             {% if param.units %}
                             <small class="text-muted">Units: {{ param.get_units_list()|join(', ') }}</small>
                             {% endif %}
+                            
                             <div class="mt-2">
                                 {% if can_edit %}
                                 <a href="{{ url_for('magic_parameter.magic_parameter_manage', id=param.id) }}" class="btn btn-sm btn-primary" title="Manage">
@@ -234,6 +254,56 @@
                             <input type="text" name="unit" id="paramUnit" class="form-control" placeholder="e.g., V, mA, °C">
                             <small class="text-muted">You can add more units later</small>
                         </div>
+                        
+                        <!-- Number Validation Settings -->
+                        <div class="card bg-light">
+                            <div class="card-header bg-warning">
+                                <h6 class="mb-0"><i class="bi bi-calculator"></i> Number Validation Settings</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-check mb-3">
+                                    <input type="checkbox" name="is_whole_number" id="wholeNumberCheck" class="form-check-input" checked onchange="toggleDecimalPlacesNew()">
+                                    <label class="form-check-label" for="wholeNumberCheck">
+                                        Set as Whole Number
+                                    </label>
+                                    <small class="d-block text-warning mt-1">
+                                        <i class="bi bi-exclamation-triangle"></i> Warning: Changing this will convert existing decimal values to whole numbers (data may be rounded/truncated)
+                                    </small>
+                                </div>
+                                
+                                <div class="mb-2">
+                                    <label class="form-label">Minimum Value</label>
+                                    <input type="number" name="number_min" class="form-control" id="numberMinInputNew" step="1" placeholder="No limit">
+                                </div>
+                                
+                                <div class="mb-2">
+                                    <label class="form-label">Maximum Value</label>
+                                    <input type="number" name="number_max" class="form-control" id="numberMaxInputNew" step="1" placeholder="No limit">
+                                </div>
+                                
+                                <div class="mb-2">
+                                    <label class="form-label">Step (Increment/Decrement)</label>
+                                    <input type="number" name="number_step" class="form-control" id="numberStepInputNew" step="1" placeholder="No fixed step">
+                                </div>
+                                
+                                <div class="mb-2">
+                                    <label class="form-label">Decimal Places (1-10)</label>
+                                    <select name="number_decimal_places" class="form-select" id="decimalPlacesSelectNew" disabled>
+                                        {% for i in range(1, 11) %}
+                                        <option value="{{ i }}">{{ i }} place{{ 's' if i > 1 }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <small class="text-muted">Disabled if set as whole number</small>
+                                </div>
+                                
+                                <div class="form-check">
+                                    <input type="checkbox" name="number_required" id="requiredCheckNew" class="form-check-input">
+                                    <label class="form-check-label" for="requiredCheckNew">
+                                        Required (User must provide a value)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- Date Type Fields -->
@@ -345,6 +415,8 @@ function showNewParameterModal(type) {
     // Show relevant fields
     if (type === 'number') {
         document.getElementById('numberFields').style.display = 'block';
+        document.getElementById('wholeNumberCheck').checked = true;
+        toggleDecimalPlacesNew();
     } else if (type === 'date') {
         document.getElementById('dateFields').style.display = 'block';
     } else if (type === 'string') {
@@ -352,6 +424,26 @@ function showNewParameterModal(type) {
     }
     
     modal.show();
+}
+
+function toggleDecimalPlacesNew() {
+    const wholeNumberCheck = document.getElementById('wholeNumberCheck');
+    const decimalPlacesSelect = document.getElementById('decimalPlacesSelectNew');
+    const numberMinInput = document.getElementById('numberMinInputNew');
+    const numberMaxInput = document.getElementById('numberMaxInputNew');
+    const numberStepInput = document.getElementById('numberStepInputNew');
+    
+    // Toggle decimal places selector
+    decimalPlacesSelect.disabled = wholeNumberCheck.checked;
+    if (wholeNumberCheck.checked) {
+        decimalPlacesSelect.value = '0';
+    }
+    
+    // Toggle step attribute for min/max/step inputs
+    const stepValue = wholeNumberCheck.checked ? '1' : 'any';
+    numberMinInput.step = stepValue;
+    numberMaxInput.step = stepValue;
+    numberStepInput.step = stepValue;
 }
 </script>
 

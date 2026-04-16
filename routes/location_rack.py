@@ -52,12 +52,12 @@ def location_management():
 
 
 
-@location_rack_bp.route('/location/<int:id>', endpoint='location_detail')
+@location_rack_bp.route('/location/<string:uuid>', endpoint='location_detail')
 @login_required
-def location_detail(id):
+def location_detail(uuid):
     """View location details with items and racks"""
     from models import Location
-    location = Location.query.get_or_404(id)
+    location = Location.query.filter_by(uuid=uuid).first_or_404()
     items = location.items
     racks = location.racks
     return render_template('location_detail.html', 
@@ -143,16 +143,16 @@ def location_new():
 
 
 
-@location_rack_bp.route('/location/<int:id>/edit', endpoint='location_edit', methods=['GET', 'POST'])
+@location_rack_bp.route('/location/<string:uuid>/edit', endpoint='location_edit', methods=['GET', 'POST'])
 @login_required
 @permission_required("settings_sections.location_management", "edit")
-def location_edit(id):
+def location_edit(uuid):
     """Edit location"""
     from models import Location
     from forms import LocationForm
     from werkzeug.utils import secure_filename
     
-    location = Location.query.get_or_404(id)
+    location = Location.query.filter_by(uuid=uuid).first_or_404()
     form = LocationForm(obj=location)
     
     if form.validate_on_submit():
@@ -224,14 +224,14 @@ def location_edit(id):
 
 
 
-@location_rack_bp.route('/location/<int:id>/delete', endpoint='location_delete', methods=['POST'])
+@location_rack_bp.route('/location/<string:uuid>/delete', endpoint='location_delete', methods=['POST'])
 @login_required
 @permission_required("settings_sections.location_management", "delete")
-def location_delete(id):
+def location_delete(uuid):
     """Delete location"""
     from models import Location
     
-    location = Location.query.get_or_404(id)
+    location = Location.query.filter_by(uuid=uuid).first_or_404()
     
     # Check if location is in use
     if location.items or location.racks:
@@ -395,12 +395,12 @@ def rack_new():
 
 
 
-@location_rack_bp.route('/rack/<int:id>/edit', methods=['GET', 'POST'])
+@location_rack_bp.route('/rack/<string:uuid>/edit', methods=['GET', 'POST'])
 @login_required
 @permission_required("settings_sections.location_management", "edit")
-def rack_edit(id):
+def rack_edit(uuid):
     """Edit rack with form"""
-    rack = Rack.query.get_or_404(id)
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
     
     if request.method == 'POST':
         new_name = request.form.get('name')
@@ -424,11 +424,11 @@ def rack_edit(id):
         
         if rows < 1 or rows > max_rows:
             flash(f'Rows must be between 1 and {max_rows}!', 'danger')
-            return redirect(url_for('location_rack.rack_edit', id=id))
+            return redirect(url_for('location_rack.rack_edit', uuid=uuid))
         
         if cols < 1 or cols > max_cols:
             flash(f'Columns must be between 1 and {max_cols}!', 'danger')
-            return redirect(url_for('location_rack.rack_edit', id=id))
+            return redirect(url_for('location_rack.rack_edit', uuid=uuid))
         
         rack.rows = rows
         rack.cols = cols
@@ -481,13 +481,13 @@ def rack_edit(id):
                 
                 if file_size > max_size_bytes:
                     flash(f'File size exceeds maximum allowed size of {max_size_mb}MB', 'danger')
-                    return redirect(url_for('location_rack.rack_edit', id=id))
+                    return redirect(url_for('location_rack.rack_edit', uuid=uuid))
                 
                 # Only allow PNG and JPEG
                 ext = file.filename.rsplit('.', 1)[1].lower()
                 if ext not in ['png', 'jpg', 'jpeg']:
                     flash('Only PNG and JPEG images are allowed for racks!', 'danger')
-                    return redirect(url_for('location_rack.rack_edit', id=id))
+                    return redirect(url_for('location_rack.rack_edit', uuid=uuid))
                 
                 # Delete old picture if exists
                 if rack.picture:
@@ -527,12 +527,12 @@ def rack_edit(id):
 
 
 
-@location_rack_bp.route('/rack/<int:id>/delete', methods=['POST'])
+@location_rack_bp.route('/rack/<string:uuid>/delete', methods=['POST'])
 @login_required
 @permission_required("settings_sections.location_management", "delete")
-def rack_delete(id):
+def rack_delete(uuid):
     """Delete rack"""
-    rack = Rack.query.get_or_404(id)
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
     rack_name = rack.name
     
     # Clear locations for items
@@ -550,11 +550,11 @@ def rack_delete(id):
 
 
 
-@location_rack_bp.route('/rack/<int:id>')
+@location_rack_bp.route('/rack/<string:uuid>')
 @login_required
-def rack_detail(id):
+def rack_detail(uuid):
     """View rack details"""
-    rack = Rack.query.get_or_404(id)
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
     items = Item.query.filter_by(rack_id=rack.id).all()
     
     drawers = {}
@@ -670,4 +670,159 @@ def delete_rack():
     flash(f'Rack "{rack_name}" deleted successfully!', 'success')
     return redirect(url_for('location_rack.rack_management'))
 
+
+@location_rack_bp.route('/location/<string:uuid>/qr-sticker', endpoint='location_qr_sticker')
+@login_required
+def location_qr_sticker(uuid):
+    """Display QR sticker generation page for location"""
+    from models import Location
+    from qr_utils import get_location_data
+    
+    location = Location.query.filter_by(uuid=uuid).first_or_404()
+    templates = StickerTemplate.query.filter_by(template_type='Location').all()
+    
+    return render_template('location_qr_sticker.html', 
+                          location=location,
+                          templates=templates)
+
+
+@location_rack_bp.route('/api/location/<string:uuid>/sticker-preview/<int:template_id>')
+@login_required
+def api_location_sticker_preview(uuid, template_id):
+    """
+    Generate sticker preview for a location with a specific template
+    Returns: SVG image
+    """
+    from models import Location
+    from qr_utils import get_location_data, render_template_to_svg
+    
+    location = Location.query.filter_by(uuid=uuid).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    
+    # Verify template is for Location type
+    if template.template_type != 'Location':
+        return jsonify({'error': 'Template must be for Location'}), 400
+    
+    # Get location data with all placeholders
+    data = get_location_data(location)
+    
+    # Render to SVG
+    svg_data = render_template_to_svg(template, data)
+    
+    return jsonify({
+        'svg': svg_data,
+        'width_mm': template.width_mm,
+        'height_mm': template.height_mm,
+        'template_name': template.name
+    })
+
+
+@location_rack_bp.route('/api/location/<string:uuid>/sticker-print/<int:template_id>')
+@login_required
+def api_location_sticker_print(uuid, template_id):
+    """
+    Generate printable sticker for a location
+    Returns: PDF file download
+    """
+    from models import Location
+    from qr_utils import get_location_data, generate_single_sticker_pdf
+    
+    location = Location.query.filter_by(uuid=uuid).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    
+    if template.template_type != 'Location':
+        return jsonify({'error': 'Template must be for Location'}), 400
+    
+    data = get_location_data(location)
+    
+    # Generate single-sticker PDF
+    output = generate_single_sticker_pdf(template, data, location.uuid)
+    
+    log_audit(current_user.id, 'print', 'location', location.id, 
+             f'Printed sticker: {template.name}')
+    
+    return send_file(
+        output, 
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f'{template.name}_{location.uuid}.pdf'
+    )
+
+
+@location_rack_bp.route('/rack/<string:uuid>/qr-sticker', endpoint='rack_qr_sticker')
+@login_required
+def rack_qr_sticker(uuid):
+    """Display QR sticker generation page for rack"""
+    from models import Rack
+    from qr_utils import get_rack_data
+    
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
+    templates = StickerTemplate.query.filter_by(template_type='Racks').all()
+    
+    return render_template('rack_qr_sticker.html', 
+                          rack=rack,
+                          templates=templates)
+
+
+@location_rack_bp.route('/api/rack/<string:uuid>/sticker-preview/<int:template_id>')
+@login_required
+def api_rack_sticker_preview(uuid, template_id):
+    """
+    Generate sticker preview for a rack with a specific template
+    Returns: SVG image
+    """
+    from models import Rack
+    from qr_utils import get_rack_data, render_template_to_svg
+    
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    
+    # Verify template is for Racks type
+    if template.template_type != 'Racks':
+        return jsonify({'error': 'Template must be for Racks'}), 400
+    
+    # Get rack data with all placeholders
+    data = get_rack_data(rack)
+    
+    # Render to SVG
+    svg_data = render_template_to_svg(template, data)
+    
+    return jsonify({
+        'svg': svg_data,
+        'width_mm': template.width_mm,
+        'height_mm': template.height_mm,
+        'template_name': template.name
+    })
+
+
+@location_rack_bp.route('/api/rack/<string:uuid>/sticker-print/<int:template_id>')
+@login_required
+def api_rack_sticker_print(uuid, template_id):
+    """
+    Generate printable sticker for a rack
+    Returns: PDF file download
+    """
+    from models import Rack
+    from qr_utils import get_rack_data, generate_single_sticker_pdf
+    
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    
+    if template.template_type != 'Racks':
+        return jsonify({'error': 'Template must be for Racks'}), 400
+    
+    data = get_rack_data(rack)
+    
+    # Generate single-sticker PDF
+    output = generate_single_sticker_pdf(template, data, rack.uuid)
+    
+    log_audit(current_user.id, 'print', 'rack', rack.id, 
+             f'Printed sticker: {template.name}')
+    
+    return send_file(
+        output, 
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f'{template.name}_{rack.uuid}.pdf'
+    )
 

@@ -1,5 +1,5 @@
 """
-Inventory Manager Application - Main Entry Point (Refactored)
+Inventory Manager Application - Main Entry Point
 """
 from flask import Flask, render_template, request, send_from_directory, jsonify
 from flask_login import LoginManager, current_user, AnonymousUserMixin, login_required
@@ -7,23 +7,8 @@ from config import Config
 from models import db, User, Category, Item, Setting
 from helpers import filesize_filter, jinja_format_amount, markdown_filter
 import os
+import json
 import logging
-
-# Check library integrity on startup (silent)
-def check_library_integrity():
-    """Silently verify libraries exist, return False if missing"""
-    lib_paths = [
-        'static/lib/bootstrap/css/bootstrap.min.css',
-        'static/lib/bootstrap/js/bootstrap.bundle.min.js',
-        'static/icons/bootstrap-icons.css',
-        'static/icons/bootstrap-icons.woff2',
-        'static/lib/Sortable.min.js'
-    ]
-    return all(os.path.exists(path) for path in lib_paths)
-
-# Verify libraries exist
-if not check_library_integrity():
-    print("[WARNING] Some libraries are missing. Run setup script to download them.")
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -87,6 +72,56 @@ app.jinja_env.filters['filesize'] = filesize_filter
 app.jinja_env.filters['format_amount'] = jinja_format_amount
 app.jinja_env.filters['markdown'] = markdown_filter
 
+def from_json_filter(value):
+    try:
+        return json.loads(value) if value else []
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+app.jinja_env.filters['from_json'] = from_json_filter
+
+
+def load_dependencies():
+    """Load JS libraries and icons from js-requirements.json"""
+    try:
+        config_path = os.path.join(app.root_path, 'js-requirements.json')
+        if not os.path.exists(config_path):
+            return [], [], []
+        
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        css_files = []
+        js_files = []
+        libs = []
+        
+        for dep in config.get('dependencies', []):
+            name = dep.get('name')
+            version = dep.get('version')
+            dest = dep.get('dest', '')
+            
+            libs.append({'name': name, 'version': version})
+            
+            # Remove 'static/' prefix if present (url_for handles it)
+            if dest.startswith('static/'):
+                dest = dest[7:]  # Remove 'static/'
+            
+            if 'css' in dest or dest.endswith('.css'):
+                css_files.append(dest)
+            elif 'js' in dest or dest.endswith('.js'):
+                js_files.append(dest)
+            elif 'icons' in dest:
+                css_files.append('icons/bootstrap-icons.css')
+        
+        # Always add Font Awesome CSS
+        if 'css/fontawesome.min.css' not in css_files:
+            css_files.append('css/fontawesome.min.css')
+        
+        return css_files, js_files, libs
+    except Exception as e:
+        print(f"Error loading dependencies: {e}")
+        return [], [], []
+
 
 @app.context_processor
 def inject_theme():
@@ -138,11 +173,17 @@ def inject_settings():
     # Banner timeout
     banner_timeout = Setting.get('banner_timeout', '5')
     
+    # Load JS dependencies dynamically
+    css_files, js_files, libs = load_dependencies()
+    
     return {
         'app_settings': settings_dict,
         'all_categories': categories,
         'notification_count': notification_count,
-        'banner_timeout': banner_timeout
+        'banner_timeout': banner_timeout,
+        'css_files': css_files,
+        'js_files': js_files,
+        'dependencies': libs
     }
 
 

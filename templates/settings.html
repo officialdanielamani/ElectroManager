@@ -92,6 +92,20 @@
     </div>
     {% endif %}
 
+    <!-- Project Settings -->
+    {% if current_user.has_permission('settings_sections.project_settings', 'view') %}
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-kanban" style="font-size: 3rem; color: #e91e8c;"></i>
+                <h5 class="card-title mt-3">Project Settings</h5>
+                <p class="card-text small">Categories, Tags, Statuses, Groups, Persons</p>
+                <a href="{{ url_for('project.project_settings') }}" class="btn btn-primary">Manage</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Stickers Template -->
     {% if current_user.has_permission('settings_sections.qr_templates', 'view') %}
     <div class="col-md-6 col-lg-4 mb-3">

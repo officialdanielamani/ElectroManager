@@ -35,7 +35,6 @@
                 <form method="POST" id="itemForm">
                     {{ form.hidden_tag() }}
 
-                    <!-- Row 1: Name and SKU -->
                     <div class="row mb-2">
                         <div class="col-8">
                             <label class="form-label form-label-sm">Component Name *</label>
@@ -48,7 +47,6 @@
                         </div>
                     </div>
 
-                    <!-- Row 2: Type/Model and Description -->
                     <div class="row mb-2">
                         <div class="col-6">
                             <label class="form-label form-label-sm">Type / Model</label>
@@ -61,9 +59,8 @@
                         {{ form.description(class="form-control form-control-sm", placeholder="Support Markdown format", rows=4, disabled=(item_perms and not item_perms.can_edit_description)) }}
                     </div>
 
-                    <!-- Row 3: Category and Quantity -->
                     <div class="row mb-2">
-                        <div class="col-8">
+                        <div class="col-12">
                             <label class="form-label form-label-sm">Category</label>
                             <div class="input-group input-group-sm">
                                 {{ form.category_id(class="form-select form-select-sm", disabled=(item_perms and not item_perms.can_edit_category)) }}
@@ -74,26 +71,168 @@
                                 </button>
                             </div>
                         </div>
-                        <div class="col-4">
-                            <label class="form-label form-label-sm">Quantity *</label>
-                            {{ form.quantity(class="form-control form-control-sm", min="0", step="1", required=True, disabled=(item_perms and not item_perms.can_edit_quantity)) }}
-                        </div>
                     </div>
 
-                    <!-- Row 4: Price and Total -->
-                    <div class="row mb-2">
-                        <div class="col-6">
-                            <label class="form-label form-label-sm">Price per Qty ({{ currency }})</label>
-                            {{ form.price(class="form-control form-control-sm", placeholder="0.00", id="price_per_qty", disabled=(item_perms and not item_perms.can_edit_price)) }}
+                    {% if item %}
+                    <div class="mb-2 border rounded p-2" id="batches-section">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label form-label-sm mb-0">
+                                <i class="bi bi-collection"></i> Batches ({{ item.batches|length }})
+                                <small class="text-muted ms-2">Total Qty: {{ item.get_overall_quantity() }} | Value: {{ currency }}{{ "%.2f"|format(item.get_overall_total_price()) }}</small>
+                            </label>
+                            {% if item_perms and item_perms.can_edit_batch %}
+                            <button type="button" class="btn btn-sm btn-success" onclick="openAddBatchModal()">
+                                <i class="bi bi-plus-circle"></i> Add Batch
+                            </button>
+                            {% endif %}
                         </div>
-                        <div class="col-6">
-                            <label class="form-label form-label-sm">Total Price ({{ currency }})</label>
-                            <input type="text" class="form-control form-control-sm" id="total_price" readonly
-                                style="background-color: #e9ecef; font-weight: bold;" value="0.00">
-                        </div>
-                    </div>
 
-                    <!-- Row 4b: No Stock Warning -->
+                        {% if item.batches|length == 0 %}
+                        <small class="text-muted"><i class="bi bi-info-circle"></i> No batches yet. Add a batch to start tracking.</small>
+                        {% endif %}
+
+                        {% for batch in item.batches %}
+                        <div class="card batch-card mb-2" style="border-left: 4px solid #0d6efd;">
+                            <div class="card-header p-2 d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#batchBody{{ batch.id }}" style="cursor:pointer; background: var(--bs-tertiary-bg, #f8f9fa);">
+                                <div>
+                                    <strong><i class="bi bi-box-seam"></i> {{ batch.get_display_label() }}</strong>
+                                    <span class="badge bg-primary ms-2">Qty: {{ batch.quantity }}</span>
+                                    {% if batch.sn_tracking_enabled %}<span class="badge bg-dark ms-1"><i class="bi bi-upc-scan"></i> Tracking</span>{% endif %}
+                                    <span class="badge bg-success ms-1">{{ currency }}{{ "%.2f"|format(batch.price_per_unit) }}/unit</span>
+                                    <span class="badge bg-info ms-1">Total: {{ currency }}{{ "%.2f"|format(batch.get_batch_total_price()) }}</span>
+                                    {% if batch.get_lend_quantity() > 0 %}<span class="badge bg-warning ms-1">Lend: {{ batch.get_lend_quantity() }}</span>{% endif %}
+                                    {% set proj_names = batch.get_project_names_for_batch() %}
+                                    {% if proj_names %}<span class="badge bg-info ms-1">Proj: {{ proj_names|join(', ') }}</span>{% endif %}
+                                    {% if batch.purchase_date %}<small class="text-muted ms-2"><i class="bi bi-calendar"></i> {{ batch.purchase_date.strftime('%d/%m/%Y') }}</small>{% endif %}
+                                    {% if batch.note %}<small class="text-muted ms-2"><i class="bi bi-sticky"></i> {{ batch.note }}</small>{% endif %}
+                                </div>
+                                <div class="d-flex gap-1 align-items-center">
+                                    <i class="bi bi-chevron-down"></i>
+                                    {% if item_perms and item_perms.can_edit_batch %}
+                                    {% if not batch.sn_tracking_enabled %}
+                                    <button type="button" class="btn btn-sm btn-outline-info py-0 px-1" onclick="event.stopPropagation(); openTransferModal({{ batch.id }}, {{ batch.get_available_quantity() }})" title="Transfer Quantity"><i class="bi bi-arrow-left-right"></i></button>
+                                    {% endif %}
+                                    <button type="button" class="btn btn-sm btn-outline-warning py-0 px-1" onclick="event.stopPropagation(); openEditBatchModal({{ batch.id }}, '{{ batch.batch_label|e if batch.batch_label else '' }}', {{ batch.quantity }}, {{ batch.price_per_unit }}, '{{ batch.purchase_date.strftime('%Y-%m-%d') if batch.purchase_date else '' }}', '{{ batch.note|e if batch.note else '' }}', '{{ batch.lend_to|e if batch.lend_to else '' }}', {{ batch.lend_quantity or 0 }}, {{ 'true' if batch.sn_tracking_enabled else 'false' }})" title="Edit"><i class="bi bi-pencil"></i></button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="event.stopPropagation(); deleteBatchJS({{ batch.id }}, '{{ batch.get_display_label()|e }}')" title="Delete"><i class="bi bi-trash"></i></button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="collapse" id="batchBody{{ batch.id }}">
+                                <div class="card-body p-2">
+                                    <div class="row mb-2 small">
+                                        <div class="col-md-3"><strong>Batch #:</strong> {{ batch.batch_number }}</div>
+                                        <div class="col-md-3"><strong>Quantity:</strong> {{ batch.quantity }}</div>
+                                        <div class="col-md-3"><strong>Price/Unit:</strong> {{ currency }}{{ "%.2f"|format(batch.price_per_unit) }}</div>
+                                        <div class="col-md-3"><strong>Total:</strong> {{ currency }}{{ "%.2f"|format(batch.get_batch_total_price()) }}</div>
+                                    </div>
+                                    <div class="row mb-2 small">
+                                        <div class="col-md-3"><strong>Lending:</strong> {{ batch.get_lend_quantity() }}</div>
+                                        <div class="col-md-3"><strong>Available:</strong> {{ batch.get_available_quantity() }}</div>
+                                        {% if not batch.sn_tracking_enabled and batch.lend_to %}
+                                        <div class="col-md-3"><strong>Lend to:</strong> {{ batch.lend_to }}</div>
+                                        {% endif %}
+                                        <div class="col-md-3"><strong>Date:</strong> {{ batch.purchase_date.strftime('%d/%m/%Y') if batch.purchase_date else 'N/A' }}</div>
+                                    </div>
+                                    {% if proj_names %}
+                                    <div class="row mb-2 small">
+                                        <div class="col-12"><strong>Project:</strong> {% for pn in proj_names %}<span class="badge bg-info">{{ pn }}</span> {% endfor %} <small class="text-muted">({{ batch.get_project_used_quantity() }} used)</small></div>
+                                    </div>
+                                    {% endif %}
+                                    {% if batch.note %}
+                                    <div class="row mb-2 small">
+                                        <div class="col-12"><strong>Note:</strong> {{ batch.note }}</div>
+                                    </div>
+                                    {% endif %}
+
+                                    {% if batch.sn_tracking_enabled and batch.serial_numbers|length > 0 %}
+                                    <hr class="my-2">
+                                    {% if item_perms and item_perms.can_edit_batch %}
+                                    <div class="d-flex gap-1 mb-2 flex-wrap">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="openEditDetailsModal({{ batch.id }})"><i class="bi bi-pencil-square"></i> Edit Selected</button>
+                                        <button type="button" class="btn btn-sm btn-outline-info" onclick="openTransferSnModal({{ batch.id }})"><i class="bi bi-arrow-left-right"></i> Transfer Selected</button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteSelectedSn({{ batch.id }})"><i class="bi bi-trash"></i> Delete Selected</button>
+                                        <div class="input-group input-group-sm" style="width:auto;">
+                                            <span class="input-group-text">Add</span>
+                                            <input type="number" class="form-control" id="addSnQty{{ batch.id }}" min="1" max="100" value="1" style="width:55px">
+                                            <button class="btn btn-outline-success" type="button" onclick="addSnToBatch({{ batch.id }}, {{ batch.quantity }})"><i class="bi bi-plus"></i></button>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="remapIsn({{ batch.id }})"><i class="bi bi-arrow-repeat"></i> Remap ISN</button>
+                                    </div>
+                                    {% endif %}
+
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="width:25px"><input type="checkbox" class="form-check-input" onclick="toggleAllSn(this, {{ batch.id }})"></th>
+                                                    <th style="width:35px">No</th>
+                                                    <th>Serial Number (SN)</th>
+                                                    <th>Internal Serial Number (ISN)</th>
+                                                    <th>Info</th>
+                                                    <th>Project</th>
+                                                    <th>Lend to</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for sn in batch.serial_numbers %}
+                                                {% set sn_project_used = sn.id in batch.get_project_used_sn_ids() %}
+                                                <tr>
+                                                    <td><input type="checkbox" class="form-check-input sn-check-{{ batch.id }}" value="{{ sn.id }}"></td>
+                                                    <td>{{ sn.sequence_number }}</td>
+                                                    <td>
+                                                        <span id="snVal{{ sn.id }}" ondblclick="inlineEdit(this, {{ sn.id }}, 'sn', '{{ sn.serial_number|e if sn.serial_number else '-' }}', {{ batch.id }})">{{ sn.serial_number or '-' }}</span>
+                                                    </td>
+                                                    <td><code style="font-size:0.78rem">{{ sn.internal_serial_number }}</code></td>
+                                                    <td>
+                                                        <span id="infoVal{{ sn.id }}" ondblclick="inlineEdit(this, {{ sn.id }}, 'info', '{{ sn.info|e if sn.info else '-' }}', {{ batch.id }})">{{ sn.info or '-' }}</span>
+                                                    </td>
+                                                    <td>
+                                                        {% if sn_project_used %}
+                                                        <span class="badge bg-info">
+                                                            {% for bom in batch.bom_uses if bom.used and bom.serial_numbers %}
+                                                                {% set sn_ids = bom.serial_numbers | from_json %}
+                                                                {% if sn.id in sn_ids %}{{ bom.project.name }}{% endif %}
+                                                            {% endfor %}
+                                                        </span>
+                                                        {% else %}-{% endif %}
+                                                    </td>
+                                                    <td>
+                                                        {% if sn_project_used %}
+                                                        <span class="text-muted" style="opacity:0.5">{{ sn.lend_to or '-' }}</span>
+                                                        {% else %}
+                                                        <span id="lendVal{{ sn.id }}" ondblclick="inlineEdit(this, {{ sn.id }}, 'lend', '{{ sn.lend_to|e if sn.lend_to else '-' }}', {{ batch.id }})">{{ sn.lend_to or '-' }}</span>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <small class="text-muted">Double-click SN, Info, or Lend to edit inline.</small>
+                                    {% elif batch.sn_tracking_enabled and batch.serial_numbers|length == 0 and item_perms and item_perms.can_edit_batch %}
+                                    <hr class="my-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <small class="text-muted">No serial numbers yet.</small>
+                                        <div class="input-group input-group-sm" style="width:auto;">
+                                            <span class="input-group-text">Add</span>
+                                            <input type="number" class="form-control" id="addSnQty{{ batch.id }}" min="1" max="100" value="1" style="width:55px">
+                                            <button class="btn btn-outline-success" type="button" onclick="addSnToBatch({{ batch.id }}, 0)"><i class="bi bi-plus"></i></button>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="mb-2">
+                        <small class="text-muted"><i class="bi bi-info-circle"></i> After creating the item, you can add batches to track quantities and prices.</small>
+                    </div>
+                    {% endif %}
+                    <input type="hidden" name="quantity" id="quantity" value="{{ item.quantity if item else 0 }}">
+                    <input type="hidden" name="price" value="{{ item.price if item else 0 }}">
+
                     <div class="row mb-2">
                         <div class="col-12">
                             <div class="form-check">
@@ -111,13 +250,11 @@
                         </div>
                     </div>
 
-                    <!-- Physical Storage Location -->
                     <div class="card bg-light mb-2">
                         <div class="card-body p-2">
                             <label class="form-label form-label-sm mb-2"><strong>Physical Storage
                                     Location</strong></label>
 
-                            <!-- Storage Type -->
                             <div class="btn-group btn-group-sm w-100 mb-2" role="group">
                                 <input type="radio" class="btn-check" name="location_type" id="type_general"
                                     value="general" {% if not item or (item and not item.rack_id) %}checked{% endif %}
@@ -130,7 +267,6 @@
                                 <label class="btn btn-outline-primary" for="type_drawer">Drawer Storage</label>
                             </div>
 
-                            <!-- General Location -->
                             <div id="general_location_section">
                                 <label class="form-label form-label-sm">General Location</label>
                                 <div class="input-group input-group-sm mb-2">
@@ -144,9 +280,7 @@
                                 <small class="text-muted d-block">Choose from existing locations or create new</small>
                             </div>
 
-                            <!-- Drawer Storage -->
                             <div id="drawer_storage_section" style="display: none;">
-                                <!-- Compact Row: Location | Rack | Drawer -->
                                 <div class="row g-2 mb-2" style="position: relative;">
                                     <div class="col-4" style="overflow: visible;">
                                         <label class="form-label form-label-sm">Location</label>
@@ -178,7 +312,6 @@
                                     </div>
                                 </div>
 
-                                <!-- Visual Drawer Picker -->
                                 <div id="drawer_picker" style="display: none;">
                                     <div class="p-2 border rounded drawer-grid-container">
                                         <small class="text-muted d-block mb-2">Click to select:</small>
@@ -191,7 +324,6 @@
                         </div>
                     </div>
 
-                    <!-- Footprint -->
                     <div class="mb-2">
                         <label class="form-label form-label-sm">Footprint</label>
                         <div class="input-group input-group-sm">
@@ -204,7 +336,6 @@
                         </div>
                     </div>
 
-                    <!-- Tags - Compact Multi-select -->
                     <div class="mb-2">
                         <div class="d-flex justify-content-between align-items-center">
                             <label class="form-label form-label-sm mb-0">Tags</label>
@@ -231,14 +362,12 @@
                         </div>
                     </div>
 
-                    <!-- Upload Files Section (only shown when editing) -->
                     {% if item %}
                     <div class="mb-3 border-top pt-3">
                         <label class="form-label form-label-sm">
                             <i class="bi bi-upload"></i> Upload Files / Pictures
                         </label>
 
-                        <!-- Existing Files Preview -->
                         {% set images = item.attachments | selectattr('file_type', 'in', ['png', 'jpg', 'jpeg', 'gif',
                         'webp']) | list %}
                         {% set other_files = item.attachments | rejectattr('file_type', 'in', ['png', 'jpg', 'jpeg',
@@ -248,7 +377,6 @@
                         <div class="mb-2">
                             <small class="text-muted">Current Files:</small>
 
-                            <!-- Image Previews -->
                             {% if images %}
                             <div class="mt-2 mb-2">
                                 <strong class="small">Images:</strong>
@@ -266,7 +394,6 @@
                             </div>
                             {% endif %}
 
-                            <!-- Other Files List -->
                             {% if other_files %}
                             <div class="mt-2">
                                 <strong class="small">Other Files:</strong>
@@ -300,7 +427,6 @@
                         </div>
                         {% endif %}
 
-                        <!-- Upload New Files Form -->
                         <div class="card bg-light">
                             <div class="card-body p-2">
                                 <div id="uploadFormContainer">
@@ -324,7 +450,6 @@
 
 
 
-                    <!-- Magic Parameters Section (only shown when editing) -->
                     {% if item %}
                     <div class="mb-3 border-top pt-3">
                         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -403,7 +528,6 @@
                     </div>
                     {% endif %}
 
-                    <!-- Datasheet URLs - New Interface -->
                     <div class="mb-3">
                         <label class="form-label form-label-sm">Datasheet URLs</label>
                         <button type="button" class="btn btn-sm btn-primary float-end" onclick="addDatasheetRow()"
@@ -411,9 +535,7 @@
                             <i class="bi bi-plus-circle"></i> Add URL
                         </button>
                         <div id="datasheet-list" class="mt-2">
-                            <!-- Datasheet entries will be shown here -->
-                        </div>
-                        <!-- Hidden field to store JSON data -->
+                            </div>
                         {{ form.datasheet_urls(id="datasheet_urls_hidden", style="display:none;") }}
                     </div>
 
@@ -598,7 +720,6 @@
                         });
                     </script>
 
-                    <!-- UUID and Min Quantity -->
                     <div class="row mb-2">
                         <div class="col-6">
                             <label class="form-label form-label-sm">UUID</label>
@@ -611,25 +732,6 @@
                         </div>
                     </div>
 
-                    <!-- Lending Section -->
-                    <div class="card bg-warning bg-opacity-10 mb-3">
-                        <div class="card-body p-2">
-                            <label class="form-label form-label-sm mb-2"><strong>Lending (Optional)</strong></label>
-                            <div class="row">
-                                <div class="col-6">
-                                    <label class="form-label form-label-sm">Lend To</label>
-                                    {{ form.lend_to(class="form-control form-control-sm", id="lend_to_input", disabled=(item_perms and not item_perms.can_edit_lending)) }}
-                                </div>
-                                <div class="col-6" id="lend_qty_section" style="display: none;">
-                                    <label class="form-label form-label-sm">Lend Quantity</label>
-                                    {{ form.lend_quantity(class="form-control form-control-sm", id="lend_qty_input", disabled=(item_perms and not item_perms.can_edit_lending)) }}
-                                    <small class="text-danger" id="lend_error"></small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Buttons -->
                     <div class="d-flex justify-content-between">
                         <a href="{{ url_for('item.items') }}" class="btn btn-secondary">
                             <i class="bi bi-x-circle"></i> Cancel
@@ -642,7 +744,6 @@
     </div>
 </div>
 
-<!-- Image Edit Modal -->
 <div class="modal fade" id="imageEditModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
@@ -674,7 +775,6 @@
     </div>
 </div>
 
-<!-- File Rename Modal -->
 <div class="modal fade" id="fileRenameModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -1079,62 +1179,15 @@
         }
     }
 
-    // Lending validation
-    const lendToInput = document.getElementById('lend_to_input');
-    const lendQtySection = document.getElementById('lend_qty_section');
-    const lendQtyInput = document.getElementById('lend_qty_input');
-    const lendError = document.getElementById('lend_error');
-    const qtyInput = document.getElementById('quantity');
-
-    lendToInput.addEventListener('input', function () {
-        if (this.value.trim()) {
-            lendQtySection.style.display = 'block';
-        } else {
-            lendQtySection.style.display = 'none';
-            lendQtyInput.value = 0;
-        }
-    });
-
-    lendQtyInput.addEventListener('input', function () {
-        const total = parseInt(qtyInput.value) || 0;
-        const lent = parseInt(this.value) || 0;
-
-        if (lent > total) {
-            lendError.textContent = `Cannot lend more than ${total}`;
-            this.value = total;
-        } else {
-            lendError.textContent = '';
-        }
-    });
-
     // Trigger on page load
     toggleLocationType();
     if (rackSelect.value) {
         rackSelect.dispatchEvent(new Event('change'));
     }
-    if (lendToInput.value && lendToInput.value.trim()) {
-        lendQtySection.style.display = 'block';
-    }
 
-    // Calculate Total Price
-    const pricePerQtyInput = document.getElementById('price_per_qty');
-    const totalPriceInput = document.getElementById('total_price');
-
-    function calculateTotalPrice() {
-        const pricePerQty = parseFloat(pricePerQtyInput.value) || 0;
-        const quantity = parseInt(qtyInput.value) || 0;
-        const totalPrice = pricePerQty * quantity;
-        totalPriceInput.value = totalPrice.toFixed(2);
-    }
-
-    pricePerQtyInput.addEventListener('input', calculateTotalPrice);
-    qtyInput.addEventListener('input', calculateTotalPrice);
-
-    // Calculate on page load
-    calculateTotalPrice();
+    // Price and quantity are now managed through batches on the item detail page
 </script>
 
-<!-- Add Category Modal -->
 <div class="modal fade" id="addCategoryModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -1161,7 +1214,6 @@
     </div>
 </div>
 
-<!-- Add Footprint Modal -->
 <div class="modal fade" id="addFootprintModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -1188,7 +1240,6 @@
     </div>
 </div>
 
-<!-- Add Tag Modal -->
 <div class="modal fade" id="addTagModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -1215,7 +1266,6 @@
     </div>
 </div>
 
-<!-- Add Location Modal -->
 <div class="modal fade" id="addLocationModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -1484,7 +1534,6 @@
     }
 </script>
 
-<!-- Add Parameter Modal -->
 {% if item %}
 <div class="modal fade" id="addParameterModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -1495,7 +1544,6 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <!-- Parameter Type Selection -->
                     <div class="mb-3">
                         <label class="form-label">Parameter Type</label>
                         <select name="param_type" id="modal_param_type" class="form-select"
@@ -1507,7 +1555,6 @@
                         </select>
                     </div>
 
-                    <!-- Parameter Selection -->
                     <div class="mb-3">
                         <label class="form-label">Parameter</label>
                         <select name="parameter_id" id="modal_parameter_id" class="form-select"
@@ -1516,7 +1563,6 @@
                         </select>
                     </div>
 
-                    <!-- Operation Selection (for Number and Date types) -->
                     <div class="mb-3" id="operation_group" style="display: none;">
                         <label class="form-label">Operation</label>
                         <select name="operation" id="modal_operation" class="form-select"
@@ -1525,7 +1571,6 @@
                         </select>
                     </div>
 
-                    <!-- Value Fields -->
                     <div class="row" id="value_fields" style="display: none;">
                         <div class="col-md-6">
                             <div class="mb-3">
@@ -1541,7 +1586,6 @@
                         </div>
                     </div>
 
-                    <!-- Unit Selection (for Number type) -->
                     <div class="mb-3" id="unit_group" style="display: none;">
                         <label class="form-label">Unit</label>
                         <select name="unit" id="modal_unit" class="form-select">
@@ -1549,7 +1593,8 @@
                         </select>
                     </div>
 
-                    <!-- String Option Selection (for String type) -->
+                    <div id="number_constraints_info" style="display: none;"></div>
+
                     <div class="mb-3" id="string_option_group" style="display: none;">
                         <label class="form-label">Option</label>
                         <select name="string_option" id="modal_string_option" class="form-select">
@@ -1557,7 +1602,6 @@
                         </select>
                     </div>
 
-                    <!-- Description -->
                     <div class="mb-3">
                         <label class="form-label">Description (Optional)</label>
                         <textarea name="description" class="form-control" rows="2"></textarea>
@@ -1587,6 +1631,7 @@
         document.getElementById('value_fields').style.display = 'none';
         document.getElementById('unit_group').style.display = 'none';
         document.getElementById('string_option_group').style.display = 'none';
+        document.getElementById('number_constraints_info').style.display = 'none';
 
         if (paramType) {
             // Fetch parameters for selected type
@@ -1620,24 +1665,31 @@
             <option value="range">Range</option>
         `;
 
-            // Fetch and populate units
+            // Fetch and populate units and show constraints
             fetch(`/api/magic-parameters/number`)
                 .then(response => response.json())
                 .then(data => {
                     const param = data.find(p => p.id == parameterId);
-                    if (param && param.units) {
-                        const unitSelect = document.getElementById('modal_unit');
-                        unitSelect.innerHTML = '<option value="">-- Select Unit --</option>';
-                        param.units.forEach(unit => {
-                            const option = new Option(unit, unit);
-                            unitSelect.add(option);
-                        });
-                        document.getElementById('unit_group').style.display = 'block';
+                    if (param) {
+                        // Populate units if available
+                        if (param.units) {
+                            const unitSelect = document.getElementById('modal_unit');
+                            unitSelect.innerHTML = '<option value="">-- Select Unit --</option>';
+                            param.units.forEach(unit => {
+                                const option = new Option(unit, unit);
+                                unitSelect.add(option);
+                            });
+                            document.getElementById('unit_group').style.display = 'block';
+                        }
+                        
+                        // Display number parameter constraints
+                        displayNumberConstraints(param);
                     }
                 });
         } else if (paramType === 'date') {
             // Show operation fields with date-specific labels
             document.getElementById('operation_group').style.display = 'block';
+            document.getElementById('number_constraints_info').style.display = 'none';
             const operationSelect = document.getElementById('modal_operation');
             operationSelect.innerHTML = `
             <option value="">-- Select Operation --</option>
@@ -1648,6 +1700,7 @@
         `;
         } else if (paramType === 'string') {
             // Show string options
+            document.getElementById('number_constraints_info').style.display = 'none';
             fetch(`/api/magic-parameters/string`)
                 .then(response => response.json())
                 .then(data => {
@@ -1662,6 +1715,59 @@
                         document.getElementById('string_option_group').style.display = 'block';
                     }
                 });
+        }
+    }
+
+    function displayNumberConstraints(param) {
+        try {
+            // Get or create the constraints info container
+            const constraintsInfo = document.getElementById('number_constraints_info');
+            
+            if (!constraintsInfo) {
+                return; // Container not found, exit gracefully
+            }
+            
+            if (!param) {
+                constraintsInfo.style.display = 'none';
+                constraintsInfo.innerHTML = '';
+                return;
+            }
+            
+            // Build the constraints HTML dynamically based on parameter settings
+            const typeText = param.is_whole_number ? 'Whole numbers only' : `Decimal (up to ${param.number_decimal_places} places)`;
+            
+            let html = `<div class="alert alert-info">
+                <h6 class="alert-heading"><i class="bi bi-info-circle"></i> Number Parameter Constraints</h6>
+                <ul class="mb-0">
+                    <li><strong>Type:</strong> ${typeText}</li>`;
+            
+            // Add min constraint if set
+            if (param.number_min !== null && param.number_min !== undefined) {
+                html += `<li><strong>Minimum:</strong> ${param.number_min}</li>`;
+            }
+            
+            // Add max constraint if set
+            if (param.number_max !== null && param.number_max !== undefined) {
+                html += `<li><strong>Maximum:</strong> ${param.number_max}</li>`;
+            }
+            
+            // Add step constraint if set
+            if (param.number_step !== null && param.number_step !== undefined && param.number_step !== 0) {
+                html += `<li><strong>Step:</strong> ${param.number_step}</li>`;
+            }
+            
+            // Add required flag if set
+            if (param.number_required) {
+                html += `<li><strong>Required:</strong> Yes</li>`;
+            }
+            
+            html += `</ul></div>`;
+            
+            // Inject HTML and display
+            constraintsInfo.innerHTML = html;
+            constraintsInfo.style.display = 'block';
+        } catch (error) {
+            // Fail silently - constraints info is optional, don't break functionality
         }
     }
 
@@ -1707,7 +1813,6 @@
 </script>
 {% endif %}
 
-<!-- Use Template Modal -->
 {% if item %}
 <div class="modal fade" id="useTemplateModal" tabindex="-1">
     <div class="modal-dialog">
@@ -1791,6 +1896,551 @@
         }
     }
 </script>
+{% endif %}
+
+{% if item %}
+<div class="modal fade" id="addBatchModalDialog" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Add New Batch</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3 p-2 border rounded">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="addBatchSnTracking" onchange="toggleAddBatchTracking()">
+                        <label class="form-check-label" for="addBatchSnTracking"><strong><i class="bi bi-upc-scan"></i> Enable Serial Number Tracking</strong></label>
+                    </div>
+                    <small class="text-muted d-block mt-1" id="addBatchTrackingInfo"><strong>OFF:</strong> Simple batch — unlimited quantity, manual lending.</small>
+                    <small class="text-danger d-block mt-1"><i class="bi bi-exclamation-triangle"></i> <strong>Warning:</strong> This setting cannot be changed after the batch is created. Choose carefully.</small>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Batch Label <small class="text-muted">(optional, max 32)</small></label>
+                    <input type="text" class="form-control form-control-sm" id="ab_label" maxlength="32">
+                </div>
+                <div class="row mb-2">
+                    <div class="col-6">
+                        <label class="form-label form-label-sm">Quantity * <small class="text-muted" id="ab_qtyHint">(no limit)</small></label>
+                        <input type="number" class="form-control form-control-sm" id="ab_qty" min="0" max="99999" value="1">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label form-label-sm">Price per Unit</label>
+                        <input type="number" class="form-control form-control-sm" id="ab_price" min="0" step="0.01" value="0">
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Date of Purchase</label>
+                    <input type="date" class="form-control form-control-sm" id="ab_date">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Note <small class="text-muted">(max 128)</small></label>
+                    <input type="text" class="form-control form-control-sm" id="ab_note" maxlength="128">
+                </div>
+                <div id="ab_lendSection">
+                    <div class="row mb-2">
+                        <div class="col-8">
+                            <label class="form-label form-label-sm">Lend to</label>
+                            <input type="text" class="form-control form-control-sm" id="ab_lend_to" maxlength="200">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label form-label-sm">Lend Qty</label>
+                            <input type="number" class="form-control form-control-sm" id="ab_lend_qty" min="0" value="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitAddBatch()"><i class="bi bi-plus-circle"></i> Add Batch</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editBatchModalDialog" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Batch</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="eb_id">
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Batch Label</label>
+                    <input type="text" class="form-control form-control-sm" id="eb_label" maxlength="32">
+                </div>
+                <div id="eb_snInfo" class="mb-2 p-2 bg-light rounded small"></div>
+                <div id="eb_qtySection">
+                    <div class="row mb-2">
+                        <div class="col-6">
+                            <label class="form-label form-label-sm">Quantity</label>
+                            <input type="number" class="form-control form-control-sm" id="eb_qty" min="0" max="99999">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label form-label-sm">Price per Unit</label>
+                            <input type="number" class="form-control form-control-sm" id="eb_price" min="0" step="0.01">
+                        </div>
+                    </div>
+                </div>
+                <div id="eb_priceOnlySection" style="display:none;">
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm">Price per Unit</label>
+                        <input type="number" class="form-control form-control-sm" id="eb_price2" min="0" step="0.01">
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Date of Purchase</label>
+                    <input type="date" class="form-control form-control-sm" id="eb_date">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Note</label>
+                    <input type="text" class="form-control form-control-sm" id="eb_note" maxlength="128">
+                </div>
+                <div id="eb_lendSection">
+                    <div class="row mb-2">
+                        <div class="col-8">
+                            <label class="form-label form-label-sm">Lend to</label>
+                            <input type="text" class="form-control form-control-sm" id="eb_lend_to" maxlength="200">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label form-label-sm">Lend Qty</label>
+                            <input type="number" class="form-control form-control-sm" id="eb_lend_qty" min="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitEditBatch()"><i class="bi bi-save"></i> Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ── Batch card open tracking ── */
+var lastOpenBatchId = null;
+document.addEventListener('DOMContentLoaded', function() {
+    // Open batch from URL hash
+    var hash = window.location.hash;
+    if (hash && hash.startsWith('#batch-')) {
+        var bid = hash.replace('#batch-', '');
+        var el = document.getElementById('batchBody' + bid);
+        if (el) { new bootstrap.Collapse(el, {toggle: true}); }
+    }
+    // Track which batch is opened
+    document.querySelectorAll('[id^="batchBody"]').forEach(function(c) {
+        c.addEventListener('shown.bs.collapse', function() {
+            lastOpenBatchId = this.id.replace('batchBody', '');
+            history.replaceState(null, null, '#batch-' + lastOpenBatchId);
+        });
+    });
+});
+function reloadKeepBatch() {
+    if (lastOpenBatchId) {
+        window.location.hash = '#batch-' + lastOpenBatchId;
+    }
+    window.location.reload(); // FIXED Bug: Was infinitely calling window.reloadKeepBatch();
+}
+
+/* ── Add Batch ── */
+function openAddBatchModal() {
+    document.getElementById('addBatchSnTracking').checked = false;
+    document.getElementById('ab_label').value = '';
+    document.getElementById('ab_qty').value = '1';
+    document.getElementById('ab_price').value = '0';
+    document.getElementById('ab_date').value = '';
+    document.getElementById('ab_note').value = '';
+    document.getElementById('ab_lend_to').value = '';
+    document.getElementById('ab_lend_qty').value = '0';
+    toggleAddBatchTracking();
+    new bootstrap.Modal(document.getElementById('addBatchModalDialog')).show();
+}
+function toggleAddBatchTracking() {
+    var on = document.getElementById('addBatchSnTracking').checked;
+    var qi = document.getElementById('ab_qty');
+    if (on) { qi.max = 100; if (parseInt(qi.value)>100) qi.value=100; document.getElementById('ab_qtyHint').textContent='(max 100)'; document.getElementById('ab_lendSection').style.display='none'; document.getElementById('addBatchTrackingInfo').innerHTML='<strong>ON:</strong> Each unit gets SN/ISN. Max 100 per batch.'; }
+    else { qi.max = 99999; document.getElementById('ab_qtyHint').textContent='(no limit)'; document.getElementById('ab_lendSection').style.display='block'; document.getElementById('addBatchTrackingInfo').innerHTML='<strong>OFF:</strong> Simple batch — unlimited quantity, manual lending.'; }
+}
+function submitAddBatch() {
+    var fd = new FormData();
+    fd.append('batch_label', document.getElementById('ab_label').value);
+    fd.append('quantity', document.getElementById('ab_qty').value);
+    fd.append('price_per_unit', document.getElementById('ab_price').value);
+    fd.append('purchase_date', document.getElementById('ab_date').value);
+    fd.append('note', document.getElementById('ab_note').value);
+    fd.append('lend_to', document.getElementById('ab_lend_to').value);
+    fd.append('lend_quantity', document.getElementById('ab_lend_qty').value);
+    if (document.getElementById('addBatchSnTracking').checked) fd.append('sn_tracking', 'on');
+    fetch('{{ url_for("batch.add_batch", uuid=item.uuid) }}', { method: 'POST', body: fd })
+        .then(function(r) { if (r.redirected) { window.location.href = r.url; } else { reloadKeepBatch(); } })
+        .catch(function(e) { alert('Error: ' + e); });
+}
+
+/* ── Edit Batch ── */
+function openEditBatchModal(batchId, label, qty, price, date, note, lendTo, lendQty, snTracking) {
+    document.getElementById('eb_id').value = batchId;
+    document.getElementById('eb_label').value = label;
+    document.getElementById('eb_qty').value = qty;
+    document.getElementById('eb_price').value = price;
+    document.getElementById('eb_price2').value = price;
+    document.getElementById('eb_date').value = date;
+    document.getElementById('eb_note').value = note;
+    document.getElementById('eb_lend_to').value = lendTo;
+    document.getElementById('eb_lend_qty').value = lendQty;
+    if (snTracking) {
+        document.getElementById('eb_qtySection').style.display = 'none';
+        document.getElementById('eb_priceOnlySection').style.display = 'block';
+        document.getElementById('eb_lendSection').style.display = 'none';
+        document.getElementById('eb_snInfo').innerHTML = '<i class="bi bi-upc-scan"></i> <strong>Tracking Enabled</strong> — Qty: ' + qty + '. Use Add/Delete in SN table to change quantity.';
+        document.getElementById('eb_snInfo').style.display = 'block';
+    } else {
+        document.getElementById('eb_qtySection').style.display = 'block';
+        document.getElementById('eb_priceOnlySection').style.display = 'none';
+        document.getElementById('eb_lendSection').style.display = 'block';
+        document.getElementById('eb_snInfo').innerHTML = '<i class="bi bi-upc-scan"></i> Tracking: <span class="badge bg-secondary">Disabled</span>';
+        document.getElementById('eb_snInfo').style.display = 'block';
+    }
+    new bootstrap.Modal(document.getElementById('editBatchModalDialog')).show();
+}
+function submitEditBatch() {
+    var batchId = document.getElementById('eb_id').value;
+    var fd = new FormData();
+    fd.append('batch_label', document.getElementById('eb_label').value);
+    var snTracking = document.getElementById('eb_qtySection').style.display === 'none';
+    if (snTracking) {
+        fd.append('quantity', document.getElementById('eb_qty').value); // hidden, kept as-is
+        fd.append('price_per_unit', document.getElementById('eb_price2').value);
+    } else {
+        fd.append('quantity', document.getElementById('eb_qty').value);
+        fd.append('price_per_unit', document.getElementById('eb_price').value);
+        fd.append('lend_to', document.getElementById('eb_lend_to').value);
+        fd.append('lend_quantity', document.getElementById('eb_lend_qty').value);
+    }
+    fd.append('purchase_date', document.getElementById('eb_date').value);
+    fd.append('note', document.getElementById('eb_note').value);
+    fetch('/item/{{ item.uuid }}/batch/' + batchId + '/edit', { method: 'POST', body: fd })
+        .then(function(r) { if (r.redirected) { window.location.href = r.url; } else { reloadKeepBatch(); } })
+        .catch(function(e) { alert('Error: ' + e); });
+}
+
+/* ── Delete Batch ── */
+function deleteBatchJS(batchId, label) {
+    if (!confirm('Delete batch "' + label + '"?')) return;
+    fetch('/item/{{ item.uuid }}/batch/' + batchId + '/delete', { method: 'POST' })
+        .then(function(r) { if (r.redirected) { window.location.href = r.url; } else { reloadKeepBatch(); } })
+        .catch(function(e) { alert('Error: ' + e); });
+}
+
+/* ── Qty Transfer Modal ── */
+var currentTransferFromBatchId = null;
+function openTransferModal(batchId, availableQty) {
+    if (availableQty <= 0) {
+        alert('No available quantity to transfer. Please ensure items are not fully lent or used in a project.');
+        return;
+    }
+    currentTransferFromBatchId = batchId;
+    document.getElementById('transfer_from_batch_id').value = batchId;
+    var qtyInput = document.getElementById('transfer_qty_input');
+    qtyInput.max = availableQty;
+    qtyInput.value = 1;
+    document.getElementById('transfer_max_hint').textContent = '(Max available: ' + availableQty + ')';
+
+    var sel = document.getElementById('transfer_to_batch_id');
+    for (var i = 0; i < sel.options.length; i++) {
+        var opt = sel.options[i];
+        if (opt.value === "") continue;
+        var optId = parseInt(opt.value);
+        if (optId === batchId) {
+            opt.style.display = 'none';
+        } else {
+            opt.style.display = '';
+        }
+    }
+    sel.value = '';
+    new bootstrap.Modal(document.getElementById('transferModalDialog')).show();
+}
+
+function submitTransferBatch() {
+    var fromId = currentTransferFromBatchId;
+    var toId = document.getElementById('transfer_to_batch_id').value;
+    var qty = parseInt(document.getElementById('transfer_qty_input').value);
+    var maxQty = parseInt(document.getElementById('transfer_qty_input').max);
+
+    if (!toId) { alert('Select a destination batch.'); return; }
+    if (!qty || qty <= 0) { alert('Enter a valid quantity.'); return; }
+    if (qty > maxQty) { alert('Cannot transfer more than available quantity (' + maxQty + ').'); return; }
+
+    var fd = new FormData();
+    fd.append('from_batch_id', fromId);
+    fd.append('to_batch_id', toId);
+    fd.append('transfer_quantity', qty);
+
+    fetch('/item/{{ item.uuid }}/batch/transfer', { method: 'POST', body: fd })
+        .then(function(r) { reloadKeepBatch(); })
+        .catch(function(e) { alert('Error: ' + e); });
+}
+
+
+/* ── SN: Select all checkbox ── */
+function toggleAllSn(source, batchId) {
+    document.querySelectorAll('.sn-check-' + batchId).forEach(function(cb) { cb.checked = source.checked; });
+}
+
+/* ── SN: Inline edit (double-click) ── */
+function inlineEdit(span, snId, field, currentVal, batchId) {
+    var td = span.parentElement;
+    var val = currentVal === '-' ? '' : currentVal;
+    var maxLen = field === 'info' ? 32 : 200;
+    td.innerHTML = '<div class="d-flex align-items-center gap-1">' +
+        '<input type="text" class="form-control form-control-sm" id="inlineInput' + field + snId + '" value="' + val.replace(/"/g,'&quot;') + '" maxlength="' + maxLen + '" style="min-width:70px">' +
+        '<button class="btn btn-success btn-sm px-1 py-0" onclick="saveInlineEdit(' + snId + ',\'' + field + '\')" title="Save"><i class="bi bi-check-lg"></i></button>' +
+        '<button class="btn btn-secondary btn-sm px-1 py-0" onclick="reloadKeepBatch()" title="Cancel"><i class="bi bi-x-lg"></i></button>' +
+        '</div>';
+    document.getElementById('inlineInput' + field + snId).focus();
+}
+function saveInlineEdit(snId, field) {
+    var input = document.getElementById('inlineInput' + field + snId);
+    if (!input) return;
+    fetch('{{ url_for("batch.inline_update_sn", uuid=item.uuid) }}', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sn_id: snId, field: field, value: input.value.trim() })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.success) reloadKeepBatch(); else alert(d.message || 'Error');
+    }).catch(function(e) { alert('Error: ' + e); });
+}
+
+/* ── SN: Delete selected ── */
+function deleteSelectedSn(batchId) {
+    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
+    if (checked.length === 0) { alert('Select at least one serial number.'); return; }
+    if (!confirm('Delete ' + checked.length + ' selected serial number(s)?')) return;
+    var ids = [];
+    checked.forEach(function(cb) { ids.push(parseInt(cb.value)); });
+    fetch('{{ url_for("batch.delete_selected_sn", uuid=item.uuid) }}', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sn_ids: ids, batch_id: batchId })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.success) reloadKeepBatch(); else alert(d.message || 'Error');
+    }).catch(function(e) { alert('Error: ' + e); });
+}
+
+/* ── SN: Add to batch ── */
+function addSnToBatch(batchId, currentQty) {
+    var input = document.getElementById('addSnQty' + batchId);
+    var qty = parseInt(input.value) || 0;
+    if (qty < 1) { alert('Enter at least 1.'); return; }
+    if (currentQty + qty > 100) { alert('Max 100 per batch. Can add up to ' + (100 - currentQty) + '.'); return; }
+    fetch('{{ url_for("batch.add_sn_to_batch", uuid=item.uuid) }}', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batch_id: batchId, quantity: qty })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.success) reloadKeepBatch(); else alert(d.message || 'Error');
+    }).catch(function(e) { alert('Error: ' + e); });
+}
+
+/* ── SN: Remap ISN ── */
+function remapIsn(batchId) {
+    if (!confirm('Regenerate ISN sequence for this batch? Existing ISN values will be replaced. SN, Info, Lend to will be kept.')) return;
+    fetch('{{ url_for("batch.remap_isn", uuid=item.uuid) }}', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batch_id: batchId })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.success) reloadKeepBatch(); else alert(d.message || 'Error');
+    }).catch(function(e) { alert('Error: ' + e); });
+}
+
+/* ── SN: Transfer Selected SNs Modal ── */
+var transferSnFromBatchId = null;
+var transferSnIds = [];
+function openTransferSnModal(batchId) {
+    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
+    if (checked.length === 0) { alert('Please select at least one serial number.'); return; }
+    transferSnFromBatchId = batchId;
+    transferSnIds = [];
+    checked.forEach(function(cb) { transferSnIds.push(parseInt(cb.value)); });
+    document.getElementById('transferSnCount').textContent = transferSnIds.length;
+
+    var sel = document.getElementById('transferSnTarget');
+    for (var i = 0; i < sel.options.length; i++) {
+        var opt = sel.options[i];
+        if (opt.value === "") continue;
+        var optId = parseInt(opt.value);
+        var isTracking = opt.dataset.tracking === '1';
+        // Hide self, AND hide non-tracking targets! Tracking Enable to Non Tracking blocked.
+        if (optId === batchId || !isTracking) {
+            opt.style.display = 'none';
+        } else {
+            opt.style.display = '';
+        }
+    }
+    sel.value = '';
+    new bootstrap.Modal(document.getElementById('transferSnModalDialog')).show();
+}
+
+function doTransferSn() {
+    var targetId = parseInt(document.getElementById('transferSnTarget').value);
+    if (!targetId) { alert('Select a destination batch.'); return; }
+    if (targetId === transferSnFromBatchId) { alert('Cannot transfer to same batch.'); return; }
+
+    fetch('{{ url_for("batch.transfer_selected_sn", uuid=item.uuid) }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sn_ids: transferSnIds, from_batch_id: transferSnFromBatchId, to_batch_id: targetId })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) reloadKeepBatch();
+        else alert(data.message || 'Error');
+    })
+    .catch(function(e) { alert('Error: ' + e); });
+}
+
+
+/* ── SN: Bulk Edit Details modal ── */
+var editDetailsSelectedIds = [];
+function openEditDetailsModal(batchId) {
+    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
+    if (checked.length === 0) { alert('Select at least one serial number.'); return; }
+    editDetailsSelectedIds = [];
+    checked.forEach(function(cb) { editDetailsSelectedIds.push(parseInt(cb.value)); });
+    document.getElementById('editDetailsCount').textContent = editDetailsSelectedIds.length;
+    ['bulkSnEdit', 'bulkInfoEdit', 'bulkLendEdit'].forEach(function(id) {
+        var inp = document.getElementById(id);
+        inp.value = ''; inp.dataset.cleared = ''; inp.placeholder = 'Leave empty to keep current'; inp.classList.remove('border-danger');
+    });
+    new bootstrap.Modal(document.getElementById('editDetailsModalDialog')).show();
+}
+function clearBulkField(inputId) {
+    var inp = document.getElementById(inputId);
+    if (!confirm('Clear this field to empty for all selected?')) return;
+    inp.value = ''; inp.dataset.cleared = 'true'; inp.placeholder = '(will be cleared)'; inp.classList.add('border-danger');
+}
+function saveEditDetails() {
+    var payload = { sn_ids: editDetailsSelectedIds, fields: {} };
+    var snVal = document.getElementById('bulkSnEdit');
+    var infoVal = document.getElementById('bulkInfoEdit');
+    var lendVal = document.getElementById('bulkLendEdit');
+    if (snVal.value.trim() !== '' || snVal.dataset.cleared === 'true') payload.fields.sn = snVal.value.trim();
+    if (infoVal.value.trim() !== '' || infoVal.dataset.cleared === 'true') payload.fields.info = infoVal.value.trim();
+    if (lendVal.value.trim() !== '' || lendVal.dataset.cleared === 'true') payload.fields.lend = lendVal.value.trim();
+    if (Object.keys(payload.fields).length === 0) { alert('No changes. Enter a value or use Clear.'); return; }
+    fetch('{{ url_for("batch.bulk_update_sn", uuid=item.uuid) }}', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.success) reloadKeepBatch(); else alert(d.message || 'Error');
+    }).catch(function(e) { alert('Error: ' + e); });
+}
+</script>
+
+<div class="modal fade" id="editDetailsModalDialog" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Edit Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-2">Applying to <strong><span id="editDetailsCount">0</span></strong> selected item(s).</p>
+                <div class="mb-3">
+                    <label class="form-label">Serial Number (SN)</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control" id="bulkSnEdit" placeholder="Leave empty to keep current">
+                        <button class="btn btn-outline-danger" type="button" onclick="clearBulkField('bulkSnEdit')"><i class="bi bi-x-circle"></i> Clear</button>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Info <small class="text-muted">(max 32)</small></label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control" id="bulkInfoEdit" placeholder="Leave empty to keep current" maxlength="32">
+                        <button class="btn btn-outline-danger" type="button" onclick="clearBulkField('bulkInfoEdit')"><i class="bi bi-x-circle"></i> Clear</button>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Lend to</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control" id="bulkLendEdit" placeholder="Leave empty to keep current">
+                        <button class="btn btn-outline-danger" type="button" onclick="clearBulkField('bulkLendEdit')"><i class="bi bi-x-circle"></i> Clear</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveEditDetails()"><i class="bi bi-save"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="transferModalDialog" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Transfer Between Batches</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="transfer_from_batch_id">
+                <div class="alert alert-info p-2 small">
+                    <i class="bi bi-info-circle"></i> Transfer non-tracked batch quantities. Max qty restricted to actual available components.
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">To Batch</label>
+                    <select class="form-select" id="transfer_to_batch_id">
+                        <option value="">-- Select Destination Batch --</option>
+                        {% for b in item.batches %}
+                        <option value="{{ b.id }}">{{ b.get_display_label() }} (Qty: {{ b.quantity }}){% if b.sn_tracking_enabled %} [Tracking]{% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Transfer Quantity <span id="transfer_max_hint" class="text-muted"></span></label>
+                    <input type="number" class="form-control" id="transfer_qty_input" min="1" value="1">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info" onclick="submitTransferBatch()"><i class="bi bi-arrow-left-right"></i> Transfer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="transferSnModalDialog" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Transfer Selected Serial Numbers</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-2">Moving <strong><span id="transferSnCount">0</span></strong> selected item(s). ISN kept as-is (renamed only if collision detected).</p>
+                <div class="alert alert-info p-2 small">
+                    <i class="bi bi-info-circle"></i> Serial numbers can only be transferred to batches with tracking enabled.
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Transfer to Batch</label>
+                    <select class="form-select" id="transferSnTarget">
+                        <option value="">-- Select Destination Batch --</option>
+                        {% for b in item.batches %}
+                        <option value="{{ b.id }}" data-tracking="{{ '1' if b.sn_tracking_enabled else '0' }}">
+                            {{ b.get_display_label() }} (Qty: {{ b.quantity }}) {% if b.sn_tracking_enabled %}[Tracking]{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info" onclick="doTransferSn()"><i class="bi bi-arrow-left-right"></i> Transfer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endif %}
 
 {% endblock %}
