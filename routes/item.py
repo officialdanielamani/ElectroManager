@@ -258,9 +258,63 @@ def item_new():
         )
         db.session.add(item)
         db.session.commit()
-        
+
+        # Process any pending batches submitted from the new-item form
+        pending_batches_raw = request.form.get('pending_batches', '[]')
+        try:
+            pending_batches = json.loads(pending_batches_raw)
+        except (json.JSONDecodeError, TypeError):
+            pending_batches = []
+
+        if isinstance(pending_batches, list) and perms.get('can_edit_quantity'):
+            from models import ItemBatch
+            for pb in pending_batches:
+                if not isinstance(pb, dict):
+                    continue
+                qty = int(pb.get('quantity', 0))
+                if qty < 0:
+                    qty = 0
+                sn_tracking = bool(pb.get('sn_tracking', False))
+                max_qty = 100 if sn_tracking else 99999
+                if qty > max_qty:
+                    qty = max_qty
+                label = str(pb.get('label', '')).strip()[:32] or None
+                price = float(pb.get('price', 0) or 0)
+                if price < 0:
+                    price = 0.0
+                date_str = pb.get('date', '')
+                purchase_date = None
+                if date_str:
+                    try:
+                        from datetime import datetime as _dt
+                        purchase_date = _dt.strptime(date_str, '%Y-%m-%d').date()
+                    except ValueError:
+                        pass
+                batch = ItemBatch(
+                    item_id=item.id,
+                    batch_number=item.get_next_batch_number(),
+                    batch_label=label,
+                    quantity=qty,
+                    price_per_unit=price,
+                    purchase_date=purchase_date,
+                    sn_tracking_enabled=sn_tracking,
+                )
+                db.session.add(batch)
+                db.session.flush()  # get batch.id before generating SNs
+                if sn_tracking:
+                    batch.generate_serial_numbers()
+            if pending_batches:
+                item.recalculate_from_batches()
+                item.updated_by = current_user.id
+                db.session.commit()
+
         log_audit(current_user.id, 'create', 'item', item.id, f'Created item: {item.name}')
         flash(f'Item "{item.name}" created successfully!', 'success')
+
+        # "Save and Create New" — stay on the new-item form instead of going to detail
+        if request.form.get('save_and_new'):
+            return redirect(url_for('item.item_new'))
+
         return redirect(url_for('item.item_detail', uuid=item.uuid))
     
     return render_template('item_form.html', form=form, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='New Item',

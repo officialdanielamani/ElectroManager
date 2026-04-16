@@ -9,6 +9,10 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./instance:/app/instance
+      # Custom icon libraries and fonts — place .css / font files here and
+      # they will be auto-loaded by the application on the next startup.
+      # Example: ./static/custom/my-icons.css, ./static/custom/my-font.woff2
+      - ./static/custom:/app/static/custom
     environment:
       - FLASK_APP=app.py
       - FLASK_ENV=production

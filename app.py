@@ -113,10 +113,14 @@ def load_dependencies():
             elif 'icons' in dest:
                 css_files.append('icons/bootstrap-icons.css')
         
-        # Always add Font Awesome CSS
-        if 'css/fontawesome.min.css' not in css_files:
-            css_files.append('css/fontawesome.min.css')
-        
+        # Auto-include any .css files the user placed in static/custom/
+        # (custom icon packs, Font Awesome, extra themes, etc.)
+        custom_dir = os.path.join(app.root_path, 'static', 'custom')
+        if os.path.isdir(custom_dir):
+            for fname in sorted(os.listdir(custom_dir)):
+                if fname.endswith('.css'):
+                    css_files.append(f'custom/{fname}')
+
         return css_files, js_files, libs
     except Exception as e:
         print(f"Error loading dependencies: {e}")

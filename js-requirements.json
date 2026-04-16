@@ -24,12 +24,7 @@
       "version": "1.15.0",
       "url": "https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js",
       "dest": "static/lib/Sortable.min.js"
-    },
-    {
-      "name": "Font Awesome",
-      "version": "7.1.0",
-      "installed": true,
-      "note": "Already in archive at static/fonts/fontawesome/"
     }
-  ]
+  ],
+  "_custom_note": "Optional icon packs (e.g. Font Awesome), custom fonts, and extra CSS can be placed in static/custom/ — they are loaded automatically without any startup check."
 }
