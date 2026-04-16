@@ -1,6 +1,16 @@
 #!/usr/bin/env python3
 """
 Unified startup initialization - handles dependencies, database, and validation
+
+Asset model
+-----------
+Core   : Bootstrap CSS/JS, SortableJS, Bootstrap Icons.
+         Downloaded on first run (or during Docker build).
+         Startup verifies these exist — missing core assets are fatal.
+
+Custom : Anything placed in static/custom/ (icon packs like Font Awesome,
+         extra fonts, custom CSS themes, etc.).
+         Loaded automatically at runtime; never pre-checked or required.
 """
 import os
 import sys
@@ -13,6 +23,7 @@ from pathlib import Path
 
 # Add startup dir to path for local imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 
 class Startup:
     def __init__(self, verbose=True):
@@ -35,14 +46,18 @@ class Startup:
     def create_dirs(self):
         self.step("Creating directories")
         dirs = [
+            # Runtime data
             'uploads',
             'uploads/locations',
             'instance',
+            # Core static assets
             'static/lib/bootstrap/css',
             'static/lib/bootstrap/js',
             'static/icons',
-            'static/fonts/fontawesome',
             'static/css',
+            'static/css/themes',
+            'static/fonts',
+            # Custom assets (user-provided, optional)
             'static/custom',
         ]
         for d in dirs:
@@ -74,7 +89,6 @@ class Startup:
 
         success = True
         for dep in self.config.get('dependencies', []):
-            # Skip if already installed or no URL
             if dep.get('installed') or not dep.get('url'):
                 continue
 
@@ -84,7 +98,7 @@ class Startup:
             dep_type = dep.get('type', 'file')
 
             if dep_type == 'zip':
-                if self._zip_already_extracted(dest, dep_name):
+                if self._zip_already_extracted(dest):
                     self.log(f"{dep_name} already present, skipping download", 'OK')
                     continue
                 self.step(f"Downloading {dep_name}")
@@ -105,12 +119,11 @@ class Startup:
 
         return success
 
-    def _zip_already_extracted(self, dest, name):
+    def _zip_already_extracted(self, dest):
         """Return True when the key artefacts of a zip dep are already on disk."""
         dest_path = os.path.join(self.project_root, dest)
         if not os.path.isdir(dest_path):
             return False
-        # Check for at least one .css and one font file
         css_files = list(Path(dest_path).glob('*.css'))
         font_files = list(Path(dest_path).glob('*.woff2')) + list(Path(dest_path).glob('*.woff'))
         return bool(css_files) or bool(font_files)
@@ -158,52 +171,66 @@ class Startup:
             self.warnings.append(f"Download failed: {os.path.basename(dest)}")
             return False
 
-    def check_font_awesome(self):
-        self.step("Checking Font Awesome")
-        fonts_dir = os.path.join(self.project_root, 'static/fonts/fontawesome')
-        css_file = os.path.join(self.project_root, 'static/css/fontawesome.min.css')
+    # ------------------------------------------------------------------
+    # Core asset verification
+    # ------------------------------------------------------------------
 
-        fonts_exist = all(os.path.exists(os.path.join(fonts_dir, f))
-                         for f in ['fa-solid-900.woff2', 'fa-regular-400.woff2',
-                                   'fa-brands-400.woff2', 'fa-v4compatibility.woff2'])
-        css_exists = os.path.exists(css_file)
+    def check_core_assets(self):
+        """Verify that all required core assets are present after download."""
+        self.step("Verifying core assets")
 
-        if fonts_exist and css_exists:
-            self.log("Font Awesome present", 'OK')
-            return True
+        core_files = {
+            'Bootstrap CSS':    'static/lib/bootstrap/css/bootstrap.min.css',
+            'Bootstrap JS':     'static/lib/bootstrap/js/bootstrap.bundle.min.js',
+            'Bootstrap Icons':  'static/icons/bootstrap-icons.css',
+            'SortableJS':       'static/lib/Sortable.min.js',
+        }
 
-        # Missing FA files degrade the UI (icons become blank) but the app
-        # can still run.  Use warnings so startup is not blocked.
-        if not fonts_exist:
-            self.warnings.append(
-                "Font Awesome fonts missing — icons may not display. "
-                "Place woff2 files in static/fonts/fontawesome/"
-            )
-            self.log("Font Awesome fonts missing (non-fatal, icons degraded)", 'WARN')
-        if not css_exists:
-            self.warnings.append(
-                "Font Awesome CSS missing — place fontawesome.min.css in static/css/"
-            )
-            self.log("Font Awesome CSS missing (non-fatal, icons degraded)", 'WARN')
-        return False
+        all_ok = True
+        for label, rel_path in core_files.items():
+            full = os.path.join(self.project_root, rel_path)
+            if os.path.exists(full):
+                self.log(f"{label} OK", 'OK')
+            else:
+                self.errors.append(
+                    f"{label} missing ({rel_path}). "
+                    "Run startup again with network access to download it."
+                )
+                all_ok = False
+
+        return all_ok
+
+    # ------------------------------------------------------------------
+    # Custom asset detection (informational only — never fatal)
+    # ------------------------------------------------------------------
 
     def detect_custom_assets(self):
-        """Scan static/custom/ and report any user-provided CSS/font files."""
+        """Scan static/custom/ and report user-provided files (no validation)."""
         self.step("Detecting custom assets (static/custom/)")
         custom_dir = os.path.join(self.project_root, 'static', 'custom')
         Path(custom_dir).mkdir(parents=True, exist_ok=True)
 
-        css_found = list(Path(custom_dir).glob('*.css'))
-        font_found = (list(Path(custom_dir).glob('*.woff2')) +
-                      list(Path(custom_dir).glob('*.woff')) +
-                      list(Path(custom_dir).glob('*.ttf')) +
-                      list(Path(custom_dir).glob('*.otf')))
+        css_found   = sorted(Path(custom_dir).glob('*.css'))
+        font_found  = sorted(
+            list(Path(custom_dir).glob('*.woff2')) +
+            list(Path(custom_dir).glob('*.woff'))  +
+            list(Path(custom_dir).glob('*.ttf'))   +
+            list(Path(custom_dir).glob('*.otf'))
+        )
 
-        if css_found or font_found:
-            self.log(f"Found {len(css_found)} CSS file(s): {[f.name for f in css_found]}", 'OK')
-            self.log(f"Found {len(font_found)} font file(s): {[f.name for f in font_found]}", 'OK')
-        else:
-            self.log("No custom assets found (place .css / font files in static/custom/ to auto-load)", 'INFO')
+        if css_found:
+            self.log(f"CSS  : {[f.name for f in css_found]}", 'OK')
+        if font_found:
+            self.log(f"Fonts: {[f.name for f in font_found]}", 'OK')
+        if not css_found and not font_found:
+            self.log(
+                "No custom assets — drop .css / font files in static/custom/ to auto-load",
+                'INFO'
+            )
+
+    # ------------------------------------------------------------------
+    # Database
+    # ------------------------------------------------------------------
 
     def init_database(self):
         self.step("Initializing database")
@@ -231,20 +258,23 @@ class Startup:
             self.errors.append(f"Database init error: {str(e)}")
             return False
 
+    # ------------------------------------------------------------------
+    # Entry points
+    # ------------------------------------------------------------------
+
     def run_download_only(self):
-        """Download JS/CSS dependencies only — used during Docker image build."""
+        """Download core dependencies only — used during Docker image build."""
         print("\n" + "="*60)
-        print("Inventory Manager - Downloading dependencies (build stage)")
+        print("Inventory Manager - Downloading core dependencies (build stage)")
         print("="*60)
 
         try:
             self.create_dirs()
             self.load_config()
             self.download_dependencies()
-            self.check_font_awesome()
+            self.check_core_assets()
 
             print("\n" + "="*60)
-
             if self.warnings:
                 print("WARNINGS (non-fatal):")
                 for w in self.warnings:
@@ -257,7 +287,7 @@ class Startup:
                 print("="*60)
                 return False
 
-            print("SUCCESS - Dependencies ready")
+            print("SUCCESS - Core dependencies ready")
             print("="*60)
             return True
         except Exception as e:
@@ -273,7 +303,7 @@ class Startup:
             self.create_dirs()
             self.load_config()
             self.download_dependencies()
-            self.check_font_awesome()
+            self.check_core_assets()
             self.detect_custom_assets()
             self.init_database()
 
@@ -302,11 +332,9 @@ class Startup:
             print(f"\n[!] Unexpected error: {str(e)}")
             return False
 
+
 if __name__ == '__main__':
     download_only = '--download-only' in sys.argv
     startup = Startup(verbose=True)
-    if download_only:
-        success = startup.run_download_only()
-    else:
-        success = startup.run()
+    success = startup.run_download_only() if download_only else startup.run()
     sys.exit(0 if success else 1)
