@@ -83,9 +83,9 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 - Per-user profile photo upload
 
 ### Personalisation
-- **Themes** — Light, Dark, Blue, Keqing (automatically detected from `static/css/themes/`)
-- **Fonts** — system fonts plus any font files placed in `static/fonts/`
-- **Custom icon libraries & fonts** — drop `.css` or font files into `static/custom/`; they are auto-loaded on the next startup without rebuilding the image
+- **Themes** — Light, Dark, Blue, Keqing; theme CSS files are auto-detected from `static/css/themes/` so new themes can be added by dropping in a CSS file
+- **Fonts** — built-in system fonts plus any font files placed in `static/fonts/` (e.g. OpenDyslexic); selected per user in settings
+- **Custom CSS / icon packs / fonts** — place any `.css` or font file (`.woff2`, `.woff`, `.ttf`, `.otf`) in `static/custom/` and it is loaded automatically on the next startup; no rebuild required (see [Custom assets](#custom-assets) below)
 - Per-user table column visibility for item and project lists
 
 ### Notifications
@@ -115,7 +115,7 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 
 ### Docker Setup (Recommended)
 
-All JS/CSS dependencies (Bootstrap, Bootstrap Icons, SortableJS) are downloaded **once** during the image build and baked in — no internet access is needed at runtime or on container restart.
+The Dockerfile downloads all core JS/CSS dependencies (Bootstrap, Bootstrap Icons, SortableJS) **once during `docker build`** and bakes them into the image layer. No network access is needed at container startup or on restart.
 
 ```bash
 # Clone the repository
@@ -139,13 +139,44 @@ docker run -p 5000:5000 \
   electromanager
 ```
 
-#### Custom icons and fonts (Docker)
+#### Startup behaviour
 
-Mount the `static/custom` volume (already included in `docker-compose.yml`):
+Every time the container (or local server) starts, `startup/init.py` runs through these steps:
+
+| Step | What happens |
+|------|-------------|
+| Create dirs | Ensures all required directories exist |
+| Load config | Reads `js-requirements.json` |
+| Download core deps | Fetches Bootstrap, Bootstrap Icons, SortableJS if not already present |
+| **Verify core assets** | Checks that Bootstrap CSS/JS, Bootstrap Icons, SortableJS are on disk — **fatal** if any are missing |
+| **Detect custom assets** | Scans `static/custom/` and logs what it finds — informational only, never blocks startup |
+| Init database | Creates the SQLite database on first run |
+
+#### Custom assets <a name="custom-assets"></a>
+
+`static/custom/` is bind-mounted as a Docker volume so you can add files without rebuilding the image:
+
 ```
-./static/custom:/app/static/custom
+./static/custom:/app/static/custom    # already in docker-compose.yml
 ```
-Drop any `.css` or font file (`.woff2`, `.woff`, `.ttf`, `.otf`) into the `./static/custom/` folder on the host. The application detects and loads them automatically on the next startup — no rebuild required.
+
+| What to drop in | Effect |
+|----------------|--------|
+| `*.css` | Loaded on every page (use for icon packs, extra themes, overrides) |
+| `*.woff2` / `*.woff` / `*.ttf` / `*.otf` | Served as static files (reference from your custom CSS) |
+
+**Example — adding Font Awesome:**
+1. Download the Font Awesome "Web" release
+2. Copy `css/all.min.css` → `static/custom/fontawesome.css`
+3. Copy `webfonts/` files → `static/custom/` (and update the `src:` paths in the CSS to match)
+4. Restart the container — no rebuild needed
+
+At startup the log will confirm what was found:
+```
+[STEP] Detecting custom assets (static/custom/)
+[OK] CSS  : ['fontawesome.css']
+[OK] Fonts: ['fa-solid-900.woff2', ...]
+```
 
 ### Linux / Mac Setup
 
@@ -246,17 +277,15 @@ ElectroManager/
 ├── static/
 │   ├── css/
 │   │   ├── style.css             # Application stylesheet
-│   │   ├── fontawesome.min.css   # Font Awesome (bundled)
 │   │   └── themes/               # Theme files (light, dark, blue, keqing, …)
 │   ├── js/
 │   │   ├── script.js             # Main application JS
 │   │   ├── theme-loader.js       # Theme switching
 │   │   └── table-sorter.js       # Client-side table sorting
-│   ├── fonts/
-│   │   └── fontawesome/          # Font Awesome WOFF2 files (bundled)
-│   ├── icons/                    # Bootstrap Icons (downloaded at build time)
-│   ├── lib/                      # Bootstrap CSS/JS + SortableJS (downloaded at build time)
-│   └── custom/                   # ← Drop custom CSS/font files here to auto-load
+│   ├── fonts/                    # Project fonts for personalisation (e.g. OpenDyslexic)
+│   ├── icons/                    # Bootstrap Icons — core, downloaded at build/startup
+│   ├── lib/                      # Bootstrap CSS/JS + SortableJS — core, downloaded at build/startup
+│   └── custom/                   # ← User-provided: icon packs, extra fonts, custom CSS (bind-mounted in Docker)
 │
 ├── uploads/                      # User file uploads (runtime, bind-mounted in Docker)
 └── instance/
@@ -283,14 +312,21 @@ ElectroManager/
 | Markdown | 3.5.1 | Markdown parsing |
 | Bleach | 6.1.0 | HTML sanitisation |
 
-**JavaScript / CSS** (downloaded at Docker build time or first local startup)
+**JavaScript / CSS — core** (downloaded at Docker build time or first local startup, verified at every startup)
 
 | Library | Version | Purpose |
 |---------|---------|---------|
 | Bootstrap | 5.3.0 | UI framework |
-| Bootstrap Icons | 1.11.1 | Icon set |
-| Font Awesome | 7.1.0 | Icon set (bundled) |
+| Bootstrap Icons | 1.11.1 | Core icon set |
 | SortableJS | 1.15.0 | Drag-and-drop sorting |
+
+**JavaScript / CSS — custom** (optional, place in `static/custom/`, never checked at startup)
+
+| Example | How to add |
+|---------|-----------|
+| Font Awesome (or any icon pack) | Drop CSS + font files into `static/custom/` |
+| Custom theme | Drop a `.css` file into `static/custom/` |
+| Personalisation font | Drop font files into `static/custom/` and reference via CSS |
 
 ---
 
