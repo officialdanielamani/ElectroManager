@@ -172,10 +172,19 @@ class Startup:
             self.log("Font Awesome present", 'OK')
             return True
 
+        # Missing FA files degrade the UI (icons become blank) but the app
+        # can still run.  Use warnings so startup is not blocked.
         if not fonts_exist:
-            self.errors.append("Font Awesome fonts missing")
+            self.warnings.append(
+                "Font Awesome fonts missing — icons may not display. "
+                "Place woff2 files in static/fonts/fontawesome/"
+            )
+            self.log("Font Awesome fonts missing (non-fatal, icons degraded)", 'WARN')
         if not css_exists:
-            self.errors.append("Font Awesome CSS missing")
+            self.warnings.append(
+                "Font Awesome CSS missing — place fontawesome.min.css in static/css/"
+            )
+            self.log("Font Awesome CSS missing (non-fatal, icons degraded)", 'WARN')
         return False
 
     def detect_custom_assets(self):
@@ -235,6 +244,12 @@ class Startup:
             self.check_font_awesome()
 
             print("\n" + "="*60)
+
+            if self.warnings:
+                print("WARNINGS (non-fatal):")
+                for w in self.warnings:
+                    print(f"  [!] {w}")
+
             if self.errors:
                 print("FAILED - Critical errors:")
                 for err in self.errors:
@@ -263,6 +278,11 @@ class Startup:
             self.init_database()
 
             print("\n" + "="*60)
+
+            if self.warnings:
+                print("WARNINGS (non-fatal):")
+                for w in self.warnings:
+                    print(f"  [!] {w}")
 
             if self.errors:
                 print("FAILED - Critical errors:")
