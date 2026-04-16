@@ -300,7 +300,12 @@ def item_new():
                     sn_tracking_enabled=sn_tracking,
                 )
                 db.session.add(batch)
+                db.session.flush()  # get batch.id before generating SNs
+                if sn_tracking:
+                    batch.generate_serial_numbers()
             if pending_batches:
+                item.recalculate_from_batches()
+                item.updated_by = current_user.id
                 db.session.commit()
 
         log_audit(current_user.id, 'create', 'item', item.id, f'Created item: {item.name}')
