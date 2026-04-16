@@ -279,6 +279,9 @@ def item_new():
                 if qty > max_qty:
                     qty = max_qty
                 label = str(pb.get('label', '')).strip()[:32] or None
+                price = float(pb.get('price', 0) or 0)
+                if price < 0:
+                    price = 0.0
                 date_str = pb.get('date', '')
                 purchase_date = None
                 if date_str:
@@ -292,7 +295,7 @@ def item_new():
                     batch_number=item.get_next_batch_number(),
                     batch_label=label,
                     quantity=qty,
-                    price_per_unit=0.0,
+                    price_per_unit=price,
                     purchase_date=purchase_date,
                     sn_tracking_enabled=sn_tracking,
                 )
