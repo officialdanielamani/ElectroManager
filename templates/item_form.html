@@ -2550,12 +2550,21 @@ function saveEditDetails() {
                 </div>
                 <div class="mb-2">
                     <label class="form-label form-label-sm">Quantity</label>
-                    <input type="number" class="form-control form-control-sm" id="pbQty" min="0" max="99999" value="0">
+                    <input type="number" class="form-control form-control-sm" id="pbQty" min="0" max="99999" value="0" oninput="pbCalcFromQtyPrice()">
                     <small class="text-muted" id="pbQtyNote"></small>
                 </div>
+                <div class="row mb-2">
+                    <div class="col-6">
+                        <label class="form-label form-label-sm">Price per Unit</label>
+                        <input type="number" class="form-control form-control-sm" id="pbPrice" min="0" step="0.0001" value="0" placeholder="0.00" oninput="pbCalcFromQtyPrice()">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label form-label-sm">Total Price <small class="text-muted">(auto)</small></label>
+                        <input type="number" class="form-control form-control-sm" id="pbTotal" min="0" step="0.01" value="0" oninput="pbCalcFromTotal()">
+                    </div>
+                </div>
                 <div class="mb-2">
-                    <label class="form-label form-label-sm">Price per Unit</label>
-                    <input type="number" class="form-control form-control-sm" id="pbPrice" min="0" step="0.01" value="0" placeholder="0.00">
+                    <small class="text-muted"><i class="bi bi-info-circle"></i> Fill any two fields — the third auto-calculates. Qty=0 treated as 1 for price calculation.</small>
                 </div>
                 <div class="mb-2">
                     <label class="form-label form-label-sm">Date</label>
@@ -2589,14 +2598,15 @@ function saveEditDetails() {
         }
 
         var html = '<table class="table table-sm table-bordered mb-0" style="font-size:0.83rem;">';
-        html += '<thead class="table-light"><tr><th>#</th><th>Label</th><th>Type</th><th>Qty</th><th>Price/Unit</th><th>Date</th><th></th></tr></thead><tbody>';
+        html += '<thead class="table-light"><tr><th>#</th><th>Label</th><th>Type</th><th>Qty</th><th>Price/Unit</th><th>Total Price</th><th>Date</th><th></th></tr></thead><tbody>';
         pendingBatches.forEach(function(b, i) {
             html += '<tr>';
             html += '<td>' + (i + 1) + '</td>';
             html += '<td>' + (b.label ? escHtml(b.label) : '<span class="text-muted">—</span>') + '</td>';
             html += '<td>' + (b.sn_tracking ? '<span class="badge bg-dark">Tracking</span>' : '<span class="badge bg-secondary">Non-Tracking</span>') + '</td>';
             html += '<td>' + b.quantity + '</td>';
-            html += '<td>' + (b.price > 0 ? b.price.toFixed(2) : '<span class="text-muted">—</span>') + '</td>';
+            html += '<td>' + (b.price > 0 ? b.price.toFixed(4) : '<span class="text-muted">—</span>') + '</td>';
+            html += '<td>' + (b.total > 0 ? b.total.toFixed(2) : '<span class="text-muted">—</span>') + '</td>';
             html += '<td>' + (b.date ? escHtml(b.date) : '<span class="text-muted">—</span>') + '</td>';
             html += '<td class="text-nowrap">';
             html += '<button type="button" class="btn btn-sm btn-outline-warning py-0 px-1 me-1" onclick="pendingBatchEdit(' + i + ')"><i class="bi bi-pencil"></i></button>';
@@ -2625,6 +2635,7 @@ function saveEditDetails() {
         document.getElementById('pbQty').max = '99999';
         document.getElementById('pbQtyNote').textContent = '';
         document.getElementById('pbPrice').value = '0';
+        document.getElementById('pbTotal').value = '0';
         document.getElementById('pbDate').value = '';
         var modal = new bootstrap.Modal(document.getElementById('pendingBatchModal'));
         modal.show();
@@ -2641,6 +2652,7 @@ function saveEditDetails() {
         document.getElementById('pbQty').max = b.sn_tracking ? '100' : '99999';
         document.getElementById('pbQtyNote').textContent = b.sn_tracking ? 'Max 100 for tracking batches.' : '';
         document.getElementById('pbPrice').value = b.price || '0';
+        document.getElementById('pbTotal').value = b.total || '0';
         document.getElementById('pbDate').value = b.date || '';
         var modal = new bootstrap.Modal(document.getElementById('pendingBatchModal'));
         modal.show();
@@ -2649,6 +2661,17 @@ function saveEditDetails() {
     window.pendingBatchDelete = function(idx) {
         pendingBatches.splice(idx, 1);
         render();
+    };
+
+    window.pbCalcFromQtyPrice = function() {
+        var qty = parseFloat(document.getElementById('pbQty').value) || 0;
+        var price = parseFloat(document.getElementById('pbPrice').value) || 0;
+        document.getElementById('pbTotal').value = (price * Math.max(1, qty)).toFixed(2);
+    };
+    window.pbCalcFromTotal = function() {
+        var qty = parseFloat(document.getElementById('pbQty').value) || 0;
+        var total = parseFloat(document.getElementById('pbTotal').value) || 0;
+        document.getElementById('pbPrice').value = (total / Math.max(1, qty)).toFixed(4);
     };
 
     window.pendingBatchSave = function() {
@@ -2660,9 +2683,11 @@ function saveEditDetails() {
         if (qty > maxQty) qty = maxQty;
         var price = parseFloat(document.getElementById('pbPrice').value) || 0;
         if (price < 0) price = 0;
+        var total = parseFloat(document.getElementById('pbTotal').value) || 0;
+        if (total < 0) total = 0;
         var date = document.getElementById('pbDate').value;
 
-        var batch = { label: label, sn_tracking: tracking, quantity: qty, price: price, date: date };
+        var batch = { label: label, sn_tracking: tracking, quantity: qty, price: price, total: total, date: date };
         var editIdx = document.getElementById('pendingBatchEditIndex').value;
         if (editIdx !== '') {
             pendingBatches[parseInt(editIdx, 10)] = batch;
