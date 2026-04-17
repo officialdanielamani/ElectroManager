@@ -312,22 +312,20 @@ def project_edit(project_id):
 @login_required
 def project_delete(project_id):
     if not current_user.has_permission('projects', 'delete'):
-        flash('You do not have permission to delete projects.', 'danger')
-        return redirect(url_for('project.projects'))
+        return jsonify({'error': 'No permission'}), 403
+
+    from werkzeug.security import check_password_hash
+    data = request.get_json() if request.is_json else {}
+    password = (data or {}).get('password', '')
+    if not password or not current_user.check_password(password):
+        return jsonify({'success': False, 'message': 'Incorrect password.'}), 401
 
     project = Project.query.filter_by(project_id=project_id).first_or_404()
-
-    # Unmark used BOM items
-    for bom in project.bom_items:
-        if bom.used:
-            _toggle_bom_used(bom, False)
-
     name = project.name
     db.session.delete(project)
     db.session.commit()
     log_audit(current_user.id, 'delete', 'project', 0, f'Deleted project: {name}')
-    flash(f'Project "{name}" deleted.', 'success')
-    return redirect(url_for('project.projects'))
+    return jsonify({'success': True, 'redirect': url_for('project.projects')})
 
 
 # ==================== BOM MANAGEMENT ====================
@@ -335,7 +333,7 @@ def project_delete(project_id):
 @project_bp.route('/project/<project_id>/bom/search-items', endpoint='bom_search_items')
 @login_required
 def bom_search_items(project_id):
-    """API: Search items for BOM - shows available qty after lend + project usage"""
+    """API: Search items for BOM. Returns batches with available qty info (no SN lists - those are for used_qty editor)."""
     project = Project.query.filter_by(project_id=project_id).first_or_404()
     search = request.args.get('q', '')
     category_id = request.args.get('category', 0, type=int)
@@ -351,29 +349,14 @@ def bom_search_items(project_id):
     for item in items:
         batches = []
         for b in item.batches:
-            available = b.get_available_quantity()
-            batch_data = {
+            batches.append({
                 'id': b.id,
                 'label': b.get_display_label(),
                 'quantity': b.quantity,
-                'available': available,
+                'available': b.get_available_quantity(),
                 'price': b.price_per_unit,
                 'sn_tracking': b.sn_tracking_enabled,
-                'serial_numbers': []
-            }
-            if b.sn_tracking_enabled:
-                used_sn_ids = b.get_project_used_sn_ids()
-                for sn in b.serial_numbers:
-                    # Skip SNs that are lent out or used in projects
-                    is_lent = bool(sn.lend_to and sn.lend_to.strip())
-                    is_project_used = sn.id in used_sn_ids
-                    if not is_lent and not is_project_used:
-                        batch_data['serial_numbers'].append({
-                            'id': sn.id,
-                            'isn': sn.internal_serial_number,
-                            'sn': sn.serial_number if sn.serial_number else sn.internal_serial_number
-                        })
-            batches.append(batch_data)
+            })
         result.append({
             'id': item.id,
             'name': item.name,
@@ -384,6 +367,36 @@ def bom_search_items(project_id):
     return jsonify(result)
 
 
+@project_bp.route('/project/<project_id>/bom/<int:bom_id>/available-sns', endpoint='bom_available_sns')
+@login_required
+def bom_available_sns(project_id, bom_id):
+    """API: Return available SNs for the batch of a BOM entry (for used_qty SN selection)."""
+    bom = ProjectBOMItem.query.get_or_404(bom_id)
+    if not bom.batch or not bom.batch.sn_tracking_enabled:
+        return jsonify([])
+    batch = bom.batch
+    used_sn_ids = batch.get_project_used_sn_ids()
+    # Include SNs already assigned to THIS bom entry so they show as selectable
+    own_sn_ids = set()
+    if bom.serial_numbers:
+        try:
+            own_sn_ids = set(json.loads(bom.serial_numbers))
+        except (json.JSONDecodeError, TypeError):
+            pass
+    sns = []
+    for sn in batch.serial_numbers:
+        is_lent = bool(sn.lend_to and sn.lend_to.strip())
+        is_used_elsewhere = sn.id in used_sn_ids and sn.id not in own_sn_ids
+        if not is_lent and not is_used_elsewhere:
+            sns.append({
+                'id': sn.id,
+                'isn': sn.internal_serial_number,
+                'sn': sn.serial_number or '',
+                'selected': sn.id in own_sn_ids,
+            })
+    return jsonify(sns)
+
+
 @project_bp.route('/project/<project_id>/bom/add', endpoint='bom_add', methods=['POST'])
 @login_required
 def bom_add(project_id):
@@ -392,91 +405,39 @@ def bom_add(project_id):
 
     project = Project.query.filter_by(project_id=project_id).first_or_404()
     data = request.get_json() if request.is_json else None
-
     if not data:
-        flash('Invalid request.', 'danger')
-        return redirect(url_for('project.project_detail', project_id=project_id))
+        return jsonify({'error': 'Invalid request'}), 400
 
     item_id = data.get('item_id')
     batch_id = data.get('batch_id')
-    quantity = data.get('quantity', 1)
-    serial_number_ids = data.get('serial_number_ids', [])
+    quantity = max(1, int(data.get('quantity', 1)))  # required_quantity, no cap
 
     item = Item.query.get(item_id)
     if not item:
         return jsonify({'error': 'Item not found'}), 404
 
-    if serial_number_ids:
-        # SN tracking: merge with existing BOM entry for same item+batch
-        existing = ProjectBOMItem.query.filter_by(
-            project_id=project.id, item_id=item_id, batch_id=batch_id
-        ).first()
-        if existing and existing.serial_numbers:
-            try:
-                current_sns = json.loads(existing.serial_numbers)
-            except (json.JSONDecodeError, TypeError):
-                current_sns = []
-            merged = list(set(current_sns + serial_number_ids))
-            existing.serial_numbers = json.dumps(merged)
-            existing.quantity = len(merged)
-            db.session.commit()
-            return jsonify({'success': True, 'id': existing.id})
-        elif existing:
-            existing.serial_numbers = json.dumps(serial_number_ids)
-            existing.quantity = len(serial_number_ids)
-            db.session.commit()
-            return jsonify({'success': True, 'id': existing.id})
-        else:
-            bom = ProjectBOMItem(
-                project_id=project.id, item_id=item_id, batch_id=batch_id,
-                quantity=len(serial_number_ids),
-                serial_numbers=json.dumps(serial_number_ids)
-            )
-            db.session.add(bom)
-            db.session.commit()
-            return jsonify({'success': True, 'id': bom.id})
-    else:
-        # Non-SN: merge quantity with existing BOM entry for same item+batch
-        existing = ProjectBOMItem.query.filter_by(
-            project_id=project.id, item_id=item_id, batch_id=batch_id
-        ).first()
-        if existing:
-            existing.quantity += quantity
-            db.session.commit()
-            return jsonify({'success': True, 'id': existing.id})
-        else:
-            bom = ProjectBOMItem(
-                project_id=project.id, item_id=item_id, batch_id=batch_id,
-                quantity=quantity
-            )
-            db.session.add(bom)
-            db.session.commit()
-            log_audit(current_user.id, 'create', 'project_bom', bom.id,
-                      f'Added BOM item {item.name} to project {project.name}')
-            return jsonify({'success': True, 'id': bom.id})
+    # Merge with existing BOM entry for same item+batch, otherwise create new
+    existing = ProjectBOMItem.query.filter_by(
+        project_id=project.id, item_id=item_id, batch_id=batch_id
+    ).first()
+    if existing:
+        existing.quantity += quantity
+        db.session.commit()
+        return jsonify({'success': True, 'id': existing.id})
 
-
-@project_bp.route('/project/<project_id>/bom/<int:bom_id>/toggle-used', endpoint='bom_toggle_used', methods=['POST'])
-@login_required
-def bom_toggle_used(project_id, bom_id):
-    if not current_user.has_permission('projects', 'edit'):
-        return jsonify({'error': 'No permission'}), 403
-
-    bom = ProjectBOMItem.query.get_or_404(bom_id)
-    new_state = not bom.used
-    _toggle_bom_used(bom, new_state)
+    bom = ProjectBOMItem(
+        project_id=project.id,
+        item_id=item_id,
+        batch_id=batch_id,
+        quantity=quantity,
+        used_quantity=0,
+        item_name_snapshot=item.name,
+    )
+    db.session.add(bom)
     db.session.commit()
-
-    return jsonify({'success': True, 'used': bom.used})
-
-
-def _toggle_bom_used(bom, used):
-    """Toggle BOM item used state and adjust batch quantities"""
-    if bom.used == used:
-        return
-    bom.used = used
-    # Note: We track usage via the BOM used flag. 
-    # The available qty in the batch is calculated considering BOM usage.
+    log_audit(current_user.id, 'create', 'project_bom', bom.id,
+              f'Added BOM item {item.name} to project {project.name}')
+    return jsonify({'success': True, 'id': bom.id})
 
 
 @project_bp.route('/project/<project_id>/bom/<int:bom_id>/edit', endpoint='bom_edit', methods=['POST'])
@@ -487,34 +448,43 @@ def bom_edit(project_id, bom_id):
 
     bom = ProjectBOMItem.query.get_or_404(bom_id)
     data = request.get_json() if request.is_json else None
-    if data:
-        # If item is changing, unmark used first
-        old_item_id = bom.item_id
-        old_batch_id = bom.batch_id
-        item_changing = False
+    if not data:
+        return jsonify({'error': 'Invalid request'}), 400
 
-        if 'item_id' in data and data['item_id'] != bom.item_id:
-            item_changing = True
-            if bom.used:
-                _toggle_bom_used(bom, False)
+    # Change item/batch
+    if 'item_id' in data and data['item_id'] != bom.item_id:
+        new_item = Item.query.get(data['item_id'])
+        if new_item:
             bom.item_id = data['item_id']
-        if 'batch_id' in data and data['batch_id'] != bom.batch_id:
-            item_changing = True
-            if bom.used and not (data.get('item_id', bom.item_id) != old_item_id):
-                _toggle_bom_used(bom, False)
-            bom.batch_id = data['batch_id']
-        if 'quantity' in data:
-            bom.quantity = data['quantity']
+            bom.item_name_snapshot = new_item.name
+            bom.used_quantity = 0
+            bom.serial_numbers = None
+    if 'batch_id' in data and data['batch_id'] != bom.batch_id:
+        bom.batch_id = data['batch_id']
+        bom.used_quantity = 0
+        bom.serial_numbers = None
+
+    # Update required quantity (no cap)
+    if 'quantity' in data:
+        bom.quantity = max(1, int(data['quantity']))
+
+    # Update used quantity (validated against available stock)
+    if 'used_quantity' in data:
+        new_used = max(0, int(data['used_quantity']))
+        if bom.batch:
+            available = bom.batch.get_available_quantity() + (bom.used_quantity or 0)
+            new_used = min(new_used, available)
+        bom.used_quantity = new_used
+        # Handle SN assignment for used_quantity
         if 'serial_number_ids' in data:
-            bom.serial_numbers = json.dumps(data['serial_number_ids']) if data['serial_number_ids'] else None
-            bom.quantity = len(data['serial_number_ids']) if data['serial_number_ids'] else bom.quantity
-        elif item_changing:
-            # Clear serial numbers when changing to a different item/batch
+            sn_ids = data['serial_number_ids'] or []
+            bom.serial_numbers = json.dumps(sn_ids) if sn_ids else None
+            bom.used_quantity = len(sn_ids)
+        elif new_used == 0:
             bom.serial_numbers = None
 
-        db.session.commit()
-        log_audit(current_user.id, 'update', 'project_bom', bom.id,
-                  f'Edited BOM item in project')
+    db.session.commit()
+    log_audit(current_user.id, 'update', 'project_bom', bom.id, 'Edited BOM item in project')
     return jsonify({'success': True})
 
 
@@ -525,8 +495,6 @@ def bom_delete(project_id, bom_id):
         return jsonify({'error': 'No permission'}), 403
 
     bom = ProjectBOMItem.query.get_or_404(bom_id)
-    if bom.used:
-        _toggle_bom_used(bom, False)
     db.session.delete(bom)
     db.session.commit()
     return jsonify({'success': True})

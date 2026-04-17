@@ -9,11 +9,35 @@ from app import app, db
 from models import User, Role, Setting
 import json
 
+def _evolve_schema():
+    """Add new columns to existing tables without full migrations."""
+    from sqlalchemy import inspect, text
+    inspector = inspect(db.engine)
+    with db.engine.connect() as conn:
+        bom_cols = {c['name'] for c in inspector.get_columns('project_bom_items')}
+        if 'used_quantity' not in bom_cols:
+            conn.execute(text("ALTER TABLE project_bom_items ADD COLUMN used_quantity INTEGER NOT NULL DEFAULT 0"))
+            conn.commit()
+            print("Schema: added project_bom_items.used_quantity")
+        if 'item_name_snapshot' not in bom_cols:
+            conn.execute(text("ALTER TABLE project_bom_items ADD COLUMN item_name_snapshot VARCHAR(300)"))
+            conn.commit()
+            print("Schema: added project_bom_items.item_name_snapshot")
+        # Populate snapshot for existing rows that have a linked item
+        conn.execute(text(
+            "UPDATE project_bom_items SET item_name_snapshot = ("
+            "  SELECT name FROM items WHERE items.id = project_bom_items.item_id"
+            ") WHERE item_name_snapshot IS NULL AND item_id IS NOT NULL"
+        ))
+        conn.commit()
+
+
 def init_db():
     with app.app_context():
         print("Creating database tables...")
         db.create_all()
         print("Database tables created!")
+        _evolve_schema()
         
         create_default_roles()
         
