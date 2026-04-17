@@ -2597,7 +2597,7 @@ function saveEditDetails() {
             html += '<td>' + (b.sn_tracking ? '<span class="badge bg-dark">Tracking</span>' : '<span class="badge bg-secondary">Non-Tracking</span>') + '</td>';
             html += '<td>' + b.quantity + '</td>';
             html += '<td>' + (b.price > 0 ? b.price.toFixed(2) : '<span class="text-muted">—</span>') + '</td>';
-            html += '<td>' + (b.date || '<span class="text-muted">—</span>') + '</td>';
+            html += '<td>' + (b.date ? escHtml(b.date) : '<span class="text-muted">—</span>') + '</td>';
             html += '<td class="text-nowrap">';
             html += '<button type="button" class="btn btn-sm btn-outline-warning py-0 px-1 me-1" onclick="pendingBatchEdit(' + i + ')"><i class="bi bi-pencil"></i></button>';
             html += '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="pendingBatchDelete(' + i + ')"><i class="bi bi-trash"></i></button>';
@@ -2608,7 +2608,12 @@ function saveEditDetails() {
     }
 
     function escHtml(str) {
-        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        return String(str == null ? '' : str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     window.pendingBatchAdd = function() {
