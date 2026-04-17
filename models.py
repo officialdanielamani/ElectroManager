@@ -328,6 +328,10 @@ class Item(db.Model):
     def get_total_lend_quantity(self):
         """Total lent quantity across all batches"""
         return sum(b.get_lend_quantity() for b in self.batches)
+
+    def get_total_project_quantity(self):
+        """Total quantity allocated to projects across all batches"""
+        return sum(b.get_project_used_quantity() for b in self.batches)
     
     def get_overall_quantity(self):
         """Total quantity across all batches"""

@@ -134,31 +134,28 @@
 
                 <!-- Overall Summary -->
                 <div class="row mb-3">
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <strong>Overall Quantity:</strong>
                         <h3 class="text-primary">{{ item.get_overall_quantity() }}</h3>
                     </div>
-                    {% if item.get_total_lend_quantity() > 0 %}
-                    <div class="col-md-3">
-                        <strong>Lending:</strong>
-                        <h3 class="text-warning">{{ item.get_total_lend_quantity() }}</h3>
+                    <div class="col-md-2">
+                        <strong>Total Lend:</strong>
+                        <h3 class="{% if item.get_total_lend_quantity() > 0 %}text-warning{% else %}text-muted{% endif %}">{{ item.get_total_lend_quantity() }}</h3>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
+                        <strong>Total in Project:</strong>
+                        <h3 class="{% if item.get_total_project_quantity() > 0 %}text-info{% else %}text-muted{% endif %}">{{ item.get_total_project_quantity() }}</h3>
+                    </div>
+                    <div class="col-md-2">
                         <strong>Available:</strong>
                         <h3 class="text-success">{{ item.get_available_quantity() }}</h3>
                     </div>
-                    {% else %}
-                    <div class="col-md-3">
-                        <strong>Available:</strong>
-                        <h3 class="text-success">{{ item.get_overall_quantity() }}</h3>
-                    </div>
-                    {% endif %}
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <strong>Total Price:</strong>
                         <h4 class="text-success">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(item.get_overall_total_price()) }}</h4>
                         <small class="text-muted">Avg: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(item.get_average_price()) }}/unit</small>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <strong>Total Value <small class="text-muted">(in stock)</small>:</strong>
                         <h4 class="text-secondary">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(item.get_overall_total_value()) }}</h4>
                     </div>
