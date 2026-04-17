@@ -64,18 +64,19 @@ def login():
             login_user(user, remember=form.remember_me.data)
             log_audit(user.id, 'login', 'user', user.id, 'User logged in')
             next_page = request.args.get('next')
-            # Validate redirect URL to prevent open redirect attacks: only
-            # allow relative paths within this app by reconstructing from
-            # the parsed path/query instead of redirecting to raw input.
-            if next_page and is_safe_url(next_page):
-                parsed = urlparse(next_page.replace('\\', ''))
-                if not parsed.scheme and not parsed.netloc:
-                    safe_target = parsed.path or '/'
-                    if not safe_target.startswith('/') or safe_target.startswith('//'):
-                        safe_target = '/'
-                    if parsed.query:
-                        safe_target = f'{safe_target}?{parsed.query}'
-                    return redirect(safe_target)
+            # Prevent open redirects by only allowing known in-app destinations.
+            allowed_next_paths = {
+                '/',
+                '/dashboard',
+                '/items',
+                '/categories',
+                '/racks',
+                '/locations',
+                '/settings',
+                '/profile',
+            }
+            if next_page in allowed_next_paths:
+                return redirect(next_page)
             return redirect(url_for('index'))
         else:
             if user:
