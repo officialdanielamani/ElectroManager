@@ -29,7 +29,7 @@
                     {% for category in categories %}
                     <div class="card mb-2 border">
                         <div class="card-body p-2">
-                            <h6 class="card-title mb-1">{{ category.name }}</h6>
+                            <h6 class="card-title mb-1"><span class="badge" style="background-color: {{ category.color }}; color: white;">{{ category.name }}</span></h6>
                             <p class="card-text text-muted small mb-1">{{ category.description or 'No description' }}</p>
                             <div class="d-flex justify-content-between align-items-center">
                                 <small class="text-muted"><i class="bi bi-box"></i> {{ category.items|length }} items</small>
@@ -79,7 +79,7 @@
                     {% for footprint in footprints %}
                     <div class="card mb-2 border">
                         <div class="card-body p-2">
-                            <h6 class="card-title mb-1">{{ footprint.name }}</h6>
+                            <h6 class="card-title mb-1"><span class="badge" style="background-color: {{ footprint.color }}; color: white;">{{ footprint.name }}</span></h6>
                             <p class="card-text text-muted small mb-1">{{ footprint.description or 'No description' }}</p>
                             <div class="d-flex justify-content-between align-items-center">
                                 <small class="text-muted"><i class="bi bi-box"></i> {{ footprint.items|length }} items</small>

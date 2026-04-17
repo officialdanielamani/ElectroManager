@@ -394,7 +394,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function showNewParameterModal(type) {
-    const modal = new bootstrap.Modal(document.getElementById('newParameterModal'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('newParameterModal'));
     document.getElementById('modalParamType').value = type;
     document.getElementById('paramTypeTitle').textContent = type.charAt(0).toUpperCase() + type.slice(1);
     

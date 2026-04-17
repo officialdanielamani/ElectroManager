@@ -256,37 +256,6 @@
                             {% if not grp.get_persons() %}<small class="text-muted">None</small>{% endif %}
                         </div>
 
-                        <!-- Add member -->
-                        {% if can_edit %}
-                        <hr class="my-2">
-                        <form method="POST" action="{{ url_for('project.project_group_add_member', id=grp.id) }}" class="row g-1 align-items-end">
-                            <div class="col-3">
-                                <label class="form-label small mb-0">Type</label>
-                                <select class="form-select form-select-sm" name="member_type" onchange="toggleMemberSelect(this, {{ grp.id }})">
-                                    <option value="user">User</option>
-                                    <option value="person">Person</option>
-                                </select>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label small mb-0">Select</label>
-                                <!-- User select (shown by default) -->
-                                <select class="form-select form-select-sm grp-user-select" id="grpUserSelect{{ grp.id }}" name="member_id">
-                                    {% for u in users %}
-                                    <option value="{{ u.id }}">{{ u.username }} ({{ u.email }})</option>
-                                    {% endfor %}
-                                </select>
-                                <!-- Person select (hidden by default) -->
-                                <select class="form-select form-select-sm grp-person-select" id="grpPersonSelect{{ grp.id }}" name="member_id" style="display:none;" disabled>
-                                    {% for p in persons %}
-                                    <option value="{{ p.id }}">{{ p.name }}{% if p.organization %} - {{ p.organization }}{% endif %}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-3">
-                                <button type="submit" class="btn btn-sm btn-success w-100"><i class="bi bi-plus"></i> Add</button>
-                            </div>
-                        </form>
-                        {% endif %}
                     </div>
                 </div>
                 <!-- Edit Group Modal -->
@@ -299,6 +268,36 @@
                         </div>
                         <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
                     </form>
+                    {% if can_edit %}
+                    <div class="modal-body border-top pt-3">
+                        <h6 class="mb-2"><i class="bi bi-person-plus"></i> Add Member</h6>
+                        <form method="POST" action="{{ url_for('project.project_group_add_member', id=grp.id) }}" class="row g-2 align-items-end">
+                            <div class="col-4">
+                                <label class="form-label small mb-1">Type</label>
+                                <select class="form-select form-select-sm" name="member_type" onchange="toggleMemberSelect(this, {{ grp.id }})">
+                                    <option value="user">User</option>
+                                    <option value="person">Person</option>
+                                </select>
+                            </div>
+                            <div class="col-5">
+                                <label class="form-label small mb-1">Select</label>
+                                <select class="form-select form-select-sm grp-user-select" id="grpUserSelect{{ grp.id }}" name="member_id">
+                                    {% for u in users %}
+                                    <option value="{{ u.id }}">{{ u.username }} ({{ u.email }})</option>
+                                    {% endfor %}
+                                </select>
+                                <select class="form-select form-select-sm grp-person-select" id="grpPersonSelect{{ grp.id }}" name="member_id" style="display:none;" disabled>
+                                    {% for p in persons %}
+                                    <option value="{{ p.id }}">{{ p.name }}{% if p.organization %} - {{ p.organization }}{% endif %}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-3">
+                                <button type="submit" class="btn btn-sm btn-success w-100"><i class="bi bi-plus"></i> Add</button>
+                            </div>
+                        </form>
+                    </div>
+                    {% endif %}
                 </div></div></div>
                 {% endfor %}
                 {% if not groups %}<p class="text-center text-muted">No groups created yet</p>{% endif %}
