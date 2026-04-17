@@ -343,7 +343,7 @@ def save_table_columns_view():
         columns = json.loads(columns_json)
         
         # Validate columns
-        valid_columns = ['type_model', 'sku', 'category', 'tags', 'footprint', 'quantity', 'available_quantity', 'total_price', 'price_per_unit', 'location', 'uuid', 'status']
+        valid_columns = ['type_model', 'sku', 'category', 'tags', 'footprint', 'quantity', 'available_quantity', 'total_value', 'total_price', 'price_per_unit', 'location', 'uuid', 'status']
         columns = [col for col in columns if col in valid_columns]
         
         # Save to current user

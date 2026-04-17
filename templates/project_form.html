@@ -373,6 +373,16 @@
 <script>
 let editBomSearchTimeout;
 let snModalBomId = null;
+let editBomItemsCache = {};
+
+function escHtml(str) {
+    return String(str == null ? '' : str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
 
 function openEditBOMModal(bomId, itemId, batchId, qty, itemName) {
     document.getElementById('editBomId').value = bomId;
@@ -393,17 +403,19 @@ function searchEditBOMItems() {
         if (q.length < 1) { document.getElementById('editBomSearchResults').style.display = 'none'; return; }
         fetch(`{{ url_for('project.bom_search_items', project_id=project.project_id) }}?q=${encodeURIComponent(q)}`)
             .then(r => r.json()).then(items => {
+                editBomItemsCache = {};
                 const div = document.getElementById('editBomSearchResults');
                 div.style.display = 'block';
                 if (!items.length) { div.innerHTML = '<p class="text-muted small">No items found.</p>'; return; }
                 let html = '';
                 items.forEach(item => {
-                    html += `<div class="card mb-2"><div class="card-body p-2"><strong>${item.name}</strong> <small class="text-muted">${item.category}</small>`;
+                    html += `<div class="card mb-2"><div class="card-body p-2"><strong>${escHtml(item.name)}</strong> <small class="text-muted">${escHtml(item.category)}</small>`;
                     item.batches.forEach(batch => {
+                        editBomItemsCache[`${item.id}-${batch.id}`] = { itemName: item.name, batchLabel: batch.label };
                         const avail = batch.available >= 0 ? batch.available : 0;
                         html += `<div class="ms-3 mt-1 p-2 border rounded d-flex justify-content-between align-items-center flex-wrap gap-2">`;
-                        html += `<span><strong>${batch.label}</strong> <small class="text-muted">Avail: ${avail}/${batch.quantity} — ${batch.sn_tracking ? '<i class="bi bi-upc-scan"></i> SN tracked' : ''}</small></span>`;
-                        html += `<div class="input-group input-group-sm" style="max-width:200px;"><input type="number" class="form-control" id="editqty-${item.id}-${batch.id}" value="1" min="1"><button class="btn btn-outline-success" onclick="selectEditBOM(${item.id}, ${batch.id}, '${item.name.replace(/'/g,"\\'")}', '${batch.label.replace(/'/g,"\\'")}')"><i class="bi bi-check"></i> Select</button></div>`;
+                        html += `<span><strong>${escHtml(batch.label)}</strong> <small class="text-muted">Avail: ${avail}/${batch.quantity} — ${batch.sn_tracking ? '<i class="bi bi-upc-scan"></i> SN tracked' : ''}</small></span>`;
+                        html += `<div class="input-group input-group-sm" style="max-width:200px;"><input type="number" class="form-control" id="editqty-${item.id}-${batch.id}" value="1" min="1"><button class="btn btn-outline-success" data-action="select-edit-bom" data-item-id="${item.id}" data-batch-id="${batch.id}"><i class="bi bi-check"></i> Select</button></div>`;
                         html += `</div>`;
                     });
                     html += `</div></div>`;
@@ -413,12 +425,13 @@ function searchEditBOMItems() {
     }, 300);
 }
 
-function selectEditBOM(itemId, batchId, itemName, batchLabel) {
+function selectEditBOM(itemId, batchId) {
+    const cached = editBomItemsCache[`${itemId}-${batchId}`] || { itemName: '', batchLabel: '' };
     const qty = parseInt(document.getElementById(`editqty-${itemId}-${batchId}`).value) || 1;
     document.getElementById('editBomNewItemId').value = itemId;
     document.getElementById('editBomNewBatchId').value = batchId;
     document.getElementById('editBomNewQty').value = qty;
-    document.getElementById('editBomSelectedText').textContent = `${itemName} / ${batchLabel} × ${qty}`;
+    document.getElementById('editBomSelectedText').textContent = `${cached.itemName} / ${cached.batchLabel} × ${qty}`;
     document.getElementById('editBomSelectedInfo').style.display = 'block';
     document.getElementById('editBomSearchResults').style.display = 'none';
 }
@@ -449,12 +462,12 @@ function searchBOMItems() {
                 if (!items.length) { div.innerHTML = '<p class="text-muted small">No items found.</p>'; return; }
                 let html = '';
                 items.forEach(item => {
-                    html += `<div class="card mb-2"><div class="card-body p-2"><strong>${item.name}</strong> <small class="text-muted">${item.category}</small>`;
+                    html += `<div class="card mb-2"><div class="card-body p-2"><strong>${escHtml(item.name)}</strong> <small class="text-muted">${escHtml(item.category)}</small>`;
                     item.batches.forEach(batch => {
                         const avail = batch.available >= 0 ? batch.available : 0;
                         html += `<div class="ms-3 mt-1 p-2 border rounded d-flex justify-content-between align-items-center flex-wrap gap-2">`;
-                        html += `<span><strong>${batch.label}</strong> <small class="text-muted">In stock: ${avail}/${batch.quantity}${batch.sn_tracking ? ' · <i class="bi bi-upc-scan"></i> SN' : ''} — ${batch.price > 0 ? batch.price + '/unit' : 'no price'}</small></span>`;
-                        html += `<div class="input-group input-group-sm" style="max-width:220px;"><input type="number" class="form-control" id="qty-${item.id}-${batch.id}" value="1" min="1" title="Required quantity (any amount)"><button class="btn btn-success" onclick="addBOM(${item.id}, ${batch.id})"><i class="bi bi-plus"></i> Add</button></div>`;
+                        html += `<span><strong>${escHtml(batch.label)}</strong> <small class="text-muted">In stock: ${avail}/${batch.quantity}${batch.sn_tracking ? ' · <i class="bi bi-upc-scan"></i> SN' : ''} — ${batch.price > 0 ? escHtml(batch.price) + '/unit' : 'no price'}</small></span>`;
+                        html += `<div class="input-group input-group-sm" style="max-width:220px;"><input type="number" class="form-control" id="qty-${item.id}-${batch.id}" value="1" min="1" title="Required quantity (any amount)"><button class="btn btn-success" data-action="add-bom" data-item-id="${item.id}" data-batch-id="${batch.id}"><i class="bi bi-plus"></i> Add</button></div>`;
                         html += `</div>`;
                     });
                     if (!item.batches.length) html += `<div class="ms-3 text-muted"><small>No batches</small></div>`;
@@ -505,7 +518,7 @@ function openSNModal(bomId) {
             html += '<th>ISN</th><th>SN</th></tr></thead><tbody>';
             sns.forEach(sn => {
                 html += `<tr><td><input class="form-check-input sn-modal-check" type="checkbox" value="${sn.id}" ${sn.selected ? 'checked' : ''}></td>`;
-                html += `<td><code style="font-size:0.8rem">${sn.isn}</code></td><td>${sn.sn || '-'}</td></tr>`;
+                html += `<td><code style="font-size:0.8rem">${escHtml(sn.isn)}</code></td><td>${escHtml(sn.sn || '-')}</td></tr>`;
             });
             html += '</tbody></table></div>';
             document.getElementById('snModalBody').innerHTML = html;
@@ -529,6 +542,19 @@ function deleteBOM(bomId) {
     fetch(`/project/{{ project.project_id }}/bom/${bomId}/delete`, {method: 'POST'})
         .then(r => r.json()).then(d => { if (d.success) location.reload(); });
 }
+
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.getAttribute('data-action');
+    const itemId = parseInt(btn.getAttribute('data-item-id'), 10);
+    const batchId = parseInt(btn.getAttribute('data-batch-id'), 10);
+    if (action === 'select-edit-bom') {
+        selectEditBOM(itemId, batchId);
+    } else if (action === 'add-bom') {
+        addBOM(itemId, batchId);
+    }
+});
 </script>
 {% endif %}
 {% endblock %}

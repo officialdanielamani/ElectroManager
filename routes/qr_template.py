@@ -14,10 +14,13 @@ from utils import log_audit, permission_required
 from datetime import datetime, timezone
 import json
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
 qr_template_bp = Blueprint('qr_template', __name__)
+
+_SAFE_ICON_PACKAGE_RE = re.compile(r'^[A-Za-z0-9_-]+$')
 
 @qr_template_bp.route('/settings/qr', methods=['GET'], endpoint='settings_qr')
 @login_required
@@ -106,7 +109,7 @@ def api_qr_template(template_id):
             return jsonify({'status': 'success'})
         except Exception as e:
             logger.error(f"Error saving template: {e}")
-            return jsonify({'status': 'error', 'message': str(e)}), 400
+            return jsonify({'status': 'error', 'message': 'Failed to save template.'}), 400
     
     elif request.method == 'PUT':
         try:
@@ -137,7 +140,7 @@ def api_qr_template(template_id):
             return jsonify({'status': 'error', 'message': 'Invalid width or height value'}), 400
         except Exception as e:
             logger.error(f"Error updating template: {e}")
-            return jsonify({'status': 'error', 'message': str(e)}), 400
+            return jsonify({'status': 'error', 'message': 'Failed to update template.'}), 400
     
     return jsonify({
         'id': template.id,
@@ -192,7 +195,7 @@ def preview_qr_template(template_id):
         return jsonify({'svg': svg_data})
     except Exception as e:
         logger.error(f"Error generating preview: {e}")
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': 'Failed to generate preview.'}), 400
 
 @qr_template_bp.route('/api/item/<string:uuid>/sticker-preview/<int:template_id>')
 @login_required
@@ -228,7 +231,7 @@ def api_item_sticker_print(uuid, template_id):
                         download_name=f'{item.name}_sticker.pdf')
     except Exception as e:
         logger.error(f"Error generating PDF: {e}")
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': 'Failed to generate PDF.'}), 400
 
 @qr_template_bp.route('/item/<string:uuid>/qr-sticker')
 @login_required
@@ -258,7 +261,7 @@ def print_qr_template(template_id):
                            download_name=f'stickers_{template.name}.pdf')
         except Exception as e:
             logger.error(f"Error generating batch PDF: {e}")
-            flash(f'Error generating PDF: {str(e)}', 'danger')
+            flash('Error generating PDF. Please try again.', 'danger')
     
     return render_template('qr_template_print.html', template=template)
 
@@ -310,7 +313,7 @@ def preview_element(template_id):
             return jsonify({'error': 'Unknown element type', 'success': False}), 400
     except Exception as e:
         logger.error(f"Error previewing element: {e}")
-        return jsonify({'error': str(e), 'success': False}), 400
+        return jsonify({'error': 'Failed to preview element.', 'success': False}), 400
 
 @qr_template_bp.route('/settings/qr/<int:template_id>/delete', methods=['POST'])
 @login_required
@@ -365,14 +368,20 @@ def api_icon_packages():
 def api_get_icons(package):
     """Get icons from a specific package"""
     import os
-    import re
-    
-    icons_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'icons')
-    css_file = os.path.join(icons_dir, f'{package}.css')
-    
+
+    if not package or not _SAFE_ICON_PACKAGE_RE.match(package):
+        return jsonify([])
+
+    icons_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'icons'))
+    css_file = os.path.abspath(os.path.join(icons_dir, f'{package}.css'))
+
+    # Ensure the resolved css_file stays inside icons_dir (defense in depth)
+    if os.path.commonpath([icons_dir, css_file]) != icons_dir:
+        return jsonify([])
+
     if not os.path.exists(css_file):
         return jsonify([])
-    
+
     try:
         with open(css_file, 'r', encoding='utf-8') as f:
             css_content = f.read()
