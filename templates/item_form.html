@@ -78,7 +78,7 @@
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <label class="form-label form-label-sm mb-0">
                                 <i class="bi bi-collection"></i> Batches ({{ item.batches|length }})
-                                <small class="text-muted ms-2">Total Qty: {{ item.get_overall_quantity() }} | Value: {{ currency }}{{ "%.2f"|format(item.get_overall_total_price()) }}</small>
+                                <small class="text-muted ms-2">Total Qty: {{ item.get_overall_quantity() }} | Price: {{ currency }}{{ "%.2f"|format(item.get_overall_total_price()) }} | Value: {{ currency }}{{ "%.2f"|format(item.get_overall_total_value()) }}</small>
                             </label>
                             {% if item_perms and item_perms.can_edit_batch %}
                             <button type="button" class="btn btn-sm btn-success" onclick="openAddBatchModal()">
@@ -99,7 +99,8 @@
                                     <span class="badge bg-primary ms-2">Qty: {{ batch.quantity }}</span>
                                     {% if batch.sn_tracking_enabled %}<span class="badge bg-dark ms-1"><i class="bi bi-upc-scan"></i> Tracking</span>{% endif %}
                                     <span class="badge bg-success ms-1">{{ currency }}{{ "%.2f"|format(batch.price_per_unit) }}/unit</span>
-                                    <span class="badge bg-info ms-1">Total: {{ currency }}{{ "%.2f"|format(batch.get_batch_total_price()) }}</span>
+                                    <span class="badge bg-info ms-1">Price: {{ currency }}{{ "%.2f"|format(batch.get_batch_total_price()) }}</span>
+                                    <span class="badge bg-secondary ms-1">Value: {{ currency }}{{ "%.2f"|format(batch.get_batch_total_value()) }}</span>
                                     {% if batch.get_lend_quantity() > 0 %}<span class="badge bg-warning ms-1">Lend: {{ batch.get_lend_quantity() }}</span>{% endif %}
                                     {% set proj_names = batch.get_project_names_for_batch() %}
                                     {% if proj_names %}<span class="badge bg-info ms-1">Proj: {{ proj_names|join(', ') }}</span>{% endif %}
@@ -123,9 +124,13 @@
                                         <div class="col-md-3"><strong>Batch #:</strong> {{ batch.batch_number }}</div>
                                         <div class="col-md-3"><strong>Quantity:</strong> {{ batch.quantity }}</div>
                                         <div class="col-md-3"><strong>Price/Unit:</strong> {{ currency }}{{ "%.2f"|format(batch.price_per_unit) }}</div>
-                                        <div class="col-md-3"><strong>Total:</strong> {{ currency }}{{ "%.2f"|format(batch.get_batch_total_price()) }}</div>
+                                        <div class="col-md-3">
+                                            <strong>Total Price:</strong> {{ currency }}{{ "%.2f"|format(batch.get_batch_total_price()) }}
+                                            {% if batch.quantity == 0 %}<small class="text-muted d-block">(qty=0, shows 1×)</small>{% endif %}
+                                        </div>
                                     </div>
                                     <div class="row mb-2 small">
+                                        <div class="col-md-3"><strong>Total Value:</strong> {{ currency }}{{ "%.2f"|format(batch.get_batch_total_value()) }}</div>
                                         <div class="col-md-3"><strong>Lending:</strong> {{ batch.get_lend_quantity() }}</div>
                                         <div class="col-md-3"><strong>Available:</strong> {{ batch.get_available_quantity() }}</div>
                                         {% if not batch.sn_tracking_enabled and batch.lend_to %}
@@ -1942,14 +1947,21 @@
                     <input type="text" class="form-control form-control-sm" id="ab_label" maxlength="32">
                 </div>
                 <div class="row mb-2">
-                    <div class="col-6">
+                    <div class="col-4">
                         <label class="form-label form-label-sm">Quantity * <small class="text-muted" id="ab_qtyHint">(no limit)</small></label>
-                        <input type="number" class="form-control form-control-sm" id="ab_qty" min="0" max="99999" value="1">
+                        <input type="number" class="form-control form-control-sm" id="ab_qty" min="0" max="99999" value="1" oninput="abCalcFromQtyPrice()">
                     </div>
-                    <div class="col-6">
-                        <label class="form-label form-label-sm">Price per Unit</label>
-                        <input type="number" class="form-control form-control-sm" id="ab_price" min="0" step="0.01" value="0">
+                    <div class="col-4">
+                        <label class="form-label form-label-sm">Price / Unit</label>
+                        <input type="number" class="form-control form-control-sm" id="ab_price" min="0" step="0.0001" value="0" oninput="abCalcFromQtyPrice()">
                     </div>
+                    <div class="col-4">
+                        <label class="form-label form-label-sm">Total Price <small class="text-muted">(auto)</small></label>
+                        <input type="number" class="form-control form-control-sm" id="ab_total" min="0" step="0.01" value="0" oninput="abCalcFromTotal()">
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <small class="text-muted"><i class="bi bi-info-circle"></i> Fill any two fields — the third auto-calculates. Qty=0 treated as 1 for price calculation.</small>
                 </div>
                 <div class="mb-2">
                     <label class="form-label form-label-sm">Date of Purchase</label>
@@ -1996,20 +2008,31 @@
                 <div id="eb_snInfo" class="mb-2 p-2 bg-light rounded small"></div>
                 <div id="eb_qtySection">
                     <div class="row mb-2">
-                        <div class="col-6">
+                        <div class="col-4">
                             <label class="form-label form-label-sm">Quantity</label>
-                            <input type="number" class="form-control form-control-sm" id="eb_qty" min="0" max="99999">
+                            <input type="number" class="form-control form-control-sm" id="eb_qty" min="0" max="99999" oninput="ebCalcFromQtyPrice()">
                         </div>
-                        <div class="col-6">
-                            <label class="form-label form-label-sm">Price per Unit</label>
-                            <input type="number" class="form-control form-control-sm" id="eb_price" min="0" step="0.01">
+                        <div class="col-4">
+                            <label class="form-label form-label-sm">Price / Unit</label>
+                            <input type="number" class="form-control form-control-sm" id="eb_price" min="0" step="0.0001" oninput="ebCalcFromQtyPrice()">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label form-label-sm">Total Price <small class="text-muted">(auto)</small></label>
+                            <input type="number" class="form-control form-control-sm" id="eb_total" min="0" step="0.01" oninput="ebCalcFromTotal()">
                         </div>
                     </div>
+                    <div class="mb-2"><small class="text-muted"><i class="bi bi-info-circle"></i> Fill any two — third auto-calculates. Qty=0 treated as 1.</small></div>
                 </div>
                 <div id="eb_priceOnlySection" style="display:none;">
-                    <div class="mb-2">
-                        <label class="form-label form-label-sm">Price per Unit</label>
-                        <input type="number" class="form-control form-control-sm" id="eb_price2" min="0" step="0.01">
+                    <div class="row mb-2">
+                        <div class="col-6">
+                            <label class="form-label form-label-sm">Price / Unit</label>
+                            <input type="number" class="form-control form-control-sm" id="eb_price2" min="0" step="0.0001" oninput="ebCalcFromPrice2()">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label form-label-sm">Total Price <small class="text-muted">(auto)</small></label>
+                            <input type="number" class="form-control form-control-sm" id="eb_total2" min="0" step="0.01" oninput="ebCalcFromTotal2()">
+                        </div>
                     </div>
                 </div>
                 <div class="mb-2">
@@ -2073,12 +2096,25 @@ function openAddBatchModal() {
     document.getElementById('ab_label').value = '';
     document.getElementById('ab_qty').value = '1';
     document.getElementById('ab_price').value = '0';
+    document.getElementById('ab_total').value = '0';
     document.getElementById('ab_date').value = '';
     document.getElementById('ab_note').value = '';
     document.getElementById('ab_lend_to').value = '';
     document.getElementById('ab_lend_qty').value = '0';
     toggleAddBatchTracking();
     new bootstrap.Modal(document.getElementById('addBatchModalDialog')).show();
+}
+/* Auto-calc helpers for Add Batch */
+function abCalcFromQtyPrice() {
+    var qty = parseFloat(document.getElementById('ab_qty').value) || 0;
+    var price = parseFloat(document.getElementById('ab_price').value) || 0;
+    document.getElementById('ab_total').value = (price * Math.max(1, qty)).toFixed(2);
+}
+function abCalcFromTotal() {
+    var qty = parseFloat(document.getElementById('ab_qty').value) || 0;
+    var total = parseFloat(document.getElementById('ab_total').value) || 0;
+    var displayQty = Math.max(1, qty);
+    document.getElementById('ab_price').value = (total / displayQty).toFixed(4);
 }
 function toggleAddBatchTracking() {
     var on = document.getElementById('addBatchSnTracking').checked;
@@ -2112,6 +2148,11 @@ function openEditBatchModal(batchId, label, qty, price, date, note, lendTo, lend
     document.getElementById('eb_note').value = note;
     document.getElementById('eb_lend_to').value = lendTo;
     document.getElementById('eb_lend_qty').value = lendQty;
+    // Pre-fill total fields
+    var displayQty = Math.max(1, parseFloat(qty) || 0);
+    var p = parseFloat(price) || 0;
+    document.getElementById('eb_total').value = (p * displayQty).toFixed(2);
+    document.getElementById('eb_total2').value = (p * displayQty).toFixed(2);
     if (snTracking) {
         document.getElementById('eb_qtySection').style.display = 'none';
         document.getElementById('eb_priceOnlySection').style.display = 'block';
@@ -2126,6 +2167,26 @@ function openEditBatchModal(batchId, label, qty, price, date, note, lendTo, lend
         document.getElementById('eb_snInfo').style.display = 'block';
     }
     new bootstrap.Modal(document.getElementById('editBatchModalDialog')).show();
+}
+/* Auto-calc helpers for Edit Batch (non-SN) */
+function ebCalcFromQtyPrice() {
+    var qty = parseFloat(document.getElementById('eb_qty').value) || 0;
+    var price = parseFloat(document.getElementById('eb_price').value) || 0;
+    document.getElementById('eb_total').value = (price * Math.max(1, qty)).toFixed(2);
+}
+function ebCalcFromTotal() {
+    var qty = parseFloat(document.getElementById('eb_qty').value) || 0;
+    var total = parseFloat(document.getElementById('eb_total').value) || 0;
+    document.getElementById('eb_price').value = (total / Math.max(1, qty)).toFixed(4);
+}
+/* Auto-calc helpers for Edit Batch (SN-tracking, price-only) */
+function ebCalcFromPrice2() {
+    var price = parseFloat(document.getElementById('eb_price2').value) || 0;
+    document.getElementById('eb_total2').value = price.toFixed(2);
+}
+function ebCalcFromTotal2() {
+    var total = parseFloat(document.getElementById('eb_total2').value) || 0;
+    document.getElementById('eb_price2').value = total.toFixed(4);
 }
 function submitEditBatch() {
     var batchId = document.getElementById('eb_id').value;

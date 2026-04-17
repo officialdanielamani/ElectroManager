@@ -195,8 +195,16 @@
                                     {% endif %}
                                     {% if col == 'total_price' %}
                                         <th>
-                                            <a href="#" class="text-decoration-none" title="Sort by Total Price">
+                                            <a href="#" class="text-decoration-none" title="Sort by Total Price (qty=0 shown as 1×)">
                                                 Total Price
+                                                <i class="bi bi-arrow-down-up text-muted sort-default"></i>
+                                            </a>
+                                        </th>
+                                    {% endif %}
+                                    {% if col == 'total_value' %}
+                                        <th>
+                                            <a href="#" class="text-decoration-none" title="Sort by Total Value (actual stock value)">
+                                                Total Value
                                                 <i class="bi bi-arrow-down-up text-muted sort-default"></i>
                                             </a>
                                         </th>
@@ -335,6 +343,15 @@
                                     <td>
                                         {% if item.get_total_price() %}
                                         {{ item.get_total_price()|format_amount(currency_decimal_places) }}
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                    {% endif %}
+                                    {% if col == 'total_value' %}
+                                    <td>
+                                        {% if item.get_total_value() %}
+                                        {{ item.get_total_value()|format_amount(currency_decimal_places) }}
                                         {% else %}
                                         -
                                         {% endif %}
