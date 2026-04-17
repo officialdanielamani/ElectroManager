@@ -66,18 +66,17 @@ def init_db():
             db.session.commit()
             print("Default admin user created!")
             print("\n" + "="*50)
-            print("DEFAULT LOGIN CREDENTIALS")
+            print("ADMIN ACCOUNT CREATED")
             print("="*50)
             print(f"  Username: {admin_username}")
-            print(f"  Password: {admin_password}")
             print(f"  Email:    {admin_email}")
             if demo_mode:
                 print(f"  Mode:     DEMO (User profile is locked)")
             print("="*50)
             if admin_password == 'admin123':
-                print("CHANGE PASSWORD IMMEDIATELY AFTER FIRST LOGIN!")
+                print("Password: default ('admin123'). CHANGE IT IMMEDIATELY AFTER FIRST LOGIN!")
             else:
-                print("Custom password set from environment variable")
+                print("Password: set from ADMIN_PASSWORD environment variable.")
             print("="*50 + "\n")
         else:
             print(f"Admin user '{admin_username}' already exists, skipping creation.")

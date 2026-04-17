@@ -252,7 +252,7 @@ def move_drawer_items():
         import traceback
         logger.error(f"Error moving drawer items: {str(e)}")
         logger.error(traceback.format_exc())
-        return jsonify({'success': False, 'error': f'An error occurred: {str(e)}'})
+        return jsonify({'success': False, 'error': 'An error occurred while moving drawer items.'})
 
 # ============= ERROR HANDLERS =============
 

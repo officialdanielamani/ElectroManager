@@ -10,6 +10,7 @@ from utils import log_audit, permission_required, allowed_file
 from werkzeug.utils import secure_filename
 from datetime import datetime, timezone
 import os
+import re
 import json
 import secrets
 import string
@@ -18,6 +19,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 project_bp = Blueprint('project', __name__)
+
+_SAFE_PROJECT_ID_RE = re.compile(r'^[A-Za-z0-9._-]+$')
+_ALLOWED_ATTACHMENT_TYPES = {'picture', 'document', 'schematic', '2d_design', '3d_design'}
 
 
 # ==================== HELPERS ====================
@@ -47,8 +51,15 @@ def save_project_file(file, project_id_str, attachment_type):
     if not file or not file.filename:
         return None, None
 
+    if attachment_type not in _ALLOWED_ATTACHMENT_TYPES:
+        return None, 'Invalid attachment type.'
+    if not project_id_str or not _SAFE_PROJECT_ID_RE.match(str(project_id_str)):
+        return None, 'Invalid project id.'
+
     allowed_ext, max_size_mb = get_project_file_settings(attachment_type)
     filename = secure_filename(file.filename)
+    if not filename:
+        return None, 'Invalid filename.'
     ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
 
     if ext not in allowed_ext:
@@ -61,7 +72,10 @@ def save_project_file(file, project_id_str, attachment_type):
     if file_size > max_size_mb * 1024 * 1024:
         return None, f'File too large. Max {max_size_mb}MB for {attachment_type}'
 
-    folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'projects', project_id_str, attachment_type)
+    upload_root = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
+    folder = os.path.abspath(os.path.join(upload_root, 'projects', project_id_str, attachment_type))
+    if not folder.startswith(upload_root + os.sep) and folder != upload_root:
+        return None, 'Invalid upload path.'
     os.makedirs(folder, exist_ok=True)
 
     file_path = os.path.join(folder, filename)
@@ -74,7 +88,7 @@ def save_project_file(file, project_id_str, attachment_type):
         counter += 1
 
     file.save(file_path)
-    rel_path = os.path.relpath(file_path, current_app.config['UPLOAD_FOLDER'])
+    rel_path = os.path.relpath(file_path, upload_root)
     return {'filename': filename, 'original_filename': file.filename if hasattr(file, 'filename') else filename,
             'file_path': rel_path, 'file_type': ext, 'file_size': file_size}, None
 
