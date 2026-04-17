@@ -64,19 +64,20 @@ def login():
             login_user(user, remember=form.remember_me.data)
             log_audit(user.id, 'login', 'user', user.id, 'User logged in')
             next_page = request.args.get('next')
-            # Prevent open redirects by only allowing known in-app destinations.
+            # Prevent open redirects by mapping user input to trusted in-app destinations.
             allowed_next_paths = {
-                '/',
-                '/dashboard',
-                '/items',
-                '/categories',
-                '/racks',
-                '/locations',
-                '/settings',
-                '/profile',
+                '/': '/',
+                '/dashboard': '/dashboard',
+                '/items': '/items',
+                '/categories': '/categories',
+                '/racks': '/racks',
+                '/locations': '/locations',
+                '/settings': '/settings',
+                '/profile': '/profile',
             }
-            if next_page in allowed_next_paths:
-                return redirect(next_page)
+            safe_next = allowed_next_paths.get(next_page)
+            if safe_next:
+                return redirect(safe_next)
             return redirect(url_for('index'))
         else:
             if user:
