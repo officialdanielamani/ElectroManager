@@ -39,7 +39,7 @@ def add_batch(uuid):
     sn_tracking = (request.form.get('sn_tracking', '') == 'on') if can_edit_sn else False
 
     # Per-batch location
-    follow_main = request.form.get('follow_main_location', 'on') == 'on'
+    follow_main = request.form.get('follow_main_location', '') == 'on'
     batch_loc_id_raw = request.form.get('batch_location_id', '')
     batch_rack_id_raw = request.form.get('batch_rack_id', '')
     batch_drawer = request.form.get('batch_drawer', '').strip() or None
@@ -152,7 +152,7 @@ def edit_batch(uuid, batch_id):
             batch.purchase_date = None
 
         # Per-batch location
-        follow_main = request.form.get('follow_main_location', 'on') == 'on'
+        follow_main = request.form.get('follow_main_location', '') == 'on'
         batch.follow_main_location = follow_main
         if follow_main:
             batch.location_id = None
