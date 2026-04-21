@@ -86,7 +86,7 @@
 
         /* ── QR block ── */
         .qr-block { flex-shrink: 0; text-align: center; }
-        .qr-block img { width: 150px; height: 150px; display: block; border: 1px solid #ddd; padding: 3px; border-radius: 3px; }
+        .qr-block img { width: 100px; height: 100px; display: block; border: 1px solid #ddd; padding: 3px; border-radius: 3px; }
         .qr-block .qr-label { font-size: 0.75em; color: #777; margin-top: 3px; }
 
         /* ── Info grid ── */
@@ -215,12 +215,14 @@
                 <div class="info-label">Overall Quantity</div>
                 <div class="info-value"><strong>{{ item.get_overall_quantity() }}</strong></div>
             </div>
-            {% if item.get_total_lend_quantity() > 0 %}
             <div class="info-item">
-                <div class="info-label">Lending</div>
+                <div class="info-label">Total Lend</div>
                 <div class="info-value"><strong>{{ item.get_total_lend_quantity() }}</strong></div>
             </div>
-            {% endif %}
+            <div class="info-item">
+                <div class="info-label">Total in Project</div>
+                <div class="info-value"><strong>{{ item.get_total_project_quantity() }}</strong></div>
+            </div>
             <div class="info-item">
                 <div class="info-label">Available</div>
                 <div class="info-value"><strong>{{ item.get_available_quantity() }}</strong></div>
