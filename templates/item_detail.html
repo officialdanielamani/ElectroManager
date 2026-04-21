@@ -198,6 +198,9 @@
                                 <span class="badge bg-success ms-1">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.price_per_unit) }}/unit</span>
                                 <span class="badge bg-info ms-1">Price: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_price()) }}</span>
                                 <span class="badge bg-secondary ms-1">Value: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_value()) }}</span>
+                                {% if not batch.follow_main_location %}
+                                <span class="badge bg-secondary ms-1"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>
+                                {% endif %}
                                 {% if batch.purchase_date %}
                                 <small class="text-muted ms-2"><i class="bi bi-calendar"></i> {{ batch.purchase_date.strftime('%d/%m/%Y') }}</small>
                                 {% endif %}

@@ -260,6 +260,7 @@
                                     {% if batch.get_lend_quantity() > 0 %}<span class="badge bg-warning ms-1">Lend: {{ batch.get_lend_quantity() }}</span>{% endif %}
                                     {% set proj_names = batch.get_project_names_for_batch() %}
                                     {% if proj_names %}<span class="badge bg-info ms-1">Proj: {{ proj_names|join(', ') }}</span>{% endif %}
+                                    {% if not batch.follow_main_location %}<span class="badge bg-secondary ms-1"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>{% endif %}
                                     {% if batch.purchase_date %}<small class="text-muted ms-2"><i class="bi bi-calendar"></i> {{ batch.purchase_date.strftime('%d/%m/%Y') }}</small>{% endif %}
                                     {% if batch.note %}<small class="text-muted ms-2"><i class="bi bi-sticky"></i> {{ batch.note }}</small>{% endif %}
                                 </div>
@@ -2036,28 +2037,30 @@
                         </label>
                     </div>
                     <div id="ab_batchLocSection" style="display:none;">
-                        <div class="row g-2 mb-2">
-                            <div class="col-6">
-                                <label class="form-label form-label-sm">Location</label>
-                                <select class="form-select form-select-sm" id="ab_location_id">
-                                    <option value="">— None —</option>
-                                    {% for loc in locations %}
-                                    <option value="{{ loc.id }}">{{ loc.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label form-label-sm">Rack</label>
-                                <select class="form-select form-select-sm" id="ab_rack_id" onchange="batchUpdateDrawerGrid('ab')">
-                                    <option value="">— None —</option>
-                                    {% for rack in racks %}
-                                    <option value="{{ rack.id }}" data-rows="{{ rack.rows }}" data-cols="{{ rack.cols }}" data-location="{{ rack.physical_location.id if rack.physical_location else '' }}">{{ rack.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
+                        <div class="btn-group btn-group-sm w-100 mb-2" role="group">
+                            <input type="radio" class="btn-check" name="ab_loc_type" id="ab_type_general" value="general" checked onchange="abSwitchLocType()">
+                            <label class="btn btn-outline-primary btn-sm" for="ab_type_general"><i class="bi bi-geo-alt"></i> General Location</label>
+                            <input type="radio" class="btn-check" name="ab_loc_type" id="ab_type_drawer" value="drawer" onchange="abSwitchLocType()">
+                            <label class="btn btn-outline-primary btn-sm" for="ab_type_drawer"><i class="bi bi-grid-3x3-gap"></i> Drawer Storage</label>
                         </div>
-                        <div class="mb-0">
-                            <label class="form-label form-label-sm">Drawer <small class="text-muted">(Select from grid)</small></label>
+                        <div id="ab_generalSection">
+                            <label class="form-label form-label-sm">Location</label>
+                            <select class="form-select form-select-sm" id="ab_location_id">
+                                <option value="">— None —</option>
+                                {% for loc in locations %}
+                                <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div id="ab_drawerSection" style="display:none;">
+                            <label class="form-label form-label-sm">Rack</label>
+                            <select class="form-select form-select-sm" id="ab_rack_id" onchange="batchUpdateDrawerGrid('ab')">
+                                <option value="">— Select Rack —</option>
+                                {% for rack in racks %}
+                                <option value="{{ rack.id }}" data-rows="{{ rack.rows }}" data-cols="{{ rack.cols }}" data-location="{{ rack.physical_location.id if rack.physical_location else '' }}">{{ rack.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <label class="form-label form-label-sm mt-2">Drawer <small class="text-muted">(Select from grid)</small></label>
                             <input type="text" class="form-control form-control-sm" id="ab_drawer" maxlength="50" readonly placeholder="Select a rack to pick a drawer">
                             <div id="ab_drawer_picker" style="display:none;" class="mt-2 p-2 border rounded drawer-grid-container">
                                 <small class="text-muted d-block mb-2">Click a drawer:</small>
@@ -2147,28 +2150,30 @@
                         </label>
                     </div>
                     <div id="eb_batchLocSection" style="display:none;">
-                        <div class="row g-2 mb-2">
-                            <div class="col-6">
-                                <label class="form-label form-label-sm">Location</label>
-                                <select class="form-select form-select-sm" id="eb_location_id">
-                                    <option value="">— None —</option>
-                                    {% for loc in locations %}
-                                    <option value="{{ loc.id }}">{{ loc.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label form-label-sm">Rack</label>
-                                <select class="form-select form-select-sm" id="eb_rack_id" onchange="batchUpdateDrawerGrid('eb')">
-                                    <option value="">— None —</option>
-                                    {% for rack in racks %}
-                                    <option value="{{ rack.id }}" data-rows="{{ rack.rows }}" data-cols="{{ rack.cols }}" data-location="{{ rack.physical_location.id if rack.physical_location else '' }}">{{ rack.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
+                        <div class="btn-group btn-group-sm w-100 mb-2" role="group">
+                            <input type="radio" class="btn-check" name="eb_loc_type" id="eb_type_general" value="general" checked onchange="ebSwitchLocType()">
+                            <label class="btn btn-outline-primary btn-sm" for="eb_type_general"><i class="bi bi-geo-alt"></i> General Location</label>
+                            <input type="radio" class="btn-check" name="eb_loc_type" id="eb_type_drawer" value="drawer" onchange="ebSwitchLocType()">
+                            <label class="btn btn-outline-primary btn-sm" for="eb_type_drawer"><i class="bi bi-grid-3x3-gap"></i> Drawer Storage</label>
                         </div>
-                        <div class="mb-0">
-                            <label class="form-label form-label-sm">Drawer <small class="text-muted">(Select from grid)</small></label>
+                        <div id="eb_generalSection">
+                            <label class="form-label form-label-sm">Location</label>
+                            <select class="form-select form-select-sm" id="eb_location_id">
+                                <option value="">— None —</option>
+                                {% for loc in locations %}
+                                <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div id="eb_drawerSection" style="display:none;">
+                            <label class="form-label form-label-sm">Rack</label>
+                            <select class="form-select form-select-sm" id="eb_rack_id" onchange="batchUpdateDrawerGrid('eb')">
+                                <option value="">— Select Rack —</option>
+                                {% for rack in racks %}
+                                <option value="{{ rack.id }}" data-rows="{{ rack.rows }}" data-cols="{{ rack.cols }}" data-location="{{ rack.physical_location.id if rack.physical_location else '' }}">{{ rack.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <label class="form-label form-label-sm mt-2">Drawer <small class="text-muted">(Select from grid)</small></label>
                             <input type="text" class="form-control form-control-sm" id="eb_drawer" maxlength="50" readonly placeholder="Select a rack to pick a drawer">
                             <div id="eb_drawer_picker" style="display:none;" class="mt-2 p-2 border rounded drawer-grid-container">
                                 <small class="text-muted d-block mb-2">Click a drawer:</small>
@@ -2282,6 +2287,8 @@ function openAddBatchModal() {
     document.getElementById('ab_location_id').value = '';
     document.getElementById('ab_rack_id').value = '';
     document.getElementById('ab_drawer').value = '';
+    document.getElementById('ab_type_general').checked = true;
+    abSwitchLocType();
     batchUpdateDrawerGrid('ab');
     abToggleLocation();
     toggleAddBatchTracking();
@@ -2290,6 +2297,19 @@ function openAddBatchModal() {
 function abToggleLocation() {
     var follow = document.getElementById('ab_follow_main').checked;
     document.getElementById('ab_batchLocSection').style.display = follow ? 'none' : 'block';
+}
+function abSwitchLocType() {
+    var isDrawer = document.getElementById('ab_type_drawer').checked;
+    document.getElementById('ab_generalSection').style.display = isDrawer ? 'none' : 'block';
+    document.getElementById('ab_drawerSection').style.display = isDrawer ? 'block' : 'none';
+    if (isDrawer) {
+        document.getElementById('ab_location_id').value = '';
+        batchUpdateDrawerGrid('ab');
+    } else {
+        document.getElementById('ab_rack_id').value = '';
+        document.getElementById('ab_drawer').value = '';
+        document.getElementById('ab_drawer_picker').style.display = 'none';
+    }
 }
 /* Auto-calc helpers for Add Batch */
 function abCalcFromQtyPrice() {
@@ -2321,10 +2341,11 @@ function submitAddBatch() {
     if (document.getElementById('addBatchSnTracking').checked) fd.append('sn_tracking', 'on');
     if (document.getElementById('ab_follow_main').checked) {
         fd.append('follow_main_location', 'on');
-    } else {
-        fd.append('batch_location_id', document.getElementById('ab_location_id').value);
+    } else if (document.getElementById('ab_type_drawer').checked) {
         fd.append('batch_rack_id', document.getElementById('ab_rack_id').value);
         fd.append('batch_drawer', document.getElementById('ab_drawer').value);
+    } else {
+        fd.append('batch_location_id', document.getElementById('ab_location_id').value);
     }
     fetch('{{ url_for("batch.add_batch", uuid=item.uuid) }}', { method: 'POST', body: fd })
         .then(function(r) { if (r.redirected) { window.location.href = r.url; } else { reloadKeepBatch(); } })
@@ -2347,6 +2368,11 @@ function openEditBatchModal(batchId, label, qty, price, date, note, lendTo, lend
     document.getElementById('eb_location_id').value = batchLocId || '';
     document.getElementById('eb_rack_id').value = batchRackId || '';
     document.getElementById('eb_drawer').value = batchDrawer || '';
+    var ebIsDrawer = !!batchRackId;
+    document.getElementById('eb_type_drawer').checked = ebIsDrawer;
+    document.getElementById('eb_type_general').checked = !ebIsDrawer;
+    document.getElementById('eb_generalSection').style.display = ebIsDrawer ? 'none' : 'block';
+    document.getElementById('eb_drawerSection').style.display = ebIsDrawer ? 'block' : 'none';
     batchUpdateDrawerGrid('eb');
     ebToggleLocation();
     // Pre-fill total fields
@@ -2372,6 +2398,19 @@ function openEditBatchModal(batchId, label, qty, price, date, note, lendTo, lend
 function ebToggleLocation() {
     var follow = document.getElementById('eb_follow_main').checked;
     document.getElementById('eb_batchLocSection').style.display = follow ? 'none' : 'block';
+}
+function ebSwitchLocType() {
+    var isDrawer = document.getElementById('eb_type_drawer').checked;
+    document.getElementById('eb_generalSection').style.display = isDrawer ? 'none' : 'block';
+    document.getElementById('eb_drawerSection').style.display = isDrawer ? 'block' : 'none';
+    if (isDrawer) {
+        document.getElementById('eb_location_id').value = '';
+        batchUpdateDrawerGrid('eb');
+    } else {
+        document.getElementById('eb_rack_id').value = '';
+        document.getElementById('eb_drawer').value = '';
+        document.getElementById('eb_drawer_picker').style.display = 'none';
+    }
 }
 /* Auto-calc helpers for Edit Batch (non-SN) */
 function ebCalcFromQtyPrice() {
@@ -2411,10 +2450,11 @@ function submitEditBatch() {
     fd.append('note', document.getElementById('eb_note').value);
     if (document.getElementById('eb_follow_main').checked) {
         fd.append('follow_main_location', 'on');
-    } else {
-        fd.append('batch_location_id', document.getElementById('eb_location_id').value);
+    } else if (document.getElementById('eb_type_drawer').checked) {
         fd.append('batch_rack_id', document.getElementById('eb_rack_id').value);
         fd.append('batch_drawer', document.getElementById('eb_drawer').value);
+    } else {
+        fd.append('batch_location_id', document.getElementById('eb_location_id').value);
     }
     fetch('/item/{{ item.uuid }}/batch/' + batchId + '/edit', { method: 'POST', body: fd })
         .then(function(r) { if (r.redirected) { window.location.href = r.url; } else { reloadKeepBatch(); } })
@@ -2791,28 +2831,30 @@ function saveEditDetails() {
                         </label>
                     </div>
                     <div id="pbBatchLocSection" style="display:none;">
-                        <div class="row g-2 mb-2">
-                            <div class="col-6">
-                                <label class="form-label form-label-sm">Location</label>
-                                <select class="form-select form-select-sm" id="pbLocationId">
-                                    <option value="">— None —</option>
-                                    {% for loc in locations %}
-                                    <option value="{{ loc.id }}">{{ loc.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label form-label-sm">Rack</label>
-                                <select class="form-select form-select-sm" id="pbRackId" onchange="batchUpdateDrawerGrid('pb')">
-                                    <option value="">— None —</option>
-                                    {% for rack in racks %}
-                                    <option value="{{ rack.id }}" data-rows="{{ rack.rows }}" data-cols="{{ rack.cols }}" data-location="{{ rack.physical_location.id if rack.physical_location else '' }}">{{ rack.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
+                        <div class="btn-group btn-group-sm w-100 mb-2" role="group">
+                            <input type="radio" class="btn-check" name="pb_loc_type" id="pb_type_general" value="general" checked onchange="pbSwitchLocType()">
+                            <label class="btn btn-outline-primary btn-sm" for="pb_type_general"><i class="bi bi-geo-alt"></i> General Location</label>
+                            <input type="radio" class="btn-check" name="pb_loc_type" id="pb_type_drawer" value="drawer" onchange="pbSwitchLocType()">
+                            <label class="btn btn-outline-primary btn-sm" for="pb_type_drawer"><i class="bi bi-grid-3x3-gap"></i> Drawer Storage</label>
                         </div>
-                        <div class="mb-0">
-                            <label class="form-label form-label-sm">Drawer <small class="text-muted">(Select from grid)</small></label>
+                        <div id="pb_generalSection">
+                            <label class="form-label form-label-sm">Location</label>
+                            <select class="form-select form-select-sm" id="pbLocationId">
+                                <option value="">— None —</option>
+                                {% for loc in locations %}
+                                <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div id="pb_drawerSection" style="display:none;">
+                            <label class="form-label form-label-sm">Rack</label>
+                            <select class="form-select form-select-sm" id="pbRackId" onchange="batchUpdateDrawerGrid('pb')">
+                                <option value="">— Select Rack —</option>
+                                {% for rack in racks %}
+                                <option value="{{ rack.id }}" data-rows="{{ rack.rows }}" data-cols="{{ rack.cols }}" data-location="{{ rack.physical_location.id if rack.physical_location else '' }}">{{ rack.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <label class="form-label form-label-sm mt-2">Drawer <small class="text-muted">(Select from grid)</small></label>
                             <input type="text" class="form-control form-control-sm" id="pbDrawer" maxlength="50" readonly placeholder="Select a rack to pick a drawer">
                             <div id="pb_drawer_picker" style="display:none;" class="mt-2 p-2 border rounded drawer-grid-container">
                                 <small class="text-muted d-block mb-2">Click a drawer:</small>
@@ -2881,6 +2923,19 @@ function saveEditDetails() {
         var follow = document.getElementById('pbFollowMain').checked;
         document.getElementById('pbBatchLocSection').style.display = follow ? 'none' : 'block';
     };
+    window.pbSwitchLocType = function() {
+        var isDrawer = document.getElementById('pb_type_drawer').checked;
+        document.getElementById('pb_generalSection').style.display = isDrawer ? 'none' : 'block';
+        document.getElementById('pb_drawerSection').style.display = isDrawer ? 'block' : 'none';
+        if (isDrawer) {
+            document.getElementById('pbLocationId').value = '';
+            batchUpdateDrawerGrid('pb');
+        } else {
+            document.getElementById('pbRackId').value = '';
+            document.getElementById('pbDrawer').value = '';
+            document.getElementById('pb_drawer_picker').style.display = 'none';
+        }
+    };
 
     window.pendingBatchAdd = function() {
         document.getElementById('pendingBatchModalTitle').innerHTML = '<i class="bi bi-collection"></i> Add Batch';
@@ -2897,6 +2952,8 @@ function saveEditDetails() {
         document.getElementById('pbLocationId').value = '';
         document.getElementById('pbRackId').value = '';
         document.getElementById('pbDrawer').value = '';
+        document.getElementById('pb_type_general').checked = true;
+        window.pbSwitchLocType();
         batchUpdateDrawerGrid('pb');
         window.pbToggleLocation();
         var modal = new bootstrap.Modal(document.getElementById('pendingBatchModal'));
@@ -2920,6 +2977,11 @@ function saveEditDetails() {
         document.getElementById('pbLocationId').value = b.location_id || '';
         document.getElementById('pbRackId').value = b.rack_id || '';
         document.getElementById('pbDrawer').value = b.drawer || '';
+        var pbIsDrawer = !!b.rack_id;
+        document.getElementById('pb_type_drawer').checked = pbIsDrawer;
+        document.getElementById('pb_type_general').checked = !pbIsDrawer;
+        document.getElementById('pb_generalSection').style.display = pbIsDrawer ? 'none' : 'block';
+        document.getElementById('pb_drawerSection').style.display = pbIsDrawer ? 'block' : 'none';
         batchUpdateDrawerGrid('pb');
         window.pbToggleLocation();
         var modal = new bootstrap.Modal(document.getElementById('pendingBatchModal'));
@@ -2955,6 +3017,7 @@ function saveEditDetails() {
         if (total < 0) total = 0;
         var date = document.getElementById('pbDate').value;
         var followMain = document.getElementById('pbFollowMain').checked;
+        var isDrawer = document.getElementById('pb_type_drawer').checked;
         var locationId = document.getElementById('pbLocationId').value || null;
         var rackId = document.getElementById('pbRackId').value || null;
         var drawer = document.getElementById('pbDrawer').value.trim().slice(0, 50);
@@ -2962,9 +3025,9 @@ function saveEditDetails() {
         var batch = {
             label: label, sn_tracking: tracking, quantity: qty, price: price, total: total, date: date,
             follow_main_location: followMain,
-            location_id: followMain ? null : (locationId ? parseInt(locationId, 10) : null),
-            rack_id: followMain ? null : (rackId ? parseInt(rackId, 10) : null),
-            drawer: followMain ? '' : drawer
+            location_id: (followMain || isDrawer) ? null : (locationId ? parseInt(locationId, 10) : null),
+            rack_id: (followMain || !isDrawer) ? null : (rackId ? parseInt(rackId, 10) : null),
+            drawer: (followMain || !isDrawer) ? '' : drawer
         };
         var editIdx = document.getElementById('pendingBatchEditIndex').value;
         if (editIdx !== '') {
