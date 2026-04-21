@@ -96,12 +96,12 @@ def create_default_roles():
     if not admin_role:
         admin_perms = {
             "items": {
-                "view": True, "create": True, "delete": True, 
-                "edit_name": True, "edit_sku_type": True, "edit_description": True,
-                "edit_datasheet": True, "edit_upload": True, "edit_lending": True,
-                "edit_price": True, "edit_quantity": True, "edit_location": True,
-                "edit_category": True, "edit_footprint": True, "edit_tags": True,
-                "edit_parameters": True, "edit_batch": True, "edit_serial": True
+                "view": True, "create": True, "delete": True,
+                "view_info": True, "edit_info": True,
+                "view_batch": True, "edit_batch": True,
+                "edit_quantity": True, "edit_price": True,
+                "edit_sn": True, "edit_lending": True, "delete_batch": True,
+                "view_advance": True, "edit_advance": True, "delete_advance": True,
             },
             "pages": {
                 "visual_storage": {"view": True, "edit": True},
@@ -140,12 +140,12 @@ def create_default_roles():
     if not manager_role:
         manager_perms = {
             "items": {
-                "view": True, "create": True, "delete": True, 
-                "edit_name": True, "edit_sku_type": True, "edit_description": True,
-                "edit_datasheet": True, "edit_upload": True, "edit_lending": True,
-                "edit_price": True, "edit_quantity": True, "edit_location": True,
-                "edit_category": True, "edit_footprint": True, "edit_tags": True,
-                "edit_parameters": True, "edit_batch": True, "edit_serial": True
+                "view": True, "create": True, "delete": True,
+                "view_info": True, "edit_info": True,
+                "view_batch": True, "edit_batch": True,
+                "edit_quantity": True, "edit_price": True,
+                "edit_sn": True, "edit_lending": True, "delete_batch": True,
+                "view_advance": True, "edit_advance": True, "delete_advance": True,
             },
             "pages": {
                 "visual_storage": {"view": True, "edit": True},
@@ -184,12 +184,12 @@ def create_default_roles():
     if not viewer_role:
         viewer_perms = {
             "items": {
-                "view": True, "create": False, "delete": False, 
-                "edit_name": False, "edit_sku_type": False, "edit_description": False,
-                "edit_datasheet": False, "edit_upload": False, "edit_lending": False,
-                "edit_price": False, "edit_quantity": False, "edit_location": False,
-                "edit_category": False, "edit_footprint": False, "edit_tags": False,
-                "edit_parameters": False, "edit_batch": False, "edit_serial": False
+                "view": True, "create": False, "delete": False,
+                "view_info": True, "edit_info": False,
+                "view_batch": True, "edit_batch": False,
+                "edit_quantity": False, "edit_price": False,
+                "edit_sn": False, "edit_lending": False, "delete_batch": False,
+                "view_advance": True, "edit_advance": False, "delete_advance": False,
             },
             "pages": {
                 "visual_storage": {"view": True, "edit": False},

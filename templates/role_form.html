@@ -80,201 +80,66 @@
                         {% set perms = role.get_permissions() %}
 
                         <!-- Items Permissions -->
+                        {% set disabled = 'disabled' if role.is_system_role else '' %}
+                        {% macro perm_check(key, title, hint) -%}
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="items_{{ key }}" id="items_{{ key }}"
+                                           {% if perms.get('items', {}).get(key) %}checked{% endif %}
+                                           {{ disabled }}>
+                                    <label class="form-check-label" for="items_{{ key }}">
+                                        <strong>{{ title }}</strong><br><small class="text-muted">{{ hint }}</small>
+                                    </label>
+                                </div>
+                            </div>
+                        {%- endmacro %}
+
                         <div class="card mb-4 border-primary" style="border-left-width: 4px;">
                             <div class="card-header bg-light">
                                 <h6 class="mb-0"><i class="bi bi-box-seam"></i> Item Management</h6>
-                                <small class="text-muted">Granular control over item operations</small>
+                                <small class="text-muted">Simplified permissions grouped by concern</small>
                             </div>
                             <div class="card-body">
+
+                                <!-- Component -->
+                                <h6 class="text-primary mb-2"><i class="bi bi-collection"></i> Component</h6>
                                 <div class="row g-3">
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="items_view" id="items_view" 
-                                                   {% if perms.get('items', {}).get('view') %}checked{% endif %}
-                                                   {% if role.is_system_role %}disabled{% endif %}>
-                                            <label class="form-check-label" for="items_view">
-                                                <strong>View</strong><br><small class="text-muted">View all item details</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="items_create" id="items_create" 
-                                                   {% if perms.get('items', {}).get('create') %}checked{% endif %}
-                                                   {% if role.is_system_role %}disabled{% endif %}>
-                                            <label class="form-check-label" for="items_create">
-                                                <strong>Create</strong><br><small class="text-muted">Create new items</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="items_delete" id="items_delete" 
-                                                   {% if perms.get('items', {}).get('delete') %}checked{% endif %}
-                                                   {% if role.is_system_role %}disabled{% endif %}>
-                                            <label class="form-check-label" for="items_delete">
-                                                <strong>Delete</strong><br><small class="text-muted">Delete items</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="items_edit_name" id="items_edit_name" 
-                                                   {% if perms.get('items', {}).get('edit_name') %}checked{% endif %}
-                                                   {% if role.is_system_role %}disabled{% endif %}>
-                                            <label class="form-check-label" for="items_edit_name">
-                                                <strong>Edit Name</strong><br><small class="text-muted">Modify item name</small>
-                                            </label>
-                                        </div>
-                                    </div>
+                                    {{ perm_check('view', 'View Item', 'See item in list/detail') }}
+                                    {{ perm_check('create', 'Create New Item', 'Create new items') }}
+                                    {{ perm_check('delete', 'Delete Item', 'Delete items entirely') }}
                                 </div>
-                                <div class="row g-3 mt-2">
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="items_edit_sku_type" id="items_edit_sku_type" 
-                                                   {% if perms.get('items', {}).get('edit_sku_type') %}checked{% endif %}
-                                                   {% if role.is_system_role %}disabled{% endif %}>
-                                            <label class="form-check-label" for="items_edit_sku_type">
-                                                <strong>Edit SKU/Type</strong><br><small class="text-muted">Edit SKU and Type</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="items_edit_description" id="items_edit_description" 
-                                                   {% if perms.get('items', {}).get('edit_description') %}checked{% endif %}
-                                                   {% if role.is_system_role %}disabled{% endif %}>
-                                            <label class="form-check-label" for="items_edit_description">
-                                                <strong>Edit Description</strong><br><small class="text-muted">Modify description</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="items_edit_datasheet" id="items_edit_datasheet" 
-                                                   {% if perms.get('items', {}).get('edit_datasheet') %}checked{% endif %}
-                                                   {% if role.is_system_role %}disabled{% endif %}>
-                                            <label class="form-check-label" for="items_edit_datasheet">
-                                                <strong>Edit Datasheet</strong><br><small class="text-muted">Edit datasheet link</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="items_edit_upload" id="items_edit_upload" 
-                                                   {% if perms.get('items', {}).get('edit_upload') %}checked{% endif %}
-                                                   {% if role.is_system_role %}disabled{% endif %}>
-                                            <label class="form-check-label" for="items_edit_upload">
-                                                <strong>Edit Upload</strong><br><small class="text-muted">Upload/delete files</small>
-                                            </label>
-                                        </div>
-                                    </div>
+                                <hr>
+
+                                <!-- Item Info -->
+                                <h6 class="text-primary mb-2"><i class="bi bi-info-circle"></i> Item Info</h6>
+                                <p class="small text-muted mb-2">If "View Item Info" is off but "View Item" is on, only UUID and Component Name are shown.</p>
+                                <div class="row g-3">
+                                    {{ perm_check('view_info', 'View Item Info', 'See Name, SKU, Type, Category, Footprint, Tags, Location, Min Qty') }}
+                                    {{ perm_check('edit_info', 'Edit Item Info', 'Edit all Item Info fields') }}
                                 </div>
-                                <div class="row g-3 mt-2">
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="items_edit_lending" id="items_edit_lending" 
-                                                   {% if perms.get('items', {}).get('edit_lending') %}checked{% endif %}
-                                                   {% if role.is_system_role %}disabled{% endif %}>
-                                            <label class="form-check-label" for="items_edit_lending">
-                                                <strong>Edit Lending</strong><br><small class="text-muted">Manage batch lending info</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="items_edit_price" id="items_edit_price" 
-                                                   {% if perms.get('items', {}).get('edit_price') %}checked{% endif %}
-                                                   {% if role.is_system_role %}disabled{% endif %}>
-                                            <label class="form-check-label" for="items_edit_price">
-                                                <strong>Edit Price</strong><br><small class="text-muted">Modify pricing</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="items_edit_quantity" id="items_edit_quantity" 
-                                                   {% if perms.get('items', {}).get('edit_quantity') %}checked{% endif %}
-                                                   {% if role.is_system_role %}disabled{% endif %}>
-                                            <label class="form-check-label" for="items_edit_quantity">
-                                                <strong>Edit Quantity</strong><br><small class="text-muted">Modify quantity</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="items_edit_location" id="items_edit_location" 
-                                                   {% if perms.get('items', {}).get('edit_location') %}checked{% endif %}
-                                                   {% if role.is_system_role %}disabled{% endif %}>
-                                            <label class="form-check-label" for="items_edit_location">
-                                                <strong>Edit Location</strong><br><small class="text-muted">Change location</small>
-                                            </label>
-                                        </div>
-                                    </div>
+                                <hr>
+
+                                <!-- Batch -->
+                                <h6 class="text-primary mb-2"><i class="bi bi-boxes"></i> Batch</h6>
+                                <p class="small text-muted mb-2">Price, Quantity, SN, Lending are kept separate because they relate to money and stock.</p>
+                                <div class="row g-3">
+                                    {{ perm_check('view_batch', 'View Batch', 'See batch section') }}
+                                    {{ perm_check('edit_batch', 'Edit Batch', 'Edit batch label, date, note, location') }}
+                                    {{ perm_check('edit_quantity', 'Edit Quantity', 'Change batch quantity (stock-sensitive)') }}
+                                    {{ perm_check('edit_price', 'Edit Price', 'Change batch price (money-sensitive)') }}
+                                    {{ perm_check('edit_sn', 'Edit Serial Number', 'Edit SN fields & tracking') }}
+                                    {{ perm_check('edit_lending', 'Edit Lending', 'Manage lend-to / lend-quantity') }}
+                                    {{ perm_check('delete_batch', 'Delete Batch', 'Remove a batch') }}
                                 </div>
-                                <div class="row g-3 mt-2">
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="items_edit_category" id="items_edit_category" 
-                                                   {% if perms.get('items', {}).get('edit_category') %}checked{% endif %}
-                                                   {% if role.is_system_role %}disabled{% endif %}>
-                                            <label class="form-check-label" for="items_edit_category">
-                                                <strong>Edit Category</strong><br><small class="text-muted">Change category</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="items_edit_footprint" id="items_edit_footprint" 
-                                                   {% if perms.get('items', {}).get('edit_footprint') %}checked{% endif %}
-                                                   {% if role.is_system_role %}disabled{% endif %}>
-                                            <label class="form-check-label" for="items_edit_footprint">
-                                                <strong>Edit Footprint</strong><br><small class="text-muted">Change footprint</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="items_edit_tags" id="items_edit_tags" 
-                                                   {% if perms.get('items', {}).get('edit_tags') %}checked{% endif %}
-                                                   {% if role.is_system_role %}disabled{% endif %}>
-                                            <label class="form-check-label" for="items_edit_tags">
-                                                <strong>Edit Tags</strong><br><small class="text-muted">Modify tags</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="items_edit_parameters" id="items_edit_parameters" 
-                                                   {% if perms.get('items', {}).get('edit_parameters') %}checked{% endif %}
-                                                   {% if role.is_system_role %}disabled{% endif %}>
-                                            <label class="form-check-label" for="items_edit_parameters">
-                                                <strong>Edit Parameters</strong><br><small class="text-muted">Edit parameters</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="row g-3 mt-2">
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="items_edit_batch" id="items_edit_batch" 
-                                                   {% if perms.get('items', {}).get('edit_batch') %}checked{% endif %}
-                                                   {% if role.is_system_role %}disabled{% endif %}>
-                                            <label class="form-check-label" for="items_edit_batch">
-                                                <strong>Edit Batch</strong><br><small class="text-muted">Add/edit/transfer batches</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="items_edit_serial" id="items_edit_serial" 
-                                                   {% if perms.get('items', {}).get('edit_serial') %}checked{% endif %}
-                                                   {% if role.is_system_role %}disabled{% endif %}>
-                                            <label class="form-check-label" for="items_edit_serial">
-                                                <strong>Edit Serial Numbers</strong><br><small class="text-muted">Toggle SN/ISN tracking</small>
-                                            </label>
-                                        </div>
-                                    </div>
+                                <hr>
+
+                                <!-- Advance Info -->
+                                <h6 class="text-primary mb-2"><i class="bi bi-layers"></i> Advance Info</h6>
+                                <p class="small text-muted mb-2">Covers Description, URLs, Files/Pictures, and Magic Parameters.</p>
+                                <div class="row g-3">
+                                    {{ perm_check('view_advance', 'View Advance Info', 'See Description, URLs, Files, Magic Params') }}
+                                    {{ perm_check('edit_advance', 'Edit Advance Info', 'Add/edit Advance Info items') }}
+                                    {{ perm_check('delete_advance', 'Delete Advance Info', 'Remove files/URLs/Magic Params') }}
                                 </div>
                             </div>
                         </div>

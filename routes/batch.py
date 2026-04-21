@@ -18,38 +18,67 @@ batch_bp = Blueprint('batch', __name__)
 def add_batch(uuid):
     """Add a new batch to an item"""
     item = Item.query.filter_by(uuid=uuid).first_or_404()
-    
+
+    # Adding a batch requires at least the general batch-edit permission.
     if not current_user.has_permission('items', 'edit_batch'):
         flash('You do not have permission to manage batches.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
-    
+
+    can_edit_qty = current_user.has_permission('items', 'edit_quantity')
+    can_edit_price = current_user.has_permission('items', 'edit_price')
+    can_edit_sn = current_user.has_permission('items', 'edit_sn')
+    can_edit_lending = current_user.has_permission('items', 'edit_lending')
+
     batch_label = request.form.get('batch_label', '').strip()[:32]
-    quantity = int(request.form.get('quantity', 0))
-    price_per_unit = float(request.form.get('price_per_unit', 0))
+    quantity = int(request.form.get('quantity', 0)) if can_edit_qty else 0
+    price_per_unit = float(request.form.get('price_per_unit', 0)) if can_edit_price else 0.0
     purchase_date_str = request.form.get('purchase_date', '')
     note = request.form.get('note', '').strip()[:128]
-    lend_to = request.form.get('lend_to', '').strip()
-    lend_quantity = int(request.form.get('lend_quantity', 0))
-    sn_tracking = request.form.get('sn_tracking', '') == 'on'
-    
+    lend_to = request.form.get('lend_to', '').strip() if can_edit_lending else ''
+    lend_quantity = int(request.form.get('lend_quantity', 0)) if can_edit_lending else 0
+    sn_tracking = (request.form.get('sn_tracking', '') == 'on') if can_edit_sn else False
+
+    # Per-batch location
+    follow_main = request.form.get('follow_main_location', 'on') == 'on'
+    batch_loc_id_raw = request.form.get('batch_location_id', '')
+    batch_rack_id_raw = request.form.get('batch_rack_id', '')
+    batch_drawer = request.form.get('batch_drawer', '').strip() or None
+    try:
+        batch_loc_id = int(batch_loc_id_raw) if batch_loc_id_raw else None
+    except (ValueError, TypeError):
+        batch_loc_id = None
+    try:
+        batch_rack_id = int(batch_rack_id_raw) if batch_rack_id_raw else None
+    except (ValueError, TypeError):
+        batch_rack_id = None
+    if follow_main:
+        batch_loc_id = None
+        batch_rack_id = None
+        batch_drawer = None
+    elif batch_rack_id:
+        batch_loc_id = None  # rack overrides general location
+    else:
+        batch_rack_id = None
+        batch_drawer = None
+
     if quantity < 0:
         flash('Quantity cannot be negative.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
-    
+
     # Limit per batch: 100 if tracking, otherwise 99999
     max_qty = 100 if sn_tracking else 99999
     if quantity > max_qty:
         quantity = max_qty
-    
+
     purchase_date = None
     if purchase_date_str:
         try:
             purchase_date = datetime.strptime(purchase_date_str, '%Y-%m-%d').date()
         except ValueError:
             pass
-    
+
     batch_number = item.get_next_batch_number()
-    
+
     batch = ItemBatch(
         item_id=item.id,
         batch_number=batch_number,
@@ -60,21 +89,25 @@ def add_batch(uuid):
         note=note or None,
         lend_to=lend_to or '',
         lend_quantity=min(lend_quantity, quantity),
-        sn_tracking_enabled=sn_tracking
+        sn_tracking_enabled=sn_tracking,
+        follow_main_location=follow_main,
+        location_id=batch_loc_id,
+        rack_id=batch_rack_id,
+        drawer=batch_drawer,
     )
     db.session.add(batch)
     db.session.flush()  # Get batch id
-    
+
     # Generate serial numbers if tracking is enabled for this batch
     if sn_tracking:
         batch.generate_serial_numbers()
-    
+
     # Recalculate item totals
     item.recalculate_from_batches()
     item.updated_by = current_user.id
-    
+
     db.session.commit()
-    
+
     log_audit(current_user.id, 'create', 'batch', batch.id,
               f'Added batch #{batch_number} to item: {item.name} (qty: {quantity}, price: {price_per_unit})')
     flash(f'Batch "{batch.get_display_label()}" added successfully!', 'success')
@@ -87,50 +120,97 @@ def edit_batch(uuid, batch_id):
     """Edit an existing batch"""
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     batch = ItemBatch.query.get_or_404(batch_id)
-    
+
     if batch.item_id != item.id:
         flash('Batch does not belong to this item.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
-    
-    if not current_user.has_permission('items', 'edit_batch'):
+
+    can_edit_batch = current_user.has_permission('items', 'edit_batch')
+    can_edit_qty = current_user.has_permission('items', 'edit_quantity')
+    can_edit_price = current_user.has_permission('items', 'edit_price')
+    can_edit_sn = current_user.has_permission('items', 'edit_sn')
+    can_edit_lending = current_user.has_permission('items', 'edit_lending')
+
+    if not (can_edit_batch or can_edit_qty or can_edit_price or can_edit_lending or can_edit_sn):
         flash('You do not have permission to manage batches.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
-    
+
     old_qty = batch.quantity
-    
-    batch.batch_label = (request.form.get('batch_label', '').strip()[:32]) or None
-    new_qty = int(request.form.get('quantity', 0))
-    # If tracking enabled, quantity is controlled by Add/Delete, use hidden field value
-    if batch.sn_tracking_enabled:
-        batch.quantity = old_qty  # Keep current, ignore form value
-    else:
-        batch.quantity = min(new_qty, 99999)
-    batch.price_per_unit = float(request.form.get('price_per_unit', 0))
-    batch.note = (request.form.get('note', '').strip()[:128]) or None
-    
-    # Lend fields (only when SN tracking is off)
-    if not batch.sn_tracking_enabled:
-        batch.lend_to = request.form.get('lend_to', '').strip()
-        batch.lend_quantity = min(int(request.form.get('lend_quantity', 0)), batch.quantity)
-    
-    purchase_date_str = request.form.get('purchase_date', '')
-    if purchase_date_str:
+
+    # General batch fields (label, date, note, location)
+    if can_edit_batch:
+        batch.batch_label = (request.form.get('batch_label', '').strip()[:32]) or None
+        batch.note = (request.form.get('note', '').strip()[:128]) or None
+
+        purchase_date_str = request.form.get('purchase_date', '')
+        if purchase_date_str:
+            try:
+                batch.purchase_date = datetime.strptime(purchase_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+        else:
+            batch.purchase_date = None
+
+        # Per-batch location
+        follow_main = request.form.get('follow_main_location', 'on') == 'on'
+        batch.follow_main_location = follow_main
+        if follow_main:
+            batch.location_id = None
+            batch.rack_id = None
+            batch.drawer = None
+        else:
+            batch_loc_id_raw = request.form.get('batch_location_id', '')
+            batch_rack_id_raw = request.form.get('batch_rack_id', '')
+            batch_drawer = request.form.get('batch_drawer', '').strip() or None
+            try:
+                batch_loc_id = int(batch_loc_id_raw) if batch_loc_id_raw else None
+            except (ValueError, TypeError):
+                batch_loc_id = None
+            try:
+                batch_rack_id = int(batch_rack_id_raw) if batch_rack_id_raw else None
+            except (ValueError, TypeError):
+                batch_rack_id = None
+            if batch_rack_id:
+                batch.location_id = None
+                batch.rack_id = batch_rack_id
+                batch.drawer = batch_drawer
+            else:
+                batch.location_id = batch_loc_id
+                batch.rack_id = None
+                batch.drawer = None
+
+    # Quantity (only when SN tracking is off - else controlled via SN Add/Delete)
+    if can_edit_qty and not batch.sn_tracking_enabled:
         try:
-            batch.purchase_date = datetime.strptime(purchase_date_str, '%Y-%m-%d').date()
-        except ValueError:
+            new_qty = int(request.form.get('quantity', batch.quantity))
+            batch.quantity = max(0, min(new_qty, 99999))
+        except (ValueError, TypeError):
             pass
-    else:
-        batch.purchase_date = None
-    
+
+    # Price
+    if can_edit_price:
+        try:
+            batch.price_per_unit = float(request.form.get('price_per_unit', batch.price_per_unit))
+        except (ValueError, TypeError):
+            pass
+
+    # Lending (only when SN tracking is off - per-SN lending used otherwise)
+    if can_edit_lending and not batch.sn_tracking_enabled:
+        batch.lend_to = request.form.get('lend_to', '').strip()
+        try:
+            batch.lend_quantity = min(int(request.form.get('lend_quantity', 0)), batch.quantity)
+        except (ValueError, TypeError):
+            pass
+
     # Regenerate serial numbers if quantity changed and tracking enabled on this batch
     if batch.sn_tracking_enabled and batch.quantity != old_qty:
         batch.generate_serial_numbers()
-    
+
     item.recalculate_from_batches()
     item.updated_by = current_user.id
-    
+
     db.session.commit()
-    
+
     log_audit(current_user.id, 'update', 'batch', batch.id,
               f'Updated batch #{batch.batch_number} of item: {item.name}')
     flash(f'Batch "{batch.get_display_label()}" updated successfully!', 'success')
@@ -147,11 +227,11 @@ def delete_batch(uuid, batch_id):
     if batch.item_id != item.id:
         flash('Batch does not belong to this item.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
-    
-    if not current_user.has_permission('items', 'edit_batch'):
-        flash('You do not have permission to manage batches.', 'danger')
+
+    if not current_user.has_permission('items', 'delete_batch'):
+        flash('You do not have permission to delete batches.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
-    
+
     batch_label = batch.get_display_label()
     db.session.delete(batch)
     
@@ -171,10 +251,10 @@ def delete_batch(uuid, batch_id):
 def bulk_delete_batches(uuid):
     """Bulk delete batches"""
     item = Item.query.filter_by(uuid=uuid).first_or_404()
-    
-    if not current_user.has_permission('items', 'edit_batch'):
+
+    if not current_user.has_permission('items', 'delete_batch'):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
-    
+
     data = request.get_json()
     batch_ids = data.get('batch_ids', [])
     
@@ -203,9 +283,10 @@ def bulk_delete_batches(uuid):
 def transfer_batch(uuid):
     """Transfer quantity between batches"""
     item = Item.query.filter_by(uuid=uuid).first_or_404()
-    
-    if not current_user.has_permission('items', 'edit_batch'):
-        flash('You do not have permission to manage batches.', 'danger')
+
+    # Transferring changes both quantities; require quantity edit permission.
+    if not current_user.has_permission('items', 'edit_quantity'):
+        flash('You do not have permission to transfer quantities.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
     
     from_batch_id = int(request.form.get('from_batch_id', 0))
@@ -299,7 +380,7 @@ def update_serial_numbers(uuid, batch_id):
         flash('Batch does not belong to this item.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
     
-    if not current_user.has_permission('items', 'edit_serial'):
+    if not current_user.has_permission('items', 'edit_sn'):
         flash('You do not have permission to manage serial numbers.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
     
@@ -327,7 +408,7 @@ def update_serial_info(uuid, batch_id):
         flash('Batch does not belong to this item.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
     
-    if not current_user.has_permission('items', 'edit_serial'):
+    if not current_user.has_permission('items', 'edit_sn'):
         flash('You do not have permission to manage serial numbers.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
     
@@ -385,11 +466,11 @@ def inline_update_sn(uuid):
         return jsonify({'success': False, 'message': 'Invalid serial number'}), 400
 
     if field == 'sn':
-        if not current_user.has_permission('items', 'edit_serial'):
+        if not current_user.has_permission('items', 'edit_sn'):
             return jsonify({'success': False, 'message': 'Permission denied'}), 403
         sn.serial_number = value
     elif field == 'info':
-        if not current_user.has_permission('items', 'edit_serial'):
+        if not current_user.has_permission('items', 'edit_sn'):
             return jsonify({'success': False, 'message': 'Permission denied'}), 403
         sn.info = value[:32]
     elif field == 'lend':
@@ -414,7 +495,7 @@ def bulk_update_sn(uuid):
     sn_ids = data.get('sn_ids', [])
     fields = data.get('fields', {})
 
-    can_edit_serial = current_user.has_permission('items', 'edit_serial')
+    can_edit_sn = current_user.has_permission('items', 'edit_sn')
     can_edit_lending = current_user.has_permission('items', 'edit_lending')
 
     count = 0
@@ -423,10 +504,10 @@ def bulk_update_sn(uuid):
         if not sn or sn.batch.item_id != item.id:
             continue
 
-        if 'sn' in fields and can_edit_serial:
+        if 'sn' in fields and can_edit_sn:
             sn.serial_number = fields['sn']
             count += 1
-        if 'info' in fields and can_edit_serial:
+        if 'info' in fields and can_edit_sn:
             sn.info = fields['info'][:32]
             count += 1
         if 'lend' in fields and can_edit_lending:
@@ -445,7 +526,9 @@ def delete_selected_sn(uuid):
     """Delete selected serial numbers and reduce batch quantity"""
     item = Item.query.filter_by(uuid=uuid).first_or_404()
 
-    if not current_user.has_permission('items', 'edit_batch'):
+    # Needs both SN edit (to remove SNs) and quantity edit (quantity is reduced).
+    if not (current_user.has_permission('items', 'edit_sn') and
+            current_user.has_permission('items', 'edit_quantity')):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
 
     data = request.get_json()
@@ -486,7 +569,7 @@ def transfer_selected_sn(uuid):
     """Transfer selected serial numbers to another batch (ISN kept as-is)"""
     item = Item.query.filter_by(uuid=uuid).first_or_404()
 
-    if not current_user.has_permission('items', 'edit_batch'):
+    if not current_user.has_permission('items', 'edit_quantity'):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
 
     data = request.get_json()
@@ -579,7 +662,9 @@ def add_sn_to_batch(uuid):
     """Add new serial numbers to a batch (appends to end)"""
     item = Item.query.filter_by(uuid=uuid).first_or_404()
 
-    if not current_user.has_permission('items', 'edit_batch'):
+    # Adding SNs increases quantity; require both SN edit and quantity edit.
+    if not (current_user.has_permission('items', 'edit_sn') and
+            current_user.has_permission('items', 'edit_quantity')):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
 
     data = request.get_json()
@@ -628,7 +713,7 @@ def remap_isn(uuid):
     """Regenerate ISN sequence for a batch while keeping SN, info, lend_to"""
     item = Item.query.filter_by(uuid=uuid).first_or_404()
 
-    if not current_user.has_permission('items', 'edit_serial'):
+    if not current_user.has_permission('items', 'edit_sn'):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
 
     data = request.get_json()

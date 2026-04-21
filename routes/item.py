@@ -172,18 +172,7 @@ def item_new():
     if not perms.get('can_create'):
         flash('You do not have permission to create new items.', 'danger')
         return redirect(url_for('item.items'))
-    
-    # Also check if user has ANY edit permission (in case someone tries to create with form directly)
-    if not (perms.get('can_edit_name') or perms.get('can_edit_sku_type') or 
-            perms.get('can_edit_description') or perms.get('can_edit_datasheet') or
-            perms.get('can_edit_upload') or
-            perms.get('can_edit_price') or perms.get('can_edit_quantity') or
-            perms.get('can_edit_location') or perms.get('can_edit_category') or
-            perms.get('can_edit_footprint') or perms.get('can_edit_tags') or
-            perms.get('can_edit_parameters')):
-        flash('You do not have permission to create items.', 'danger')
-        return redirect(url_for('item.items'))
-    
+
     # Create form with permission-based field disabling
     form = ItemAddForm(perms=perms)
     locations = Location.query.order_by(Location.name).all()
@@ -203,56 +192,46 @@ def item_new():
             prefill_rack_id = rack.id
     
     if form.validate_on_submit():
-        # For view-only users, check if they're trying to edit
-        if not (perms.get('can_edit_name') or perms.get('can_edit_sku_type') or 
-                perms.get('can_edit_description') or perms.get('can_edit_datasheet') or
-                perms.get('can_edit_upload') or
-                perms.get('can_edit_price') or perms.get('can_edit_quantity') or
-                perms.get('can_edit_location') or perms.get('can_edit_category') or
-                perms.get('can_edit_footprint') or perms.get('can_edit_tags') or
-                perms.get('can_edit_parameters')):
-            flash('You do not have permission to create items with any editable fields.', 'danger')
+        # Creation requires edit_info permission (item name is required)
+        if not perms.get('can_edit_info'):
+            flash('You do not have permission to create items (missing Edit Item Info).', 'danger')
             return redirect(url_for('item.items'))
-        
-        # Apply default values for fields user cannot edit
-        location_id = form.location_id.data if form.location_id.data and perms['can_edit_location'] else None
-        rack_id = request.form.get('rack_id') if perms['can_edit_location'] else None
-        drawer = request.form.get('drawer') if perms['can_edit_location'] else None
-        
+
+        # Item Info fields (all gated by can_edit_info)
+        location_id = form.location_id.data if form.location_id.data else None
+        rack_id = request.form.get('rack_id')
+        drawer = request.form.get('drawer')
+
         # Determine location type
         if rack_id and int(rack_id) > 0:
-            # Drawer storage
             location_id_value = None
             rack_id_value = int(rack_id)
             drawer_value = drawer
         else:
-            # General location
             location_id_value = location_id if location_id and location_id != 0 else None
             rack_id_value = None
             drawer_value = None
-        
-        # Get selected tags (only if can edit tags)
-        selected_tags = request.form.getlist('tags[]') if perms['can_edit_tags'] else []
+
+        # Tags live under Item Info
+        selected_tags = request.form.getlist('tags[]')
         tags_json = json.dumps([int(t) for t in selected_tags if t])
-        
-        # Create item with role-based restrictions
-        # Note: quantity and price are managed through batches, not direct input
+
         item = Item(
-            name=form.name.data if perms['can_edit_name'] else 'New Item',
-            sku=form.sku.data if form.sku.data and perms['can_edit_sku_type'] else None,
-            info=form.info.data if perms['can_edit_sku_type'] else None,
-            description=form.description.data if perms['can_edit_description'] else None,
+            name=form.name.data,
+            sku=form.sku.data if form.sku.data else None,
+            info=form.info.data,
+            description=form.description.data if perms['can_edit_advance'] else None,
             quantity=0,
             price=0.0,
             location_id=location_id_value,
             rack_id=rack_id_value,
             drawer=drawer_value,
-            min_quantity=form.min_quantity.data if form.min_quantity.data and perms['can_edit_quantity'] else 0,
-            no_stock_warning=form.no_stock_warning.data if perms['can_edit_quantity'] else True,
-            category_id=form.category_id.data if form.category_id.data and form.category_id.data > 0 and perms['can_edit_category'] else None,
-            footprint_id=form.footprint_id.data if form.footprint_id.data and form.footprint_id.data > 0 and perms['can_edit_footprint'] else None,
+            min_quantity=form.min_quantity.data or 0,
+            no_stock_warning=form.no_stock_warning.data,
+            category_id=form.category_id.data if form.category_id.data and form.category_id.data > 0 else None,
+            footprint_id=form.footprint_id.data if form.footprint_id.data and form.footprint_id.data > 0 else None,
             tags=tags_json,
-            datasheet_urls=form.datasheet_urls.data if perms['can_edit_datasheet'] else None,
+            datasheet_urls=form.datasheet_urls.data if perms['can_edit_advance'] else None,
             created_by=current_user.id,
             updated_by=current_user.id
         )
@@ -266,20 +245,22 @@ def item_new():
         except (json.JSONDecodeError, TypeError):
             pending_batches = []
 
-        if isinstance(pending_batches, list) and perms.get('can_edit_quantity'):
+        # Pending batches require edit_batch (general batch fields) to create,
+        # and the quantity/price/sn sub-fields are still gated individually.
+        if isinstance(pending_batches, list) and perms.get('can_edit_batch'):
             from models import ItemBatch
             for pb in pending_batches:
                 if not isinstance(pb, dict):
                     continue
-                qty = int(pb.get('quantity', 0))
+                qty = int(pb.get('quantity', 0)) if perms.get('can_edit_quantity') else 0
                 if qty < 0:
                     qty = 0
-                sn_tracking = bool(pb.get('sn_tracking', False))
+                sn_tracking = bool(pb.get('sn_tracking', False)) if perms.get('can_edit_sn') else False
                 max_qty = 100 if sn_tracking else 99999
                 if qty > max_qty:
                     qty = max_qty
                 label = str(pb.get('label', '')).strip()[:32] or None
-                price = float(pb.get('price', 0) or 0)
+                price = float(pb.get('price', 0) or 0) if perms.get('can_edit_price') else 0.0
                 if price < 0:
                     price = 0.0
                 date_str = pb.get('date', '')
@@ -290,6 +271,27 @@ def item_new():
                         purchase_date = _dt.strptime(date_str, '%Y-%m-%d').date()
                     except ValueError:
                         pass
+
+                # Per-batch location
+                follow_main = pb.get('follow_main_location', True)
+                if follow_main is None:
+                    follow_main = True
+                batch_loc_id = pb.get('location_id') or None
+                batch_rack_id = pb.get('rack_id') or None
+                batch_drawer = pb.get('drawer') or None
+                try:
+                    batch_loc_id = int(batch_loc_id) if batch_loc_id else None
+                except (ValueError, TypeError):
+                    batch_loc_id = None
+                try:
+                    batch_rack_id = int(batch_rack_id) if batch_rack_id else None
+                except (ValueError, TypeError):
+                    batch_rack_id = None
+                if follow_main:
+                    batch_loc_id = None
+                    batch_rack_id = None
+                    batch_drawer = None
+
                 batch = ItemBatch(
                     item_id=item.id,
                     batch_number=item.get_next_batch_number(),
@@ -298,6 +300,10 @@ def item_new():
                     price_per_unit=price,
                     purchase_date=purchase_date,
                     sn_tracking_enabled=sn_tracking,
+                    follow_main_location=bool(follow_main),
+                    location_id=batch_loc_id,
+                    rack_id=batch_rack_id,
+                    drawer=batch_drawer,
                 )
                 db.session.add(batch)
                 db.session.flush()  # get batch.id before generating SNs
@@ -376,18 +382,15 @@ def item_edit(uuid):
     
     # Get user permissions for this item
     perms = get_item_edit_permissions(current_user)
-    
+
     # Check if user has any edit permissions
-    if not (perms.get('can_edit_name') or perms.get('can_edit_sku_type') or 
-            perms.get('can_edit_description') or perms.get('can_edit_datasheet') or
-            perms.get('can_edit_upload') or
-            perms.get('can_edit_price') or perms.get('can_edit_quantity') or
-            perms.get('can_edit_location') or perms.get('can_edit_category') or
-            perms.get('can_edit_footprint') or perms.get('can_edit_tags') or
-            perms.get('can_edit_parameters')):
+    if not (perms.get('can_edit_info') or perms.get('can_edit_batch') or
+            perms.get('can_edit_quantity') or perms.get('can_edit_price') or
+            perms.get('can_edit_sn') or perms.get('can_edit_lending') or
+            perms.get('can_edit_advance')):
         flash('You do not have permission to edit items.', 'danger')
         return redirect(url_for('item.item_detail', uuid=item.uuid))
-    
+
     # Create form with permission-based field disabling
     form = ItemEditForm(obj=item, perms=perms)
     locations = Location.query.order_by(Location.name).all()
@@ -397,66 +400,39 @@ def item_edit(uuid):
     all_tags = [{'id': t.id, 'name': t.name, 'color': t.color} for t in Tag.query.order_by(Tag.name).all()]
     
     if form.validate_on_submit():
-        # Check if user has permission to edit anything
-        if not (perms.get('can_edit_name') or perms.get('can_edit_sku_type') or 
-                perms.get('can_edit_description') or perms.get('can_edit_datasheet') or
-                perms.get('can_edit_upload') or
-                perms.get('can_edit_price') or perms.get('can_edit_quantity') or
-                perms.get('can_edit_location') or perms.get('can_edit_category') or
-                perms.get('can_edit_footprint') or perms.get('can_edit_tags') or
-                perms.get('can_edit_parameters')):
-            flash('You do not have permission to edit this item.', 'danger')
-            return redirect(url_for('item.item_detail', uuid=item.uuid))
-        
-        # Only update fields user has permission for
-        if perms['can_edit_name']:
+        # Item Info section (all fields gated by edit_info)
+        if perms['can_edit_info']:
             item.name = form.name.data
-        
-        if perms['can_edit_sku_type']:
             item.sku = form.sku.data if form.sku.data else None
             item.info = form.info.data
-        
-        if perms['can_edit_description']:
-            item.description = form.description.data
-        
-        if perms['can_edit_datasheet']:
-            item.datasheet_urls = form.datasheet_urls.data
-        
-        # Note: price and quantity are managed through batches
-        # Only min_quantity and no_stock_warning are editable here
-        if perms['can_edit_quantity']:
-            item.min_quantity = form.min_quantity.data
+            item.min_quantity = form.min_quantity.data or 0
             item.no_stock_warning = form.no_stock_warning.data
-        
-        if perms['can_edit_location']:
+            item.category_id = form.category_id.data if form.category_id.data and form.category_id.data > 0 else None
+            item.footprint_id = form.footprint_id.data if form.footprint_id.data and form.footprint_id.data > 0 else None
+
+            # Location (main)
             location_id = form.location_id.data if form.location_id.data else None
             rack_id = request.form.get('rack_id')
             drawer = request.form.get('drawer')
-            
-            # Determine location type
             if rack_id and int(rack_id) > 0:
-                # Drawer storage
                 item.location_id = None
                 item.rack_id = int(rack_id)
                 item.drawer = drawer
             else:
-                # General location
                 item.location_id = location_id if location_id and location_id != 0 else None
                 item.rack_id = None
                 item.drawer = None
-        
-        if perms['can_edit_category']:
-            item.category_id = form.category_id.data if form.category_id.data and form.category_id.data > 0 else None
-        
-        if perms['can_edit_footprint']:
-            item.footprint_id = form.footprint_id.data if form.footprint_id.data and form.footprint_id.data > 0 else None
-        
-        if perms['can_edit_tags']:
-            # Get selected tags
+
+            # Tags
             selected_tags = request.form.getlist('tags[]')
             tags_json = json.dumps([int(t) for t in selected_tags if t])
             item.tags = tags_json
-        
+
+        # Advance Info section
+        if perms['can_edit_advance']:
+            item.description = form.description.data
+            item.datasheet_urls = form.datasheet_urls.data
+
         item.updated_at = datetime.now(timezone.utc)
         item.updated_by = current_user.id
         
@@ -607,9 +583,9 @@ def upload_attachment(item_id):
     item = Item.query.get_or_404(item_id)
     form = AttachmentForm()
     
-    # SECURITY CHECK: Verify user has upload permission
-    if not current_user.has_permission('items', 'edit_upload'):
-        flash('❌ You do not have permission to upload files.', 'danger')
+    # SECURITY CHECK: Verify user has advance edit permission (files live under Advance Info)
+    if not current_user.has_permission('items', 'edit_advance'):
+        flash('You do not have permission to upload files.', 'danger')
         log_audit(current_user.id, 'denied', 'attachment_upload', item.id, f'Unauthorized upload attempt to item: {item.name}')
         return redirect(url_for('item.item_detail', uuid=item.uuid))
     
@@ -677,7 +653,11 @@ def upload_attachment(item_id):
 def delete_attachment(id):
     attachment = Attachment.query.get_or_404(id)
     item = attachment.item
-    
+
+    if not current_user.has_permission('items', 'delete_advance'):
+        flash('You do not have permission to delete files.', 'danger')
+        return redirect(url_for('item.item_edit', uuid=item.uuid))
+
     try:
         if attachment.file_path and is_safe_file_path(attachment.file_path):
             if os.path.exists(attachment.file_path):
@@ -700,7 +680,10 @@ def delete_attachment(id):
 def rename_attachment(attachment_id):
     """Rename an attachment file"""
     attachment = Attachment.query.get_or_404(attachment_id)
-    
+
+    if not current_user.has_permission('items', 'edit_advance'):
+        return jsonify({'success': False, 'error': 'You do not have permission to rename files.'}), 403
+
     try:
         data = request.get_json()
         new_name = data.get('new_name', '').strip()
@@ -730,7 +713,10 @@ def rename_attachment(attachment_id):
 def update_datasheets(item_id):
     """Update item datasheet URLs via AJAX"""
     item = Item.query.get_or_404(item_id)
-    
+
+    if not current_user.has_permission('items', 'edit_advance'):
+        return jsonify({'success': False, 'error': 'You do not have permission to edit datasheets.'}), 403
+
     try:
         data = request.get_json()
         datasheets = data.get('datasheets', [])
@@ -766,7 +752,7 @@ def item_populate_template(id):
     item = Item.query.get_or_404(id)
     
     # SECURITY CHECK: Verify user has parameter edit permission
-    if not current_user.has_permission('items', 'edit_parameters'):
+    if not current_user.has_permission('items', 'edit_advance'):
         flash('❌ You do not have permission to apply templates.', 'danger')
         log_audit(current_user.id, 'denied', 'item_template_apply', id, f'Unauthorized template apply attempt to item: {item.name}')
         return redirect(url_for('item.item_edit', uuid=item.uuid))
@@ -811,7 +797,7 @@ def item_add_parameter(id):
     item = Item.query.get_or_404(id)
     
     # SECURITY CHECK: Verify user has parameter edit permission
-    if not current_user.has_permission('items', 'edit_parameters'):
+    if not current_user.has_permission('items', 'edit_advance'):
         flash('❌ You do not have permission to add parameters.', 'danger')
         log_audit(current_user.id, 'denied', 'item_parameter_add', id, f'Unauthorized parameter add attempt to item: {item.name}')
         return redirect(url_for('item.item_edit', uuid=item.uuid))
@@ -896,19 +882,19 @@ def item_delete_parameter(item_id, param_id):
     item = Item.query.get_or_404(item_id)
     item_param = ItemParameter.query.get_or_404(param_id)
     
-    # SECURITY CHECK: Verify user has parameter edit permission
-    if not current_user.has_permission('items', 'edit_parameters'):
-        flash('❌ You do not have permission to delete parameters.', 'danger')
+    # SECURITY CHECK: Deletion requires delete_advance
+    if not current_user.has_permission('items', 'delete_advance'):
+        flash('You do not have permission to delete parameters.', 'danger')
         log_audit(current_user.id, 'denied', 'item_parameter_delete', item_id, f'Unauthorized parameter delete attempt to item: {item.name}')
         return redirect(url_for('item.item_edit', uuid=item.uuid))
-    
+
     if item_param.item_id != item_id:
         flash('Invalid parameter!', 'danger')
         return redirect(url_for('item.item_edit', uuid=item.uuid))
-    
+
     db.session.delete(item_param)
     db.session.commit()
-    
+
     log_audit(current_user.id, 'update', 'item', item_id, f'Removed parameter from item: {item.name}')
     flash('Parameter removed successfully!', 'success')
     return redirect(url_for('item.item_edit', uuid=item.uuid))

@@ -354,24 +354,27 @@ def role_new():
         
         # Create new role with default permissions (all false)
         default_perms = {
-            # Item Management (granular)
+            # Item Management (simplified schema grouped by concern)
             "items": {
-                "view": False, 
+                # Component
+                "view": False,
                 "create": False,
-                "delete": False, 
-                "edit_name": False,
-                "edit_sku_type": False,
-                "edit_description": False,
-                "edit_datasheet": False,
-                "edit_upload": False,
+                "delete": False,
+                # Item Info
+                "view_info": False,
+                "edit_info": False,
+                # Batch
+                "view_batch": False,
+                "edit_batch": False,
+                "edit_quantity": False,
+                "edit_price": False,
+                "edit_sn": False,
                 "edit_lending": False,
-                "edit_price": False, 
-                "edit_quantity": False, 
-                "edit_location": False,
-                "edit_category": False,
-                "edit_footprint": False,
-                "edit_tags": False,
-                "edit_parameters": False
+                "delete_batch": False,
+                # Advance Info
+                "view_advance": False,
+                "edit_advance": False,
+                "delete_advance": False,
             },
             # Page Permissions
             "pages": {
@@ -444,11 +447,18 @@ def role_edit(id):
                 "settings_sections": {}
             }
             
-            # Items permissions (granular)
-            item_actions = ['view', 'create', 'delete', 'edit_name', 'edit_sku_type', 'edit_description', 
-                           'edit_datasheet', 'edit_upload', 'edit_lending', 'edit_price', 'edit_quantity', 
-                           'edit_location', 'edit_category', 'edit_footprint', 'edit_tags', 'edit_parameters',
-                           'edit_batch', 'edit_serial']
+            # Items permissions (simplified schema)
+            item_actions = [
+                # Component
+                'view', 'create', 'delete',
+                # Item Info
+                'view_info', 'edit_info',
+                # Batch
+                'view_batch', 'edit_batch', 'edit_quantity', 'edit_price',
+                'edit_sn', 'edit_lending', 'delete_batch',
+                # Advance Info
+                'view_advance', 'edit_advance', 'delete_advance',
+            ]
             for action in item_actions:
                 checkbox_name = f'items_{action}'
                 perms['items'][action] = checkbox_name in request.form
