@@ -26,5 +26,5 @@
       "dest": "static/lib/Sortable.min.js"
     }
   ],
-  "_custom_note": "User additions go under static/custom/: fonts in static/custom/font/, themes in static/custom/theme/, icon packs in static/custom/icon/<pack>/. CSS files inside static/custom/icon/ are auto-loaded; themes are loaded per-user when selected in Settings."
+  "_custom_note": "User additions go under static/custom/: fonts in static/custom/font/ and themes in static/custom/theme/. Icons are fixed to the bundled Bootstrap Icons library — no custom icon packs."
 }

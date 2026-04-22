@@ -59,7 +59,6 @@ class Startup:
             # Custom assets (user-provided, optional)
             'static/custom/font',
             'static/custom/theme',
-            'static/custom/icon',
         ]
         for d in dirs:
             path = os.path.join(self.project_root, d)

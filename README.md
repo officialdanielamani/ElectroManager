@@ -85,7 +85,7 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 ### Personalisation
 - **Themes** — Light, Dark, Blue, Keqing; theme CSS files are auto-detected from `static/custom/theme/` so new themes can be added by dropping in a CSS file
 - **Fonts** — built-in system fonts plus any font files placed in `static/custom/font/` (e.g. OpenDyslexic); selected per user in settings
-- **Icon packs** — drop custom icon packs into `static/custom/icon/<pack>/` (each pack in its own folder with its CSS + webfont files); CSS is auto-loaded and the icons show up in the QR template editor
+- **Icons** — the bundled Bootstrap Icons library is used everywhere (site navigation and the QR template editor). Custom icon packs are intentionally not supported; stick to Bootstrap Icons so layouts render identically everywhere.
 - Per-user table column visibility for item and project lists
 
 ### Notifications
@@ -160,35 +160,14 @@ Every time the container (or local server) starts, `startup/init.py` runs throug
 ./static/custom:/app/static/custom    # already in docker-compose.yml
 ```
 
-Three dedicated subfolders — no manual registration needed:
+Two dedicated subfolders — no manual registration needed:
 
 | Folder | Purpose |
 |--------|---------|
 | `static/custom/font/` | Font files (`.woff2` / `.woff` / `.ttf` / `.otf`). Detected by `/api/available-fonts`; available in the user font picker. |
-| `static/custom/theme/` | Theme CSS files with a `/* Theme Metadata */` header. Detected by `/api/available-themes`; available in the theme picker. |
-| `static/custom/icon/<pack>/` | One folder per icon pack, each containing the pack CSS plus its webfont/image assets. All CSS is auto-loaded globally; icons show up in the QR template editor. |
+| `static/custom/theme/` | Theme CSS files with a `/* Theme Metadata */` header. Detected and listed in the theme picker under **Settings → Personalisation**. |
 
-**Example — adding Font Awesome:**
-
-Each pack must live in its own subdirectory under `static/custom/icon/`. Flat CSS files dropped directly under `static/custom/icon/` are ignored so a partial dump doesn't show up as multiple spurious packs (`solid`, `regular`, `brand`, …).
-
-1. Download the Font Awesome "Web" release.
-2. Copy the contents into `static/custom/icon/fontawesome/` so the layout is:
-   ```
-   static/custom/icon/fontawesome/
-   ├── css/all.min.css            (or any .css files — all are auto-loaded and
-   ├── css/solid.min.css           merged into the single "fontawesome" pack)
-   ├── css/regular.min.css
-   ├── css/brands.min.css
-   └── webfonts/
-       ├── fa-solid-900.woff2
-       ├── fa-regular-400.woff2
-       └── fa-brands-400.woff2
-   ```
-   The CSS already references `../webfonts/…` so no path editing is needed.
-3. Restart the container — no rebuild required.
-
-On the QR template editor the pack shows up as a single **"Fontawesome"** entry and the icon grid lists every icon found across those CSS files.
+> Icon packs are intentionally not supported — the app uses the bundled Bootstrap Icons everywhere so QR templates and UI stay consistent across installs.
 
 ### Linux / Mac Setup
 
@@ -297,7 +276,7 @@ ElectroManager/
 │   ├── fonts/                    # Project fonts for personalisation (e.g. OpenDyslexic)
 │   ├── icons/                    # Bootstrap Icons — core, downloaded at build/startup
 │   ├── lib/                      # Bootstrap CSS/JS + SortableJS — core, downloaded at build/startup
-│   └── custom/                   # ← User-provided: icon packs, extra fonts, custom CSS (bind-mounted in Docker)
+│   └── custom/                   # ← User-provided: custom fonts + themes (bind-mounted in Docker)
 │
 ├── uploads/                      # User file uploads (runtime, bind-mounted in Docker)
 └── instance/
@@ -332,12 +311,11 @@ ElectroManager/
 | Bootstrap Icons | 1.11.1 | Core icon set |
 | SortableJS | 1.15.0 | Drag-and-drop sorting |
 
-**JavaScript / CSS — custom** (optional, place in `static/custom/`, never checked at startup)
+**Customisable assets** (optional, place under `static/custom/`, no rebuild needed)
 
 | Example | How to add |
 |---------|-----------|
-| Font Awesome (or any icon pack) | Drop the pack folder into `static/custom/icon/<pack>/` (each pack gets its own subfolder) |
-| Custom theme | Drop a `.css` file into `static/custom/theme/` |
+| Custom theme | Drop a `.css` file into `static/custom/theme/` (see existing themes for the metadata header format) |
 | Personalisation font | Drop font files into `static/custom/font/` — no CSS needed, `@font-face` is generated automatically |
 
 ---

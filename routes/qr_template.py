@@ -1,7 +1,7 @@
 """
 QR/Barcode Sticker Template Routes - Blueprint
 """
-from flask import Blueprint, render_template, request, jsonify, send_file, redirect, url_for, flash
+from flask import Blueprint, render_template, request, jsonify, send_file, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from models import db, Item, Location, Rack, StickerTemplate
 from qr_utils import (
@@ -19,8 +19,6 @@ import re
 logger = logging.getLogger(__name__)
 
 qr_template_bp = Blueprint('qr_template', __name__)
-
-_SAFE_ICON_PACKAGE_RE = re.compile(r'^[A-Za-z0-9_-]+$')
 
 @qr_template_bp.route('/settings/qr', methods=['GET'], endpoint='settings_qr')
 @login_required
@@ -303,11 +301,10 @@ def preview_element(template_id):
         elif element_type == 'icon':
             from qr_utils import generate_icon_svg
             icon_name = data.get('icon_name', '')
-            icon_package = data.get('icon_package', 'bootstrap-icons')
             icon_color = data.get('icon_color', '#000000')
             # Scale icon to fit container (80% of minimum dimension)
             icon_size = min(width, height) * 0.8
-            svg = generate_icon_svg(icon_name, icon_package, int(icon_size), icon_color, width, height)
+            svg = generate_icon_svg(icon_name, int(icon_size), icon_color, width, height)
             return jsonify({'svg': svg, 'success': True})
         else:
             return jsonify({'error': 'Unknown element type', 'success': False}), 400
@@ -342,140 +339,19 @@ def api_available_fonts():
     """Get list of available fonts (system + project)"""
     return jsonify(get_available_fonts())
 
-def _icon_pack_css_paths(package):
-    """Return every CSS file path that belongs to the given icon pack.
-
-    Convention:
-    - Core pack: `static/icons/<package>.css` (single flat file, e.g. Bootstrap Icons).
-    - Custom pack: `static/custom/icon/<package>/` — a subdirectory holding one or
-      more CSS files and its webfont assets. All `.css` files inside the subtree
-      are merged so packs like Font Awesome (which split icons across
-      solid.css / regular.css / brands.css) surface as a single package.
-    """
+@qr_template_bp.route('/api/icons')
+def api_get_icons():
+    """Return the bundled Bootstrap Icons catalogue (name + class)."""
     import os
-
-    # Defense in depth: validate here as well, since this helper constructs paths.
-    if not isinstance(package, str) or not _SAFE_ICON_PACKAGE_RE.fullmatch(package):
-        return []
-
-    paths = []
-
-    # Core pack (flat file)
-    core_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'icons'))
-    flat_css = os.path.abspath(os.path.join(core_root, f'{package}.css'))
-    if os.path.commonpath([core_root, flat_css]) == core_root and os.path.isfile(flat_css):
-        paths.append(flat_css)
-
-    # Custom pack (subdirectory)
-    custom_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'custom', 'icon'))
-    pack_dir = os.path.abspath(os.path.join(custom_root, package))
-    if os.path.commonpath([custom_root, pack_dir]) == custom_root and os.path.isdir(pack_dir):
-        for root, _, files in os.walk(pack_dir):
-            for fname in sorted(files):
-                if fname.endswith('.css'):
-                    paths.append(os.path.join(root, fname))
-    return paths
-
-
-def _list_icon_packages():
-    """Return the list of installed icon packages.
-
-    - `static/icons/` (core): each flat `.css` file is a pack — used for the
-      bundled Bootstrap Icons.
-    - `static/custom/icon/<pack>/` (custom): each subdirectory that contains at
-      least one CSS file is a pack. Flat CSS files placed directly under
-      `static/custom/icon/` are ignored so partial Font Awesome dumps don't
-      appear as multiple spurious packs (solid, regular, brand, all, …).
-    """
-    import os
-    seen = set()
-    packages = []
-
-    core_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'icons'))
-    if os.path.isdir(core_root):
-        for entry in sorted(os.listdir(core_root)):
-            if entry.endswith('.css'):
-                pack_id = entry[:-4]
-                if _SAFE_ICON_PACKAGE_RE.match(pack_id) and pack_id not in seen:
-                    seen.add(pack_id)
-                    packages.append({'id': pack_id, 'name': pack_id.replace('-', ' ').title()})
-
-    custom_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'custom', 'icon'))
-    if os.path.isdir(custom_root):
-        for entry in sorted(os.listdir(custom_root)):
-            entry_path = os.path.join(custom_root, entry)
-            if not os.path.isdir(entry_path):
-                continue
-            if not _SAFE_ICON_PACKAGE_RE.match(entry):
-                continue
-            has_css = any(
-                f.endswith('.css')
-                for _, _, files in os.walk(entry_path)
-                for f in files
-            )
-            if has_css and entry not in seen:
-                seen.add(entry)
-                packages.append({'id': entry, 'name': entry.replace('-', ' ').title()})
-    return packages
-
-
-@qr_template_bp.route('/api/icon-packages')
-def api_icon_packages():
-    """Get list of available icon packages (core `static/icons/` + `static/custom/icon/`)."""
-    return jsonify(_list_icon_packages())
-
-
-def _parse_icons_from_css(css_content):
-    """Extract (name, class) pairs from a CSS file.
-
-    Supports:
-    - Bootstrap Icons: `.bi-NAME::before` or `:before` with content
-    - Font Awesome 6/7: `.fa-NAME{--fa:"\\Exxx"}` (uses CSS variables)
-    - Generic prefixed classes: `.PREFIX-NAME::?before { content: ... }`
-    """
-    # Bootstrap Icons pattern
-    bi = set(re.findall(r'\.bi-([a-z0-9\-]+):{1,2}before', css_content))
-    if bi:
-        return [{'name': n, 'class': f'bi bi-{n}'} for n in sorted(bi)]
-
-    # Font Awesome pattern (v6/v7): variable-based
-    fa = set(re.findall(r'\.fa-([a-zA-Z0-9\-]+)\{--fa:', css_content))
-    if fa:
-        # FA6/7 needs both the style and icon class (default: solid)
-        return [{'name': n, 'class': f'fa-solid fa-{n}'} for n in sorted(fa)]
-
-    # Generic fallback: any `.PREFIX-NAME::before { content: ... }` rule
-    generic = re.findall(r'\.([a-zA-Z][a-zA-Z0-9]*)-([a-z0-9\-]+):{1,2}before\s*\{[^}]*content\s*:', css_content)
-    if generic:
-        # Group by prefix so we pick the prefix with the most matches
-        from collections import Counter
-        counts = Counter(p for p, _ in generic)
-        top_prefix = counts.most_common(1)[0][0]
-        names = sorted({n for p, n in generic if p == top_prefix})
-        return [{'name': n, 'class': f'{top_prefix} {top_prefix}-{n}'} for n in names]
-
-    return []
-
-
-@qr_template_bp.route('/api/icons/<package>')
-def api_get_icons(package):
-    """Get icons from a specific package (core or custom)."""
-    if not package or not _SAFE_ICON_PACKAGE_RE.match(package):
+    css_path = os.path.join(current_app.root_path, 'static', 'icons', 'bootstrap-icons.css')
+    if not os.path.isfile(css_path):
         return jsonify([])
-
-    css_paths = _icon_pack_css_paths(package)
-    if not css_paths:
-        return jsonify([])
-
     try:
-        icons_by_name = {}
-        for path in css_paths:
-            with open(path, 'r', encoding='utf-8') as f:
-                css_content = f.read()
-            for icon in _parse_icons_from_css(css_content):
-                icons_by_name.setdefault(icon['name'], icon)
-        return jsonify(sorted(icons_by_name.values(), key=lambda i: i['name']))
+        with open(css_path, 'r', encoding='utf-8') as f:
+            css_content = f.read()
+        names = sorted(set(re.findall(r'\.bi-([a-z0-9\-]+):{1,2}before', css_content)))
+        return jsonify([{'name': n, 'class': f'bi bi-{n}'} for n in names])
     except Exception as e:
-        logger.error(f"Error reading icons from {package}: {e}")
+        logger.error(f"Error reading Bootstrap Icons CSS: {e}")
         return jsonify([])
 

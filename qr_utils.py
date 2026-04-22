@@ -229,22 +229,19 @@ def render_template_to_svg(template, data):
         
         elif element['type'] == 'icon':
             icon_name = element.get('icon_name', '')
-            icon_package = element.get('icon_package', 'bootstrap-icons')
             icon_color = element.get('icon_color', '#000000')
-            
+
             # Scale icon to fit container (80% of container size)
             icon_size_px = min(w_px, h_px) * 0.8
-            
+
             if icon_name:
-                print(f"[SVG] Element {idx}: ICON = '{icon_name}' from '{icon_package}' (container: {w_px}×{h_px}px, scaled size: {icon_size_px}px, color: {icon_color})")
+                print(f"[SVG] Element {idx}: ICON = '{icon_name}' (container: {w_px}×{h_px}px, scaled size: {icon_size_px}px, color: {icon_color})")
                 try:
-                    # Generate icon SVG using the icon font
-                    icon_svg = generate_icon_svg(icon_name, icon_package, int(icon_size_px), icon_color, int(w_px), int(h_px))
+                    icon_svg = generate_icon_svg(icon_name, int(icon_size_px), icon_color, int(w_px), int(h_px))
                     svg += f'  <g transform="translate({x_px}, {y_px})">{icon_svg}</g>\n'
                 except Exception as e:
                     print(f"[SVG] Icon generation error: {e}")
-                    # Fallback: just show a placeholder
-                    svg += f'  <rect x="{x_px}" y="{y_py}" width="{w_px}" height="{h_px}" '
+                    svg += f'  <rect x="{x_px}" y="{y_px}" width="{w_px}" height="{h_px}" '
                     svg += f'fill="lightgray" stroke="red" stroke-width="1"/>\n'
                     svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" '
                     svg += f'text-anchor="middle">Icon Error</text>\n'
@@ -414,22 +411,19 @@ def generate_barcode_svg(data, format_type, width, height, show_label=False):
         print(f"[BARCODE] Returning placeholder")
         return placeholder
 
-def generate_icon_svg(icon_name, icon_package, icon_size, icon_color, container_width, container_height):
-    """Generate icon as actual SVG <path> extracted from the icon font file.
-    
-    Previously used @font-face text rendering which fails in browser previews
-    because inline SVG @font-face rules don't reliably load when the SVG is
-    inserted via innerHTML. Extracting the glyph outline as an SVG path works
-    everywhere: browser preview, PDF, SVG download, PNG export.
+def generate_icon_svg(icon_name, icon_size, icon_color, container_width, container_height):
+    """Generate icon as actual SVG <path> extracted from the Bootstrap Icons font.
+
+    Extracting the glyph outline as an SVG path works everywhere: browser
+    preview, PDF, SVG download, PNG export.
     """
-    print(f"[ICON] Generating icon: {icon_name} from {icon_package} (size: {icon_size}px, color: {icon_color})")
-    
+    print(f"[ICON] Generating icon: {icon_name} (size: {icon_size}px, color: {icon_color})")
+
     try:
         center_x = container_width / 2
         center_y = container_height / 2
-        
-        # Get the SVG path data from the font file
-        path_data, glyph_bounds, units_per_em = get_icon_path(icon_name, icon_package)
+
+        path_data, glyph_bounds, units_per_em = get_icon_path(icon_name)
         
         if not path_data:
             print(f"[ICON] Warning: Could not extract path for {icon_name}")
@@ -477,13 +471,16 @@ def generate_icon_svg(icon_name, icon_package, icon_size, icon_color, container_
 # Cache for loaded font data to avoid re-reading font files repeatedly
 _font_cache = {}
 
-def get_icon_path(icon_name, icon_package):
-    """Extract SVG path data for an icon from its font file using fontTools.
-    
+_BS_ICON_PACKAGE = 'bootstrap-icons'
+
+
+def get_icon_path(icon_name):
+    """Extract SVG path data for a Bootstrap Icons glyph using fontTools.
+
     Returns: (path_data, bounds, units_per_em) or (None, None, None)
     """
     import os
-    
+
     try:
         from fontTools.ttLib import TTFont
         from fontTools.pens.svgPathPen import SVGPathPen
@@ -491,33 +488,31 @@ def get_icon_path(icon_name, icon_package):
     except ImportError:
         print("[ICON] fontTools not available, cannot extract icon paths")
         return None, None, None
-    
+
     try:
-        # Get unicode codepoint for the icon from CSS
-        icon_unicode_char = get_icon_unicode(icon_name, icon_package)
+        icon_unicode_char = get_icon_unicode(icon_name)
         if not icon_unicode_char:
             return None, None, None
-        
+
         codepoint = ord(icon_unicode_char)
-        
-        # Load font (cached)
-        if icon_package not in _font_cache:
+
+        if _BS_ICON_PACKAGE not in _font_cache:
             icons_dir = os.path.join(current_app.root_path, 'static', 'icons')
             font_path = None
             for ext in ['.woff2', '.woff', '.ttf', '.otf']:
-                candidate = os.path.join(icons_dir, icon_package + ext)
+                candidate = os.path.join(icons_dir, _BS_ICON_PACKAGE + ext)
                 if os.path.exists(candidate):
                     font_path = candidate
                     break
-            
+
             if not font_path:
-                print(f"[ICON] No font file found for {icon_package}")
+                print("[ICON] No Bootstrap Icons font file found in static/icons/")
                 return None, None, None
-            
-            _font_cache[icon_package] = TTFont(font_path)
+
+            _font_cache[_BS_ICON_PACKAGE] = TTFont(font_path)
             print(f"[ICON] Loaded and cached font: {font_path}")
-        
-        font = _font_cache[icon_package]
+
+        font = _font_cache[_BS_ICON_PACKAGE]
         cmap = font.getBestCmap()
         units_per_em = font['head'].unitsPerEm
         
@@ -552,45 +547,29 @@ def get_icon_path(icon_name, icon_package):
         traceback.print_exc()
         return None, None, None
 
-def get_icon_unicode(icon_name, icon_package):
-    """Extract unicode character for icon from CSS file"""
+def get_icon_unicode(icon_name):
+    """Extract unicode character for a Bootstrap Icon from bootstrap-icons.css."""
     import os
     import re
-    
+
     try:
-        css_path = os.path.join(current_app.root_path, 'static', 'icons', f'{icon_package}.css')
-        
+        css_path = os.path.join(current_app.root_path, 'static', 'icons', 'bootstrap-icons.css')
+
         if not os.path.exists(css_path):
             print(f"[ICON] CSS file not found: {css_path}")
             return None
-        
+
         with open(css_path, 'r', encoding='utf-8') as f:
             css_content = f.read()
-        
-        # First, try to detect the prefix by looking at the first icon class
-        # Pattern: .prefix-something::before
-        prefix_match = re.search(r'\.([a-z]+)-[a-z0-9\-]+::before', css_content)
-        
-        if not prefix_match:
-            print(f"[ICON] Could not detect CSS prefix in {icon_package}.css")
-            return None
-        
-        prefix = prefix_match.group(1)
-        print(f"[ICON] Detected prefix '{prefix}' from CSS file")
-        
-        # Now look for the specific icon with the detected prefix
-        pattern = rf'\.{prefix}-{re.escape(icon_name)}::before\s*{{\s*content:\s*"(\\[0-9a-fA-F]+)";'
+
+        pattern = rf'\.bi-{re.escape(icon_name)}::before\s*{{\s*content:\s*"(\\[0-9a-fA-F]+)";'
         match = re.search(pattern, css_content)
-        
         if match:
-            unicode_escape = match.group(1)
-            # Convert \f123 to actual unicode character
-            unicode_value = int(unicode_escape[1:], 16)
-            unicode_char = chr(unicode_value)
+            unicode_value = int(match.group(1)[1:], 16)
             print(f"[ICON] Found unicode for {icon_name}: U+{unicode_value:04X}")
-            return unicode_char
-        
-        print(f"[ICON] Could not find icon '{icon_name}' with prefix '{prefix}' in CSS")
+            return chr(unicode_value)
+
+        print(f"[ICON] Could not find icon '{icon_name}' in bootstrap-icons.css")
         return None
         
     except Exception as e:

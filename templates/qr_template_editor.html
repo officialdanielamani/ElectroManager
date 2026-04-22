@@ -999,11 +999,10 @@ function createElementDiv(element, index) {
         
         const iconColor = element.icon_color || '#000000';
         
-        if (element.icon_name && element.icon_package) {
+        if (element.icon_name) {
             // Has icon selected - scale to fit container (use 80% of container size)
             const containerSize = Math.min(w, h) * 0.8;
-            const iconClass = `bi bi-${element.icon_name}`;
-            div.innerHTML = `<i class="${iconClass}" style="font-size: ${containerSize}px; color: ${iconColor};"></i>`;
+            div.innerHTML = `<i class="bi bi-${element.icon_name}" style="font-size: ${containerSize}px; color: ${iconColor};"></i>`;
         } else {
             // Empty - show placeholder
             div.innerHTML = `<div style="width: 100%; height: 100%; border: 2px dashed #666; display: flex; align-items: center; justify-content: center; background: rgba(100,100,100,0.05); position: relative;"><i class="bi bi-image" style="font-size: ${Math.min(w, h) * 0.5}px; color: #666;"></i><span style="position: absolute; bottom: 2px; right: 2px; font-size: calc(${MM_TO_PX}px * 2); color: #666; background: white; padding: 1px 3px; border-radius: 2px;">Icon</span></div>`;
@@ -1299,26 +1298,18 @@ function updatePropertiesPanel(index) {
             <input type="text" class="form-control form-control-sm" id="prop-layername" value="${layerName}" style="font-size: 12px;">
         </div>
         
-        <!-- Icon Package Selection -->
-        <div class="mb-2">
-            <label class="form-label" style="font-size: 12px;"><strong>Icon Package</strong></label>
-            <select class="form-select form-select-sm" id="prop-icon-package" style="font-size: 12px;">
-                <option value="">Select icon package...</option>
-            </select>
-            <small class="text-muted" style="font-size: 11px;">Choose an icon library</small>
-        </div>
-        
         <!-- Icon Search -->
         <div class="mb-2">
             <label class="form-label" style="font-size: 12px;"><strong>Search Icons</strong></label>
-            <input type="text" class="form-control form-control-sm" id="prop-icon-search" placeholder="Search icon name..." style="font-size: 12px;">
+            <input type="text" class="form-control form-control-sm" id="prop-icon-search" placeholder="Search Bootstrap Icons..." style="font-size: 12px;">
+            <small class="text-muted" style="font-size: 11px;">Bootstrap Icons bundled with ElectroManager</small>
         </div>
-        
+
         <!-- Icon Preview Grid -->
         <div class="mb-2">
             <label class="form-label" style="font-size: 12px;"><strong>Icon Preview</strong></label>
             <div id="prop-icon-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; max-height: 250px; overflow-y: auto; border: 1px solid #ddd; padding: 8px; border-radius: 4px; background: #f9f9f9;">
-                <p class="text-muted mb-0" style="font-size: 11px; grid-column: 1/-1; text-align: center; padding: 20px 0;">Select package to browse icons</p>
+                <p class="text-muted mb-0" style="font-size: 11px; grid-column: 1/-1; text-align: center; padding: 20px 0;">Loading icons…</p>
             </div>
         </div>
         
@@ -1625,34 +1616,23 @@ function attachPropertyListeners(index) {
     document.getElementById('prop-show-label')?.addEventListener('change', e => updateProp('show_label', e.target.checked));
     
     // Icon element handlers
-    const iconPackageSelect = document.getElementById('prop-icon-package');
     const iconSearchInput = document.getElementById('prop-icon-search');
     const iconColorInput = document.getElementById('prop-icon-color');
     const iconColorText = document.getElementById('prop-icon-color-text');
     const iconSizeInput = document.getElementById('prop-icon-size');
-    
-    if (iconPackageSelect) {
-        // Load icon packages on initialization
-        loadIconPackages(iconPackageSelect, el);
-        
-        iconPackageSelect.addEventListener('change', (e) => {
-            updateProp('icon_package', e.target.value);
-            loadIconsForPackage(e.target.value, el);
-        });
-    }
-    
+
     if (iconSearchInput) {
         iconSearchInput.addEventListener('input', (e) => {
             filterIconGrid(e.target.value, el);
         });
     }
-    
+
     if (iconColorInput && iconColorText) {
         iconColorInput.addEventListener('change', (e) => {
             iconColorText.value = e.target.value;
             updateProp('icon_color', e.target.value);
         });
-        
+
         iconColorText.addEventListener('change', (e) => {
             if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
                 iconColorInput.value = e.target.value;
@@ -1660,7 +1640,7 @@ function attachPropertyListeners(index) {
             }
         });
     }
-    
+
     if (iconSizeInput) {
         iconSizeInput.addEventListener('blur', (e) => {
             updateProp('icon_size_mm', parseFloat(e.target.value));
@@ -1672,53 +1652,27 @@ function attachPropertyListeners(index) {
             }
         });
     }
-    
-    // Load initial icons if package is already selected
-    if (el.icon_package) {
-        loadIconsForPackage(el.icon_package, el);
-    }
+
+    // Load Bootstrap Icons catalogue
+    loadBootstrapIcons(el);
 }
 
-// Icon package and icon management functions
-let allIconsCache = {}; // Cache icons by package name
+// Bootstrap Icons catalogue (cached across calls in this page)
+let bootstrapIconsCache = null;
 
-async function loadIconPackages(selectElement, element) {
+async function loadBootstrapIcons(element) {
+    const grid = document.getElementById('prop-icon-grid');
     try {
-        const response = await fetch('/api/icon-packages');
-        const packages = await response.json();
-        
-        selectElement.innerHTML = '<option value="">Select icon package...</option>';
-        packages.forEach(pkg => {
-            const option = document.createElement('option');
-            option.value = pkg.id;
-            option.textContent = pkg.name;
-            if (element.icon_package === pkg.id) {
-                option.selected = true;
-            }
-            selectElement.appendChild(option);
-        });
-    } catch (error) {
-        console.error('Error loading icon packages:', error);
-    }
-}
-
-async function loadIconsForPackage(packageName, element) {
-    if (!packageName) {
-        document.getElementById('prop-icon-grid').innerHTML = '<p class="text-muted mb-0" style="font-size: 11px; grid-column: 1/-1; text-align: center; padding: 20px 0;">Select package to browse icons</p>';
-        return;
-    }
-    
-    try {
-        // Check cache first
-        if (!allIconsCache[packageName]) {
-            const response = await fetch(`/api/icons/${packageName}`);
-            allIconsCache[packageName] = await response.json();
+        if (!bootstrapIconsCache) {
+            const response = await fetch('/api/icons');
+            bootstrapIconsCache = await response.json();
         }
-        
-        displayIconGrid(allIconsCache[packageName], element);
+        displayIconGrid(bootstrapIconsCache, element);
     } catch (error) {
         console.error('Error loading icons:', error);
-        document.getElementById('prop-icon-grid').innerHTML = '<p class="text-danger mb-0" style="font-size: 11px; grid-column: 1/-1;">Error loading icons</p>';
+        if (grid) {
+            grid.innerHTML = '<p class="text-danger mb-0" style="font-size: 11px; grid-column: 1/-1;">Error loading icons</p>';
+        }
     }
 }
 
@@ -1755,9 +1709,7 @@ function displayIconGrid(icons, element) {
 }
 
 function filterIconGrid(searchText, element) {
-    if (!element.icon_package) return;
-    
-    const icons = allIconsCache[element.icon_package] || [];
+    const icons = bootstrapIconsCache || [];
     const filtered = icons.filter(icon => icon.name.includes(searchText.toLowerCase()));
     
     if (searchText.trim()) {
@@ -1980,7 +1932,6 @@ document.getElementById('btn-add-icon').addEventListener('click', () => {
     layout.push({
         id: 'icon-' + Date.now(),
         type: 'icon',
-        icon_package: '',
         icon_name: '',
         x_mm: 2,
         y_mm: 2,
