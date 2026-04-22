@@ -349,6 +349,11 @@ def _icon_pack_css_paths(package):
     pack) and in `static/custom/icon/<package>/` (for any user-added pack).
     """
     import os
+
+    # Defense in depth: validate here as well, since this helper constructs paths.
+    if not isinstance(package, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', package):
+        return []
+
     roots = [
         os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'custom', 'icon')),
         os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'icons')),
