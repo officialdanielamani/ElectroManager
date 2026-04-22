@@ -58,69 +58,49 @@
     
     <!-- Theme CSS - Load immediately for non-light themes (server validates file exists) -->
     {% if current_theme and current_theme != 'light' %}
-    <link id="theme-link" rel="stylesheet" href="{{ url_for('static', filename='css/themes/' + current_theme + '.css') }}?v=1" onerror="console.warn('Theme CSS failed to load, fallback to light theme')">
+    <link id="theme-link" rel="stylesheet" href="{{ url_for('static', filename='custom/theme/' + current_theme + '.css') }}?v=1" onerror="console.warn('Theme CSS failed to load, fallback to light theme')">
     {% else %}
     <link id="theme-link" rel="stylesheet" href="">
     {% endif %}
-    
-    <!-- Font Face Definitions (Local Files + Dynamic Project Fonts) -->
+
+    <!-- Font Face Definitions — rules are generated dynamically from static/custom/font/ -->
     <style id="project-fonts-style">
-        @font-face {
-            font-family: 'OpenDyslexic';
-            src: 
-                url('{{ url_for("static", filename="fonts/OpenDyslexic-Regular.woff2") }}') format('woff2'),
-                url('{{ url_for("static", filename="fonts/OpenDyslexic-Regular.ttf") }}') format('truetype'),
-                url('{{ url_for("static", filename="fonts/OpenDyslexic-Regular.otf") }}') format('opentype');
-            font-weight: 400;
-            font-display: swap;
-        }
-        
-        @font-face {
-            font-family: 'OpenDyslexic';
-            src: 
-                url('{{ url_for("static", filename="fonts/OpenDyslexic-Bold.woff2") }}') format('woff2'),
-                url('{{ url_for("static", filename="fonts/OpenDyslexic-Bold.ttf") }}') format('truetype'),
-                url('{{ url_for("static", filename="fonts/OpenDyslexic-Bold.otf") }}') format('opentype');
-            font-weight: bold;
-            font-display: swap;
-        }
-        
         /* Placeholder for dynamic project fonts - will be filled by script below */
     </style>
-    
+
     <!-- Inline script to load and inject all project fonts -->
     <script>
         (function() {
-            // Load all available fonts and inject @font-face rules
             fetch('/api/available-fonts')
                 .then(response => response.json())
                 .then(fonts => {
                     const projectFonts = fonts.filter(f => f.type === 'project');
                     if (projectFonts.length > 0) {
                         const styleEl = document.getElementById('project-fonts-style');
+                        const fontBase = '{{ url_for("static", filename="custom/font/") }}';
                         let fontFaceRules = styleEl.textContent;
-                        
+
                         projectFonts.forEach(font => {
                             fontFaceRules += `
                                 @font-face {
                                     font-family: '${font.id}';
-                                    src: url('{{ url_for("static", filename="fonts/") }}${font.id}.woff2') format('woff2'),
-                                         url('{{ url_for("static", filename="fonts/") }}${font.id}-Regular.woff2') format('woff2'),
-                                         url('{{ url_for("static", filename="fonts/") }}${font.id}.woff') format('woff'),
-                                         url('{{ url_for("static", filename="fonts/") }}${font.id}-Regular.woff') format('woff'),
-                                         url('{{ url_for("static", filename="fonts/") }}${font.id}.ttf') format('truetype'),
-                                         url('{{ url_for("static", filename="fonts/") }}${font.id}-Regular.ttf') format('truetype'),
-                                         url('{{ url_for("static", filename="fonts/") }}${font.id}.otf') format('opentype');
+                                    src: url('${fontBase}${font.id}.woff2') format('woff2'),
+                                         url('${fontBase}${font.id}-Regular.woff2') format('woff2'),
+                                         url('${fontBase}${font.id}.woff') format('woff'),
+                                         url('${fontBase}${font.id}-Regular.woff') format('woff'),
+                                         url('${fontBase}${font.id}.ttf') format('truetype'),
+                                         url('${fontBase}${font.id}-Regular.ttf') format('truetype'),
+                                         url('${fontBase}${font.id}.otf') format('opentype');
                                     font-display: swap;
                                 }
                             `;
                         });
-                        
+
                         styleEl.textContent = fontFaceRules;
-                        console.log(`Loaded ${projectFonts.length} project fonts`);
+                        console.log(`Loaded ${projectFonts.length} custom fonts`);
                     }
                 })
-                .catch(err => console.log('Could not load project fonts:', err));
+                .catch(err => console.log('Could not load custom fonts:', err));
         })();
     </script>
     

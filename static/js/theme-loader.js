@@ -58,7 +58,7 @@ const ThemeLoader = {
    */
   async loadTheme(themeName) {
     try {
-      const response = await fetch(`/static/css/themes/${themeName}.css`);
+      const response = await fetch(`/static/custom/theme/${themeName}.css`);
       const cssText = await response.text();
       const metadata = this.parseThemeMetadata(cssText);
       

@@ -113,13 +113,19 @@ def load_dependencies():
             elif 'icons' in dest:
                 css_files.append('icons/bootstrap-icons.css')
         
-        # Auto-include any .css files the user placed in static/custom/
-        # (custom icon packs, Font Awesome, extra themes, etc.)
-        custom_dir = os.path.join(app.root_path, 'static', 'custom')
-        if os.path.isdir(custom_dir):
-            for fname in sorted(os.listdir(custom_dir)):
-                if fname.endswith('.css'):
-                    css_files.append(f'custom/{fname}')
+        # Auto-include every CSS file inside static/custom/icon/ so custom
+        # icon packs (Font Awesome, etc.) render automatically. Themes are
+        # loaded per-user in base.html, not bundled globally.
+        custom_icon_dir = os.path.join(app.root_path, 'static', 'custom', 'icon')
+        if os.path.isdir(custom_icon_dir):
+            for entry in sorted(os.listdir(custom_icon_dir)):
+                entry_path = os.path.join(custom_icon_dir, entry)
+                if os.path.isdir(entry_path):
+                    for fname in sorted(os.listdir(entry_path)):
+                        if fname.endswith('.css'):
+                            css_files.append(f'custom/icon/{entry}/{fname}')
+                elif entry.endswith('.css'):
+                    css_files.append(f'custom/icon/{entry}')
 
         return css_files, js_files, libs
     except Exception as e:
@@ -136,7 +142,7 @@ def inject_theme():
         import re
         
         def get_available_themes():
-            themes_dir = os.path.join(app.root_path, 'static', 'css', 'themes')
+            themes_dir = os.path.join(app.root_path, 'static', 'custom', 'theme')
             theme_ids = []
             if os.path.exists(themes_dir):
                 for file in os.listdir(themes_dir):

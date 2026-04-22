@@ -26,5 +26,5 @@
       "dest": "static/lib/Sortable.min.js"
     }
   ],
-  "_custom_note": "Optional icon packs (e.g. Font Awesome), custom fonts, and extra CSS can be placed in static/custom/ — they are loaded automatically without any startup check."
+  "_custom_note": "User additions go under static/custom/: fonts in static/custom/font/, themes in static/custom/theme/, icon packs in static/custom/icon/<pack>/. CSS files inside static/custom/icon/ are auto-loaded; themes are loaded per-user when selected in Settings."
 }

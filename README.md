@@ -83,9 +83,9 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 - Per-user profile photo upload
 
 ### Personalisation
-- **Themes** — Light, Dark, Blue, Keqing; theme CSS files are auto-detected from `static/css/themes/` so new themes can be added by dropping in a CSS file
-- **Fonts** — built-in system fonts plus any font files placed in `static/fonts/` (e.g. OpenDyslexic); selected per user in settings
-- **Custom CSS / icon packs / fonts** — place any `.css` or font file (`.woff2`, `.woff`, `.ttf`, `.otf`) in `static/custom/` and it is loaded automatically on the next startup; no rebuild required (see [Custom assets](#custom-assets) below)
+- **Themes** — Light, Dark, Blue, Keqing; theme CSS files are auto-detected from `static/custom/theme/` so new themes can be added by dropping in a CSS file
+- **Fonts** — built-in system fonts plus any font files placed in `static/custom/font/` (e.g. OpenDyslexic); selected per user in settings
+- **Icon packs** — drop custom icon packs into `static/custom/icon/<pack>/` (each pack in its own folder with its CSS + webfont files); CSS is auto-loaded and the icons show up in the QR template editor
 - Per-user table column visibility for item and project lists
 
 ### Notifications
@@ -160,23 +160,20 @@ Every time the container (or local server) starts, `startup/init.py` runs throug
 ./static/custom:/app/static/custom    # already in docker-compose.yml
 ```
 
-| What to drop in | Effect |
-|----------------|--------|
-| `*.css` | Loaded on every page (use for icon packs, extra themes, overrides) |
-| `*.woff2` / `*.woff` / `*.ttf` / `*.otf` | Served as static files (reference from your custom CSS) |
+Three dedicated subfolders — no manual registration needed:
+
+| Folder | Purpose |
+|--------|---------|
+| `static/custom/font/` | Font files (`.woff2` / `.woff` / `.ttf` / `.otf`). Detected by `/api/available-fonts`; available in the user font picker. |
+| `static/custom/theme/` | Theme CSS files with a `/* Theme Metadata */` header. Detected by `/api/available-themes`; available in the theme picker. |
+| `static/custom/icon/<pack>/` | One folder per icon pack, each containing the pack CSS plus its webfont/image assets. All CSS is auto-loaded globally; icons show up in the QR template editor. |
 
 **Example — adding Font Awesome:**
 1. Download the Font Awesome "Web" release
-2. Copy `css/all.min.css` → `static/custom/fontawesome.css`
-3. Copy `webfonts/` files → `static/custom/` (and update the `src:` paths in the CSS to match)
-4. Restart the container — no rebuild needed
-
-At startup the log will confirm what was found:
-```
-[STEP] Detecting custom assets (static/custom/)
-[OK] CSS  : ['fontawesome.css']
-[OK] Fonts: ['fa-solid-900.woff2', ...]
-```
+2. Create the folder `static/custom/icon/fontawesome/`
+3. Copy `css/all.min.css` → `static/custom/icon/fontawesome/fontawesome.css`
+4. Copy the `webfonts/` directory → `static/custom/icon/fontawesome/webfonts/` (the CSS already references `../webfonts/*`, so no path editing is needed)
+5. Restart the container — no rebuild required
 
 ### Linux / Mac Setup
 
@@ -324,9 +321,9 @@ ElectroManager/
 
 | Example | How to add |
 |---------|-----------|
-| Font Awesome (or any icon pack) | Drop CSS + font files into `static/custom/` |
-| Custom theme | Drop a `.css` file into `static/custom/` |
-| Personalisation font | Drop font files into `static/custom/` and reference via CSS |
+| Font Awesome (or any icon pack) | Drop the pack folder into `static/custom/icon/<pack>/` (each pack gets its own subfolder) |
+| Custom theme | Drop a `.css` file into `static/custom/theme/` |
+| Personalisation font | Drop font files into `static/custom/font/` — no CSS needed, `@font-face` is generated automatically |
 
 ---
 

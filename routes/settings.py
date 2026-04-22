@@ -28,7 +28,7 @@ def parse_theme_metadata(theme_name):
     import os
     import re
     
-    css_file = os.path.join(current_app.root_path, 'static', 'css', 'themes', f'{theme_name}.css')
+    css_file = os.path.join(current_app.root_path, 'static', 'custom', 'theme', f'{theme_name}.css')
     metadata = {
         'name': theme_name.capitalize(),
         'description': 'Custom theme',
@@ -60,9 +60,9 @@ def parse_theme_metadata(theme_name):
 
 
 def get_available_themes():
-    """Get list of available themes from static/css/themes with metadata"""
+    """Get list of available themes from static/custom/theme with metadata"""
     import os
-    themes_dir = os.path.join(current_app.root_path, 'static', 'css', 'themes')
+    themes_dir = os.path.join(current_app.root_path, 'static', 'custom', 'theme')
     available_themes = []
     if os.path.exists(themes_dir):
         for file in os.listdir(themes_dir):
@@ -81,9 +81,9 @@ def get_available_themes():
 
 
 def get_available_fonts():
-    """Get list of available fonts - system fonts + project fonts from static/fonts"""
+    """Get list of available fonts - system fonts + custom fonts from static/custom/font"""
     import os
-    
+
     # Built-in system fonts (always available)
     system_fonts = [
         {'id': 'system', 'name': 'System (Default)', 'type': 'system'},
@@ -95,9 +95,9 @@ def get_available_fonts():
         {'id': 'Comic Sans MS', 'name': 'Comic Sans MS', 'type': 'system'},
         {'id': 'Trebuchet MS', 'name': 'Trebuchet MS', 'type': 'system'},
     ]
-    
-    # Project fonts from static/fonts
-    fonts_dir = os.path.join(current_app.root_path, 'static', 'fonts')
+
+    # Custom fonts from static/custom/font
+    fonts_dir = os.path.join(current_app.root_path, 'static', 'custom', 'font')
     font_extensions = {'.woff2', '.woff', '.ttf', '.otf'}
     font_names_set = set()
     
@@ -109,9 +109,9 @@ def get_available_fonts():
                 font_name = font_base.rsplit('-', 1)[0] if '-' in font_base else font_base
                 font_names_set.add(font_name)
     
-    # Add project fonts to the list
+    # Add custom fonts to the list
     project_fonts = [
-        {'id': name, 'name': name, 'type': 'project'} 
+        {'id': name, 'name': name, 'type': 'project'}
         for name in sorted(list(font_names_set))
     ]
     
