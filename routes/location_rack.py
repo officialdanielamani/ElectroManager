@@ -3,7 +3,7 @@ Location Rack Routes Blueprint
 """
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file, abort, current_app
 from flask_login import login_required, current_user, login_user, logout_user
-from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate
+from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate, ItemBatch
 from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEditForm, AttachmentForm, 
                    SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm)
 from helpers import is_safe_url, format_currency, is_safe_file_path
@@ -553,18 +553,43 @@ def rack_delete(uuid):
 @location_rack_bp.route('/rack/<string:uuid>')
 @login_required
 def rack_detail(uuid):
-    """View rack details"""
+    """View rack details — includes items whose main is here and batches overriding here."""
     rack = Rack.query.filter_by(uuid=uuid).first_or_404()
-    items = Item.query.filter_by(rack_id=rack.id).all()
-    
+    items_main = Item.query.filter_by(rack_id=rack.id).all()
+    batches_here = ItemBatch.query.filter_by(rack_id=rack.id, follow_main_location=False).all()
+
+    entries = []
+    for item in items_main:
+        entries.append({
+            'scope': 'main',
+            'drawer': item.drawer or '',
+            'item': item,
+            'batch': None,
+        })
+    for batch in batches_here:
+        if batch.item is None:
+            continue
+        entries.append({
+            'scope': 'batch',
+            'drawer': batch.drawer or '',
+            'item': batch.item,
+            'batch': batch,
+        })
+    entries.sort(key=lambda e: (e['drawer'], e['item'].name.lower()))
+
     drawers = {}
-    for item in items:
-        if item.drawer:
-            if item.drawer not in drawers:
-                drawers[item.drawer] = []
-            drawers[item.drawer].append(item)
-    
-    return render_template('rack_detail.html', rack=rack, items=items, drawers=drawers)
+    for e in entries:
+        key = e['drawer'] or 'N/A'
+        drawers.setdefault(key, []).append(e)
+
+    return render_template(
+        'rack_detail.html',
+        rack=rack,
+        entries=entries,
+        drawers=drawers,
+        item_count=len(items_main),
+        batch_count=len(batches_here),
+    )
 
 # ============= VISUAL STORAGE ROUTES =============
 

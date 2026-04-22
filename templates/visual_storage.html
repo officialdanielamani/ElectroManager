@@ -612,8 +612,12 @@ function displaySearchResults(data, searchTerm) {
                     }
                 }, 100);
             } else if (item.type === 'general') {
+                var locationHref = item.location_uuid ? `/location/${item.location_uuid}` : null;
+                var locClick = locationHref
+                    ? `onclick="window.location='${locationHref}'" style="cursor:pointer;"`
+                    : 'onclick="closeSearchModal()"';
                 html += `
-                    <div class="search-result-item general-location" onclick="closeSearchModal()">
+                    <div class="search-result-item general-location" ${locClick}>
                         <div>
                             <strong>${item.name}</strong>
                             ${scopeBadge}
@@ -622,6 +626,7 @@ function displaySearchResults(data, searchTerm) {
                         </div>
                         <small class="text-muted d-block mt-1">
                             <i class="bi bi-geo-alt"></i> <strong>${item.location_name}</strong>
+                            ${locationHref ? `<i class="bi bi-box-arrow-up-right ms-1"></i>` : ''}
                         </small>
                     </div>
                 `;
