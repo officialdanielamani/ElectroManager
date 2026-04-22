@@ -36,11 +36,14 @@
                     <span style="display: inline-block; width: 20px; height: 20px; background-color: {{ rack.color }}; border: 1px solid #dee2e6; border-radius: 4px; vertical-align: middle;"></span>
                     {{ rack.color }}
                 </p>
-                <p><strong>Location:</strong> 
+                <p><strong>Location:</strong>
                     {% if rack.physical_location %}
-                    <span class="badge" style="background-color: {{ rack.physical_location.color }};">
-                        {{ rack.physical_location.name }}
-                    </span>
+                    <a href="{{ url_for('location_rack.location_detail', uuid=rack.physical_location.uuid) }}"
+                       class="badge text-decoration-none"
+                       style="background-color: {{ rack.physical_location.color }}; color: #fff;"
+                       title="View location details">
+                        <i class="bi bi-geo-alt-fill"></i> {{ rack.physical_location.name }}
+                    </a>
                     {% else %}
                     {{ rack.location or 'N/A' }}
                     {% endif %}

@@ -111,9 +111,12 @@
                                     {% endif %}
                                     <small class="text-muted">
                                         {% if rack.physical_location %}
-                                        <span class="badge" style="background-color: {{ rack.physical_location.color }};">
+                                        <a href="{{ url_for('location_rack.location_detail', uuid=rack.physical_location.uuid) }}"
+                                           class="badge text-decoration-none"
+                                           style="background-color: {{ rack.physical_location.color }}; color: #fff;"
+                                           title="View location details">
                                             <i class="bi bi-geo-alt-fill"></i> {{ rack.physical_location.name }}
-                                        </span>
+                                        </a>
                                         {% else %}
                                         <i class="bi bi-geo-alt"></i> No location
                                         {% endif %}

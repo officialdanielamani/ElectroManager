@@ -53,53 +53,101 @@ def search_item():
             items = Item.query.filter(Item.name.ilike(f'%{search_term}%')).all()
     
     results = []
-    
+
+    from models import ItemBatch
+
     for item in items:
-        # Apply location and rack filters if specified
+        # Apply location and rack filters if specified (main-location scope)
+        filter_loc_id = None
         if location_uuid:
             location = Location.query.filter_by(uuid=location_uuid).first()
-            if not location or item.location_id != location.id:
-                continue
-        
+            filter_loc_id = location.id if location else -1
+        filter_rack_id = None
         if rack_uuid:
             rack = Rack.query.filter_by(uuid=rack_uuid).first()
-            if not rack or item.rack_id != rack.id:
+            filter_rack_id = rack.id if rack else -1
+
+        # 1) Item main location result
+        matches_main_filters = True
+        if filter_loc_id is not None and item.location_id != filter_loc_id:
+            matches_main_filters = False
+        if filter_rack_id is not None and item.rack_id != filter_rack_id:
+            matches_main_filters = False
+
+        if matches_main_filters:
+            if item.rack_id and item.drawer:
+                rack = Rack.query.get(item.rack_id)
+                loc_name = rack.physical_location.name if rack and rack.physical_location else None
+                results.append({
+                    'type': 'rack',
+                    'scope': 'main',
+                    'id': item.id,
+                    'name': item.name,
+                    'uuid': item.uuid,
+                    'quantity': item.get_overall_quantity(),
+                    'sku': item.sku or 'N/A',
+                    'rack_id': item.rack_id,
+                    'rack_uuid': rack.uuid if rack else None,
+                    'rack_name': rack.name if rack else 'Unknown Rack',
+                    'drawer': item.drawer,
+                    'location_name': loc_name,
+                })
+            elif item.location_id:
+                location = Location.query.get(item.location_id)
+                results.append({
+                    'type': 'general',
+                    'scope': 'main',
+                    'id': item.id,
+                    'name': item.name,
+                    'uuid': item.uuid,
+                    'quantity': item.get_overall_quantity(),
+                    'sku': item.sku or 'N/A',
+                    'location_id': item.location_id,
+                    'location_uuid': location.uuid if location else None,
+                    'location_name': location.name if location else 'Unknown Location',
+                })
+
+        # 2) Batch overrides: each batch with follow_main_location=False is a distinct result
+        for batch in ItemBatch.query.filter_by(item_id=item.id, follow_main_location=False).all():
+            if filter_loc_id is not None and batch.location_id != filter_loc_id:
                 continue
-        
-        # Check if item is in a rack (drawer storage)
-        if item.rack_id and item.drawer:
-            rack = Rack.query.get(item.rack_id)
-            location_name = None
-            if rack and rack.physical_location:
-                location_name = rack.physical_location.name
-            
-            results.append({
-                'type': 'rack',
-                'id': item.id,
-                'name': item.name,
-                'uuid': item.uuid,
-                'quantity': item.get_overall_quantity(),
-                'sku': item.sku or 'N/A',
-                'rack_id': item.rack_id,
-                'rack_uuid': rack.uuid if rack else None,
-                'rack_name': rack.name if rack else 'Unknown Rack',
-                'drawer': item.drawer,
-                'location_name': location_name
-            })
-        # Check if item is in a general location
-        elif item.location_id:
-            location = Location.query.get(item.location_id)
-            results.append({
-                'type': 'general',
-                'id': item.id,
-                'name': item.name,
-                'uuid': item.uuid,
-                'quantity': item.get_overall_quantity(),
-                'sku': item.sku or 'N/A',
-                'location_id': item.location_id,
-                'location_uuid': location.uuid if location else None,
-                'location_name': location.name if location else 'Unknown Location'
-            })
+            if filter_rack_id is not None and batch.rack_id != filter_rack_id:
+                continue
+            if batch.rack_id and batch.drawer:
+                rack = Rack.query.get(batch.rack_id)
+                loc_name = rack.physical_location.name if rack and rack.physical_location else None
+                results.append({
+                    'type': 'rack',
+                    'scope': 'batch',
+                    'id': item.id,
+                    'batch_id': batch.id,
+                    'batch_label': batch.get_display_label(),
+                    'name': item.name,
+                    'uuid': item.uuid,
+                    'quantity': batch.quantity,
+                    'sku': item.sku or 'N/A',
+                    'rack_id': batch.rack_id,
+                    'rack_uuid': rack.uuid if rack else None,
+                    'rack_name': rack.name if rack else 'Unknown Rack',
+                    'drawer': batch.drawer,
+                    'location_name': loc_name,
+                })
+            elif batch.location_id:
+                location = Location.query.get(batch.location_id)
+                results.append({
+                    'type': 'general',
+                    'scope': 'batch',
+                    'id': item.id,
+                    'batch_id': batch.id,
+                    'batch_label': batch.get_display_label(),
+                    'name': item.name,
+                    'uuid': item.uuid,
+                    'quantity': batch.quantity,
+                    'sku': item.sku or 'N/A',
+                    'location_id': batch.location_id,
+                    'location_uuid': location.uuid if location else None,
+                    'location_name': location.name if location else 'Unknown Location',
+                })
     
     # Sort: rack items first, then general location items
     rack_items = [item for item in results if item['type'] == 'rack']
