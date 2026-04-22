@@ -169,11 +169,26 @@ Three dedicated subfolders — no manual registration needed:
 | `static/custom/icon/<pack>/` | One folder per icon pack, each containing the pack CSS plus its webfont/image assets. All CSS is auto-loaded globally; icons show up in the QR template editor. |
 
 **Example — adding Font Awesome:**
-1. Download the Font Awesome "Web" release
-2. Create the folder `static/custom/icon/fontawesome/`
-3. Copy `css/all.min.css` → `static/custom/icon/fontawesome/fontawesome.css`
-4. Copy the `webfonts/` directory → `static/custom/icon/fontawesome/webfonts/` (the CSS already references `../webfonts/*`, so no path editing is needed)
-5. Restart the container — no rebuild required
+
+Each pack must live in its own subdirectory under `static/custom/icon/`. Flat CSS files dropped directly under `static/custom/icon/` are ignored so a partial dump doesn't show up as multiple spurious packs (`solid`, `regular`, `brand`, …).
+
+1. Download the Font Awesome "Web" release.
+2. Copy the contents into `static/custom/icon/fontawesome/` so the layout is:
+   ```
+   static/custom/icon/fontawesome/
+   ├── css/all.min.css            (or any .css files — all are auto-loaded and
+   ├── css/solid.min.css           merged into the single "fontawesome" pack)
+   ├── css/regular.min.css
+   ├── css/brands.min.css
+   └── webfonts/
+       ├── fa-solid-900.woff2
+       ├── fa-regular-400.woff2
+       └── fa-brands-400.woff2
+   ```
+   The CSS already references `../webfonts/…` so no path editing is needed.
+3. Restart the container — no rebuild required.
+
+On the QR template editor the pack shows up as a single **"Fontawesome"** entry and the icon grid lists every icon found across those CSS files.
 
 ### Linux / Mac Setup
 

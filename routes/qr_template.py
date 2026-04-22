@@ -343,65 +343,79 @@ def api_available_fonts():
     return jsonify(get_available_fonts())
 
 def _icon_pack_css_paths(package):
-    """Return the list of CSS file paths for a given icon package id.
+    """Return every CSS file path that belongs to the given icon pack.
 
-    Looks in the core `static/icons/` folder (for the bundled Bootstrap Icons
-    pack) and in `static/custom/icon/<package>/` (for any user-added pack).
+    Convention:
+    - Core pack: `static/icons/<package>.css` (single flat file, e.g. Bootstrap Icons).
+    - Custom pack: `static/custom/icon/<package>/` — a subdirectory holding one or
+      more CSS files and its webfont assets. All `.css` files inside the subtree
+      are merged so packs like Font Awesome (which split icons across
+      solid.css / regular.css / brands.css) surface as a single package.
     """
     import os
 
     # Defense in depth: validate here as well, since this helper constructs paths.
-    if not isinstance(package, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', package):
+    if not isinstance(package, str) or not _SAFE_ICON_PACKAGE_RE.fullmatch(package):
         return []
 
-    roots = [
-        os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'custom', 'icon')),
-        os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'icons')),
-    ]
     paths = []
-    for root in roots:
-        pack_dir = os.path.abspath(os.path.join(root, package))
-        # Path traversal defence: ensure the resolved dir stays inside root
-        if os.path.commonpath([root, pack_dir]) != root:
-            continue
-        if os.path.isdir(pack_dir):
-            for fname in sorted(os.listdir(pack_dir)):
+
+    # Core pack (flat file)
+    core_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'icons'))
+    flat_css = os.path.abspath(os.path.join(core_root, f'{package}.css'))
+    if os.path.commonpath([core_root, flat_css]) == core_root and os.path.isfile(flat_css):
+        paths.append(flat_css)
+
+    # Custom pack (subdirectory)
+    custom_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'custom', 'icon'))
+    pack_dir = os.path.abspath(os.path.join(custom_root, package))
+    if os.path.commonpath([custom_root, pack_dir]) == custom_root and os.path.isdir(pack_dir):
+        for root, _, files in os.walk(pack_dir):
+            for fname in sorted(files):
                 if fname.endswith('.css'):
-                    paths.append(os.path.join(pack_dir, fname))
-        # Also accept a flat `<package>.css` directly under the root
-        flat_css = os.path.abspath(os.path.join(root, f'{package}.css'))
-        if os.path.commonpath([root, flat_css]) == root and os.path.isfile(flat_css):
-            paths.append(flat_css)
+                    paths.append(os.path.join(root, fname))
     return paths
 
 
 def _list_icon_packages():
-    """Return the list of installed icon packages (core + custom)."""
+    """Return the list of installed icon packages.
+
+    - `static/icons/` (core): each flat `.css` file is a pack — used for the
+      bundled Bootstrap Icons.
+    - `static/custom/icon/<pack>/` (custom): each subdirectory that contains at
+      least one CSS file is a pack. Flat CSS files placed directly under
+      `static/custom/icon/` are ignored so partial Font Awesome dumps don't
+      appear as multiple spurious packs (solid, regular, brand, all, …).
+    """
     import os
     seen = set()
     packages = []
-    roots = [
-        os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'icons')),
-        os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'custom', 'icon')),
-    ]
-    for root in roots:
-        if not os.path.isdir(root):
-            continue
-        for entry in sorted(os.listdir(root)):
-            entry_path = os.path.join(root, entry)
-            if os.path.isdir(entry_path):
-                if not _SAFE_ICON_PACKAGE_RE.match(entry):
-                    continue
-                # Pack is a subdir containing at least one CSS file
-                if any(f.endswith('.css') for f in os.listdir(entry_path)):
-                    if entry not in seen:
-                        seen.add(entry)
-                        packages.append({'id': entry, 'name': entry.replace('-', ' ').title()})
-            elif entry.endswith('.css'):
+
+    core_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'icons'))
+    if os.path.isdir(core_root):
+        for entry in sorted(os.listdir(core_root)):
+            if entry.endswith('.css'):
                 pack_id = entry[:-4]
                 if _SAFE_ICON_PACKAGE_RE.match(pack_id) and pack_id not in seen:
                     seen.add(pack_id)
                     packages.append({'id': pack_id, 'name': pack_id.replace('-', ' ').title()})
+
+    custom_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'custom', 'icon'))
+    if os.path.isdir(custom_root):
+        for entry in sorted(os.listdir(custom_root)):
+            entry_path = os.path.join(custom_root, entry)
+            if not os.path.isdir(entry_path):
+                continue
+            if not _SAFE_ICON_PACKAGE_RE.match(entry):
+                continue
+            has_css = any(
+                f.endswith('.css')
+                for _, _, files in os.walk(entry_path)
+                for f in files
+            )
+            if has_css and entry not in seen:
+                seen.add(entry)
+                packages.append({'id': entry, 'name': entry.replace('-', ' ').title()})
     return packages
 
 

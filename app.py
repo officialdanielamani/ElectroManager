@@ -113,19 +113,23 @@ def load_dependencies():
             elif 'icons' in dest:
                 css_files.append('icons/bootstrap-icons.css')
         
-        # Auto-include every CSS file inside static/custom/icon/ so custom
-        # icon packs (Font Awesome, etc.) render automatically. Themes are
-        # loaded per-user in base.html, not bundled globally.
+        # Auto-include every CSS file inside static/custom/icon/<pack>/ so
+        # custom icon packs (Font Awesome, etc.) render automatically. One
+        # pack = one subdirectory. Flat CSS placed directly under
+        # static/custom/icon/ is ignored (see routes/qr_template.py for the
+        # same convention on the /api/icons endpoints).
         custom_icon_dir = os.path.join(app.root_path, 'static', 'custom', 'icon')
         if os.path.isdir(custom_icon_dir):
-            for entry in sorted(os.listdir(custom_icon_dir)):
-                entry_path = os.path.join(custom_icon_dir, entry)
-                if os.path.isdir(entry_path):
-                    for fname in sorted(os.listdir(entry_path)):
+            for pack in sorted(os.listdir(custom_icon_dir)):
+                pack_dir = os.path.join(custom_icon_dir, pack)
+                if not os.path.isdir(pack_dir):
+                    continue
+                for root, _, files in os.walk(pack_dir):
+                    rel_root = os.path.relpath(root, os.path.join(app.root_path, 'static'))
+                    for fname in sorted(files):
                         if fname.endswith('.css'):
-                            css_files.append(f'custom/icon/{entry}/{fname}')
-                elif entry.endswith('.css'):
-                    css_files.append(f'custom/icon/{entry}')
+                            # Forward slashes for url_for on all platforms
+                            css_files.append(os.path.join(rel_root, fname).replace(os.sep, '/'))
 
         return css_files, js_files, libs
     except Exception as e:
