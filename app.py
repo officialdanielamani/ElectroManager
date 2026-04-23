@@ -239,6 +239,11 @@ def internal_error(error):
 from routes import register_blueprints
 register_blueprints(app)
 
+# Validate Bootstrap Icons at startup
+from qr_utils import validate_bootstrap_icons
+with app.app_context():
+    validate_bootstrap_icons()
+
 
 if __name__ == '__main__':
     with app.app_context():

@@ -2,6 +2,7 @@
 QR/Barcode Sticker Template Utilities
 """
 import json
+import os
 from io import BytesIO
 from flask import current_app
 from datetime import datetime, timezone
@@ -9,7 +10,7 @@ from datetime import datetime, timezone
 # Available placeholders for each template type
 AVAILABLE_PLACEHOLDERS = {
     'Items': [
-        '{ItemUUID}', '{ItemName}', '{SKU}', '{Price}', 
+        '{ItemUUID}', '{ItemName}', '{SKU}', '{Price}',
         '{Quantity}', '{Category}', '{LocationName}', '{RackName}', '{Drawer}'
     ],
     'Location': [
@@ -19,6 +20,22 @@ AVAILABLE_PLACEHOLDERS = {
         '{RackUUID}', '{RackName}', '{Capacity}', '{ItemCount}'
     ]
 }
+
+def validate_bootstrap_icons():
+    """Validate Bootstrap Icons files exist. Halt if missing."""
+    from flask import Flask
+    if isinstance(current_app, Flask):
+        icons_dir = os.path.join(current_app.root_path, 'static', 'icons')
+        required_files = ['bootstrap-icons.css', 'bootstrap-icons.woff2']
+
+        missing = [f for f in required_files if not os.path.exists(os.path.join(icons_dir, f))]
+
+        if missing:
+            print(f"[ERROR] Bootstrap Icons files missing in {icons_dir}:")
+            for f in missing:
+                print(f"  - {f}")
+            print("[ERROR] Cannot start without Bootstrap Icons. Please ensure static/icons/ directory has the required files.")
+            raise RuntimeError(f"Missing Bootstrap Icons files: {', '.join(missing)}")
 
 def get_item_data(item):
     """Extract printable data from Item"""
