@@ -17,7 +17,8 @@
       "version": "1.11.1",
       "url": "https://github.com/twbs/icons/releases/download/v1.11.1/bootstrap-icons-1.11.1.zip",
       "dest": "static/icons",
-      "type": "zip"
+      "type": "zip",
+      "installed": true
     },
     {
       "name": "SortableJS",
