@@ -85,8 +85,6 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 ### Personalisation
 - **Themes** — Light, Dark, Blue, Keqing; theme CSS files are auto-detected from `static/custom/theme/` so new themes can be added by dropping in a CSS file
 - **Fonts** — built-in system fonts plus any font files placed in `static/custom/font/` (e.g. OpenDyslexic); selected per user in settings
-- **Icons** — the bundled Bootstrap Icons library is used everywhere (site navigation and the QR template editor). Custom icon packs are intentionally not supported; stick to Bootstrap Icons so layouts render identically everywhere.
-- Per-user table column visibility for item and project lists
 
 ### Notifications
 - Notification centre showing date-parameter alerts (due today or overdue) and duration-parameter windows
