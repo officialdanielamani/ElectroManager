@@ -31,6 +31,42 @@ def _evolve_schema():
         ))
         conn.commit()
 
+    _scrub_icon_package_from_sticker_templates()
+
+
+def _scrub_icon_package_from_sticker_templates():
+    """Strip the legacy icon_package field from every StickerTemplate layout.
+
+    Custom icon packs were removed — the app now always uses Bootstrap Icons.
+    Old rows still carry icon_package: 'fontawesome' etc. in their JSON
+    blobs; scrub them so layouts round-trip cleanly.
+    """
+    from models import StickerTemplate
+    try:
+        templates = StickerTemplate.query.all()
+    except Exception as e:
+        print(f"Schema: StickerTemplate table not ready, skipping icon scrub ({e})")
+        return
+    scrubbed = 0
+    for tpl in templates:
+        try:
+            layout = tpl.get_layout()
+        except Exception:
+            continue
+        if not isinstance(layout, list):
+            continue
+        changed = False
+        for element in layout:
+            if isinstance(element, dict) and 'icon_package' in element:
+                element.pop('icon_package', None)
+                changed = True
+        if changed:
+            tpl.set_layout(layout)
+            scrubbed += 1
+    if scrubbed:
+        db.session.commit()
+        print(f"Schema: removed icon_package from {scrubbed} sticker template(s)")
+
 
 def init_db():
     with app.app_context():
