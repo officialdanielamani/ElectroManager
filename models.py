@@ -271,11 +271,10 @@ class Item(db.Model):
     sku = db.Column(db.String(100))
     info = db.Column(db.String(500))
     description = db.Column(db.Text)
-    
-    # Kept for backward compat - recalculated from batches
+
     quantity = db.Column(db.Integer, default=0)
     price = db.Column(db.Float, default=0.0)
-    
+
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
     rack_id = db.Column(db.Integer, db.ForeignKey('racks.id'))
     drawer = db.Column(db.String(50))
@@ -287,8 +286,7 @@ class Item(db.Model):
     
     datasheet_urls = db.Column(db.Text)
     no_stock_warning = db.Column(db.Boolean, default=True)
-    
-    # Serial number tracking is now per-batch; item-level field kept for backward compat
+
     sn_tracking_enabled = db.Column(db.Boolean, default=False)
     
     @property
@@ -428,8 +426,6 @@ class ItemBatch(db.Model):
     lend_quantity = db.Column(db.Integer, default=0)
     sn_tracking_enabled = db.Column(db.Boolean, default=False)
 
-    # Per-batch location. If follow_main_location is True, the item's main
-    # location/rack/drawer is used and these fields are ignored.
     follow_main_location = db.Column(db.Boolean, default=True)
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
     rack_id = db.Column(db.Integer, db.ForeignKey('racks.id'), nullable=True)
@@ -962,13 +958,12 @@ class ProjectBOMItem(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
     item_id = db.Column(db.Integer, db.ForeignKey('items.id'), nullable=True)
     batch_id = db.Column(db.Integer, db.ForeignKey('item_batches.id'), nullable=True)
-    quantity = db.Column(db.Integer, default=1)          # required_quantity (no cap)
-    used_quantity = db.Column(db.Integer, default=0)     # actual used (capped by available stock)
-    serial_numbers = db.Column(db.Text)                  # JSON list of SN IDs assigned to used_quantity
-    item_name_snapshot = db.Column(db.String(300))       # preserved item name if item is deleted
+    quantity = db.Column(db.Integer, default=1)
+    used_quantity = db.Column(db.Integer, default=0)
+    serial_numbers = db.Column(db.Text)
+    item_name_snapshot = db.Column(db.String(300))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    # No cascade: deleting an Item preserves BOM entries (item_id becomes a dangling FK, item prop returns None)
     item = db.relationship('Item', backref=db.backref('bom_uses'))
     batch = db.relationship('ItemBatch', backref='bom_uses')
     @property
