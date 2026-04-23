@@ -113,13 +113,6 @@ def load_dependencies():
             elif 'icons' in dest:
                 css_files.append('icons/bootstrap-icons.css')
         
-        # Auto-include any .css files the user placed in static/custom/
-        # (custom icon packs, Font Awesome, extra themes, etc.)
-        custom_dir = os.path.join(app.root_path, 'static', 'custom')
-        if os.path.isdir(custom_dir):
-            for fname in sorted(os.listdir(custom_dir)):
-                if fname.endswith('.css'):
-                    css_files.append(f'custom/{fname}')
 
         return css_files, js_files, libs
     except Exception as e:
@@ -136,7 +129,7 @@ def inject_theme():
         import re
         
         def get_available_themes():
-            themes_dir = os.path.join(app.root_path, 'static', 'css', 'themes')
+            themes_dir = os.path.join(app.root_path, 'static', 'custom', 'theme')
             theme_ids = []
             if os.path.exists(themes_dir):
                 for file in os.listdir(themes_dir):

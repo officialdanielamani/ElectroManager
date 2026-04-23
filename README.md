@@ -83,10 +83,8 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 - Per-user profile photo upload
 
 ### Personalisation
-- **Themes** — Light, Dark, Blue, Keqing; theme CSS files are auto-detected from `static/css/themes/` so new themes can be added by dropping in a CSS file
-- **Fonts** — built-in system fonts plus any font files placed in `static/fonts/` (e.g. OpenDyslexic); selected per user in settings
-- **Custom CSS / icon packs / fonts** — place any `.css` or font file (`.woff2`, `.woff`, `.ttf`, `.otf`) in `static/custom/` and it is loaded automatically on the next startup; no rebuild required (see [Custom assets](#custom-assets) below)
-- Per-user table column visibility for item and project lists
+- **Themes** — Light, Dark, Blue, Keqing; theme CSS files are auto-detected from `static/custom/theme/` so new themes can be added by dropping in a CSS file
+- **Fonts** — built-in system fonts plus any font files placed in `static/custom/font/` (e.g. OpenDyslexic); selected per user in settings
 
 ### Notifications
 - Notification centre showing date-parameter alerts (due today or overdue) and duration-parameter windows
@@ -160,23 +158,14 @@ Every time the container (or local server) starts, `startup/init.py` runs throug
 ./static/custom:/app/static/custom    # already in docker-compose.yml
 ```
 
-| What to drop in | Effect |
-|----------------|--------|
-| `*.css` | Loaded on every page (use for icon packs, extra themes, overrides) |
-| `*.woff2` / `*.woff` / `*.ttf` / `*.otf` | Served as static files (reference from your custom CSS) |
+Two dedicated subfolders — no manual registration needed:
 
-**Example — adding Font Awesome:**
-1. Download the Font Awesome "Web" release
-2. Copy `css/all.min.css` → `static/custom/fontawesome.css`
-3. Copy `webfonts/` files → `static/custom/` (and update the `src:` paths in the CSS to match)
-4. Restart the container — no rebuild needed
+| Folder | Purpose |
+|--------|---------|
+| `static/custom/font/` | Font files (`.woff2` / `.woff` / `.ttf` / `.otf`). Detected by `/api/available-fonts`; available in the user font picker. |
+| `static/custom/theme/` | Theme CSS files with a `/* Theme Metadata */` header. Detected and listed in the theme picker under **Settings → Personalisation**. |
 
-At startup the log will confirm what was found:
-```
-[STEP] Detecting custom assets (static/custom/)
-[OK] CSS  : ['fontawesome.css']
-[OK] Fonts: ['fa-solid-900.woff2', ...]
-```
+> Icon packs are intentionally not supported — the app uses the bundled Bootstrap Icons everywhere so QR templates and UI stay consistent across installs.
 
 ### Linux / Mac Setup
 
@@ -285,7 +274,7 @@ ElectroManager/
 │   ├── fonts/                    # Project fonts for personalisation (e.g. OpenDyslexic)
 │   ├── icons/                    # Bootstrap Icons — core, downloaded at build/startup
 │   ├── lib/                      # Bootstrap CSS/JS + SortableJS — core, downloaded at build/startup
-│   └── custom/                   # ← User-provided: icon packs, extra fonts, custom CSS (bind-mounted in Docker)
+│   └── custom/                   # ← User-provided: custom fonts + themes (bind-mounted in Docker)
 │
 ├── uploads/                      # User file uploads (runtime, bind-mounted in Docker)
 └── instance/
@@ -320,13 +309,12 @@ ElectroManager/
 | Bootstrap Icons | 1.11.1 | Core icon set |
 | SortableJS | 1.15.0 | Drag-and-drop sorting |
 
-**JavaScript / CSS — custom** (optional, place in `static/custom/`, never checked at startup)
+**Customisable assets** (optional, place under `static/custom/`, no rebuild needed)
 
 | Example | How to add |
 |---------|-----------|
-| Font Awesome (or any icon pack) | Drop CSS + font files into `static/custom/` |
-| Custom theme | Drop a `.css` file into `static/custom/` |
-| Personalisation font | Drop font files into `static/custom/` and reference via CSS |
+| Custom theme | Drop a `.css` file into `static/custom/theme/` (see existing themes for the metadata header format) |
+| Personalisation font | Drop font files into `static/custom/font/` — no CSS needed, `@font-face` is generated automatically |
 
 ---
 

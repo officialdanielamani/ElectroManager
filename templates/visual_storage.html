@@ -121,7 +121,15 @@
                         <small>{{ rack.description }}</small>
                         {% endif %}
                         {% if rack.physical_location %}
-                        <div><small><i class="bi bi-geo-alt"></i> <span class="badge" style="background-color: {{ rack.physical_location.color }};">{{ rack.physical_location.name }}</span></small></div>
+                        <div><small>
+                            <a href="{{ url_for('location_rack.location_detail', uuid=rack.physical_location.uuid) }}"
+                               class="badge text-decoration-none"
+                               style="background-color: {{ rack.physical_location.color }}; color: #fff;"
+                               title="View location details"
+                               onclick="event.stopPropagation();">
+                                <i class="bi bi-geo-alt-fill"></i> {{ rack.physical_location.name }}
+                            </a>
+                        </small></div>
                         {% elif rack.location %}
                         <div><small><i class="bi bi-geo-alt"></i> {{ rack.location }}</small></div>
                         {% endif %}
@@ -139,19 +147,20 @@
                         {% set drawer_id = "R%d-C%d"|format(row + 1, col + 1) %}
                         {% set drawer_data = rack.drawers.get(drawer_id) %}
                         {% set is_unavailable = drawer_id in rack.unavailable_drawers %}
-                        <div class="drawer-cell {% if is_unavailable %}unavailable{% elif drawer_data %}has-items{% else %}empty{% endif %}" 
+                        {% set entry_count = (drawer_data['items']|length + drawer_data['batches']|length) if drawer_data else 0 %}
+                        <div class="drawer-cell {% if is_unavailable %}unavailable{% elif entry_count %}has-items{% else %}empty{% endif %}"
                              data-drawer="{{ drawer_id }}"
                              data-rack="{{ rack.uuid }}"
                              onclick="openDrawer('{{ rack.name }}', '{{ drawer_id }}', '{{ rack.uuid }}')">
                             <div class="drawer-label">{{ drawer_id }}</div>
                             <div class="drawer-count">
-                                {% if is_unavailable and drawer_data %}
+                                {% if is_unavailable and entry_count %}
                                 <span class="badge bg-secondary">Unavailable</span>
-                                <span class="badge bg-info mt-1">{{ drawer_data['items']|length }}</span>
+                                <span class="badge bg-info mt-1">{{ entry_count }}</span>
                                 {% elif is_unavailable %}
                                 <span class="badge bg-secondary">Unavailable</span>
-                                {% elif drawer_data %}
-                                <span class="badge bg-success">{{ drawer_data['items']|length }}</span>
+                                {% elif entry_count %}
+                                <span class="badge bg-success">{{ entry_count }}</span>
                                 {% else %}
                                 <span class="text-muted">Empty</span>
                                 {% endif %}
@@ -577,12 +586,15 @@ function displaySearchResults(data, searchTerm) {
         title.textContent = `Search Results for "${searchTerm}" (${data.items.length} found)`;
         
         data.items.forEach(item => {
+            var scopeBadge = item.scope === 'batch'
+                ? `<span class="badge bg-info ms-1" title="Batch override"><i class="bi bi-boxes"></i> ${item.batch_label}</span>`
+                : `<span class="badge bg-secondary ms-1" title="Item main location"><i class="bi bi-pin-map"></i> Main</span>`;
             if (item.type === 'rack') {
-                // Item found in rack/drawer
                 html += `
                     <div class="search-result-item" onclick="navigateToItemOnPage(${item.page}, '${item.rack_uuid}', '${item.drawer}', true)">
                         <div>
                             <strong>${item.name}</strong>
+                            ${scopeBadge}
                             <span class="badge bg-success ms-2">${item.quantity}</span>
                             <span class="badge bg-info">UUID: ${item.uuid}</span>
                         </div>
@@ -592,8 +604,7 @@ function displaySearchResults(data, searchTerm) {
                         </small>
                     </div>
                 `;
-                
-                // Highlight the drawer
+
                 setTimeout(() => {
                     const drawer = document.querySelector(`.drawer-cell[data-drawer="${item.drawer}"][data-rack="${item.rack_uuid}"]`);
                     if (drawer) {
@@ -601,16 +612,21 @@ function displaySearchResults(data, searchTerm) {
                     }
                 }, 100);
             } else if (item.type === 'general') {
-                // Item found in general location
+                var locationHref = item.location_uuid ? `/location/${item.location_uuid}` : null;
+                var locClick = locationHref
+                    ? `onclick="window.location='${locationHref}'" style="cursor:pointer;"`
+                    : 'onclick="closeSearchModal()"';
                 html += `
-                    <div class="search-result-item general-location" onclick="closeSearchModal()">
+                    <div class="search-result-item general-location" ${locClick}>
                         <div>
                             <strong>${item.name}</strong>
+                            ${scopeBadge}
                             <span class="badge bg-success ms-2">${item.quantity}</span>
                             <span class="badge bg-info">UUID: ${item.uuid}</span>
                         </div>
                         <small class="text-muted d-block mt-1">
                             <i class="bi bi-geo-alt"></i> <strong>${item.location_name}</strong>
+                            ${locationHref ? `<i class="bi bi-box-arrow-up-right ms-1"></i>` : ''}
                         </small>
                     </div>
                 `;
@@ -737,35 +753,55 @@ function openDrawer(rackName, drawerId, rackId) {
             html += `<input class="form-check-input" type="checkbox" id="drawerUnavailable" ${data.is_unavailable ? 'checked' : ''} onchange="toggleDrawerAvailability()">`;
             html += '<label class="form-check-label" for="drawerUnavailable">Make this Drawer Unavailable</label>';
             html += '</div>';
-            if (data.items && data.items.length > 0) {
-                html += '<button class="btn btn-sm btn-warning" onclick="showMoveItemsModal()"><i class="bi bi-arrow-right"></i> Move All Items</button>';
+            if (data.entries && data.entries.length > 0 && data.entries.some(function(e) { return e.type === 'item_main'; })) {
+                html += '<button class="btn btn-sm btn-warning" onclick="showMoveItemsModal()" title="Moves items whose main location is this drawer (batch overrides are not moved)"><i class="bi bi-arrow-right"></i> Move Main Items</button>';
             }
             html += '</div>';
             html += '</div>';
             {% endif %}
             
-            if (data.items && data.items.length > 0) {
+            var entries = data.entries || [];
+            if (entries.length > 0) {
                 html += '<table class="table table-hover">';
-                html += '<thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Available</th></tr></thead>';
+                html += '<thead><tr><th>Item</th><th>SKU</th><th>Batch</th><th>Qty</th><th>Available</th></tr></thead>';
                 html += '<tbody>';
-                data.items.forEach(item => {
-                    html += `
-                        <tr onclick="window.location='/item/${item.uuid}'" style="cursor: pointer;">
-                            <td>
-                                <strong>${item.name}</strong><br>
-                                <small class="text-muted">${item.uuid}</small>
-                            </td>
-                            <td>${item.sku}</td>
-                            <td><span class="badge bg-primary">${item.quantity}</span></td>
-                            <td><span class="badge bg-success">${item.available}</span></td>
-                        </tr>
-                    `;
+                entries.forEach(function(entry) {
+                    var rowClick = entry.item_uuid ? `onclick="window.location='/item/${entry.item_uuid}'" style="cursor: pointer;"` : '';
+                    if (entry.type === 'item_main') {
+                        html += `
+                            <tr ${rowClick}>
+                                <td>
+                                    <strong>${entry.name}</strong>
+                                    <span class="badge bg-secondary ms-1" title="Item's main location is this drawer"><i class="bi bi-pin-map"></i> Main</span>
+                                    <br><small class="text-muted">${entry.item_uuid || ''}</small>
+                                </td>
+                                <td>${entry.sku}</td>
+                                <td><span class="text-muted">—</span></td>
+                                <td><span class="text-muted">—</span></td>
+                                <td><span class="text-muted">—</span></td>
+                            </tr>
+                        `;
+                    } else {
+                        html += `
+                            <tr ${rowClick}>
+                                <td>
+                                    <strong>${entry.name}</strong>
+                                    <br><small class="text-muted">${entry.item_uuid || ''}</small>
+                                </td>
+                                <td>${entry.sku}</td>
+                                <td><span class="badge bg-info"><i class="bi bi-boxes"></i> ${entry.batch_label}</span></td>
+                                <td><span class="badge bg-primary">${entry.quantity}</span></td>
+                                <td><span class="badge bg-success">${entry.available}</span></td>
+                            </tr>
+                        `;
+                    }
                 });
                 html += '</tbody></table>';
+                html += '<small class="text-muted"><i class="bi bi-info-circle"></i> <strong>Main</strong> = item\'s main location is this drawer (no batch-level override). Batches show their own quantity.</small>';
             } else {
                 html += '<div class="alert alert-info">This drawer is empty.</div>';
             }
-            
+
             let canCreate = {{ 'true' if current_user.has_permission('items', 'create') else 'false' }};
             if (canCreate) {
             html += `

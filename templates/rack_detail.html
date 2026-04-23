@@ -36,17 +36,21 @@
                     <span style="display: inline-block; width: 20px; height: 20px; background-color: {{ rack.color }}; border: 1px solid #dee2e6; border-radius: 4px; vertical-align: middle;"></span>
                     {{ rack.color }}
                 </p>
-                <p><strong>Location:</strong> 
+                <p><strong>Location:</strong>
                     {% if rack.physical_location %}
-                    <span class="badge" style="background-color: {{ rack.physical_location.color }};">
-                        {{ rack.physical_location.name }}
-                    </span>
+                    <a href="{{ url_for('location_rack.location_detail', uuid=rack.physical_location.uuid) }}"
+                       class="badge text-decoration-none"
+                       style="background-color: {{ rack.physical_location.color }}; color: #fff;"
+                       title="View location details">
+                        <i class="bi bi-geo-alt-fill"></i> {{ rack.physical_location.name }}
+                    </a>
                     {% else %}
                     {{ rack.location or 'N/A' }}
                     {% endif %}
                 </p>
                 <p><strong>Grid Size:</strong> {{ rack.rows }} × {{ rack.cols }}</p>
-                <p><strong>Total Items:</strong> {{ items|length }}</p>
+                <p><strong>Items (main here):</strong> {{ item_count }}</p>
+                <p><strong>Batch Overrides:</strong> {{ batch_count }}</p>
                 <p><strong>Drawers Used:</strong> {{ drawers|length }}</p>
                 
                 {% if rack.picture %}
@@ -68,27 +72,42 @@
         <div class="card">
             <div class="card-header bg-light">
                 <h5 class="mb-0">Items in this Rack</h5>
+                <small class="text-muted">Items with main location here show without quantity. Batches overriding to this rack show their own quantity.</small>
             </div>
             <div class="card-body">
-                {% if items %}
+                {% if entries %}
                 <div class="table-responsive">
                     <table class="table table-sm">
                         <thead>
                             <tr>
                                 <th>Drawer</th>
                                 <th>Item</th>
+                                <th>Scope</th>
                                 <th>Quantity</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for item in items %}
+                            {% for e in entries %}
                             <tr>
-                                <td>{{ item.drawer or 'N/A' }}</td>
-                                <td>{{ item.name }}</td>
-                                <td>{{ item.get_overall_quantity() }}</td>
+                                <td>{{ e.drawer or 'N/A' }}</td>
+                                <td>{{ e.item.name }}</td>
                                 <td>
-                                    <a href="{{ url_for('item.item_detail', uuid=item.uuid) }}" class="btn btn-sm btn-info">
+                                    {% if e.scope == 'main' %}
+                                    <span class="badge bg-secondary"><i class="bi bi-pin-map"></i> Main</span>
+                                    {% else %}
+                                    <span class="badge bg-info"><i class="bi bi-boxes"></i> {{ e.batch.get_display_label() }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if e.scope == 'main' %}
+                                    <span class="text-muted">—</span>
+                                    {% else %}
+                                    <span class="badge bg-primary">{{ e.batch.quantity }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('item.item_detail', uuid=e.item.uuid) }}{% if e.batch %}#batch-{{ e.batch.id }}{% endif %}" class="btn btn-sm btn-info" title="View item">
                                         <i class="bi bi-eye"></i>
                                     </a>
                                 </td>

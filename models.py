@@ -146,15 +146,14 @@ class User(UserMixin, db.Model):
         if self.is_admin():
             return True
         return self.has_permission('items', 'view') and (
-            self.has_permission('items', 'create') or 
-            self.has_permission('items', 'edit_name') or 
-            self.has_permission('items', 'edit_data') or
-            self.has_permission('items', 'edit_price') or
+            self.has_permission('items', 'create') or
+            self.has_permission('items', 'edit_info') or
+            self.has_permission('items', 'edit_batch') or
             self.has_permission('items', 'edit_quantity') or
-            self.has_permission('items', 'edit_location') or
-            self.has_permission('items', 'edit_classification') or
-            self.has_permission('items', 'edit_parameters') or
-            self.has_permission('items', 'edit_batch')
+            self.has_permission('items', 'edit_price') or
+            self.has_permission('items', 'edit_sn') or
+            self.has_permission('items', 'edit_lending') or
+            self.has_permission('items', 'edit_advance')
         )
     
     def has_permission(self, resource, action):
@@ -428,12 +427,34 @@ class ItemBatch(db.Model):
     lend_to = db.Column(db.String(200), default='')
     lend_quantity = db.Column(db.Integer, default=0)
     sn_tracking_enabled = db.Column(db.Boolean, default=False)
-    
+
+    # Per-batch location. If follow_main_location is True, the item's main
+    # location/rack/drawer is used and these fields are ignored.
+    follow_main_location = db.Column(db.Boolean, default=True)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
+    rack_id = db.Column(db.Integer, db.ForeignKey('racks.id'), nullable=True)
+    drawer = db.Column(db.String(50))
+
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    
+
+    batch_location = db.relationship('Location', foreign_keys=[location_id])
+    batch_rack = db.relationship('Rack', foreign_keys=[rack_id])
+
     serial_numbers = db.relationship('BatchSerialNumber', backref='batch', lazy=True, cascade='all, delete-orphan', order_by='BatchSerialNumber.sequence_number')
     
+    def get_effective_location_text(self):
+        """Return human-readable location. Falls back to parent item when follow_main_location is True."""
+        if self.follow_main_location:
+            return self.item.get_full_location() if self.item else 'Not specified'
+        if self.rack_id and self.drawer:
+            rack_name = self.batch_rack.name if self.batch_rack else ''
+            loc_name = self.batch_rack.physical_location.name if self.batch_rack and self.batch_rack.physical_location else ''
+            return f"{rack_name} - {self.drawer}" + (f" ({loc_name})" if loc_name else "")
+        if self.location_id and self.batch_location:
+            return self.batch_location.name
+        return 'Not specified'
+
     def get_batch_total_price(self):
         """Display price reference: qty=0 treated as 1 so price/unit is visible when out of stock."""
         if not self.price_per_unit:

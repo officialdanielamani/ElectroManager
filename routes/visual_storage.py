@@ -3,7 +3,7 @@ Visual Storage Routes Blueprint
 """
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file, abort
 from flask_login import login_required, current_user, login_user, logout_user
-from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate
+from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate, ItemBatch
 from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEditForm, AttachmentForm, 
                    SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm)
 from helpers import is_safe_url, format_currency, is_safe_file_path
@@ -75,27 +75,42 @@ def visual_storage():
     end_idx = start_idx + racks_per_page
     racks_for_page = racks_query[start_idx:end_idx]
     
+    def _first_image_url(item):
+        if not item:
+            return None
+        for att in item.attachments:
+            if att.file_type in ['png', 'jpg', 'jpeg', 'gif']:
+                return url_for('uploaded_file', filename=att.filename)
+        return None
+
     rack_data = []
     for rack in racks_for_page:
-        items = Item.query.filter_by(rack_id=rack.id).all()
-        
+        # Items whose main location is this rack (shown without quantity)
+        items_main = Item.query.filter_by(rack_id=rack.id).all()
+        # Batches that override to this rack (shown with quantity)
+        batches_here = ItemBatch.query.filter_by(rack_id=rack.id, follow_main_location=False).all()
+
         drawers = {}
-        for item in items:
+
+        def _ensure(drawer_key):
+            if drawer_key not in drawers:
+                drawers[drawer_key] = {'items': [], 'batches': [], 'preview_image': None}
+            return drawers[drawer_key]
+
+        for item in items_main:
             if item.drawer:
-                if item.drawer not in drawers:
-                    drawers[item.drawer] = {
-                        'items': [],
-                        'preview_image': None
-                    }
-                drawers[item.drawer]['items'].append(item)
-                
-                # Get first image for preview
-                if not drawers[item.drawer]['preview_image'] and item.attachments:
-                    for att in item.attachments:
-                        if att.file_type in ['png', 'jpg', 'jpeg', 'gif']:
-                            drawers[item.drawer]['preview_image'] = url_for('uploaded_file', filename=att.filename)
-                            break
-        
+                entry = _ensure(item.drawer)
+                entry['items'].append(item)
+                if not entry['preview_image']:
+                    entry['preview_image'] = _first_image_url(item)
+
+        for batch in batches_here:
+            if batch.drawer:
+                entry = _ensure(batch.drawer)
+                entry['batches'].append(batch)
+                if not entry['preview_image']:
+                    entry['preview_image'] = _first_image_url(batch.item)
+
         rack_data.append({
             'id': rack.id,
             'uuid': rack.uuid,
@@ -105,7 +120,7 @@ def visual_storage():
             'rows': rack.rows,
             'cols': rack.cols,
             'drawers': drawers,
-            'item_count': len(items),
+            'item_count': len(items_main) + len(batches_here),
             'unavailable_drawers': rack.get_unavailable_drawers()
         })
     
@@ -131,23 +146,36 @@ def visual_storage():
 @visual_storage_bp.route('/api/drawer/<string:rack_uuid>/<path:drawer_id>')
 @login_required
 def get_drawer_contents(rack_uuid, drawer_id):
-    """API endpoint to get drawer contents"""
+    """API endpoint to get drawer contents (items with main here + batches overriding here)"""
     rack = Rack.query.filter_by(uuid=rack_uuid).first_or_404()
-    items = Item.query.filter_by(rack_id=rack.id, drawer=drawer_id).all()
-    
-    items_data = []
-    for item in items:
-        items_data.append({
-            'id': item.id,
+    items_main = Item.query.filter_by(rack_id=rack.id, drawer=drawer_id).all()
+    batches_here = ItemBatch.query.filter_by(rack_id=rack.id, drawer=drawer_id, follow_main_location=False).all()
+
+    entries = []
+    for item in items_main:
+        entries.append({
+            'type': 'item_main',
+            'item_id': item.id,
+            'item_uuid': item.uuid,
             'name': item.name,
             'sku': item.sku or 'N/A',
-            'quantity': item.get_overall_quantity(),
-            'available': item.get_available_quantity(),
-            'uuid': item.uuid
         })
-    
+    for batch in batches_here:
+        item = batch.item
+        entries.append({
+            'type': 'batch',
+            'item_id': item.id if item else None,
+            'item_uuid': item.uuid if item else None,
+            'name': item.name if item else 'Unknown',
+            'sku': (item.sku if item and item.sku else 'N/A'),
+            'batch_id': batch.id,
+            'batch_label': batch.get_display_label(),
+            'quantity': batch.quantity,
+            'available': batch.get_available_quantity(),
+        })
+
     return jsonify({
-        'items': items_data,
+        'entries': entries,
         'rack': {
             'id': rack.id,
             'name': rack.name

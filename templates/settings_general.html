@@ -675,7 +675,7 @@ async function loadAllThemeColors() {
     
     for (const themeName of availableThemes) {
         try {
-            const response = await fetch(`/static/css/themes/${themeName}.css`);
+            const response = await fetch(`/static/custom/theme/${themeName}.css`);
             if (!response.ok) continue;
             
             const cssText = await response.text();
@@ -724,7 +724,7 @@ async function initializeThemePreview() {
     // Extract metadata from CSS files
     async function loadThemeMetadata(themeName) {
         try {
-            const response = await fetch(`/static/css/themes/${themeName}.css`);
+            const response = await fetch(`/static/custom/theme/${themeName}.css`);
             const cssText = await response.text();
             
             const metadataRegex = /\/\*\s*Theme Metadata\s*([\s\S]*?)\*\//;
@@ -793,7 +793,7 @@ async function updatePreview(themeName) {
     }
     
     try {
-        const response = await fetch(`/static/css/themes/${themeName}.css`);
+        const response = await fetch(`/static/custom/theme/${themeName}.css`);
         
         if (!response.ok) {
             console.error(`Failed to load theme: ${themeName} (${response.status})`);

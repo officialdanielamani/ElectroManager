@@ -117,32 +117,42 @@ class ItemAddForm(FlaskForm):
             self._apply_field_permissions(perms)
     
     def _apply_field_permissions(self, perms):
-        """Mark fields user doesn't have permission to edit - don't disable to allow data to be sent"""
+        """Mark fields user doesn't have permission to edit - don't disable to allow data to be sent.
+
+        Maps form fields to the simplified permission schema:
+        - Item Info section -> items.edit_info
+        - Batch fields (price/quantity) -> dedicated batch perms; item-level qty/price are
+          legacy mirrors, gate them behind edit_quantity/edit_price
+        - Advance Info section (description, datasheets) -> items.edit_advance
+        """
         field_perms = {
-            'name': 'can_edit_name',
-            'sku': 'can_edit_sku_type',
-            'info': 'can_edit_sku_type',
-            'description': 'can_edit_description',
-            'datasheet_urls': 'can_edit_datasheet',
+            # Item Info
+            'name': 'can_edit_info',
+            'sku': 'can_edit_info',
+            'info': 'can_edit_info',
+            'location_id': 'can_edit_info',
+            'rack_id': 'can_edit_info',
+            'drawer': 'can_edit_info',
+            'category_id': 'can_edit_info',
+            'footprint_id': 'can_edit_info',
+            'min_quantity': 'can_edit_info',
+            'no_stock_warning': 'can_edit_info',
+            # Batch-level legacy mirrors
             'price': 'can_edit_price',
             'quantity': 'can_edit_quantity',
-            'min_quantity': 'can_edit_quantity',
-            'no_stock_warning': 'can_edit_quantity',
-            'location_id': 'can_edit_location',
-            'rack_id': 'can_edit_location',
-            'drawer': 'can_edit_location',
-            'category_id': 'can_edit_category',
-            'footprint_id': 'can_edit_footprint',
+            # Advance Info
+            'description': 'can_edit_advance',
+            'datasheet_urls': 'can_edit_advance',
         }
-        
+
+        select_fields = {'location_id', 'rack_id', 'category_id', 'footprint_id'}
         for field_name, perm_name in field_perms.items():
             if field_name in self._fields:
                 field = self._fields[field_name]
                 has_perm = perms.get(perm_name, False)
                 if not has_perm:
-                    # Add readonly or data attribute for CSS targeting, but don't disable
                     field.render_kw = field.render_kw or {}
-                    field.render_kw['readonly'] = True if field_name not in ['location_id', 'rack_id', 'category_id', 'footprint_id'] else False
+                    field.render_kw['readonly'] = field_name not in select_fields
                     field.render_kw['data-restricted'] = 'true'
 
 
@@ -181,32 +191,32 @@ class ItemEditForm(FlaskForm):
             self._apply_field_permissions(perms)
     
     def _apply_field_permissions(self, perms):
-        """Mark fields user doesn't have permission to edit - don't disable to allow data to be sent"""
+        """Same mapping as ItemAddForm._apply_field_permissions."""
         field_perms = {
-            'name': 'can_edit_name',
-            'sku': 'can_edit_sku_type',
-            'info': 'can_edit_sku_type',
-            'description': 'can_edit_description',
-            'datasheet_urls': 'can_edit_datasheet',
+            'name': 'can_edit_info',
+            'sku': 'can_edit_info',
+            'info': 'can_edit_info',
+            'location_id': 'can_edit_info',
+            'rack_id': 'can_edit_info',
+            'drawer': 'can_edit_info',
+            'category_id': 'can_edit_info',
+            'footprint_id': 'can_edit_info',
+            'min_quantity': 'can_edit_info',
+            'no_stock_warning': 'can_edit_info',
             'price': 'can_edit_price',
             'quantity': 'can_edit_quantity',
-            'min_quantity': 'can_edit_quantity',
-            'no_stock_warning': 'can_edit_quantity',
-            'location_id': 'can_edit_location',
-            'rack_id': 'can_edit_location',
-            'drawer': 'can_edit_location',
-            'category_id': 'can_edit_category',
-            'footprint_id': 'can_edit_footprint',
+            'description': 'can_edit_advance',
+            'datasheet_urls': 'can_edit_advance',
         }
-        
+
+        select_fields = {'location_id', 'rack_id', 'category_id', 'footprint_id'}
         for field_name, perm_name in field_perms.items():
             if field_name in self._fields:
                 field = self._fields[field_name]
                 has_perm = perms.get(perm_name, False)
                 if not has_perm:
-                    # Add readonly or data attribute for CSS targeting, but don't disable
                     field.render_kw = field.render_kw or {}
-                    field.render_kw['readonly'] = True if field_name not in ['location_id', 'rack_id', 'category_id', 'footprint_id'] else False
+                    field.render_kw['readonly'] = field_name not in select_fields
                     field.render_kw['data-restricted'] = 'true'
 
 

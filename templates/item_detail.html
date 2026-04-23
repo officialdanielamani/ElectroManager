@@ -56,7 +56,7 @@
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h4 class="mb-0"><i class="bi bi-box"></i> {{ item.name }}</h4>
                 <div class="d-flex gap-2 flex-wrap">
-                    {% if current_user.has_permission('items', 'edit_name') or current_user.has_permission('items', 'edit_sku_type') or current_user.has_permission('items', 'edit_description') or current_user.has_permission('items', 'edit_datasheet') or current_user.has_permission('items', 'edit_upload') or current_user.has_permission('items', 'edit_location') or current_user.has_permission('items', 'edit_category') or current_user.has_permission('items', 'edit_footprint') or current_user.has_permission('items', 'edit_tags') or current_user.has_permission('items', 'edit_parameters') %}
+                    {% if current_user.has_permission('items', 'edit_info') or current_user.has_permission('items', 'edit_batch') or current_user.has_permission('items', 'edit_quantity') or current_user.has_permission('items', 'edit_price') or current_user.has_permission('items', 'edit_sn') or current_user.has_permission('items', 'edit_lending') or current_user.has_permission('items', 'edit_advance') %}
                     <a href="{{ url_for('item.item_edit', uuid=item.uuid) }}" class="btn btn-warning btn-sm">
                         <i class="bi bi-pencil"></i> Edit
                     </a>
@@ -198,6 +198,9 @@
                                 <span class="badge bg-success ms-1">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.price_per_unit) }}/unit</span>
                                 <span class="badge bg-info ms-1">Price: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_price()) }}</span>
                                 <span class="badge bg-secondary ms-1">Value: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_value()) }}</span>
+                                {% if not batch.follow_main_location %}
+                                <span class="badge bg-secondary ms-1"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>
+                                {% endif %}
                                 {% if batch.purchase_date %}
                                 <small class="text-muted ms-2"><i class="bi bi-calendar"></i> {{ batch.purchase_date.strftime('%d/%m/%Y') }}</small>
                                 {% endif %}
@@ -226,6 +229,17 @@
                                     <div class="col-md-3"><strong>Lend to:</strong> {{ batch.lend_to }}</div>
                                     {% endif %}
                                     <div class="col-md-3"><strong>Date:</strong> {{ batch.purchase_date.strftime('%d/%m/%Y') if batch.purchase_date else 'N/A' }}</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-md-12">
+                                        <strong>Location:</strong>
+                                        {% if batch.follow_main_location %}
+                                        <span class="text-muted"><i class="bi bi-link-45deg"></i> Follow Main</span>
+                                        <small class="text-muted">({{ batch.get_effective_location_text() }})</small>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ batch.get_effective_location_text() }}</span>
+                                        {% endif %}
+                                    </div>
                                 </div>
                                 {% set proj_names = batch.get_project_names_for_batch() %}
                                 {% if proj_names %}

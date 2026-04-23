@@ -159,22 +159,25 @@ def item_permission_required(f):
         if not current_user.is_authenticated:
             flash('Please log in to access this page.', 'danger')
             return redirect(url_for('login'))
-        
+
         # Check if user has view permission first
         if not current_user.has_permission('items', 'view'):
             flash('You do not have permission to view items.', 'danger')
             return redirect(url_for('index'))
-        
+
         # Check if user has ANY item edit permission (not just 'edit')
         has_any_edit_perm = any([
-            current_user.has_permission('items', action) 
-            for action in ['create', 'edit_name', 'edit_data', 'edit_price', 'edit_quantity', 'edit_location', 'edit_classification', 'edit_parameters', 'delete']
+            current_user.has_permission('items', action)
+            for action in ['create', 'delete', 'edit_info', 'edit_batch',
+                           'edit_quantity', 'edit_price', 'edit_sn',
+                           'edit_lending', 'delete_batch',
+                           'edit_advance', 'delete_advance']
         ])
-        
+
         if not has_any_edit_perm:
             flash('You do not have permission to edit items.', 'danger')
             return redirect(url_for('index'))
-        
+
         return f(*args, **kwargs)
     return decorated_function
 
@@ -230,26 +233,47 @@ def markdown_to_html(text):
 
 
 def get_item_edit_permissions(user):
-    """Get which item fields a user can edit"""
+    """Get simplified item permissions grouped by Component / Info / Batch / Advance.
+
+    Schema:
+      items.view           - can see item in list/detail
+      items.view_info      - can see full Item Info section (else only UUID + name)
+      items.edit_info      - can edit Item Info fields
+      items.view_batch     - can see Batch section
+      items.edit_batch     - can edit general batch fields (label, date, note)
+      items.edit_quantity  - can edit batch quantity
+      items.edit_price     - can edit batch price
+      items.edit_sn        - can edit serial numbers
+      items.edit_lending   - can edit lending info
+      items.delete_batch   - can delete a batch
+      items.view_advance   - can see Advance Info section
+      items.edit_advance   - can edit Advance Info (files/URLs/magic params)
+      items.delete_advance - can delete advance items (files/URLs/magic params)
+      items.create         - can create new items
+      items.delete         - can delete items
+    """
+    is_admin = user.is_admin()
     perms = {
-        'can_edit_name': user.has_permission('items', 'edit_name'),
-        'can_edit_sku_type': user.has_permission('items', 'edit_sku_type'),
-        'can_edit_description': user.has_permission('items', 'edit_description'),
-        'can_edit_datasheet': user.has_permission('items', 'edit_datasheet'),
-        'can_edit_upload': user.has_permission('items', 'edit_upload'),
-        'can_edit_lending': user.has_permission('items', 'edit_lending'),
-        'can_edit_price': user.has_permission('items', 'edit_price'),
-        'can_edit_quantity': user.has_permission('items', 'edit_quantity'),
-        'can_edit_location': user.has_permission('items', 'edit_location'),
-        'can_edit_category': user.has_permission('items', 'edit_category'),
-        'can_edit_footprint': user.has_permission('items', 'edit_footprint'),
-        'can_edit_tags': user.has_permission('items', 'edit_tags'),
-        'can_edit_parameters': user.has_permission('items', 'edit_parameters'),
-        'can_edit_batch': user.has_permission('items', 'edit_batch'),
-        'can_edit_serial': user.has_permission('items', 'edit_serial'),
+        # Component
+        'can_view': is_admin or user.has_permission('items', 'view'),
         'can_create': user.has_permission('items', 'create'),
         'can_delete': user.has_permission('items', 'delete'),
-        'is_admin': user.is_admin()
+        # Item Info
+        'can_view_info': is_admin or user.has_permission('items', 'view_info'),
+        'can_edit_info': user.has_permission('items', 'edit_info'),
+        # Batch
+        'can_view_batch': is_admin or user.has_permission('items', 'view_batch'),
+        'can_edit_batch': user.has_permission('items', 'edit_batch'),
+        'can_edit_quantity': user.has_permission('items', 'edit_quantity'),
+        'can_edit_price': user.has_permission('items', 'edit_price'),
+        'can_edit_sn': user.has_permission('items', 'edit_sn'),
+        'can_edit_lending': user.has_permission('items', 'edit_lending'),
+        'can_delete_batch': user.has_permission('items', 'delete_batch'),
+        # Advance Info
+        'can_view_advance': is_admin or user.has_permission('items', 'view_advance'),
+        'can_edit_advance': user.has_permission('items', 'edit_advance'),
+        'can_delete_advance': user.has_permission('items', 'delete_advance'),
+        'is_admin': is_admin,
     }
     return perms
 

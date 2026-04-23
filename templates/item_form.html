@@ -4,75 +4,231 @@
 
 {% block content %}
 
-{% if item_perms and not (item_perms.can_edit_name and item_perms.can_edit_sku_type and item_perms.can_edit_description and item_perms.can_edit_price and item_perms.can_edit_quantity and item_perms.can_edit_location and item_perms.can_edit_category and item_perms.can_edit_footprint and item_perms.can_edit_tags and item_perms.can_edit_parameters) %}
+{% if item_perms and not (item_perms.can_edit_info and item_perms.can_edit_batch and item_perms.can_edit_quantity and item_perms.can_edit_price and item_perms.can_edit_sn and item_perms.can_edit_lending and item_perms.can_edit_advance) %}
 <div class="alert alert-info alert-dismissible fade show" role="alert">
     <strong><i class="bi bi-info-circle"></i> Limited Editing Permissions</strong><br>
-    <small>You can only edit: 
+    <small>You can edit:
     {% set editable_sections = [] %}
-    {% if item_perms.can_edit_name %}{{ editable_sections.append('Name') or '' }}{% endif %}
-    {% if item_perms.can_edit_sku_type %}{{ editable_sections.append('SKU & Type') or '' }}{% endif %}
-    {% if item_perms.can_edit_description %}{{ editable_sections.append('Description') or '' }}{% endif %}
+    {% if item_perms.can_edit_info %}{{ editable_sections.append('Item Info') or '' }}{% endif %}
+    {% if item_perms.can_edit_batch %}{{ editable_sections.append('Batch') or '' }}{% endif %}
+    {% if item_perms.can_edit_quantity %}{{ editable_sections.append('Quantity') or '' }}{% endif %}
     {% if item_perms.can_edit_price %}{{ editable_sections.append('Price') or '' }}{% endif %}
-    {% if item_perms.can_edit_quantity %}{{ editable_sections.append('Qty & Min Qty') or '' }}{% endif %}
-    {% if item_perms.can_edit_location %}{{ editable_sections.append('Location') or '' }}{% endif %}
-    {% if item_perms.can_edit_category %}{{ editable_sections.append('Category') or '' }}{% endif %}
-    {% if item_perms.can_edit_footprint %}{{ editable_sections.append('Footprint') or '' }}{% endif %}
-    {% if item_perms.can_edit_tags %}{{ editable_sections.append('Tags') or '' }}{% endif %}
-    {% if item_perms.can_edit_parameters %}{{ editable_sections.append('Magic Parameters') or '' }}{% endif %}
-    {{ editable_sections|join(', ') }}
+    {% if item_perms.can_edit_sn %}{{ editable_sections.append('Serial Numbers') or '' }}{% endif %}
+    {% if item_perms.can_edit_lending %}{{ editable_sections.append('Lending') or '' }}{% endif %}
+    {% if item_perms.can_edit_advance %}{{ editable_sections.append('Advance Info') or '' }}{% endif %}
+    {{ editable_sections|join(', ') if editable_sections else 'nothing (view-only)' }}
     </small>
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 
 <div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="bi bi-box"></i> {{ title }}</h5>
-            </div>
-            <div class="card-body">
-                <form method="POST" id="itemForm">
-                    {{ form.hidden_tag() }}
+    <div class="col-md-10">
+        <form method="POST" id="itemForm">
+            {{ form.hidden_tag() }}
 
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0"><i class="bi bi-box"></i> {{ title }}</h5>
+            </div>
+
+            {# ============================================================= #}
+            {# SECTION 1: ITEM INFO                                            #}
+            {# ============================================================= #}
+            <div class="card mb-3">
+                <div class="card-header d-flex align-items-center">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Item Info</strong>
+                    {% if item_perms and not item_perms.can_edit_info %}
+                    <span class="badge bg-secondary ms-2">Read-only</span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
                     <div class="row mb-2">
-                        <div class="col-8">
+                        <div class="col-md-8">
                             <label class="form-label form-label-sm">Component Name *</label>
                             {{ form.name(class="form-control form-control-sm" + (" is-invalid" if form.name.errors else
-                            ""), disabled=(item_perms and not item_perms.can_edit_name)) }}
+                            ""), disabled=(item_perms and not item_perms.can_edit_info)) }}
                         </div>
-                        <div class="col-4">
+                        <div class="col-md-4">
                             <label class="form-label form-label-sm">SKU</label>
-                            {{ form.sku(class="form-control form-control-sm", disabled=(item_perms and not item_perms.can_edit_sku_type)) }}
+                            {{ form.sku(class="form-control form-control-sm", disabled=(item_perms and not item_perms.can_edit_info)) }}
                         </div>
                     </div>
 
                     <div class="row mb-2">
-                        <div class="col-6">
+                        <div class="col-md-6">
                             <label class="form-label form-label-sm">Type / Model</label>
-                            {{ form.info(class="form-control form-control-sm", placeholder="eg TVS Diode", disabled=(item_perms and not item_perms.can_edit_sku_type)) }}
+                            {{ form.info(class="form-control form-control-sm", placeholder="eg TVS Diode", disabled=(item_perms and not item_perms.can_edit_info)) }}
                         </div>
-                    </div>
-
-                    <div class="mb-2">
-                        <label class="form-label form-label-sm">Description</label>
-                        {{ form.description(class="form-control form-control-sm", placeholder="Support Markdown format", rows=4, disabled=(item_perms and not item_perms.can_edit_description)) }}
-                    </div>
-
-                    <div class="row mb-2">
-                        <div class="col-12">
+                        <div class="col-md-6">
                             <label class="form-label form-label-sm">Category</label>
                             <div class="input-group input-group-sm">
-                                {{ form.category_id(class="form-select form-select-sm", disabled=(item_perms and not item_perms.can_edit_category)) }}
+                                {{ form.category_id(class="form-select form-select-sm", disabled=(item_perms and not item_perms.can_edit_info)) }}
                                 <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
                                     data-bs-target="#addCategoryModal"
-                                    {% if item_perms and not item_perms.can_edit_category %}disabled{% endif %}>
+                                    {% if item_perms and not item_perms.can_edit_info %}disabled{% endif %}>
                                     <i class="bi bi-plus-circle"></i>
                                 </button>
                             </div>
                         </div>
                     </div>
 
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm">Footprint</label>
+                        <div class="input-group input-group-sm">
+                            {{ form.footprint_id(class="form-select form-select-sm", disabled=(item_perms and not item_perms.can_edit_info)) }}
+                            <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
+                                data-bs-target="#addFootprintModal"
+                                {% if item_perms and not item_perms.can_edit_info %}disabled{% endif %}>
+                                <i class="bi bi-plus-circle"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <label class="form-label form-label-sm mb-0">Tags</label>
+                            <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
+                                data-bs-target="#addTagModal" {% if item_perms and not item_perms.can_edit_info %}disabled{% endif %}>
+                                <i class="bi bi-plus-circle"></i> Add Tag
+                            </button>
+                        </div>
+                        <div class="border rounded p-2 mt-1" style="max-height: 120px; overflow-y: auto;"
+                            id="tagsContainer">
+                            {% for tag in all_tags %}
+                            <div class="form-check form-check-inline" style="min-width: 150px;">
+                                <input class="form-check-input" type="checkbox" name="tags[]" value="{{ tag.id }}"
+                                    id="tag{{ tag.id }}" {% if item and tag.id in
+                                    item.get_tags_list()|map(attribute='id')|list %}checked{% endif %}
+                                    {% if item_perms and not item_perms.can_edit_info %}disabled{% endif %}>
+                                <label class="form-check-label" for="tag{{ tag.id }}">
+                                    <span class="badge"
+                                        style="background-color: {{ tag.color }}; font-size: 0.75rem;">{{ tag.name
+                                        }}</span>
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="card bg-light mb-2">
+                        <div class="card-body p-2">
+                            <label class="form-label form-label-sm mb-2"><strong>Main Physical Storage Location</strong>
+                                <small class="text-muted">(batches can override this)</small>
+                            </label>
+
+                            <div class="btn-group btn-group-sm w-100 mb-2" role="group">
+                                <input type="radio" class="btn-check" name="location_type" id="type_general"
+                                    value="general" {% if not item or (item and not item.rack_id) %}checked{% endif %}
+                                    {% if item_perms and not item_perms.can_edit_info %}disabled{% endif %}>
+                                <label class="btn btn-outline-primary" for="type_general">General Location</label>
+
+                                <input type="radio" class="btn-check" name="location_type" id="type_drawer"
+                                    value="drawer" {% if item and item.rack_id %}checked{% endif %}
+                                    {% if item_perms and not item_perms.can_edit_info %}disabled{% endif %}>
+                                <label class="btn btn-outline-primary" for="type_drawer">Drawer Storage</label>
+                            </div>
+
+                            <div id="general_location_section">
+                                <label class="form-label form-label-sm">General Location</label>
+                                <div class="input-group input-group-sm mb-2">
+                                    {{ form.location_id(class="form-select form-select-sm", disabled=(item_perms and not item_perms.can_edit_info)) }}
+                                    <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
+                                        data-bs-target="#addLocationModal"
+                                        {% if item_perms and not item_perms.can_edit_info %}disabled{% endif %}>
+                                        <i class="bi bi-plus-circle"></i>
+                                    </button>
+                                </div>
+                                <small class="text-muted d-block">Choose from existing locations or create new</small>
+                            </div>
+
+                            <div id="drawer_storage_section" style="display: none;">
+                                <div class="row g-2 mb-2" style="position: relative;">
+                                    <div class="col-4" style="overflow: visible;">
+                                        <label class="form-label form-label-sm">Location</label>
+                                        <select name="storage_location_id" id="storage_location_select" class="form-select form-select-sm" onchange="updateStorageRackSelect()" style="position: relative; z-index: 100;"
+                                            {% if item_perms and not item_perms.can_edit_info %}disabled{% endif %}>
+                                            <option value="">All</option>
+                                            {% for loc in locations %}
+                                            <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-4" style="overflow: visible;">
+                                        <label class="form-label form-label-sm">Rack</label>
+                                        <select name="rack_id" id="rack_select" class="form-select form-select-sm" onchange="updateDrawerGrid()" style="position: relative; z-index: 99;"
+                                            {% if item_perms and not item_perms.can_edit_info %}disabled{% endif %}>
+                                            <option value="">Select</option>
+                                            {% for rack in racks %}
+                                            <option value="{{ rack.id }}" data-rows="{{ rack.rows }}"
+                                                data-cols="{{ rack.cols }}" data-location="{{ rack.physical_location.id if rack.physical_location else '' }}" {% if item and item.rack_id==rack.id
+                                                %}selected{% endif %}>
+                                                {{ rack.name }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-4" style="overflow: visible;">
+                                        <label class="form-label form-label-sm">Drawer</label>
+                                        {{ form.drawer(class="form-control form-control-sm", id="drawer_input", placeholder="Select", readonly=True, disabled=(item_perms and not item_perms.can_edit_info)) }}
+                                    </div>
+                                </div>
+
+                                <div id="drawer_picker" style="display: none;">
+                                    <div class="p-2 border rounded drawer-grid-container">
+                                        <small class="text-muted d-block mb-2">Click to select:</small>
+                                        <div id="drawer_grid" style="display: inline-grid; gap: 4px; background: transparent;"></div>
+                                    </div>
+                                </div>
+
+                                <small class="text-muted d-block">Precise cell-level organization</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label form-label-sm">UUID</label>
+                            <input type="text" class="form-control form-control-sm"
+                                value="{{ item.uuid if item else 'Auto-generated' }}" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label form-label-sm">Min Quantity</label>
+                            {{ form.min_quantity(class="form-control form-control-sm", placeholder="0", disabled=(item_perms and not item_perms.can_edit_info)) }}
+                        </div>
+                    </div>
+
+                    <div class="row mb-0">
+                        <div class="col-12">
+                            <div class="form-check">
+                                {% if item %}
+                                    <input type="checkbox" class="form-check-input" id="no_stock_warning" name="no_stock_warning" value="y" {% if item.no_stock_warning %}checked{% endif %}
+                                        {% if item_perms and not item_perms.can_edit_info %}disabled{% endif %}>
+                                {% else %}
+                                    <input type="checkbox" class="form-check-input" id="no_stock_warning" name="no_stock_warning" value="y" checked
+                                        {% if item_perms and not item_perms.can_edit_info %}disabled{% endif %}>
+                                {% endif %}
+                                <label class="form-check-label" for="no_stock_warning">
+                                    Enable No Stock Warning
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {# ============================================================= #}
+            {# SECTION 2: BATCH                                                #}
+            {# ============================================================= #}
+            <div class="card mb-3">
+                <div class="card-header d-flex align-items-center">
+                    <i class="bi bi-collection me-2"></i>
+                    <strong>Batch</strong>
+                    {% if item_perms and not item_perms.can_edit_batch %}
+                    <span class="badge bg-secondary ms-2">Read-only</span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
                     {% if item %}
                     <div class="mb-2 border rounded p-2" id="batches-section">
                         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -104,6 +260,7 @@
                                     {% if batch.get_lend_quantity() > 0 %}<span class="badge bg-warning ms-1">Lend: {{ batch.get_lend_quantity() }}</span>{% endif %}
                                     {% set proj_names = batch.get_project_names_for_batch() %}
                                     {% if proj_names %}<span class="badge bg-info ms-1">Proj: {{ proj_names|join(', ') }}</span>{% endif %}
+                                    {% if not batch.follow_main_location %}<span class="badge bg-secondary ms-1"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>{% endif %}
                                     {% if batch.purchase_date %}<small class="text-muted ms-2"><i class="bi bi-calendar"></i> {{ batch.purchase_date.strftime('%d/%m/%Y') }}</small>{% endif %}
                                     {% if batch.note %}<small class="text-muted ms-2"><i class="bi bi-sticky"></i> {{ batch.note }}</small>{% endif %}
                                 </div>
@@ -113,7 +270,7 @@
                                     {% if not batch.sn_tracking_enabled %}
                                     <button type="button" class="btn btn-sm btn-outline-info py-0 px-1" onclick="event.stopPropagation(); openTransferModal({{ batch.id }}, {{ batch.get_available_quantity() }})" title="Transfer Quantity"><i class="bi bi-arrow-left-right"></i></button>
                                     {% endif %}
-                                    <button type="button" class="btn btn-sm btn-outline-warning py-0 px-1" onclick="event.stopPropagation(); openEditBatchModal({{ batch.id }}, '{{ batch.batch_label|e if batch.batch_label else '' }}', {{ batch.quantity }}, {{ batch.price_per_unit }}, '{{ batch.purchase_date.strftime('%Y-%m-%d') if batch.purchase_date else '' }}', '{{ batch.note|e if batch.note else '' }}', '{{ batch.lend_to|e if batch.lend_to else '' }}', {{ batch.lend_quantity or 0 }}, {{ 'true' if batch.sn_tracking_enabled else 'false' }})" title="Edit"><i class="bi bi-pencil"></i></button>
+                                    <button type="button" class="btn btn-sm btn-outline-warning py-0 px-1" onclick="event.stopPropagation(); openEditBatchModal({{ batch.id }}, '{{ batch.batch_label|e if batch.batch_label else '' }}', {{ batch.quantity }}, {{ batch.price_per_unit }}, '{{ batch.purchase_date.strftime('%Y-%m-%d') if batch.purchase_date else '' }}', '{{ batch.note|e if batch.note else '' }}', '{{ batch.lend_to|e if batch.lend_to else '' }}', {{ batch.lend_quantity or 0 }}, {{ 'true' if batch.sn_tracking_enabled else 'false' }}, {{ 'true' if (batch.follow_main_location if batch.follow_main_location is not none else true) else 'false' }}, {{ batch.location_id or 'null' }}, {{ batch.rack_id or 'null' }}, '{{ batch.drawer|e if batch.drawer else '' }}')" title="Edit"><i class="bi bi-pencil"></i></button>
                                     <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="event.stopPropagation(); deleteBatchJS({{ batch.id }}, '{{ batch.get_display_label()|e }}')" title="Delete"><i class="bi bi-trash"></i></button>
                                     {% endif %}
                                 </div>
@@ -137,6 +294,17 @@
                                         <div class="col-md-3"><strong>Lend to:</strong> {{ batch.lend_to }}</div>
                                         {% endif %}
                                         <div class="col-md-3"><strong>Date:</strong> {{ batch.purchase_date.strftime('%d/%m/%Y') if batch.purchase_date else 'N/A' }}</div>
+                                    </div>
+                                    <div class="row mb-2 small">
+                                        <div class="col-12">
+                                            <strong>Location:</strong>
+                                            {% if batch.follow_main_location %}
+                                            <span class="text-muted"><i class="bi bi-link-45deg"></i> Follow Main</span>
+                                            <small class="text-muted">({{ batch.get_effective_location_text() }})</small>
+                                            {% else %}
+                                            <span class="badge bg-secondary">{{ batch.get_effective_location_text() }}</span>
+                                            {% endif %}
+                                        </div>
                                     </div>
                                     {% if proj_names %}
                                     <div class="row mb-2 small">
@@ -252,134 +420,35 @@
                     {% endif %}
                     <input type="hidden" name="quantity" id="quantity" value="{{ item.quantity if item else 0 }}">
                     <input type="hidden" name="price" value="{{ item.price if item else 0 }}">
+                </div>
+            </div>
 
-                    <div class="row mb-2">
-                        <div class="col-12">
-                            <div class="form-check">
-                                {% if item %}
-                                    <input type="checkbox" class="form-check-input" id="no_stock_warning" name="no_stock_warning" value="y" {% if item.no_stock_warning %}checked{% endif %}
-                                        {% if item_perms and not item_perms.can_edit_quantity %}disabled{% endif %}>
-                                {% else %}
-                                    <input type="checkbox" class="form-check-input" id="no_stock_warning" name="no_stock_warning" value="y" checked
-                                        {% if item_perms and not item_perms.can_edit_quantity %}disabled{% endif %}>
-                                {% endif %}
-                                <label class="form-check-label" for="no_stock_warning">
-                                    Enable No Stock Warning
-                                </label>
-                            </div>
-                        </div>
+            {# ============================================================= #}
+            {# SECTION 3: ADVANCE INFO                                         #}
+            {# ============================================================= #}
+            <div class="card mb-3">
+                <div class="card-header d-flex align-items-center">
+                    <i class="bi bi-sliders me-2"></i>
+                    <strong>Advance Info</strong>
+                    {% if item_perms and not item_perms.can_edit_advance %}
+                    <span class="badge bg-secondary ms-2">Read-only</span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label form-label-sm">Description</label>
+                        {{ form.description(class="form-control form-control-sm", placeholder="Support Markdown format", rows=4, disabled=(item_perms and not item_perms.can_edit_advance)) }}
                     </div>
 
-                    <div class="card bg-light mb-2">
-                        <div class="card-body p-2">
-                            <label class="form-label form-label-sm mb-2"><strong>Physical Storage
-                                    Location</strong></label>
-
-                            <div class="btn-group btn-group-sm w-100 mb-2" role="group">
-                                <input type="radio" class="btn-check" name="location_type" id="type_general"
-                                    value="general" {% if not item or (item and not item.rack_id) %}checked{% endif %}
-                                    {% if item_perms and not item_perms.can_edit_location %}disabled{% endif %}>
-                                <label class="btn btn-outline-primary" for="type_general">General Location</label>
-
-                                <input type="radio" class="btn-check" name="location_type" id="type_drawer"
-                                    value="drawer" {% if item and item.rack_id %}checked{% endif %}
-                                    {% if item_perms and not item_perms.can_edit_location %}disabled{% endif %}>
-                                <label class="btn btn-outline-primary" for="type_drawer">Drawer Storage</label>
-                            </div>
-
-                            <div id="general_location_section">
-                                <label class="form-label form-label-sm">General Location</label>
-                                <div class="input-group input-group-sm mb-2">
-                                    {{ form.location_id(class="form-select form-select-sm", disabled=(item_perms and not item_perms.can_edit_location)) }}
-                                    <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
-                                        data-bs-target="#addLocationModal"
-                                        {% if item_perms and not item_perms.can_edit_location %}disabled{% endif %}>
-                                        <i class="bi bi-plus-circle"></i>
-                                    </button>
-                                </div>
-                                <small class="text-muted d-block">Choose from existing locations or create new</small>
-                            </div>
-
-                            <div id="drawer_storage_section" style="display: none;">
-                                <div class="row g-2 mb-2" style="position: relative;">
-                                    <div class="col-4" style="overflow: visible;">
-                                        <label class="form-label form-label-sm">Location</label>
-                                        <select name="storage_location_id" id="storage_location_select" class="form-select form-select-sm" onchange="updateStorageRackSelect()" style="position: relative; z-index: 100;"
-                                            {% if item_perms and not item_perms.can_edit_location %}disabled{% endif %}>
-                                            <option value="">All</option>
-                                            {% for loc in locations %}
-                                            <option value="{{ loc.id }}">{{ loc.name }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <div class="col-4" style="overflow: visible;">
-                                        <label class="form-label form-label-sm">Rack</label>
-                                        <select name="rack_id" id="rack_select" class="form-select form-select-sm" onchange="updateDrawerGrid()" style="position: relative; z-index: 99;"
-                                            {% if item_perms and not item_perms.can_edit_location %}disabled{% endif %}>
-                                            <option value="">Select</option>
-                                            {% for rack in racks %}
-                                            <option value="{{ rack.id }}" data-rows="{{ rack.rows }}"
-                                                data-cols="{{ rack.cols }}" data-location="{{ rack.physical_location.id if rack.physical_location else '' }}" {% if item and item.rack_id==rack.id
-                                                %}selected{% endif %}>
-                                                {{ rack.name }}
-                                            </option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <div class="col-4" style="overflow: visible;">
-                                        <label class="form-label form-label-sm">Drawer</label>
-                                        {{ form.drawer(class="form-control form-control-sm", id="drawer_input", placeholder="Select", readonly=True, disabled=(item_perms and not item_perms.can_edit_location)) }}
-                                    </div>
-                                </div>
-
-                                <div id="drawer_picker" style="display: none;">
-                                    <div class="p-2 border rounded drawer-grid-container">
-                                        <small class="text-muted d-block mb-2">Click to select:</small>
-                                        <div id="drawer_grid" style="display: inline-grid; gap: 4px; background: transparent;"></div>
-                                    </div>
-                                </div>
-
-                                <small class="text-muted d-block">Precise cell-level organization</small>
-                            </div>
+                    <div class="mb-3">
+                        <label class="form-label form-label-sm">Datasheet URLs</label>
+                        <button type="button" class="btn btn-sm btn-primary float-end" onclick="addDatasheetRow()"
+                            {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
+                            <i class="bi bi-plus-circle"></i> Add URL
+                        </button>
+                        <div id="datasheet-list" class="mt-2">
                         </div>
-                    </div>
-
-                    <div class="mb-2">
-                        <label class="form-label form-label-sm">Footprint</label>
-                        <div class="input-group input-group-sm">
-                            {{ form.footprint_id(class="form-select form-select-sm", disabled=(item_perms and not item_perms.can_edit_footprint)) }}
-                            <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
-                                data-bs-target="#addFootprintModal"
-                                {% if item_perms and not item_perms.can_edit_footprint %}disabled{% endif %}>
-                                <i class="bi bi-plus-circle"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="mb-2">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <label class="form-label form-label-sm mb-0">Tags</label>
-                            <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
-                                data-bs-target="#addTagModal" {% if item_perms and not item_perms.can_edit_tags %}disabled{% endif %}>
-                                <i class="bi bi-plus-circle"></i> Add Tag
-                            </button>
-                        </div>
-                        <div class="border rounded p-2 mt-1" style="max-height: 120px; overflow-y: auto;"
-                            id="tagsContainer">
-                            {% for tag in all_tags %}
-                            <div class="form-check form-check-inline" style="min-width: 150px;">
-                                <input class="form-check-input" type="checkbox" name="tags[]" value="{{ tag.id }}"
-                                    id="tag{{ tag.id }}" {% if item and tag.id in
-                                    item.get_tags_list()|map(attribute='id')|list %}checked{% endif %}
-                                    {% if item_perms and not item_perms.can_edit_tags %}disabled{% endif %}>
-                                <label class="form-check-label" for="tag{{ tag.id }}">
-                                    <span class="badge"
-                                        style="background-color: {{ tag.color }}; font-size: 0.75rem;">{{ tag.name
-                                        }}</span>
-                                </label>
-                            </div>
-                            {% endfor %}
-                        </div>
+                        {{ form.datasheet_urls(id="datasheet_urls_hidden", style="display:none;") }}
                     </div>
 
                     {% if item %}
@@ -429,13 +498,13 @@
                                             <button type="button" class="btn btn-warning btn-sm"
                                                 style="padding: 0.1rem 0.4rem; font-size: 0.75rem;"
                                                 onclick="openFileRenameModal({{ att.id }}, '{{ att.original_filename }}')"
-                                                {% if item_perms and not item_perms.can_edit_upload %}disabled{% endif %}>
+                                                {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
                                                 <i class="bi bi-pencil"></i>
                                             </button>
                                             <button type="button" class="btn btn-danger btn-sm"
                                                 style="padding: 0.1rem 0.4rem; font-size: 0.75rem;"
                                                 onclick="deleteFile({{ att.id }})"
-                                                {% if item_perms and not item_perms.can_edit_upload %}disabled{% endif %}>
+                                                {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </div>
@@ -453,11 +522,11 @@
                                     <div class="mb-2">
                                         <label class="form-label form-label-sm">Select Files to Upload:</label>
                                         <input type="file" id="fileUploadInput" class="form-control form-control-sm"
-                                            multiple {% if item_perms and not item_perms.can_edit_upload %}disabled{% endif %}>
+                                            multiple {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
                                         <small class="text-muted">Allowed: {{ allowed_file_types }} | Max: {{
                                             max_file_size_mb }}MB per file</small>
                                     </div>
-                                    <button type="button" class="btn btn-primary btn-sm" onclick="uploadFiles()" {% if item_perms and not item_perms.can_edit_upload %}disabled{% endif %}>
+                                    <button type="button" class="btn btn-primary btn-sm" onclick="uploadFiles()" {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
                                         <i class="bi bi-upload"></i> Upload Files
                                     </button>
                                 </div>
@@ -478,11 +547,11 @@
                             </label>
                             <div>
                                 <button type="button" id="addParameterBtn" class="btn btn-sm btn-success" data-bs-toggle="modal"
-                                    data-bs-target="#addParameterModal" {% if item_perms and not item_perms.can_edit_parameters %}disabled{% endif %}>
+                                    data-bs-target="#addParameterModal" {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
                                     <i class="bi bi-plus-circle"></i> Add Parameter
                                 </button>
                                 <button type="button" id="useTemplateBtn" class="btn btn-sm btn-success ms-1" data-bs-toggle="modal"
-                                    data-bs-target="#useTemplateModal" {% if item_perms and not item_perms.can_edit_parameters %}disabled{% endif %}>
+                                    data-bs-target="#useTemplateModal" {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
                                     <i class="bi bi-collection"></i> Use Template
                                 </button>
                             </div>
@@ -526,13 +595,13 @@
                                         <div>
                                             <a href="{{ url_for('item.item_edit_parameter', item_id=item.id, param_id=param.id) }}"
                                                 class="btn btn-sm btn-warning btn-sm" title="Edit"
-                                                {% if item_perms and not item_perms.can_edit_parameters %}onclick="event.preventDefault(); alert('You do not have permission to edit parameters.'); return false;"{% endif %}>
+                                                {% if item_perms and not item_perms.can_edit_advance %}onclick="event.preventDefault(); alert('You do not have permission to edit parameters.'); return false;"{% endif %}>
                                                 <i class="bi bi-pencil"></i>
                                             </a>
                                             <button type="button" class="btn btn-sm btn-danger btn-sm"
                                                 onclick="submitDeleteParameterForm({{ item.id }}, {{ param.id }}, event)"
                                                 title="Delete"
-                                                {% if item_perms and not item_perms.can_edit_parameters %}disabled{% endif %}>
+                                                {% if item_perms and not item_perms.can_delete_advance %}disabled{% endif %}>
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </div>
@@ -548,30 +617,17 @@
                     </div>
                     {% endif %}
 
-                    <div class="mb-3">
-                        <label class="form-label form-label-sm">Datasheet URLs</label>
-                        <button type="button" class="btn btn-sm btn-primary float-end" onclick="addDatasheetRow()"
-                            {% if item_perms and not item_perms.can_edit_datasheet %}disabled{% endif %}>
-                            <i class="bi bi-plus-circle"></i> Add URL
-                        </button>
-                        <div id="datasheet-list" class="mt-2">
-                            </div>
-                        {{ form.datasheet_urls(id="datasheet_urls_hidden", style="display:none;") }}
-                    </div>
-
                     <script>
                         // Ensure datasheet URLs are updated before the main form is submitted
                         document.getElementById('itemForm').addEventListener('submit', function (e) {
                             updateHiddenField(); // Call the function to ensure the hidden field is current
-                            // Optional: Log the value being submitted for debugging
-                            // console.log("Submitting datasheet URLs:", document.getElementById('datasheet_urls_hidden').value);
                         });
 
                         // Store datasheet data for form
                         let formDatasheets = [];
-                        
-                        // Check if user has permission to edit datasheets
-                        const canEditDatasheet = {% if item_perms and item_perms.can_edit_datasheet %}true{% else %}false{% endif %};
+
+                        // Check if user has permission to edit advance info
+                        const canEditAdvance = {% if item_perms and item_perms.can_edit_advance %}true{% else %}false{% endif %};
 
                         // Load existing datasheets
                         {% if form.datasheet_urls.data %}
@@ -606,8 +662,8 @@
                                 if (ds.info) {
                                     html += ` <span class="text-muted">- ${ds.info}</span>`;
                                 }
-                                html += ` <button type="button" class="btn btn-sm btn-outline-primary btn-sm ms-2" onclick="editFormDatasheet(${index})" ${!canEditDatasheet ? 'disabled' : ''}>Edit</button>`;
-                                html += ` <button type="button" class="btn btn-sm btn-outline-danger btn-sm" onclick="deleteFormDatasheet(${index})" ${!canEditDatasheet ? 'disabled' : ''}>Delete</button>`;
+                                html += ` <button type="button" class="btn btn-sm btn-outline-primary btn-sm ms-2" onclick="editFormDatasheet(${index})" ${!canEditAdvance ? 'disabled' : ''}>Edit</button>`;
+                                html += ` <button type="button" class="btn btn-sm btn-outline-danger btn-sm" onclick="deleteFormDatasheet(${index})" ${!canEditAdvance ? 'disabled' : ''}>Delete</button>`;
                                 html += `</div>`;
 
                                 // Edit mode
@@ -740,34 +796,23 @@
                         });
                     </script>
 
-                    <div class="row mb-2">
-                        <div class="col-6">
-                            <label class="form-label form-label-sm">UUID</label>
-                            <input type="text" class="form-control form-control-sm"
-                                value="{{ item.uuid if item else 'Auto-generated' }}" readonly>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label form-label-sm">Min Quantity</label>
-                            {{ form.min_quantity(class="form-control form-control-sm", placeholder="0", disabled=(item_perms and not item_perms.can_edit_quantity)) }}
-                        </div>
-                    </div>
-
-                    <div class="d-flex justify-content-between align-items-center">
-                        <a href="{{ url_for('item.items') }}" class="btn btn-secondary">
-                            <i class="bi bi-x-circle"></i> Cancel
-                        </a>
-                        <div class="d-flex gap-2">
-                            {% if not item %}
-                            <button type="submit" name="save_and_new" value="1" class="btn btn-outline-primary">
-                                <i class="bi bi-plus-square"></i> Save and Create New
-                            </button>
-                            {% endif %}
-                            {{ form.submit(class="btn btn-primary") }}
-                        </div>
-                    </div>
-                </form>
+                </div>
             </div>
-        </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <a href="{{ url_for('item.items') }}" class="btn btn-secondary">
+                    <i class="bi bi-x-circle"></i> Cancel
+                </a>
+                <div class="d-flex gap-2">
+                    {% if not item %}
+                    <button type="submit" name="save_and_new" value="1" class="btn btn-outline-primary">
+                        <i class="bi bi-plus-square"></i> Save and Create New
+                    </button>
+                    {% endif %}
+                    {{ form.submit(class="btn btn-primary") }}
+                </div>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -789,12 +834,12 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-danger" onclick="deleteImageFromModal()"
-                    {% if item_perms and not item_perms.can_edit_upload %}disabled{% endif %}>
+                    {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
                     <i class="bi bi-trash"></i> Delete
                 </button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 <button type="button" class="btn btn-primary" onclick="saveImageName()"
-                    {% if item_perms and not item_perms.can_edit_upload %}disabled{% endif %}>
+                    {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
                     <i class="bi bi-save"></i> Save Name
                 </button>
             </div>
@@ -818,7 +863,7 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveFileName()"
-                    {% if item_perms and not item_perms.can_edit_upload %}disabled{% endif %}>
+                    {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
                     <i class="bi bi-save"></i> Save
                 </button>
             </div>
@@ -833,7 +878,7 @@
     let fileRenameModalInstance = null;
     
     // Permission variables from backend
-    const canEditUpload = {{ 'true' if item_perms and item_perms.can_edit_upload else 'false' }};
+    const canEditUpload = {{ 'true' if item_perms and item_perms.can_edit_advance else 'false' }};
 
     // Initialize modals
     document.addEventListener('DOMContentLoaded', function () {
@@ -1062,7 +1107,7 @@
     const racksData = {{ racks_data| tojson | safe }};
     
     // Permission check for location editing
-    const canEditLocation = {{ 'true' if item_perms and item_perms.can_edit_location else 'false' }};
+    const canEditLocation = {{ 'true' if item_perms and item_perms.can_edit_info else 'false' }};
 
     // Location type toggle
     const typeGeneral = document.getElementById('type_general');
@@ -1925,6 +1970,86 @@
 </script>
 {% endif %}
 
+{# Shared batch-location helpers — always rendered so the pending-batch
+   modal on /item/new can call them too, not only the edit-item page. #}
+<script>
+/* ── Batch drawer grid picker (shared across Add / Edit / Pending modals) ── */
+var BATCH_LOC_IDS = {
+    ab: { rack: 'ab_rack_id', drawer: 'ab_drawer', picker: 'ab_drawer_picker', grid: 'ab_drawer_grid', locFilter: 'ab_storage_location_select' },
+    eb: { rack: 'eb_rack_id', drawer: 'eb_drawer', picker: 'eb_drawer_picker', grid: 'eb_drawer_grid', locFilter: 'eb_storage_location_select' },
+    pb: { rack: 'pbRackId',   drawer: 'pbDrawer',   picker: 'pb_drawer_picker', grid: 'pb_drawer_grid', locFilter: 'pb_storage_location_select' }
+};
+function batchUpdateStorageRackSelect(prefix) {
+    var ids = BATCH_LOC_IDS[prefix];
+    if (!ids) return;
+    var filter = document.getElementById(ids.locFilter);
+    var rackSel = document.getElementById(ids.rack);
+    var drawerInput = document.getElementById(ids.drawer);
+    var picker = document.getElementById(ids.picker);
+    if (!filter || !rackSel) return;
+    if (drawerInput) drawerInput.value = '';
+    if (picker) picker.style.display = 'none';
+    var selectedLoc = String(filter.value || '');
+    Array.prototype.forEach.call(rackSel.options, function(option) {
+        if (option.value === '') {
+            option.style.display = 'block';
+            return;
+        }
+        var rackLoc = String(option.getAttribute('data-location') || '');
+        option.style.display = (selectedLoc === '' || rackLoc === selectedLoc) ? 'block' : 'none';
+    });
+    rackSel.value = '';
+}
+function batchUpdateDrawerGrid(prefix) {
+    var ids = BATCH_LOC_IDS[prefix];
+    if (!ids) return;
+    var rackSel = document.getElementById(ids.rack);
+    var drawerInput = document.getElementById(ids.drawer);
+    var picker = document.getElementById(ids.picker);
+    var grid = document.getElementById(ids.grid);
+    if (!rackSel || !drawerInput || !picker || !grid) return;
+    if (!rackSel.value) {
+        picker.style.display = 'none';
+        drawerInput.value = '';
+        grid.innerHTML = '';
+        return;
+    }
+    var opt = rackSel.options[rackSel.selectedIndex];
+    var rows = parseInt(opt.getAttribute('data-rows')) || 0;
+    var cols = parseInt(opt.getAttribute('data-cols')) || 0;
+    var rackId = parseInt(rackSel.value);
+    if (!rows || !cols) { picker.style.display = 'none'; return; }
+    grid.innerHTML = '';
+    grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+    grid.style.maxWidth = (cols * 45) + 'px';
+    var rackData = (typeof racksData !== 'undefined') ? racksData.find(function(r) { return r.id === rackId; }) : null;
+    var unavailable = rackData ? rackData.unavailable_drawers : [];
+    for (var r = 1; r <= rows; r++) {
+        for (var c = 1; c <= cols; c++) {
+            (function(drawerId) {
+                var cell = document.createElement('div');
+                cell.className = 'drawer-cell-picker';
+                cell.textContent = drawerId;
+                cell.setAttribute('data-drawer', drawerId);
+                if (unavailable.indexOf(drawerId) !== -1) {
+                    cell.classList.add('unavailable');
+                    cell.title = 'This drawer is unavailable';
+                } else {
+                    cell.addEventListener('click', function() {
+                        grid.querySelectorAll('.drawer-cell-picker').forEach(function(d) { d.classList.remove('selected'); });
+                        this.classList.add('selected');
+                        drawerInput.value = drawerId;
+                    });
+                }
+                if (drawerInput.value === drawerId) cell.classList.add('selected');
+                grid.appendChild(cell);
+            })('R' + r + '-C' + c);
+        }
+    }
+    picker.style.display = 'block';
+}
+</script>
+
 {% if item %}
 <div class="modal fade" id="addBatchModalDialog" tabindex="-1">
     <div class="modal-dialog">
@@ -1980,6 +2105,65 @@
                         <div class="col-4">
                             <label class="form-label form-label-sm">Lend Qty</label>
                             <input type="number" class="form-control form-control-sm" id="ab_lend_qty" min="0" value="0">
+                        </div>
+                    </div>
+                </div>
+                <div class="border rounded p-2 mb-2">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="ab_follow_main" checked onchange="abToggleLocation()">
+                        <label class="form-check-label" for="ab_follow_main">
+                            <strong>Follow Main Location</strong>
+                            <small class="text-muted d-block">Use the item's main physical storage location for this batch.</small>
+                        </label>
+                    </div>
+                    <div id="ab_batchLocSection" style="display:none;">
+                        <div class="btn-group btn-group-sm w-100 mb-2" role="group">
+                            <input type="radio" class="btn-check" name="ab_loc_type" id="ab_type_general" value="general" checked onchange="abSwitchLocType()">
+                            <label class="btn btn-outline-primary btn-sm" for="ab_type_general"><i class="bi bi-geo-alt"></i> General Location</label>
+                            <input type="radio" class="btn-check" name="ab_loc_type" id="ab_type_drawer" value="drawer" onchange="abSwitchLocType()">
+                            <label class="btn btn-outline-primary btn-sm" for="ab_type_drawer"><i class="bi bi-grid-3x3-gap"></i> Drawer Storage</label>
+                        </div>
+                        <div id="ab_generalSection">
+                            <label class="form-label form-label-sm">Location</label>
+                            <select class="form-select form-select-sm" id="ab_location_id">
+                                <option value="">— None —</option>
+                                {% for loc in locations %}
+                                <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div id="ab_drawerSection" style="display:none;">
+                            <div class="row g-2 mb-2" style="position: relative;">
+                                <div class="col-4" style="overflow: visible;">
+                                    <label class="form-label form-label-sm">Location</label>
+                                    <select class="form-select form-select-sm" id="ab_storage_location_select" onchange="batchUpdateStorageRackSelect('ab')">
+                                        <option value="">All</option>
+                                        {% for loc in locations %}
+                                        <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-4" style="overflow: visible;">
+                                    <label class="form-label form-label-sm">Rack</label>
+                                    <select class="form-select form-select-sm" id="ab_rack_id" onchange="batchUpdateDrawerGrid('ab')">
+                                        <option value="">Select</option>
+                                        {% for rack in racks %}
+                                        <option value="{{ rack.id }}" data-rows="{{ rack.rows }}" data-cols="{{ rack.cols }}" data-location="{{ rack.physical_location.id if rack.physical_location else '' }}">{{ rack.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-4" style="overflow: visible;">
+                                    <label class="form-label form-label-sm">Drawer</label>
+                                    <input type="text" class="form-control form-control-sm" id="ab_drawer" maxlength="50" readonly placeholder="Select">
+                                </div>
+                            </div>
+                            <div id="ab_drawer_picker" style="display:none;">
+                                <div class="p-2 border rounded drawer-grid-container">
+                                    <small class="text-muted d-block mb-2">Click to select:</small>
+                                    <div id="ab_drawer_grid" style="display:inline-grid; gap:4px; background: transparent;"></div>
+                                </div>
+                            </div>
+                            <small class="text-muted d-block">Precise cell-level organization</small>
                         </div>
                     </div>
                 </div>
@@ -2055,6 +2239,65 @@
                         </div>
                     </div>
                 </div>
+                <div class="border rounded p-2 mb-2">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="eb_follow_main" onchange="ebToggleLocation()">
+                        <label class="form-check-label" for="eb_follow_main">
+                            <strong>Follow Main Location</strong>
+                            <small class="text-muted d-block">Use the item's main physical storage location for this batch.</small>
+                        </label>
+                    </div>
+                    <div id="eb_batchLocSection" style="display:none;">
+                        <div class="btn-group btn-group-sm w-100 mb-2" role="group">
+                            <input type="radio" class="btn-check" name="eb_loc_type" id="eb_type_general" value="general" checked onchange="ebSwitchLocType()">
+                            <label class="btn btn-outline-primary btn-sm" for="eb_type_general"><i class="bi bi-geo-alt"></i> General Location</label>
+                            <input type="radio" class="btn-check" name="eb_loc_type" id="eb_type_drawer" value="drawer" onchange="ebSwitchLocType()">
+                            <label class="btn btn-outline-primary btn-sm" for="eb_type_drawer"><i class="bi bi-grid-3x3-gap"></i> Drawer Storage</label>
+                        </div>
+                        <div id="eb_generalSection">
+                            <label class="form-label form-label-sm">Location</label>
+                            <select class="form-select form-select-sm" id="eb_location_id">
+                                <option value="">— None —</option>
+                                {% for loc in locations %}
+                                <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div id="eb_drawerSection" style="display:none;">
+                            <div class="row g-2 mb-2" style="position: relative;">
+                                <div class="col-4" style="overflow: visible;">
+                                    <label class="form-label form-label-sm">Location</label>
+                                    <select class="form-select form-select-sm" id="eb_storage_location_select" onchange="batchUpdateStorageRackSelect('eb')">
+                                        <option value="">All</option>
+                                        {% for loc in locations %}
+                                        <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-4" style="overflow: visible;">
+                                    <label class="form-label form-label-sm">Rack</label>
+                                    <select class="form-select form-select-sm" id="eb_rack_id" onchange="batchUpdateDrawerGrid('eb')">
+                                        <option value="">Select</option>
+                                        {% for rack in racks %}
+                                        <option value="{{ rack.id }}" data-rows="{{ rack.rows }}" data-cols="{{ rack.cols }}" data-location="{{ rack.physical_location.id if rack.physical_location else '' }}">{{ rack.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-4" style="overflow: visible;">
+                                    <label class="form-label form-label-sm">Drawer</label>
+                                    <input type="text" class="form-control form-control-sm" id="eb_drawer" maxlength="50" readonly placeholder="Select">
+                                </div>
+                            </div>
+                            <div id="eb_drawer_picker" style="display:none;">
+                                <div class="p-2 border rounded drawer-grid-container">
+                                    <small class="text-muted d-block mb-2">Click to select:</small>
+                                    <div id="eb_drawer_grid" style="display:inline-grid; gap:4px; background: transparent;"></div>
+                                </div>
+                            </div>
+                            <small class="text-muted d-block">Precise cell-level organization</small>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -2101,8 +2344,35 @@ function openAddBatchModal() {
     document.getElementById('ab_note').value = '';
     document.getElementById('ab_lend_to').value = '';
     document.getElementById('ab_lend_qty').value = '0';
+    document.getElementById('ab_follow_main').checked = true;
+    document.getElementById('ab_location_id').value = '';
+    document.getElementById('ab_storage_location_select').value = '';
+    batchUpdateStorageRackSelect('ab');
+    document.getElementById('ab_rack_id').value = '';
+    document.getElementById('ab_drawer').value = '';
+    document.getElementById('ab_type_general').checked = true;
+    abSwitchLocType();
+    batchUpdateDrawerGrid('ab');
+    abToggleLocation();
     toggleAddBatchTracking();
     new bootstrap.Modal(document.getElementById('addBatchModalDialog')).show();
+}
+function abToggleLocation() {
+    var follow = document.getElementById('ab_follow_main').checked;
+    document.getElementById('ab_batchLocSection').style.display = follow ? 'none' : 'block';
+}
+function abSwitchLocType() {
+    var isDrawer = document.getElementById('ab_type_drawer').checked;
+    document.getElementById('ab_generalSection').style.display = isDrawer ? 'none' : 'block';
+    document.getElementById('ab_drawerSection').style.display = isDrawer ? 'block' : 'none';
+    if (isDrawer) {
+        document.getElementById('ab_location_id').value = '';
+        batchUpdateDrawerGrid('ab');
+    } else {
+        document.getElementById('ab_rack_id').value = '';
+        document.getElementById('ab_drawer').value = '';
+        document.getElementById('ab_drawer_picker').style.display = 'none';
+    }
 }
 /* Auto-calc helpers for Add Batch */
 function abCalcFromQtyPrice() {
@@ -2132,13 +2402,21 @@ function submitAddBatch() {
     fd.append('lend_to', document.getElementById('ab_lend_to').value);
     fd.append('lend_quantity', document.getElementById('ab_lend_qty').value);
     if (document.getElementById('addBatchSnTracking').checked) fd.append('sn_tracking', 'on');
+    if (document.getElementById('ab_follow_main').checked) {
+        fd.append('follow_main_location', 'on');
+    } else if (document.getElementById('ab_type_drawer').checked) {
+        fd.append('batch_rack_id', document.getElementById('ab_rack_id').value);
+        fd.append('batch_drawer', document.getElementById('ab_drawer').value);
+    } else {
+        fd.append('batch_location_id', document.getElementById('ab_location_id').value);
+    }
     fetch('{{ url_for("batch.add_batch", uuid=item.uuid) }}', { method: 'POST', body: fd })
         .then(function(r) { if (r.redirected) { window.location.href = r.url; } else { reloadKeepBatch(); } })
         .catch(function(e) { alert('Error: ' + e); });
 }
 
 /* ── Edit Batch ── */
-function openEditBatchModal(batchId, label, qty, price, date, note, lendTo, lendQty, snTracking) {
+function openEditBatchModal(batchId, label, qty, price, date, note, lendTo, lendQty, snTracking, followMain, batchLocId, batchRackId, batchDrawer) {
     document.getElementById('eb_id').value = batchId;
     document.getElementById('eb_label').value = label;
     document.getElementById('eb_qty').value = qty;
@@ -2148,6 +2426,20 @@ function openEditBatchModal(batchId, label, qty, price, date, note, lendTo, lend
     document.getElementById('eb_note').value = note;
     document.getElementById('eb_lend_to').value = lendTo;
     document.getElementById('eb_lend_qty').value = lendQty;
+    // Per-batch location
+    document.getElementById('eb_follow_main').checked = followMain !== false;
+    document.getElementById('eb_location_id').value = batchLocId || '';
+    document.getElementById('eb_storage_location_select').value = '';
+    batchUpdateStorageRackSelect('eb');
+    document.getElementById('eb_rack_id').value = batchRackId || '';
+    document.getElementById('eb_drawer').value = batchDrawer || '';
+    var ebIsDrawer = !!batchRackId;
+    document.getElementById('eb_type_drawer').checked = ebIsDrawer;
+    document.getElementById('eb_type_general').checked = !ebIsDrawer;
+    document.getElementById('eb_generalSection').style.display = ebIsDrawer ? 'none' : 'block';
+    document.getElementById('eb_drawerSection').style.display = ebIsDrawer ? 'block' : 'none';
+    batchUpdateDrawerGrid('eb');
+    ebToggleLocation();
     // Pre-fill total fields
     var displayQty = Math.max(1, parseFloat(qty) || 0);
     var p = parseFloat(price) || 0;
@@ -2167,6 +2459,23 @@ function openEditBatchModal(batchId, label, qty, price, date, note, lendTo, lend
         document.getElementById('eb_snInfo').style.display = 'block';
     }
     new bootstrap.Modal(document.getElementById('editBatchModalDialog')).show();
+}
+function ebToggleLocation() {
+    var follow = document.getElementById('eb_follow_main').checked;
+    document.getElementById('eb_batchLocSection').style.display = follow ? 'none' : 'block';
+}
+function ebSwitchLocType() {
+    var isDrawer = document.getElementById('eb_type_drawer').checked;
+    document.getElementById('eb_generalSection').style.display = isDrawer ? 'none' : 'block';
+    document.getElementById('eb_drawerSection').style.display = isDrawer ? 'block' : 'none';
+    if (isDrawer) {
+        document.getElementById('eb_location_id').value = '';
+        batchUpdateDrawerGrid('eb');
+    } else {
+        document.getElementById('eb_rack_id').value = '';
+        document.getElementById('eb_drawer').value = '';
+        document.getElementById('eb_drawer_picker').style.display = 'none';
+    }
 }
 /* Auto-calc helpers for Edit Batch (non-SN) */
 function ebCalcFromQtyPrice() {
@@ -2204,6 +2513,14 @@ function submitEditBatch() {
     }
     fd.append('purchase_date', document.getElementById('eb_date').value);
     fd.append('note', document.getElementById('eb_note').value);
+    if (document.getElementById('eb_follow_main').checked) {
+        fd.append('follow_main_location', 'on');
+    } else if (document.getElementById('eb_type_drawer').checked) {
+        fd.append('batch_rack_id', document.getElementById('eb_rack_id').value);
+        fd.append('batch_drawer', document.getElementById('eb_drawer').value);
+    } else {
+        fd.append('batch_location_id', document.getElementById('eb_location_id').value);
+    }
     fetch('/item/{{ item.uuid }}/batch/' + batchId + '/edit', { method: 'POST', body: fd })
         .then(function(r) { if (r.redirected) { window.location.href = r.url; } else { reloadKeepBatch(); } })
         .catch(function(e) { alert('Error: ' + e); });
@@ -2570,6 +2887,65 @@ function saveEditDetails() {
                     <label class="form-label form-label-sm">Date</label>
                     <input type="date" class="form-control form-control-sm" id="pbDate">
                 </div>
+                <div class="border rounded p-2 mb-2">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="pbFollowMain" checked onchange="pbToggleLocation()">
+                        <label class="form-check-label" for="pbFollowMain">
+                            <strong>Follow Main Location</strong>
+                            <small class="text-muted d-block">Use the item's main physical storage location for this batch.</small>
+                        </label>
+                    </div>
+                    <div id="pbBatchLocSection" style="display:none;">
+                        <div class="btn-group btn-group-sm w-100 mb-2" role="group">
+                            <input type="radio" class="btn-check" name="pb_loc_type" id="pb_type_general" value="general" checked onchange="pbSwitchLocType()">
+                            <label class="btn btn-outline-primary btn-sm" for="pb_type_general"><i class="bi bi-geo-alt"></i> General Location</label>
+                            <input type="radio" class="btn-check" name="pb_loc_type" id="pb_type_drawer" value="drawer" onchange="pbSwitchLocType()">
+                            <label class="btn btn-outline-primary btn-sm" for="pb_type_drawer"><i class="bi bi-grid-3x3-gap"></i> Drawer Storage</label>
+                        </div>
+                        <div id="pb_generalSection">
+                            <label class="form-label form-label-sm">Location</label>
+                            <select class="form-select form-select-sm" id="pbLocationId">
+                                <option value="">— None —</option>
+                                {% for loc in locations %}
+                                <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div id="pb_drawerSection" style="display:none;">
+                            <div class="row g-2 mb-2" style="position: relative;">
+                                <div class="col-4" style="overflow: visible;">
+                                    <label class="form-label form-label-sm">Location</label>
+                                    <select class="form-select form-select-sm" id="pb_storage_location_select" onchange="batchUpdateStorageRackSelect('pb')">
+                                        <option value="">All</option>
+                                        {% for loc in locations %}
+                                        <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-4" style="overflow: visible;">
+                                    <label class="form-label form-label-sm">Rack</label>
+                                    <select class="form-select form-select-sm" id="pbRackId" onchange="batchUpdateDrawerGrid('pb')">
+                                        <option value="">Select</option>
+                                        {% for rack in racks %}
+                                        <option value="{{ rack.id }}" data-rows="{{ rack.rows }}" data-cols="{{ rack.cols }}" data-location="{{ rack.physical_location.id if rack.physical_location else '' }}">{{ rack.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-4" style="overflow: visible;">
+                                    <label class="form-label form-label-sm">Drawer</label>
+                                    <input type="text" class="form-control form-control-sm" id="pbDrawer" maxlength="50" readonly placeholder="Select">
+                                </div>
+                            </div>
+                            <div id="pb_drawer_picker" style="display:none;">
+                                <div class="p-2 border rounded drawer-grid-container">
+                                    <small class="text-muted d-block mb-2">Click to select:</small>
+                                    <div id="pb_drawer_grid" style="display:inline-grid; gap:4px; background: transparent;"></div>
+                                </div>
+                            </div>
+                            <small class="text-muted d-block">Precise cell-level organization</small>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -2626,6 +3002,24 @@ function saveEditDetails() {
             .replace(/'/g, '&#39;');
     }
 
+    window.pbToggleLocation = function() {
+        var follow = document.getElementById('pbFollowMain').checked;
+        document.getElementById('pbBatchLocSection').style.display = follow ? 'none' : 'block';
+    };
+    window.pbSwitchLocType = function() {
+        var isDrawer = document.getElementById('pb_type_drawer').checked;
+        document.getElementById('pb_generalSection').style.display = isDrawer ? 'none' : 'block';
+        document.getElementById('pb_drawerSection').style.display = isDrawer ? 'block' : 'none';
+        if (isDrawer) {
+            document.getElementById('pbLocationId').value = '';
+            batchUpdateDrawerGrid('pb');
+        } else {
+            document.getElementById('pbRackId').value = '';
+            document.getElementById('pbDrawer').value = '';
+            document.getElementById('pb_drawer_picker').style.display = 'none';
+        }
+    };
+
     window.pendingBatchAdd = function() {
         document.getElementById('pendingBatchModalTitle').innerHTML = '<i class="bi bi-collection"></i> Add Batch';
         document.getElementById('pendingBatchEditIndex').value = '';
@@ -2637,6 +3031,16 @@ function saveEditDetails() {
         document.getElementById('pbPrice').value = '0';
         document.getElementById('pbTotal').value = '0';
         document.getElementById('pbDate').value = '';
+        document.getElementById('pbFollowMain').checked = true;
+        document.getElementById('pbLocationId').value = '';
+        document.getElementById('pb_storage_location_select').value = '';
+        batchUpdateStorageRackSelect('pb');
+        document.getElementById('pbRackId').value = '';
+        document.getElementById('pbDrawer').value = '';
+        document.getElementById('pb_type_general').checked = true;
+        window.pbSwitchLocType();
+        batchUpdateDrawerGrid('pb');
+        window.pbToggleLocation();
         var modal = new bootstrap.Modal(document.getElementById('pendingBatchModal'));
         modal.show();
     };
@@ -2654,6 +3058,19 @@ function saveEditDetails() {
         document.getElementById('pbPrice').value = b.price || '0';
         document.getElementById('pbTotal').value = b.total || '0';
         document.getElementById('pbDate').value = b.date || '';
+        document.getElementById('pbFollowMain').checked = b.follow_main_location !== false;
+        document.getElementById('pbLocationId').value = b.location_id || '';
+        document.getElementById('pb_storage_location_select').value = '';
+        batchUpdateStorageRackSelect('pb');
+        document.getElementById('pbRackId').value = b.rack_id || '';
+        document.getElementById('pbDrawer').value = b.drawer || '';
+        var pbIsDrawer = !!b.rack_id;
+        document.getElementById('pb_type_drawer').checked = pbIsDrawer;
+        document.getElementById('pb_type_general').checked = !pbIsDrawer;
+        document.getElementById('pb_generalSection').style.display = pbIsDrawer ? 'none' : 'block';
+        document.getElementById('pb_drawerSection').style.display = pbIsDrawer ? 'block' : 'none';
+        batchUpdateDrawerGrid('pb');
+        window.pbToggleLocation();
         var modal = new bootstrap.Modal(document.getElementById('pendingBatchModal'));
         modal.show();
     };
@@ -2686,8 +3103,19 @@ function saveEditDetails() {
         var total = parseFloat(document.getElementById('pbTotal').value) || 0;
         if (total < 0) total = 0;
         var date = document.getElementById('pbDate').value;
+        var followMain = document.getElementById('pbFollowMain').checked;
+        var isDrawer = document.getElementById('pb_type_drawer').checked;
+        var locationId = document.getElementById('pbLocationId').value || null;
+        var rackId = document.getElementById('pbRackId').value || null;
+        var drawer = document.getElementById('pbDrawer').value.trim().slice(0, 50);
 
-        var batch = { label: label, sn_tracking: tracking, quantity: qty, price: price, total: total, date: date };
+        var batch = {
+            label: label, sn_tracking: tracking, quantity: qty, price: price, total: total, date: date,
+            follow_main_location: followMain,
+            location_id: (followMain || isDrawer) ? null : (locationId ? parseInt(locationId, 10) : null),
+            rack_id: (followMain || !isDrawer) ? null : (rackId ? parseInt(rackId, 10) : null),
+            drawer: (followMain || !isDrawer) ? '' : drawer
+        };
         var editIdx = document.getElementById('pendingBatchEditIndex').value;
         if (editIdx !== '') {
             pendingBatches[parseInt(editIdx, 10)] = batch;

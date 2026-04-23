@@ -52,7 +52,7 @@
                                     <a href="{{ url_for('item.item_detail', uuid=item.uuid) }}" class="btn btn-sm btn-info">
                                         <i class="bi bi-eye"></i> View
                                     </a>
-                                    {% if current_user.has_permission('items', 'edit_name') or current_user.has_permission('items', 'edit_sku_type') or current_user.has_permission('items', 'edit_description') or current_user.has_permission('items', 'edit_quantity') %}
+                                    {% if current_user.has_permission('items', 'edit_info') or current_user.has_permission('items', 'edit_batch') or current_user.has_permission('items', 'edit_quantity') or current_user.has_permission('items', 'edit_advance') %}
                                     <a href="{{ url_for('item.item_edit', uuid=item.uuid) }}" class="btn btn-sm btn-warning">
                                         <i class="bi bi-pencil"></i> Edit
                                     </a>

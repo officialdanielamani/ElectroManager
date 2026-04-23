@@ -1,7 +1,7 @@
 """
 QR/Barcode Sticker Template Routes - Blueprint
 """
-from flask import Blueprint, render_template, request, jsonify, send_file, redirect, url_for, flash
+from flask import Blueprint, render_template, request, jsonify, send_file, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from models import db, Item, Location, Rack, StickerTemplate
 from qr_utils import (
@@ -19,8 +19,6 @@ import re
 logger = logging.getLogger(__name__)
 
 qr_template_bp = Blueprint('qr_template', __name__)
-
-_SAFE_ICON_PACKAGE_RE = re.compile(r'^[A-Za-z0-9_-]+$')
 
 @qr_template_bp.route('/settings/qr', methods=['GET'], endpoint='settings_qr')
 @login_required
@@ -303,11 +301,10 @@ def preview_element(template_id):
         elif element_type == 'icon':
             from qr_utils import generate_icon_svg
             icon_name = data.get('icon_name', '')
-            icon_package = data.get('icon_package', 'bootstrap-icons')
             icon_color = data.get('icon_color', '#000000')
             # Scale icon to fit container (80% of minimum dimension)
             icon_size = min(width, height) * 0.8
-            svg = generate_icon_svg(icon_name, icon_package, int(icon_size), icon_color, width, height)
+            svg = generate_icon_svg(icon_name, int(icon_size), icon_color, width, height)
             return jsonify({'svg': svg, 'success': True})
         else:
             return jsonify({'error': 'Unknown element type', 'success': False}), 400
@@ -342,57 +339,19 @@ def api_available_fonts():
     """Get list of available fonts (system + project)"""
     return jsonify(get_available_fonts())
 
-@qr_template_bp.route('/api/icon-packages')
-def api_icon_packages():
-    """Get list of available icon packages"""
+@qr_template_bp.route('/api/icons')
+def api_get_icons():
+    """Return the bundled Bootstrap Icons catalogue (name + class)."""
     import os
-    import re
-    
-    icons_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'icons')
-    packages = []
-    
-    # Look for CSS files that define icon packages
-    if os.path.exists(icons_dir):
-        for file in os.listdir(icons_dir):
-            if file.endswith('.css'):
-                # Extract package name (e.g., bootstrap-icons.css -> bootstrap-icons)
-                package_name = file.replace('.css', '')
-                packages.append({
-                    'id': package_name,
-                    'name': package_name.replace('-', ' ').title()
-                })
-    
-    return jsonify(packages)
-
-@qr_template_bp.route('/api/icons/<package>')
-def api_get_icons(package):
-    """Get icons from a specific package"""
-    import os
-
-    if not package or not _SAFE_ICON_PACKAGE_RE.match(package):
+    css_path = os.path.join(current_app.root_path, 'static', 'icons', 'bootstrap-icons.css')
+    if not os.path.isfile(css_path):
         return jsonify([])
-
-    icons_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'icons'))
-    css_file = os.path.abspath(os.path.join(icons_dir, f'{package}.css'))
-
-    # Ensure the resolved css_file stays inside icons_dir (defense in depth)
-    if os.path.commonpath([icons_dir, css_file]) != icons_dir:
-        return jsonify([])
-
-    if not os.path.exists(css_file):
-        return jsonify([])
-
     try:
-        with open(css_file, 'r', encoding='utf-8') as f:
+        with open(css_path, 'r', encoding='utf-8') as f:
             css_content = f.read()
-        
-        # Extract icon names from CSS
-        # Look for patterns like .bi-icon-name::before (double colon)
-        pattern = r'\.bi-([a-z0-9\-]+)::before'
-        icons = sorted(set(re.findall(pattern, css_content)))
-        
-        return jsonify([{'name': icon, 'class': f'bi bi-{icon}'} for icon in icons])
+        names = sorted(set(re.findall(r'\.bi-([a-z0-9\-]+):{1,2}before', css_content)))
+        return jsonify([{'name': n, 'class': f'bi bi-{n}'} for n in names])
     except Exception as e:
-        logger.error(f"Error reading icons from {package}: {e}")
+        logger.error(f"Error reading Bootstrap Icons CSS: {e}")
         return jsonify([])
 

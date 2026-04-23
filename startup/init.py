@@ -55,10 +55,10 @@ class Startup:
             'static/lib/bootstrap/js',
             'static/icons',
             'static/css',
-            'static/css/themes',
-            'static/fonts',
+            'static/js',
             # Custom assets (user-provided, optional)
-            'static/custom',
+            'static/custom/font',
+            'static/custom/theme',
         ]
         for d in dirs:
             path = os.path.join(self.project_root, d)
