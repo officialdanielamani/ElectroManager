@@ -1,23 +1,10 @@
 #!/usr/bin/env python3
 """
-Unified startup initialization - handles dependencies, database, and validation
-
-Asset model
------------
-Core   : Bootstrap CSS/JS, SortableJS, Bootstrap Icons.
-         Downloaded on first run (or during Docker build).
-         Startup verifies these exist — missing core assets are fatal.
-
-Custom : Anything placed in static/custom/ (icon packs like Font Awesome,
-         extra fonts, custom CSS themes, etc.).
-         Loaded automatically at runtime; never pre-checked or required.
+Unified startup initialization - handles database and directory setup only.
+No external downloads - all assets must be in the repository.
 """
 import os
 import sys
-import json
-import urllib.request
-import zipfile
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -30,7 +17,6 @@ class Startup:
         self.verbose = verbose
         self.errors = []
         self.warnings = []
-        self.config = None
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.project_root = os.path.dirname(self.base_path)
 
@@ -50,12 +36,6 @@ class Startup:
             'uploads',
             'uploads/locations',
             'instance',
-            # Core static assets
-            'static/lib/bootstrap/css',
-            'static/lib/bootstrap/js',
-            'static/icons',
-            'static/css',
-            'static/js',
             # Custom assets (user-provided, optional)
             'static/custom/font',
             'static/custom/theme',
@@ -65,125 +45,16 @@ class Startup:
             Path(path).mkdir(parents=True, exist_ok=True)
         self.log("Directories created", 'OK')
 
-    def load_config(self):
-        self.step("Loading configuration")
-        config_path = os.path.join(self.project_root, 'js-requirements.json')
-
-        if not os.path.exists(config_path):
-            self.errors.append("js-requirements.json not found")
-            return False
-
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                self.config = json.load(f)
-            self.log("Configuration loaded", 'OK')
-            return True
-        except json.JSONDecodeError as e:
-            self.errors.append(f"Invalid JSON: {str(e)}")
-            return False
-
-    def download_dependencies(self):
-        if not self.config:
-            self.errors.append("Configuration not loaded")
-            return False
-
-        success = True
-        for dep in self.config.get('dependencies', []):
-            if dep.get('installed') or not dep.get('url'):
-                continue
-
-            dep_name = dep.get('name')
-            url = dep.get('url')
-            dest = dep.get('dest')
-            dep_type = dep.get('type', 'file')
-
-            if dep_type == 'zip':
-                if self._zip_already_extracted(dest):
-                    self.log(f"{dep_name} already present, skipping download", 'OK')
-                    continue
-                self.step(f"Downloading {dep_name}")
-                if self.download_and_extract(url, dest, dep_name):
-                    self.log(f"{dep_name} extracted", 'OK')
-                else:
-                    success = False
-            else:
-                dest_path = os.path.join(self.project_root, dest)
-                if os.path.exists(dest_path):
-                    self.log(f"{dep_name} already present, skipping download", 'OK')
-                    continue
-                self.step(f"Downloading {dep_name}")
-                if self.download_file(url, dest_path):
-                    self.log(f"{os.path.basename(dest)} downloaded", 'OK')
-                else:
-                    success = False
-
-        return success
-
-    def _zip_already_extracted(self, dest):
-        """Return True when the key artefacts of a zip dep are already on disk."""
-        dest_path = os.path.join(self.project_root, dest)
-        if not os.path.isdir(dest_path):
-            return False
-        css_files = list(Path(dest_path).glob('*.css'))
-        font_files = list(Path(dest_path).glob('*.woff2')) + list(Path(dest_path).glob('*.woff'))
-        return bool(css_files) or bool(font_files)
-
-    def download_and_extract(self, url, extract_path, name):
-        try:
-            Path(extract_path).mkdir(parents=True, exist_ok=True)
-            zip_path = os.path.join(extract_path, f'{name}.zip')
-            urllib.request.urlretrieve(url, zip_path)
-
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                for file in zip_ref.namelist():
-                    if 'fonts/' in file and file.endswith(('.woff', '.woff2')):
-                        zip_ref.extract(file, extract_path)
-                        src = os.path.join(extract_path, file)
-                        dst = os.path.join(extract_path, os.path.basename(file))
-                        if src != dst and os.path.exists(src):
-                            shutil.move(src, dst)
-                    elif file.endswith('.css'):
-                        zip_ref.extract(file, extract_path)
-                        src = os.path.join(extract_path, file)
-                        dst = os.path.join(extract_path, os.path.basename(file))
-                        if src != dst and os.path.exists(src):
-                            shutil.move(src, dst)
-
-            os.remove(zip_path)
-            for item in os.listdir(extract_path):
-                item_path = os.path.join(extract_path, item)
-                if os.path.isdir(item_path):
-                    shutil.rmtree(item_path)
-
-            return True
-        except Exception as e:
-            self.warnings.append(f"{name} download failed: {str(e)}")
-            return False
-
-    def download_file(self, url, dest):
-        try:
-            if os.path.exists(dest):
-                return True
-            Path(os.path.dirname(dest)).mkdir(parents=True, exist_ok=True)
-            urllib.request.urlretrieve(url, dest)
-            return True
-        except Exception as e:
-            self.warnings.append(f"Download failed: {os.path.basename(dest)}")
-            return False
-
-    # ------------------------------------------------------------------
-    # Core asset verification
-    # ------------------------------------------------------------------
-
     def check_core_assets(self):
-        """Verify that all required core assets are present after download."""
+        """Verify that all required core assets are present in the repository."""
         self.step("Verifying core assets")
 
         core_files = {
-            'Bootstrap CSS':    'static/lib/bootstrap/css/bootstrap.min.css',
-            'Bootstrap JS':     'static/lib/bootstrap/js/bootstrap.bundle.min.js',
-            'Bootstrap Icons':  'static/icons/bootstrap-icons.css',
-            'SortableJS':       'static/lib/Sortable.min.js',
+            'Bootstrap CSS':         'static/lib/bootstrap.min.css',
+            'Bootstrap JS':          'static/lib/bootstrap.bundle.min.js',
+            'Bootstrap Icons CSS':   'static/icons/bootstrap-icons.css',
+            'Bootstrap Icons font':  'static/icons/fonts/bootstrap-icons.woff2',
+            'SortableJS':            'static/lib/sortable.min.js',
         }
 
         all_ok = True
@@ -194,15 +65,11 @@ class Startup:
             else:
                 self.errors.append(
                     f"{label} missing ({rel_path}). "
-                    "Run startup again with network access to download it."
+                    "This is a required asset that must be in the repository."
                 )
                 all_ok = False
 
         return all_ok
-
-    # ------------------------------------------------------------------
-    # Custom asset detection (informational only — never fatal)
-    # ------------------------------------------------------------------
 
     def detect_custom_assets(self):
         """Scan static/custom/ and report user-provided files (no validation)."""
@@ -227,10 +94,6 @@ class Startup:
                 "No custom assets — drop .css / font files in static/custom/ to auto-load",
                 'INFO'
             )
-
-    # ------------------------------------------------------------------
-    # Database
-    # ------------------------------------------------------------------
 
     def init_database(self):
         self.step("Initializing database")
@@ -258,42 +121,6 @@ class Startup:
             self.errors.append(f"Database init error: {str(e)}")
             return False
 
-    # ------------------------------------------------------------------
-    # Entry points
-    # ------------------------------------------------------------------
-
-    def run_download_only(self):
-        """Download core dependencies only — used during Docker image build."""
-        print("\n" + "="*60)
-        print("Inventory Manager - Downloading core dependencies (build stage)")
-        print("="*60)
-
-        try:
-            self.create_dirs()
-            self.load_config()
-            self.download_dependencies()
-            self.check_core_assets()
-
-            print("\n" + "="*60)
-            if self.warnings:
-                print("WARNINGS (non-fatal):")
-                for w in self.warnings:
-                    print(f"  [!] {w}")
-
-            if self.errors:
-                print("FAILED - Critical errors:")
-                for err in self.errors:
-                    print(f"  - {err}")
-                print("="*60)
-                return False
-
-            print("SUCCESS - Core dependencies ready")
-            print("="*60)
-            return True
-        except Exception as e:
-            print(f"\n[!] Unexpected error: {str(e)}")
-            return False
-
     def run(self):
         print("\n" + "="*60)
         print("Inventory Manager - Startup")
@@ -301,11 +128,13 @@ class Startup:
 
         try:
             self.create_dirs()
-            self.load_config()
-            self.download_dependencies()
-            self.check_core_assets()
+            assets_ok = self.check_core_assets()
             self.detect_custom_assets()
-            self.init_database()
+
+            if assets_ok:
+                self.init_database()
+            else:
+                print("\n[!] Skipping database init — fix missing assets first.")
 
             print("\n" + "="*60)
 
@@ -334,7 +163,6 @@ class Startup:
 
 
 if __name__ == '__main__':
-    download_only = '--download-only' in sys.argv
     startup = Startup(verbose=True)
-    success = startup.run_download_only() if download_only else startup.run()
+    success = startup.run()
     sys.exit(0 if success else 1)

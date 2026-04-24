@@ -465,7 +465,7 @@ def settings_system():
                 loc_size = request.form.get('location_upload_max_size', '10')
                 Setting.set('location_upload_extensions', loc_ext, 'Location upload allowed extensions')
                 Setting.set('location_upload_max_size', loc_size, 'Location upload max size MB')
-                for ptype in ['picture', 'document', 'schematic', '2d_design', '3d_design']:
+                for ptype in ['picture', 'document', 'schematic', '2d_design', '3d_design', 'program']:
                     pext = request.form.get(f'project_upload_{ptype}_extensions', '').strip()
                     psize = request.form.get(f'project_upload_{ptype}_max_size', '10')
                     if pext: Setting.set(f'project_upload_{ptype}_extensions', pext)
@@ -525,6 +525,7 @@ def settings_system():
                               'schematic': {'extensions': Setting.get('project_upload_schematic_extensions', 'pdf,zip'), 'max_size': Setting.get('project_upload_schematic_max_size', '20')},
                               '2d_design': {'extensions': Setting.get('project_upload_2d_design_extensions', 'pdf,zip'), 'max_size': Setting.get('project_upload_2d_design_max_size', '20')},
                               '3d_design': {'extensions': Setting.get('project_upload_3d_design_extensions', 'pdf,zip,stl,step'), 'max_size': Setting.get('project_upload_3d_design_max_size', '50')},
+                              'program': {'extensions': Setting.get('project_upload_program_extensions', 'zip,txt,cpp,py'), 'max_size': Setting.get('project_upload_program_max_size', '10')},
                           })
 
 

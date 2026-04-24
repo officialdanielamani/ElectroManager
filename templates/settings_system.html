@@ -170,7 +170,7 @@
                     </div>
 
                     <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-kanban"></i> Project Uploads</h6>
-                    {% set proj_types = [('picture', 'Pictures', 'webp,png,svg,jpeg,jpg'), ('document', 'Documents', 'txt,doc,docx,pdf'), ('schematic', 'Schematics', 'pdf,zip'), ('2d_design', '2D Design', 'pdf,zip'), ('3d_design', '3D Design', 'pdf,zip,stl,step')] %}
+                    {% set proj_types = [('picture', 'Pictures', 'webp,png,svg,jpeg,jpg'), ('document', 'Documents', 'txt,doc,docx,pdf'), ('schematic', 'Schematics', 'pdf,zip'), ('2d_design', '2D Design', 'pdf,zip'), ('3d_design', '3D Design', 'pdf,zip,stl,step'), ('program', 'Programs', 'zip,txt,cpp,py')] %}
                     {% for ptype, plabel, pdefault in proj_types %}
                     <div class="row mb-2">
                         <div class="col-md-3"><label class="form-label small fw-bold">{{ plabel }}</label></div>

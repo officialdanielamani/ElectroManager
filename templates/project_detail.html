@@ -80,7 +80,7 @@
                 </div>
 
                 <!-- Attachments (view only) -->
-                {% set att_types = [('picture', 'Pictures', 'bi-image'), ('document', 'Documents', 'bi-file-text'), ('schematic', 'Schematics', 'bi-cpu'), ('2d_design', '2D Designs', 'bi-pencil-square'), ('3d_design', '3D Designs', 'bi-box')] %}
+                {% set att_types = [('picture', 'Pictures', 'bi-image'), ('document', 'Documents', 'bi-file-text'), ('schematic', 'Schematics', 'bi-cpu'), ('2d_design', '2D Designs', 'bi-pencil-square'), ('3d_design', '3D Designs', 'bi-box'), ('program', 'Programs', 'bi-code')] %}
                 {% set has_attachments = attachments.values() | map('length') | sum > 0 %}
                 {% if has_attachments %}
                 <hr>

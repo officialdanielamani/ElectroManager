@@ -433,29 +433,43 @@ def rack_edit(uuid):
         rack.rows = rows
         rack.cols = cols
         
-        # If rack size decreased, clear items from drawers that are now out of bounds
+        # If rack size decreased, clear items and merges that are now out of bounds
         if rows < old_rows or cols < old_cols:
             items_cleared = 0
             items = Item.query.filter_by(rack_id=rack.id).all()
-            
+
             for item in items:
                 if item.drawer:
-                    # Parse drawer ID (e.g., "R3-C5" -> row=3, col=5)
                     try:
                         parts = item.drawer.replace('R', '').replace('C', '-').split('-')
                         drawer_row = int(parts[0])
                         drawer_col = int(parts[1])
-                        
-                        # If drawer is now outside bounds, remove location
                         if drawer_row > rows or drawer_col > cols:
                             item.rack_id = None
                             item.drawer = None
                             item.location_id = None
                             items_cleared += 1
-                    except:
-                        # If parsing fails, skip this item
+                    except Exception:
                         pass
-            
+
+            # Remove merge groups that contain any out-of-bounds cell
+            existing_merges = rack.get_merged_cells()
+            valid_merges = []
+            for group in existing_merges:
+                in_bounds = True
+                for cell in group.get('cells', []):
+                    try:
+                        parts = cell.replace('R', '').replace('C', '-').split('-')
+                        if int(parts[0]) > rows or int(parts[1]) > cols:
+                            in_bounds = False
+                            break
+                    except Exception:
+                        in_bounds = False
+                        break
+                if in_bounds:
+                    valid_merges.append(group)
+            rack.merged_cells = json.dumps(valid_merges)
+
             if items_cleared > 0:
                 flash(f'Warning: {items_cleared} item(s) were removed from drawers outside new bounds. These items now have no location.', 'warning')
         

@@ -5,19 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Inventory Manager{% endblock %}</title>
     
-    <!-- Load CSS files from js-requirements.json dynamically -->
     {% for css in css_files %}
     <link rel="stylesheet" href="{{ url_for('static', filename=css) }}">
     {% endfor %}
-    
-    <!-- Fix icon font paths to be dynamic -->
-    <style>
-        @font-face {
-            font-family: 'bootstrap-icons';
-            src: url("{{ url_for('static', filename='icons/bootstrap-icons.woff2') }}") format("woff2"),
-                 url("{{ url_for('static', filename='icons/bootstrap-icons.woff') }}") format("woff");
-        }
-    </style>
     
     <!-- Inline script to apply theme BEFORE page renders (prevents flash) -->
     <script>
@@ -257,7 +247,6 @@
         {% block content %}{% endblock %}
     </div>
 
-    <!-- Load JS files from js-requirements.json dynamically -->
     {% for js in js_files %}
     <script src="{{ url_for('static', filename=js) }}"></script>
     {% endfor %}

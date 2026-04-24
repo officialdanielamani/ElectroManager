@@ -140,34 +140,36 @@
                 </div>
             </div>
             <div class="card-body">
-                <div class="drawer-grid">
+                <div class="drawer-grid" style="grid-template-columns: repeat({{ rack.cols }}, minmax(0, 1fr));">
                     {% for row in range(rack.rows) %}
-                    <div class="drawer-row">
-                        {% for col in range(rack.cols) %}
-                        {% set drawer_id = "R%d-C%d"|format(row + 1, col + 1) %}
-                        {% set drawer_data = rack.drawers.get(drawer_id) %}
-                        {% set is_unavailable = drawer_id in rack.unavailable_drawers %}
-                        {% set entry_count = (drawer_data['items']|length + drawer_data['batches']|length) if drawer_data else 0 %}
-                        <div class="drawer-cell {% if is_unavailable %}unavailable{% elif entry_count %}has-items{% else %}empty{% endif %}"
-                             data-drawer="{{ drawer_id }}"
-                             data-rack="{{ rack.uuid }}"
-                             onclick="openDrawer('{{ rack.name }}', '{{ drawer_id }}', '{{ rack.uuid }}')">
-                            <div class="drawer-label">{{ drawer_id }}</div>
-                            <div class="drawer-count">
-                                {% if is_unavailable and entry_count %}
-                                <span class="badge bg-secondary">Unavailable</span>
-                                <span class="badge bg-info mt-1">{{ entry_count }}</span>
-                                {% elif is_unavailable %}
-                                <span class="badge bg-secondary">Unavailable</span>
-                                {% elif entry_count %}
-                                <span class="badge bg-success">{{ entry_count }}</span>
-                                {% else %}
-                                <span class="text-muted">Empty</span>
-                                {% endif %}
-                            </div>
+                    {% for col in range(rack.cols) %}
+                    {% set drawer_id = "R%d-C%d"|format(row + 1, col + 1) %}
+                    {% if drawer_id not in rack.skip_cells %}
+                    {% set span = rack.cell_spans.get(drawer_id) %}
+                    {% set drawer_data = rack.drawers.get(drawer_id) %}
+                    {% set is_unavailable = drawer_id in rack.unavailable_drawers %}
+                    {% set entry_count = (drawer_data['items']|length + drawer_data['batches']|length) if drawer_data else 0 %}
+                    <div class="drawer-cell {% if is_unavailable %}unavailable{% elif entry_count %}has-items{% else %}empty{% endif %}{% if span %} merged-cell{% endif %}"
+                         data-drawer="{{ drawer_id }}"
+                         data-rack="{{ rack.uuid }}"
+                         {% if span %}style="grid-row: span {{ span.rowspan }}; grid-column: span {{ span.colspan }};"{% endif %}
+                         onclick="openDrawer('{{ rack.name }}', '{{ drawer_id }}', '{{ rack.uuid }}')">
+                        <div class="drawer-label">{{ drawer_id }}{% if span %} <span class="merged-badge">{{ span.rowspan }}×{{ span.colspan }}</span>{% endif %}</div>
+                        <div class="drawer-count">
+                            {% if is_unavailable and entry_count %}
+                            <span class="badge bg-secondary">Unavailable</span>
+                            <span class="badge bg-info mt-1">{{ entry_count }}</span>
+                            {% elif is_unavailable %}
+                            <span class="badge bg-secondary">Unavailable</span>
+                            {% elif entry_count %}
+                            <span class="badge bg-success">{{ entry_count }}</span>
+                            {% else %}
+                            <span class="text-muted">Empty</span>
+                            {% endif %}
                         </div>
-                        {% endfor %}
                     </div>
+                    {% endif %}
+                    {% endfor %}
                     {% endfor %}
                 </div>
             </div>
@@ -290,7 +292,9 @@
                             <select id="move_rack_id" class="form-select form-select-sm" onchange="updateMoveDrawerGrid()">
                                 <option value="0">Select</option>
                                 {% for rack in all_racks %}
-                                <option value="{{ rack.uuid }}" data-rows="{{ rack.rows }}" data-cols="{{ rack.cols }}" data-location="{{ rack.physical_location.uuid if rack.physical_location else '' }}">
+                                <option value="{{ rack.uuid }}" data-rows="{{ rack.rows }}" data-cols="{{ rack.cols }}"
+                                        data-location="{{ rack.physical_location.uuid if rack.physical_location else '' }}"
+                                        data-merged-cells="{{ rack.get_merged_cells()|tojson|e }}">
                                     {{ rack.name }}
                                 </option>
                                 {% endfor %}
@@ -340,20 +344,14 @@
 
 <style>
 .drawer-grid {
-    display: table;
+    display: grid;
+    gap: 5px;
     width: 100%;
-    border-collapse: separate;
-    border-spacing: 5px;
-}
-
-.drawer-row {
-    display: table-row;
 }
 
 .drawer-cell {
-    display: table-cell;
-    width: 120px;
-    height: 120px;
+    min-width: 0;
+    min-height: 120px;
     border: 2px solid #ddd;
     border-radius: 8px;
     text-align: center;
@@ -362,7 +360,26 @@
     transition: all 0.3s;
     position: relative;
     background: linear-gradient(145deg, #f8f9fa, #e9ecef);
-    vertical-align: top;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.drawer-cell.merged-cell {
+    border-color: #0d6efd;
+    border-width: 2px;
+    border-style: dashed;
+    background: linear-gradient(145deg, #cfe2ff, #b6d4fe);
+}
+
+.merged-badge {
+    font-size: 0.55rem;
+    background: #0d6efd;
+    color: #fff;
+    padding: 0 3px;
+    border-radius: 3px;
+    vertical-align: middle;
 }
 
 .drawer-cell:hover {
@@ -438,6 +455,14 @@
     border-color: var(--bs-secondary);
     opacity: 0.6;
     cursor: not-allowed;
+}
+
+.move-drawer-cell.merged {
+    background: linear-gradient(135deg, #cfe2ff, #b6d4fe);
+    border-color: #0d6efd;
+    border-style: dashed;
+    color: #084298;
+    font-size: 0.65rem;
 }
 
 .drawer-label {
@@ -1019,43 +1044,67 @@ function updateMoveDrawerGrid() {
     const cols = parseInt(selected.dataset.cols || 0);
     const rackId = select.value;
     const container = document.getElementById('move_drawer_grid_container');
-    
+
     if (!rows || !cols) {
         container.innerHTML = '';
         return;
     }
-    
-    // Get unavailable drawers for this rack from the page data
+
+    // Unavailable drawers from rendered rack grid
     let unavailableDrawers = [];
     const rackSection = document.querySelector(`[data-rack-id="${rackId}"]`);
     if (rackSection) {
-        unavailableDrawers = Array.from(rackSection.querySelectorAll('.drawer-cell.unavailable')).map(cell => 
+        unavailableDrawers = Array.from(rackSection.querySelectorAll('.drawer-cell.unavailable')).map(cell =>
             cell.dataset.drawer
         );
     }
-    
-    // Calculate dynamic grid-template-columns based on cols
-    const gridCols = `repeat(${cols}, 1fr)`;
-    container.style.gridTemplateColumns = gridCols;
+
+    // Merged cells data
+    let mergedGroups = [];
+    try { mergedGroups = JSON.parse(selected.dataset.mergedCells || '[]'); } catch(e) {}
+    const skipCells = new Set();
+    const cellSpans = {};
+    mergedGroups.forEach(group => {
+        const master = group.master;
+        const cells = group.cells || [];
+        const rowNums = cells.map(c => parseInt(c.split('-')[0].replace('R',''))).filter(Boolean);
+        const colNums = cells.map(c => parseInt(c.split('-')[1].replace('C',''))).filter(Boolean);
+        if (rowNums.length && colNums.length) {
+            cellSpans[master] = {
+                rowspan: Math.max(...rowNums) - Math.min(...rowNums) + 1,
+                colspan: Math.max(...colNums) - Math.min(...colNums) + 1
+            };
+        }
+        cells.forEach(c => { if (c !== master) skipCells.add(c); });
+    });
+
+    container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
     container.style.maxWidth = `${cols * 45}px`;
-    
     container.innerHTML = '';
+
     for (let r = 1; r <= rows; r++) {
         for (let c = 1; c <= cols; c++) {
             const drawerId = 'R' + r + '-C' + c;
+            if (skipCells.has(drawerId)) continue;
+
             const isUnavailable = unavailableDrawers.includes(drawerId);
+            const span = cellSpans[drawerId];
             const cellDiv = document.createElement('div');
-            cellDiv.className = `move-drawer-cell ${isUnavailable ? 'unavailable' : ''}`;
+            cellDiv.className = 'move-drawer-cell' + (isUnavailable ? ' unavailable' : '') + (span ? ' merged' : '');
             cellDiv.textContent = drawerId;
-            cellDiv.title = isUnavailable ? 'Unavailable' : '';
-            
-            if (!isUnavailable) {
-                cellDiv.onclick = (e) => {
-                    e.preventDefault();
-                    selectMoveDrawer(drawerId);
-                };
+            cellDiv.title = isUnavailable ? 'Unavailable' : (span ? `Merged ${span.rowspan}×${span.colspan}` : '');
+            cellDiv.setAttribute('data-drawer', drawerId);
+
+            if (span) {
+                cellDiv.style.gridRow = `span ${span.rowspan}`;
+                cellDiv.style.gridColumn = `span ${span.colspan}`;
+                cellDiv.style.height = `${span.rowspan * 40 + (span.rowspan - 1) * 4}px`;
             }
-            
+
+            if (!isUnavailable) {
+                cellDiv.onclick = (e) => { e.preventDefault(); selectMoveDrawer(drawerId); };
+            }
+
             container.appendChild(cellDiv);
         }
     }

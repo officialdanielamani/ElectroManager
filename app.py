@@ -82,42 +82,18 @@ app.jinja_env.filters['from_json'] = from_json_filter
 
 
 def load_dependencies():
-    """Load JS libraries and icons from js-requirements.json"""
-    try:
-        config_path = os.path.join(app.root_path, 'js-requirements.json')
-        if not os.path.exists(config_path):
-            return [], [], []
-        
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        
-        css_files = []
-        js_files = []
-        libs = []
-        
-        for dep in config.get('dependencies', []):
-            name = dep.get('name')
-            version = dep.get('version')
-            dest = dep.get('dest', '')
-            
-            libs.append({'name': name, 'version': version})
-            
-            # Remove 'static/' prefix if present (url_for handles it)
-            if dest.startswith('static/'):
-                dest = dest[7:]  # Remove 'static/'
-            
-            if 'css' in dest or dest.endswith('.css'):
-                css_files.append(dest)
-            elif 'js' in dest or dest.endswith('.js'):
-                js_files.append(dest)
-            elif 'icons' in dest:
-                css_files.append('icons/bootstrap-icons.css')
-        
-
-        return css_files, js_files, libs
-    except Exception as e:
-        print(f"Error loading dependencies: {e}")
-        return [], [], []
+    """Return core static assets bundled in the repository."""
+    return [
+        'lib/bootstrap.min.css',
+        'icons/bootstrap-icons.css',
+    ], [
+        'lib/bootstrap.bundle.min.js',
+        'lib/sortable.min.js',
+    ], [
+        {'name': 'Bootstrap', 'version': '5.3.0'},
+        {'name': 'Bootstrap Icons', 'version': '1.11.1'},
+        {'name': 'SortableJS', 'version': '1.15.0'},
+    ]
 
 
 @app.context_processor
@@ -238,6 +214,24 @@ def internal_error(error):
 # Register all modular blueprints
 from routes import register_blueprints
 register_blueprints(app)
+
+# Validate Bootstrap Icons at startup
+from qr_utils import validate_bootstrap_icons
+with app.app_context():
+    validate_bootstrap_icons()
+
+# Add merged_cells column to racks table if it doesn't exist (migration for existing DBs)
+with app.app_context():
+    try:
+        from sqlalchemy import text, inspect as sa_inspect
+        inspector = sa_inspect(db.engine)
+        rack_columns = [c['name'] for c in inspector.get_columns('racks')]
+        if 'merged_cells' not in rack_columns:
+            with db.engine.connect() as conn:
+                conn.execute(text("ALTER TABLE racks ADD COLUMN merged_cells TEXT DEFAULT '[]'"))
+                conn.commit()
+    except Exception:
+        pass
 
 
 if __name__ == '__main__':

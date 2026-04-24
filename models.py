@@ -234,10 +234,11 @@ class Rack(db.Model):
     rows = db.Column(db.Integer, default=5)
     cols = db.Column(db.Integer, default=5)
     unavailable_drawers = db.Column(db.Text)
+    merged_cells = db.Column(db.Text, default='[]')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     items = db.relationship('Item', backref='rack', lazy=True)
-    
+
     def __init__(self, **kwargs):
         super(Rack, self).__init__(**kwargs)
         if not self.uuid:
@@ -251,13 +252,58 @@ class Rack(db.Model):
             return json.loads(self.unavailable_drawers)
         except (json.JSONDecodeError, TypeError):
             return []
-    
+
     def is_drawer_unavailable(self, drawer_id):
         return drawer_id in self.get_unavailable_drawers()
-    
+
+    def get_merged_cells(self):
+        try:
+            return json.loads(self.merged_cells or '[]')
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def get_merge_group(self, cell_id):
+        for group in self.get_merged_cells():
+            if cell_id in group.get('cells', []):
+                return group
+        return None
+
+    def is_merged_away(self, cell_id):
+        group = self.get_merge_group(cell_id)
+        return group is not None and group.get('master') != cell_id
+
+    def get_master_cell(self, cell_id):
+        group = self.get_merge_group(cell_id)
+        return group['master'] if group else cell_id
+
+    def compute_merge_layout(self):
+        """Return (skip_cells set, cell_spans dict) for template rendering."""
+        skip_cells = set()
+        cell_spans = {}
+        for group in self.get_merged_cells():
+            master = group.get('master')
+            cells = group.get('cells', [])
+            rows_used, cols_used = set(), set()
+            for cell in cells:
+                try:
+                    parts = cell.replace('R', '').replace('C', '-').split('-')
+                    rows_used.add(int(parts[0]))
+                    cols_used.add(int(parts[1]))
+                except (ValueError, IndexError):
+                    continue
+            if rows_used and cols_used:
+                cell_spans[master] = {
+                    'rowspan': len(rows_used),
+                    'colspan': len(cols_used),
+                }
+            for cell in cells:
+                if cell != master:
+                    skip_cells.add(cell)
+        return skip_cells, cell_spans
+
     def get_drawer_uuid(self, row, col):
         return f"{self.uuid}{int(row):02d}{int(col):02d}"
-    
+
     def __repr__(self):
         return f'<Rack {self.name}>'
 
@@ -271,11 +317,10 @@ class Item(db.Model):
     sku = db.Column(db.String(100))
     info = db.Column(db.String(500))
     description = db.Column(db.Text)
-    
-    # Kept for backward compat - recalculated from batches
+
     quantity = db.Column(db.Integer, default=0)
     price = db.Column(db.Float, default=0.0)
-    
+
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
     rack_id = db.Column(db.Integer, db.ForeignKey('racks.id'))
     drawer = db.Column(db.String(50))
@@ -287,8 +332,7 @@ class Item(db.Model):
     
     datasheet_urls = db.Column(db.Text)
     no_stock_warning = db.Column(db.Boolean, default=True)
-    
-    # Serial number tracking is now per-batch; item-level field kept for backward compat
+
     sn_tracking_enabled = db.Column(db.Boolean, default=False)
     
     @property
@@ -428,8 +472,6 @@ class ItemBatch(db.Model):
     lend_quantity = db.Column(db.Integer, default=0)
     sn_tracking_enabled = db.Column(db.Boolean, default=False)
 
-    # Per-batch location. If follow_main_location is True, the item's main
-    # location/rack/drawer is used and these fields are ignored.
     follow_main_location = db.Column(db.Boolean, default=True)
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
     rack_id = db.Column(db.Integer, db.ForeignKey('racks.id'), nullable=True)
@@ -962,13 +1004,12 @@ class ProjectBOMItem(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
     item_id = db.Column(db.Integer, db.ForeignKey('items.id'), nullable=True)
     batch_id = db.Column(db.Integer, db.ForeignKey('item_batches.id'), nullable=True)
-    quantity = db.Column(db.Integer, default=1)          # required_quantity (no cap)
-    used_quantity = db.Column(db.Integer, default=0)     # actual used (capped by available stock)
-    serial_numbers = db.Column(db.Text)                  # JSON list of SN IDs assigned to used_quantity
-    item_name_snapshot = db.Column(db.String(300))       # preserved item name if item is deleted
+    quantity = db.Column(db.Integer, default=1)
+    used_quantity = db.Column(db.Integer, default=0)
+    serial_numbers = db.Column(db.Text)
+    item_name_snapshot = db.Column(db.String(300))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    # No cascade: deleting an Item preserves BOM entries (item_id becomes a dangling FK, item prop returns None)
     item = db.relationship('Item', backref=db.backref('bom_uses'))
     batch = db.relationship('ItemBatch', backref='bom_uses')
     @property
