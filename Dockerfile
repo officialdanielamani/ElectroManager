@@ -24,8 +24,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application files
 COPY . .
 
-# Create required directories (startup script will do this too, but be explicit)
-RUN mkdir -p instance static/custom static/lib/bootstrap/{css,js} static/icons
+# Ensure runtime directories exist (static asset dirs are already in repo)
+RUN mkdir -p instance static/custom/font static/custom/theme
 
 # Set environment variables
 ENV FLASK_APP=app.py

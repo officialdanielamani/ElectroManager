@@ -36,12 +36,6 @@ class Startup:
             'uploads',
             'uploads/locations',
             'instance',
-            # Core static assets (must exist in repo)
-            'static/lib/bootstrap/css',
-            'static/lib/bootstrap/js',
-            'static/icons',
-            'static/css',
-            'static/js',
             # Custom assets (user-provided, optional)
             'static/custom/font',
             'static/custom/theme',
@@ -56,10 +50,11 @@ class Startup:
         self.step("Verifying core assets")
 
         core_files = {
-            'Bootstrap CSS':    'static/lib/bootstrap/css/bootstrap.min.css',
-            'Bootstrap JS':     'static/lib/bootstrap/js/bootstrap.bundle.min.js',
-            'Bootstrap Icons':  'static/icons/bootstrap-icons.css',
-            'SortableJS':       'static/lib/Sortable.min.js',
+            'Bootstrap CSS':         'static/lib/bootstrap.min.css',
+            'Bootstrap JS':          'static/lib/bootstrap.bundle.min.js',
+            'Bootstrap Icons CSS':   'static/icons/bootstrap-icons.css',
+            'Bootstrap Icons font':  'static/icons/fonts/bootstrap-icons.woff2',
+            'SortableJS':            'static/lib/sortable.min.js',
         }
 
         all_ok = True
@@ -133,9 +128,13 @@ class Startup:
 
         try:
             self.create_dirs()
-            self.check_core_assets()
+            assets_ok = self.check_core_assets()
             self.detect_custom_assets()
-            self.init_database()
+
+            if assets_ok:
+                self.init_database()
+            else:
+                print("\n[!] Skipping database init — fix missing assets first.")
 
             print("\n" + "="*60)
 

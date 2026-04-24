@@ -82,13 +82,13 @@ app.jinja_env.filters['from_json'] = from_json_filter
 
 
 def load_dependencies():
-    """Return core static assets - no external downloads."""
+    """Return core static assets bundled in the repository."""
     return [
-        'lib/bootstrap/css/bootstrap.min.css',
+        'lib/bootstrap.min.css',
         'icons/bootstrap-icons.css',
     ], [
-        'lib/bootstrap/js/bootstrap.bundle.min.js',
-        'lib/Sortable.min.js',
+        'lib/bootstrap.bundle.min.js',
+        'lib/sortable.min.js',
     ], [
         {'name': 'Bootstrap', 'version': '5.3.0'},
         {'name': 'Bootstrap Icons', 'version': '1.11.1'},
