@@ -153,6 +153,126 @@
     </div>
 </div>
 
+{% if rack %}
+<!-- ===== Layout Manager ===== -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-grid-3x3-gap"></i> Cell Layout Manager
+                    <small class="text-muted fw-normal ms-2">Merge or split cells to emulate real rack layout</small>
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info py-2 small mb-3">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>How to merge:</strong> Click cells to select them (they must form a rectangle), then click <strong>Merge Selected</strong>.
+                    Items are stored in the top-left master cell. Click a merged cell then <strong>Split</strong> to undo.
+                </div>
+
+                <div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
+                    <button id="btnMerge" class="btn btn-primary btn-sm" onclick="doMerge()" disabled>
+                        <i class="bi bi-table"></i> Merge Selected
+                    </button>
+                    <button id="btnSplit" class="btn btn-warning btn-sm" onclick="doSplit()" style="display:none;">
+                        <i class="bi bi-layout-split"></i> Split Merged Cell
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="clearLayoutSelection()">
+                        <i class="bi bi-x-circle"></i> Clear Selection
+                    </button>
+                    <span id="layoutStatus" class="text-muted small"></span>
+                </div>
+
+                <!-- Rack grid preview -->
+                <div id="layoutGrid" class="layout-grid"
+                     style="display:grid; grid-template-columns: repeat({{ rack.cols }}, minmax(0, 1fr)); gap:6px; max-width: {{ rack.cols * 86 }}px;">
+                    {% set skip_cells, cell_spans = rack.compute_merge_layout() %}
+                    {% for row in range(rack.rows) %}
+                    {% for col in range(rack.cols) %}
+                    {% set drawer_id = "R%d-C%d"|format(row + 1, col + 1) %}
+                    {% if drawer_id not in skip_cells %}
+                    {% set span = cell_spans.get(drawer_id) %}
+                    <div class="layout-cell {% if span %}merged{% endif %}"
+                         data-drawer="{{ drawer_id }}"
+                         data-is-merged="{{ 'true' if span else 'false' }}"
+                         {% if span %}
+                         style="grid-row: span {{ span.rowspan }}; grid-column: span {{ span.colspan }};"
+                         data-rowspan="{{ span.rowspan }}"
+                         data-colspan="{{ span.colspan }}"
+                         {% endif %}
+                         onclick="layoutCellClick(this)">
+                        <div class="layout-cell-label">{{ drawer_id }}</div>
+                        {% if span %}
+                        <div class="layout-cell-badge">
+                            <span class="badge bg-primary" style="font-size:0.6rem;">{{ span.rowspan }}×{{ span.colspan }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                    {% endfor %}
+                </div>
+
+                <div class="mt-3">
+                    <small class="text-muted">
+                        <span class="badge bg-light border text-dark me-1">&nbsp;&nbsp;&nbsp;</span> Normal cell &nbsp;
+                        <span class="badge bg-primary me-1">&nbsp;&nbsp;&nbsp;</span> Merged cell &nbsp;
+                        <span class="badge bg-success me-1">&nbsp;&nbsp;&nbsp;</span> Selected
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<style>
+.layout-cell {
+    min-height: 72px;
+    border: 2px solid #dee2e6;
+    border-radius: 6px;
+    padding: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+}
+.layout-cell:hover {
+    border-color: #0d6efd;
+    background: var(--bs-primary-bg-subtle);
+}
+.layout-cell.selected {
+    border-color: #198754;
+    background: #d1e7dd;
+    color: #0a3622;
+}
+.layout-cell.merged {
+    background: linear-gradient(135deg, #cfe2ff, #b6d4fe);
+    border-color: #0d6efd;
+    color: #084298;
+}
+.layout-cell.merged:hover {
+    background: linear-gradient(135deg, #b6d4fe, #9ec5fe);
+}
+.layout-cell.split-target {
+    border-color: #ffc107;
+    background: #fff3cd;
+    color: #664d03;
+}
+.layout-cell-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+.layout-cell-badge {
+    margin-top: 2px;
+}
+</style>
+
 <script>
 // Sync color input with text display
 const colorInput = document.getElementById('color');
@@ -163,5 +283,122 @@ if (colorInput && colorText) {
         colorText.value = this.value;
     });
 }
+
+{% if rack %}
+// ===== Layout Manager Logic =====
+const RACK_UUID = '{{ rack.uuid }}';
+let selectedCells = new Set();
+let splitTarget = null;
+
+function layoutCellClick(cell) {
+    const drawerId = cell.dataset.drawer;
+    const isMerged = cell.dataset.isMerged === 'true';
+
+    // If clicking a merged cell: enter split mode
+    if (isMerged) {
+        // Clear any selection first
+        clearLayoutSelection();
+        splitTarget = drawerId;
+        document.querySelectorAll('.layout-cell').forEach(c => c.classList.remove('split-target'));
+        cell.classList.add('split-target');
+        document.getElementById('btnSplit').style.display = 'inline-block';
+        document.getElementById('btnMerge').disabled = true;
+        document.getElementById('layoutStatus').textContent = `Selected merged cell ${drawerId} — click Split to undo merge`;
+        return;
+    }
+
+    // Normal cell: toggle selection
+    splitTarget = null;
+    document.querySelectorAll('.layout-cell').forEach(c => c.classList.remove('split-target'));
+    document.getElementById('btnSplit').style.display = 'none';
+
+    if (selectedCells.has(drawerId)) {
+        selectedCells.delete(drawerId);
+        cell.classList.remove('selected');
+    } else {
+        selectedCells.add(drawerId);
+        cell.classList.add('selected');
+    }
+
+    updateMergeButton();
+}
+
+function updateMergeButton() {
+    const cells = Array.from(selectedCells);
+    const btn = document.getElementById('btnMerge');
+    const status = document.getElementById('layoutStatus');
+
+    if (cells.length < 2) {
+        btn.disabled = true;
+        status.textContent = cells.length === 1 ? '1 cell selected — select more to merge' : '';
+        return;
+    }
+
+    // Check rectangle
+    const rows = cells.map(c => parseInt(c.split('-')[0].replace('R', '')));
+    const cols = cells.map(c => parseInt(c.split('-')[1].replace('C', '')));
+    const minR = Math.min(...rows), maxR = Math.max(...rows);
+    const minC = Math.min(...cols), maxC = Math.max(...cols);
+    const expected = (maxR - minR + 1) * (maxC - minC + 1);
+
+    if (cells.length === expected) {
+        btn.disabled = false;
+        status.textContent = `${cells.length} cells selected (${maxR-minR+1}×${maxC-minC+1}) — ready to merge`;
+    } else {
+        btn.disabled = true;
+        status.textContent = `${cells.length} cells selected — must form a rectangle`;
+    }
+}
+
+function clearLayoutSelection() {
+    selectedCells.clear();
+    splitTarget = null;
+    document.querySelectorAll('.layout-cell').forEach(c => {
+        c.classList.remove('selected', 'split-target');
+    });
+    document.getElementById('btnMerge').disabled = true;
+    document.getElementById('btnSplit').style.display = 'none';
+    document.getElementById('layoutStatus').textContent = '';
+}
+
+function doMerge() {
+    const cells = Array.from(selectedCells);
+    if (cells.length < 2) return;
+
+    fetch(`/api/rack/${RACK_UUID}/merge-cells`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({cells: cells})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Merge failed: ' + data.error);
+        }
+    })
+    .catch(err => alert('Error: ' + err));
+}
+
+function doSplit() {
+    if (!splitTarget) return;
+
+    fetch(`/api/rack/${RACK_UUID}/split-cells`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({master: splitTarget})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Split failed: ' + data.error);
+        }
+    })
+    .catch(err => alert('Error: ' + err));
+}
+{% endif %}
 </script>
 {% endblock %}

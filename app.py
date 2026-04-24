@@ -220,6 +220,19 @@ from qr_utils import validate_bootstrap_icons
 with app.app_context():
     validate_bootstrap_icons()
 
+# Add merged_cells column to racks table if it doesn't exist (migration for existing DBs)
+with app.app_context():
+    try:
+        from sqlalchemy import text, inspect as sa_inspect
+        inspector = sa_inspect(db.engine)
+        rack_columns = [c['name'] for c in inspector.get_columns('racks')]
+        if 'merged_cells' not in rack_columns:
+            with db.engine.connect() as conn:
+                conn.execute(text("ALTER TABLE racks ADD COLUMN merged_cells TEXT DEFAULT '[]'"))
+                conn.commit()
+    except Exception:
+        pass
+
 
 if __name__ == '__main__':
     with app.app_context():

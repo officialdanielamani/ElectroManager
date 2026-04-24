@@ -111,6 +111,7 @@ def visual_storage():
                 if not entry['preview_image']:
                     entry['preview_image'] = _first_image_url(batch.item)
 
+        skip_cells, cell_spans = rack.compute_merge_layout()
         rack_data.append({
             'id': rack.id,
             'uuid': rack.uuid,
@@ -121,7 +122,10 @@ def visual_storage():
             'cols': rack.cols,
             'drawers': drawers,
             'item_count': len(items_main) + len(batches_here),
-            'unavailable_drawers': rack.get_unavailable_drawers()
+            'unavailable_drawers': rack.get_unavailable_drawers(),
+            'merged_cells': rack.get_merged_cells(),
+            'skip_cells': list(skip_cells),
+            'cell_spans': cell_spans,
         })
     
     # For the dropdown, show all racks for location selection, but filtered by current location for rack selection
@@ -281,6 +285,79 @@ def move_drawer_items():
         logger.error(f"Error moving drawer items: {str(e)}")
         logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': 'An error occurred while moving drawer items.'})
+
+@visual_storage_bp.route('/api/rack/<string:rack_uuid>/merge-cells', methods=['POST'])
+@login_required
+@permission_required("settings_sections.location_management", "edit")
+def merge_rack_cells(rack_uuid):
+    """Merge a rectangular selection of cells into one logical cell."""
+    rack = Rack.query.filter_by(uuid=rack_uuid).first_or_404()
+    data = request.get_json()
+    cells = data.get('cells', [])
+
+    if len(cells) < 2:
+        return jsonify({'success': False, 'error': 'Select at least 2 cells to merge'})
+
+    rows_set, cols_set = set(), set()
+    for cell in cells:
+        try:
+            parts = cell.replace('R', '').replace('C', '-').split('-')
+            rows_set.add(int(parts[0]))
+            cols_set.add(int(parts[1]))
+        except (ValueError, IndexError):
+            return jsonify({'success': False, 'error': f'Invalid cell ID: {cell}'})
+
+    min_row, max_row = min(rows_set), max(rows_set)
+    min_col, max_col = min(cols_set), max(cols_set)
+
+    if len(cells) != (max_row - min_row + 1) * (max_col - min_col + 1):
+        return jsonify({'success': False, 'error': 'Selected cells must form a rectangle'})
+
+    if max_row > rack.rows or max_col > rack.cols:
+        return jsonify({'success': False, 'error': 'Cells are outside rack bounds'})
+
+    existing = rack.get_merged_cells()
+    occupied = set()
+    for group in existing:
+        for c in group.get('cells', []):
+            occupied.add(c)
+
+    for cell in cells:
+        if cell in occupied:
+            return jsonify({'success': False, 'error': f'Cell {cell} is already part of a merge group'})
+
+    master = f'R{min_row}-C{min_col}'
+    existing.append({'master': master, 'cells': cells})
+    rack.merged_cells = json.dumps(existing)
+    db.session.commit()
+
+    log_audit(current_user.id, 'update', 'rack', rack.id,
+              f'Merged cells {cells} with master {master}')
+    return jsonify({'success': True, 'master': master})
+
+
+@visual_storage_bp.route('/api/rack/<string:rack_uuid>/split-cells', methods=['POST'])
+@login_required
+@permission_required("settings_sections.location_management", "edit")
+def split_rack_cells(rack_uuid):
+    """Split a merged cell group back to individual cells."""
+    rack = Rack.query.filter_by(uuid=rack_uuid).first_or_404()
+    data = request.get_json()
+    master = data.get('master')
+
+    existing = rack.get_merged_cells()
+    new_merged = [g for g in existing if g.get('master') != master]
+
+    if len(new_merged) == len(existing):
+        return jsonify({'success': False, 'error': 'No merge group found for this cell'})
+
+    rack.merged_cells = json.dumps(new_merged)
+    db.session.commit()
+
+    log_audit(current_user.id, 'update', 'rack', rack.id,
+              f'Split merged cells with master {master}')
+    return jsonify({'success': True})
+
 
 # ============= ERROR HANDLERS =============
 

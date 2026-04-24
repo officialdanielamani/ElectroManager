@@ -177,8 +177,9 @@ def item_new():
     form = ItemAddForm(perms=perms)
     locations = Location.query.order_by(Location.name).all()
     racks = Rack.query.order_by(Rack.name).all()
-    racks_data = [{'id': r.id, 'name': r.name, 'rows': r.rows, 'cols': r.cols, 
-                   'unavailable_drawers': r.get_unavailable_drawers()} for r in racks]
+    racks_data = [{'id': r.id, 'name': r.name, 'rows': r.rows, 'cols': r.cols,
+                   'unavailable_drawers': r.get_unavailable_drawers(),
+                   'merged_cells': r.get_merged_cells()} for r in racks]
     all_tags = [{'id': t.id, 'name': t.name, 'color': t.color} for t in Tag.query.order_by(Tag.name).all()]
     
     prefill_rack_uuid = request.args.get('rack_id', type=str)
@@ -395,8 +396,9 @@ def item_edit(uuid):
     form = ItemEditForm(obj=item, perms=perms)
     locations = Location.query.order_by(Location.name).all()
     racks = Rack.query.order_by(Rack.name).all()
-    racks_data = [{'id': r.id, 'name': r.name, 'rows': r.rows, 'cols': r.cols, 
-                   'unavailable_drawers': r.get_unavailable_drawers()} for r in racks]
+    racks_data = [{'id': r.id, 'name': r.name, 'rows': r.rows, 'cols': r.cols,
+                   'unavailable_drawers': r.get_unavailable_drawers(),
+                   'merged_cells': r.get_merged_cells()} for r in racks]
     all_tags = [{'id': t.id, 'name': t.name, 'color': t.color} for t in Tag.query.order_by(Tag.name).all()]
     
     if form.validate_on_submit():

@@ -234,10 +234,11 @@ class Rack(db.Model):
     rows = db.Column(db.Integer, default=5)
     cols = db.Column(db.Integer, default=5)
     unavailable_drawers = db.Column(db.Text)
+    merged_cells = db.Column(db.Text, default='[]')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     items = db.relationship('Item', backref='rack', lazy=True)
-    
+
     def __init__(self, **kwargs):
         super(Rack, self).__init__(**kwargs)
         if not self.uuid:
@@ -251,13 +252,58 @@ class Rack(db.Model):
             return json.loads(self.unavailable_drawers)
         except (json.JSONDecodeError, TypeError):
             return []
-    
+
     def is_drawer_unavailable(self, drawer_id):
         return drawer_id in self.get_unavailable_drawers()
-    
+
+    def get_merged_cells(self):
+        try:
+            return json.loads(self.merged_cells or '[]')
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def get_merge_group(self, cell_id):
+        for group in self.get_merged_cells():
+            if cell_id in group.get('cells', []):
+                return group
+        return None
+
+    def is_merged_away(self, cell_id):
+        group = self.get_merge_group(cell_id)
+        return group is not None and group.get('master') != cell_id
+
+    def get_master_cell(self, cell_id):
+        group = self.get_merge_group(cell_id)
+        return group['master'] if group else cell_id
+
+    def compute_merge_layout(self):
+        """Return (skip_cells set, cell_spans dict) for template rendering."""
+        skip_cells = set()
+        cell_spans = {}
+        for group in self.get_merged_cells():
+            master = group.get('master')
+            cells = group.get('cells', [])
+            rows_used, cols_used = set(), set()
+            for cell in cells:
+                try:
+                    parts = cell.replace('R', '').replace('C', '-').split('-')
+                    rows_used.add(int(parts[0]))
+                    cols_used.add(int(parts[1]))
+                except (ValueError, IndexError):
+                    continue
+            if rows_used and cols_used:
+                cell_spans[master] = {
+                    'rowspan': len(rows_used),
+                    'colspan': len(cols_used),
+                }
+            for cell in cells:
+                if cell != master:
+                    skip_cells.add(cell)
+        return skip_cells, cell_spans
+
     def get_drawer_uuid(self, row, col):
         return f"{self.uuid}{int(row):02d}{int(col):02d}"
-    
+
     def __repr__(self):
         return f'<Rack {self.name}>'
 
