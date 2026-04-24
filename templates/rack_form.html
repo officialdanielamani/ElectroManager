@@ -160,14 +160,16 @@
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-grid-3x3-gap"></i> Cell Layout Manager
-                    <small class="text-muted fw-normal ms-2">Merge or split cells to emulate real rack layout</small>
+                    <small class="text-muted fw-normal ms-2">Merge, split, or mark cells as unavailable</small>
                 </h5>
             </div>
             <div class="card-body">
                 <div class="alert alert-info py-2 small mb-3">
                     <i class="bi bi-info-circle"></i>
-                    <strong>How to merge:</strong> Click cells to select them (they must all be connected/adjacent — any shape), then click <strong>Merge Selected</strong>.
-                    Items are stored in the top-left master cell. Click a merged cell then <strong>Split</strong> to undo.
+                    <strong>How to use:</strong> Click cells to select them, then use the buttons below.
+                    <strong>Merge:</strong> select connected/adjacent cells → Merge Selected (items stored in top-left master cell).
+                    <strong>Split:</strong> click a merged cell → Split.
+                    <strong>Unavailable:</strong> select cells → Mark Unavailable / Mark Available.
                 </div>
 
                 <div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
@@ -177,6 +179,12 @@
                     <button id="btnSplit" class="btn btn-warning btn-sm" onclick="doSplit()" style="display:none;">
                         <i class="bi bi-layout-split"></i> Split Merged Cell
                     </button>
+                    <button id="btnMarkUnavailable" class="btn btn-danger btn-sm" onclick="doMarkUnavailable(true)" style="display:none;">
+                        <i class="bi bi-slash-circle"></i> Mark Unavailable
+                    </button>
+                    <button id="btnMarkAvailable" class="btn btn-success btn-sm" onclick="doMarkUnavailable(false)" style="display:none;">
+                        <i class="bi bi-check-circle"></i> Mark Available
+                    </button>
                     <button class="btn btn-secondary btn-sm" onclick="clearLayoutSelection()">
                         <i class="bi bi-x-circle"></i> Clear Selection
                     </button>
@@ -184,6 +192,7 @@
                 </div>
 
                 <!-- Rack grid preview -->
+                {% set unavailable_drawers = rack.get_unavailable_drawers() %}
                 <div id="layoutGrid" class="layout-grid"
                      style="display:grid; grid-template-columns: repeat({{ rack.cols }}, minmax(0, 1fr)); gap:6px; max-width: {{ rack.cols * 86 }}px;">
                     {% set skip_cells, cell_spans, group_cells = rack.compute_merge_layout() %}
@@ -193,9 +202,11 @@
                     {% if drawer_id not in skip_cells %}
                     {% set span = cell_spans.get(drawer_id) %}
                     {% set grp = group_cells.get(drawer_id) %}
-                    <div class="layout-cell {% if span %}merged{% elif grp %}group-{{ grp.role }}{% endif %}"
+                    {% set is_unavail = drawer_id in unavailable_drawers %}
+                    <div class="layout-cell {% if span %}merged{% elif grp %}group-{{ grp.role }}{% endif %}{% if is_unavail %} unavailable{% endif %}"
                          data-drawer="{{ drawer_id }}"
                          data-is-merged="{{ 'true' if (span or (grp and grp.role == 'master')) else 'false' }}"
+                         data-unavailable="{{ 'true' if is_unavail else 'false' }}"
                          {% if grp and grp.role == 'slave' %}data-group-master="{{ grp.master }}"{% endif %}
                          {% if span %}
                          style="grid-row: span {{ span.rowspan }}; grid-column: span {{ span.colspan }};"
@@ -204,19 +215,20 @@
                          {% endif %}
                          onclick="layoutCellClick(this)">
                         <div class="layout-cell-label">{{ drawer_id }}</div>
-                        {% if span %}
                         <div class="layout-cell-badge">
+                            {% if span %}
                             <span class="badge bg-primary" style="font-size:0.6rem;">{{ span.rowspan }}×{{ span.colspan }}</span>
-                        </div>
-                        {% elif grp %}
-                        <div class="layout-cell-badge">
-                            {% if grp.role == 'master' %}
-                            <span class="badge bg-info" style="font-size:0.6rem;">{{ grp.count }} cells</span>
-                            {% else %}
-                            <span class="badge bg-secondary" style="font-size:0.6rem;">→ {{ grp.master }}</span>
+                            {% elif grp %}
+                                {% if grp.role == 'master' %}
+                                <span class="badge bg-info" style="font-size:0.6rem;">{{ grp.count }} cells</span>
+                                {% else %}
+                                <span class="badge bg-secondary" style="font-size:0.6rem;">→ {{ grp.master }}</span>
+                                {% endif %}
+                            {% endif %}
+                            {% if is_unavail %}
+                            <span class="badge bg-danger" style="font-size:0.6rem;">N/A</span>
                             {% endif %}
                         </div>
-                        {% endif %}
                     </div>
                     {% endif %}
                     {% endfor %}
@@ -225,11 +237,12 @@
 
                 <div class="mt-3">
                     <small class="text-muted">
-                        <span class="badge bg-light border text-dark me-1">&nbsp;&nbsp;&nbsp;</span> Normal cell &nbsp;
+                        <span class="badge bg-light border text-dark me-1">&nbsp;&nbsp;&nbsp;</span> Normal &nbsp;
                         <span class="badge bg-primary me-1">&nbsp;&nbsp;&nbsp;</span> Merged (rect) &nbsp;
                         <span class="badge bg-info me-1">&nbsp;&nbsp;&nbsp;</span> Merged master &nbsp;
                         <span class="badge bg-secondary me-1">&nbsp;&nbsp;&nbsp;</span> Merged slave &nbsp;
-                        <span class="badge bg-success me-1">&nbsp;&nbsp;&nbsp;</span> Selected
+                        <span class="badge bg-success me-1">&nbsp;&nbsp;&nbsp;</span> Selected &nbsp;
+                        <span class="badge" style="background:#fd7e14;">&nbsp;&nbsp;&nbsp;</span> Unavailable
                     </small>
                 </div>
             </div>
@@ -295,6 +308,20 @@
     background: #d3d3d3;
     border-color: #495057;
 }
+.layout-cell.unavailable {
+    background: linear-gradient(135deg, #ffe5d0, #ffcba4);
+    border-color: #fd7e14;
+    color: #6e2e00;
+}
+.layout-cell.unavailable:hover {
+    background: linear-gradient(135deg, #ffcba4, #ffb37a);
+    border-color: #e06000;
+}
+.layout-cell.selected.unavailable {
+    border-color: #198754;
+    background: #d1e7dd;
+    color: #0a3622;
+}
 .layout-cell-label {
     font-size: 0.72rem;
     font-weight: 700;
@@ -318,6 +345,7 @@ if (colorInput && colorText) {
 {% if rack %}
 // ===== Layout Manager Logic =====
 const RACK_UUID = '{{ rack.uuid }}';
+const UNAVAILABLE_DRAWERS = new Set({{ rack.get_unavailable_drawers()|tojson }});
 let selectedCells = new Set();
 let splitTarget = null;
 
@@ -383,17 +411,39 @@ function layoutCellClick(cell) {
         cell.classList.add('selected');
     }
 
-    updateMergeButton();
+    updateToolbar();
 }
 
-function updateMergeButton() {
+function updateToolbar() {
     const cells = Array.from(selectedCells);
     const btn = document.getElementById('btnMerge');
+    const btnMarkUnavail = document.getElementById('btnMarkUnavailable');
+    const btnMarkAvail = document.getElementById('btnMarkAvailable');
     const status = document.getElementById('layoutStatus');
+
+    if (cells.length === 0) {
+        btn.disabled = true;
+        btnMarkUnavail.style.display = 'none';
+        btnMarkAvail.style.display = 'none';
+        status.textContent = '';
+        return;
+    }
+
+    const hasUnavail = cells.some(c => UNAVAILABLE_DRAWERS.has(c));
+    const hasAvail   = cells.some(c => !UNAVAILABLE_DRAWERS.has(c));
+
+    btnMarkUnavail.style.display = hasAvail   ? 'inline-block' : 'none';
+    btnMarkAvail.style.display   = hasUnavail ? 'inline-block' : 'none';
 
     if (cells.length < 2) {
         btn.disabled = true;
-        status.textContent = cells.length === 1 ? '1 cell selected — select more to merge' : '';
+        status.textContent = `1 cell selected${hasUnavail ? ' (unavailable)' : ''} — select more cells to merge`;
+        return;
+    }
+
+    if (hasUnavail) {
+        btn.disabled = true;
+        status.textContent = `${cells.length} cells selected — deselect unavailable cells before merging`;
         return;
     }
 
@@ -414,6 +464,8 @@ function clearLayoutSelection() {
     });
     document.getElementById('btnMerge').disabled = true;
     document.getElementById('btnSplit').style.display = 'none';
+    document.getElementById('btnMarkUnavailable').style.display = 'none';
+    document.getElementById('btnMarkAvailable').style.display = 'none';
     document.getElementById('layoutStatus').textContent = '';
 }
 
@@ -454,6 +506,27 @@ function doSplit() {
         }
     })
     .catch(err => alert('Error: ' + err));
+}
+
+function doMarkUnavailable(makeUnavailable) {
+    const cells = Array.from(selectedCells).filter(c =>
+        makeUnavailable ? !UNAVAILABLE_DRAWERS.has(c) : UNAVAILABLE_DRAWERS.has(c)
+    );
+    if (cells.length === 0) return;
+
+    Promise.all(cells.map(cell =>
+        fetch('/api/drawer/toggle-availability', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({rack_id: RACK_UUID, drawer_id: cell, is_unavailable: makeUnavailable})
+        }).then(r => r.json())
+    )).then(results => {
+        if (results.every(r => r.success)) {
+            location.reload();
+        } else {
+            alert('Some operations failed. Please refresh and try again.');
+        }
+    }).catch(err => alert('Error: ' + err));
 }
 {% endif %}
 </script>
