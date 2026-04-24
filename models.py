@@ -277,29 +277,45 @@ class Rack(db.Model):
         return group['master'] if group else cell_id
 
     def compute_merge_layout(self):
-        """Return (skip_cells set, cell_spans dict) for template rendering."""
+        """Return (skip_cells, cell_spans, group_cells) for template rendering.
+
+        skip_cells:  cells not rendered (slaves of rectangular merges)
+        cell_spans:  master → {rowspan, colspan} for rectangular merges
+        group_cells: cell → {role, master, count} for non-rectangular merges
+        """
         skip_cells = set()
         cell_spans = {}
+        group_cells = {}
         for group in self.get_merged_cells():
             master = group.get('master')
             cells = group.get('cells', [])
             rows_used, cols_used = set(), set()
             for cell in cells:
                 try:
-                    parts = cell.replace('R', '').replace('C', '-').split('-')
+                    parts = cell[1:].split('-C')
                     rows_used.add(int(parts[0]))
                     cols_used.add(int(parts[1]))
                 except (ValueError, IndexError):
                     continue
-            if rows_used and cols_used:
+            if not rows_used or not cols_used:
+                continue
+            is_rectangular = len(cells) == len(rows_used) * len(cols_used)
+            if is_rectangular:
                 cell_spans[master] = {
                     'rowspan': len(rows_used),
                     'colspan': len(cols_used),
                 }
-            for cell in cells:
-                if cell != master:
-                    skip_cells.add(cell)
-        return skip_cells, cell_spans
+                for cell in cells:
+                    if cell != master:
+                        skip_cells.add(cell)
+            else:
+                for cell in cells:
+                    group_cells[cell] = {
+                        'role': 'master' if cell == master else 'slave',
+                        'master': master,
+                        'count': len(cells),
+                    }
+        return skip_cells, cell_spans, group_cells
 
     def get_drawer_uuid(self, row, col):
         return f"{self.uuid}{int(row):02d}{int(col):02d}"

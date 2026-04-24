@@ -1079,15 +1079,16 @@
     }
 
     .drawer-cell-picker.unavailable {
-        background-color: var(--bs-secondary);
-        color: var(--bs-secondary-text-emphasis);
-        opacity: 0.6;
+        background: linear-gradient(135deg, var(--dc-unavail-bg-1), var(--dc-unavail-bg-2));
+        border-color: var(--dc-unavail-border);
+        color: var(--dc-unavail-color);
+        opacity: 0.8;
         cursor: not-allowed;
     }
 
     .drawer-cell-picker.unavailable:hover {
         transform: none;
-        border-color: var(--bs-secondary);
+        border-color: var(--dc-unavail-border);
     }
     
     .drawer-cell-picker.no-permission {
@@ -1102,24 +1103,69 @@
     }
 
     .drawer-cell-picker.merged {
-        background: linear-gradient(135deg, #cfe2ff, #b6d4fe);
-        border-color: #0d6efd;
+        background: linear-gradient(135deg, var(--dc-merged-bg-1), var(--dc-merged-bg-2));
+        border-color: var(--dc-merged-border);
         border-style: dashed;
-        color: #084298;
+        color: var(--dc-merged-color);
         font-size: 0.65rem;
+        width: 100%;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
     }
 
     .drawer-cell-picker.merged:hover:not(.unavailable) {
-        background: linear-gradient(135deg, #b6d4fe, #9ec5fe);
-        border-color: #0a58ca;
+        background: linear-gradient(135deg, var(--dc-merged-bg-2), var(--dc-merged-bg-2));
+        border-color: var(--dc-merged-border);
     }
 
     .drawer-cell-picker.merged.selected {
-        background: var(--bs-primary);
-        color: #fff;
+        background: var(--dc-selected-bg);
+        color: var(--dc-selected-color);
+    }
+
+    .drawer-cell-picker.group-master {
+        background: linear-gradient(135deg, var(--dc-gmaster-bg-1), var(--dc-gmaster-bg-2));
+        border: 2px dashed var(--dc-gmaster-border);
+        color: var(--dc-gmaster-color);
+        font-size: 0.6rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        line-height: 1.2;
+    }
+
+    .drawer-cell-picker.group-slave {
+        background: linear-gradient(135deg, var(--dc-gmaster-bg-1), var(--dc-gslave-bg));
+        border: 1px dashed var(--dc-gmaster-border);
+        color: var(--dc-gmaster-color);
+        font-size: 0.6rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        line-height: 1.2;
+        opacity: 0.75;
+    }
+
+    .drawer-cell-picker.group-highlight {
+        background: linear-gradient(135deg, var(--dc-ghover-bg-1), var(--dc-ghover-bg-2)) !important;
+        border-color: var(--dc-ghover-border) !important;
+        border-style: solid !important;
+        opacity: 1 !important;
+        transform: scale(1.08);
+        z-index: 1;
+        position: relative;
+    }
+
+    .drawer-cell-picker.group-master.selected,
+    .drawer-cell-picker.group-slave.selected {
+        background: linear-gradient(135deg, var(--dc-ghover-bg-2), var(--dc-ghover-bg-1)) !important;
+        border-color: var(--dc-ghover-border) !important;
+        border-style: solid !important;
+        opacity: 1 !important;
     }
 </style>
 
@@ -1175,21 +1221,29 @@
         const unavailableDrawers = rackData ? rackData.unavailable_drawers : [];
         const mergedGroups = rackData ? (rackData.merged_cells || []) : [];
 
-        // Build skip/span maps from merged cells
+        // Build skip / span / group maps from merged cells
         const skipCells = new Set();
         const cellSpans = {};
+        const groupMap = {};   // cellId → {master, role, count}
         mergedGroups.forEach(group => {
             const master = group.master;
             const cells = group.cells || [];
-            const rowNums = cells.map(c => parseInt(c.split('-')[0].replace('R',''))).filter(Boolean);
-            const colNums = cells.map(c => parseInt(c.split('-')[1].replace('C',''))).filter(Boolean);
-            if (rowNums.length && colNums.length) {
+            const rowNums = cells.map(c => parseInt(c.slice(1).split('-C')[0])).filter(n => !isNaN(n));
+            const colNums = cells.map(c => parseInt(c.slice(1).split('-C')[1])).filter(n => !isNaN(n));
+            if (!rowNums.length || !colNums.length) return;
+            const isRect = cells.length === (Math.max(...rowNums) - Math.min(...rowNums) + 1) *
+                                            (Math.max(...colNums) - Math.min(...colNums) + 1);
+            if (isRect) {
                 cellSpans[master] = {
                     rowspan: Math.max(...rowNums) - Math.min(...rowNums) + 1,
                     colspan: Math.max(...colNums) - Math.min(...colNums) + 1,
                 };
+                cells.forEach(c => { if (c !== master) skipCells.add(c); });
+            } else {
+                cells.forEach(c => {
+                    groupMap[c] = { master, role: c === master ? 'master' : 'slave', count: cells.length };
+                });
             }
-            cells.forEach(c => { if (c !== master) skipCells.add(c); });
         });
 
         for (let r = 1; r <= rows; r++) {
@@ -1198,9 +1252,34 @@
                 if (skipCells.has(drawerId)) continue;
 
                 const isUnavailable = unavailableDrawers.includes(drawerId);
+                const groupInfo = groupMap[drawerId] || null;
                 const span = cellSpans[drawerId];
                 const cell = document.createElement('div');
+                cell.className = 'drawer-cell-picker';
+                cell.dataset.drawer = drawerId;
 
+        // Single toggle helper used by all cell types
+        function pickDrawer(targetId) {
+            grid.querySelectorAll('.drawer-cell-picker').forEach(d => d.classList.remove('selected'));
+            if (drawerInput.value === targetId) {
+                drawerInput.value = '';
+            } else {
+                const targetEl = grid.querySelector(`[data-drawer="${targetId}"]`);
+                if (targetEl) targetEl.classList.add('selected');
+                drawerInput.value = targetId;
+            }
+        }
+
+        for (let r = 1; r <= rows; r++) {
+            for (let c = 1; c <= cols; c++) {
+                const drawerId = `R${r}-C${c}`;
+                if (skipCells.has(drawerId)) continue;
+
+                const isUnavailable = unavailableDrawers.includes(drawerId);
+                const groupInfo = groupMap[drawerId] || null;
+                const span = cellSpans[drawerId];
+                const targetId = groupInfo ? groupInfo.master : drawerId;
+                const cell = document.createElement('div');
                 cell.className = 'drawer-cell-picker';
                 cell.dataset.drawer = drawerId;
 
@@ -1209,26 +1288,44 @@
                     cell.style.gridRow = `span ${span.rowspan}`;
                     cell.style.gridColumn = `span ${span.colspan}`;
                     cell.style.height = `${span.rowspan * 40 + (span.rowspan - 1) * 4}px`;
-                }
-
-                if (isUnavailable) {
-                    cell.classList.add('unavailable');
-                    cell.title = 'This drawer is unavailable';
-                } else if (!canEditLocation) {
-                    cell.classList.add('no-permission');
-                    cell.title = 'You do not have permission to edit location';
-                }
-
-                cell.textContent = drawerId;
-                if (drawerInput.value === drawerId) cell.classList.add('selected');
-
-                if (!isUnavailable) {
-                    cell.addEventListener('click', function () {
-                        if (!canEditLocation) return;
-                        grid.querySelectorAll('.drawer-cell-picker').forEach(d => d.classList.remove('selected'));
-                        this.classList.add('selected');
-                        drawerInput.value = this.dataset.drawer;
+                    cell.innerHTML = `<span>${drawerId}</span><small style="font-size:0.5rem">${span.rowspan}×${span.colspan}</small>`;
+                } else if (groupInfo) {
+                    cell.classList.add(groupInfo.role === 'master' ? 'group-master' : 'group-slave');
+                    cell.dataset.groupMaster = groupInfo.master;
+                    cell.innerHTML = `<span>${drawerId}</span><small style="font-size:0.5rem">${
+                        groupInfo.role === 'master'
+                            ? `${groupInfo.count} cells`
+                            : `→${groupInfo.master}`
+                    }</small>`;
+                    cell.title = `Merged group — master: ${groupInfo.master} (${groupInfo.count} cells)`;
+                    cell.addEventListener('mouseenter', () => {
+                        grid.querySelectorAll(`[data-group-master="${groupInfo.master}"]`)
+                            .forEach(el => el.classList.add('group-highlight'));
                     });
+                    cell.addEventListener('mouseleave', () => {
+                        grid.querySelectorAll(`[data-group-master="${groupInfo.master}"]`)
+                            .forEach(el => el.classList.remove('group-highlight'));
+                    });
+                } else {
+                    cell.textContent = drawerId;
+                    if (isUnavailable) {
+                        cell.classList.add('unavailable');
+                        cell.title = 'This drawer is unavailable';
+                    } else if (!canEditLocation) {
+                        cell.classList.add('no-permission');
+                        cell.title = 'You do not have permission to edit location';
+                    }
+                }
+
+                // Unified click handler: all selectable cell types use pickDrawer
+                const isSelectable = canEditLocation && !(!groupInfo && !span && isUnavailable);
+                if (isSelectable) {
+                    cell.addEventListener('click', () => pickDrawer(targetId));
+                }
+
+                // Restore selected state (only show on the master/direct cell, not on slaves)
+                if (drawerInput.value === targetId && (!groupInfo || groupInfo.role === 'master')) {
+                    cell.classList.add('selected');
                 }
 
                 grid.appendChild(cell);
@@ -2064,32 +2161,54 @@ function batchUpdateDrawerGrid(prefix) {
 
     var skipCells = {};
     var cellSpans = {};
+    var groupMap = {};   // cellId → {master, role, count}
     mergedGroups.forEach(function(group) {
         var master = group.master;
         var cells = group.cells || [];
-        var rowNums = cells.map(function(c) { return parseInt(c.split('-')[0].replace('R','')); }).filter(Boolean);
-        var colNums = cells.map(function(c) { return parseInt(c.split('-')[1].replace('C','')); }).filter(Boolean);
-        if (rowNums.length && colNums.length) {
+        var rowNums = cells.map(function(c) { var n = parseInt(c.slice(1).split('-C')[0]); return isNaN(n) ? null : n; }).filter(function(n) { return n !== null; });
+        var colNums = cells.map(function(c) { var n = parseInt(c.slice(1).split('-C')[1]); return isNaN(n) ? null : n; }).filter(function(n) { return n !== null; });
+        if (!rowNums.length || !colNums.length) return;
+        var isRect = cells.length === (Math.max.apply(null, rowNums) - Math.min.apply(null, rowNums) + 1) *
+                                      (Math.max.apply(null, colNums) - Math.min.apply(null, colNums) + 1);
+        if (isRect) {
             cellSpans[master] = {
                 rowspan: Math.max.apply(null, rowNums) - Math.min.apply(null, rowNums) + 1,
                 colspan: Math.max.apply(null, colNums) - Math.min.apply(null, colNums) + 1,
             };
+            cells.forEach(function(c) { if (c !== master) skipCells[c] = true; });
+        } else {
+            cells.forEach(function(c) {
+                groupMap[c] = { master: master, role: c === master ? 'master' : 'slave', count: cells.length };
+            });
         }
-        cells.forEach(function(c) { if (c !== master) skipCells[c] = true; });
     });
 
     grid.innerHTML = '';
     grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
     grid.style.maxWidth = (cols * 45) + 'px';
 
+    // Single toggle helper used by all cell types in the batch picker
+    function batchPickDrawer(targetId) {
+        grid.querySelectorAll('.drawer-cell-picker').forEach(function(d) { d.classList.remove('selected'); });
+        if (drawerInput.value === targetId) {
+            drawerInput.value = '';
+        } else {
+            var targetEl = grid.querySelector('[data-drawer="' + targetId + '"]');
+            if (targetEl) targetEl.classList.add('selected');
+            drawerInput.value = targetId;
+        }
+    }
+
     for (var r = 1; r <= rows; r++) {
         for (var c = 1; c <= cols; c++) {
             (function(drawerId) {
                 if (skipCells[drawerId]) return;
+                var groupInfo = groupMap[drawerId] || null;
                 var span = cellSpans[drawerId];
+                var isUnavailable = unavailable.indexOf(drawerId) !== -1;
+                var targetId = groupInfo ? groupInfo.master : drawerId;
                 var cell = document.createElement('div');
                 cell.className = 'drawer-cell-picker';
-                cell.textContent = drawerId;
                 cell.setAttribute('data-drawer', drawerId);
 
                 if (span) {
@@ -2097,19 +2216,43 @@ function batchUpdateDrawerGrid(prefix) {
                     cell.style.gridRow = 'span ' + span.rowspan;
                     cell.style.gridColumn = 'span ' + span.colspan;
                     cell.style.height = (span.rowspan * 40 + (span.rowspan - 1) * 4) + 'px';
+                    cell.innerHTML = '<span>' + drawerId + '</span><small style="font-size:0.5rem">' + span.rowspan + '×' + span.colspan + '</small>';
+                } else if (groupInfo) {
+                    cell.classList.add(groupInfo.role === 'master' ? 'group-master' : 'group-slave');
+                    cell.setAttribute('data-group-master', groupInfo.master);
+                    cell.innerHTML = '<span>' + drawerId + '</span><small style="font-size:0.5rem">' +
+                        (groupInfo.role === 'master' ? groupInfo.count + ' cells' : '→' + groupInfo.master) + '</small>';
+                    cell.title = 'Merged group — master: ' + groupInfo.master + ' (' + groupInfo.count + ' cells)';
+                    cell.addEventListener('mouseenter', function() {
+                        var gm = this.getAttribute('data-group-master');
+                        grid.querySelectorAll('[data-group-master="' + gm + '"]')
+                            .forEach(function(el) { el.classList.add('group-highlight'); });
+                    });
+                    cell.addEventListener('mouseleave', function() {
+                        var gm = this.getAttribute('data-group-master');
+                        grid.querySelectorAll('[data-group-master="' + gm + '"]')
+                            .forEach(function(el) { el.classList.remove('group-highlight'); });
+                    });
+                } else {
+                    cell.textContent = drawerId;
+                    if (isUnavailable) {
+                        cell.classList.add('unavailable');
+                        cell.title = 'This drawer is unavailable';
+                    }
                 }
 
-                if (unavailable.indexOf(drawerId) !== -1) {
-                    cell.classList.add('unavailable');
-                    cell.title = 'This drawer is unavailable';
-                } else {
-                    cell.addEventListener('click', function() {
-                        grid.querySelectorAll('.drawer-cell-picker').forEach(function(d) { d.classList.remove('selected'); });
-                        this.classList.add('selected');
-                        drawerInput.value = drawerId;
-                    });
+                // Unified click handler for all selectable cells
+                var isSelectable = !(!groupInfo && !span && isUnavailable);
+                if (isSelectable) {
+                    (function(tid) {
+                        cell.addEventListener('click', function() { batchPickDrawer(tid); });
+                    })(targetId);
                 }
-                if (drawerInput.value === drawerId) cell.classList.add('selected');
+
+                // Restore selected state (master/direct cell only, not slaves)
+                if (drawerInput.value === targetId && (!groupInfo || groupInfo.role === 'master')) {
+                    cell.classList.add('selected');
+                }
                 grid.appendChild(cell);
             })('R' + r + '-C' + c);
         }

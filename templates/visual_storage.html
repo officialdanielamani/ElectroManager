@@ -146,17 +146,28 @@
                     {% set drawer_id = "R%d-C%d"|format(row + 1, col + 1) %}
                     {% if drawer_id not in rack.skip_cells %}
                     {% set span = rack.cell_spans.get(drawer_id) %}
-                    {% set drawer_data = rack.drawers.get(drawer_id) %}
-                    {% set is_unavailable = drawer_id in rack.unavailable_drawers %}
+                    {% set grp = rack.group_cells.get(drawer_id) if rack.group_cells is defined else None %}
+                    {% set is_slave = grp and grp.role == 'slave' %}
+                    {% set effective_id = grp.master if is_slave else drawer_id %}
+                    {% set drawer_data = rack.drawers.get(effective_id) %}
+                    {% set is_unavailable = effective_id in rack.unavailable_drawers %}
                     {% set entry_count = (drawer_data['items']|length + drawer_data['batches']|length) if drawer_data else 0 %}
-                    <div class="drawer-cell {% if is_unavailable %}unavailable{% elif entry_count %}has-items{% else %}empty{% endif %}{% if span %} merged-cell{% endif %}"
+                    <div class="drawer-cell {% if is_unavailable %}unavailable{% elif entry_count %}has-items{% else %}empty{% endif %}{% if span %} merged-cell{% elif grp %} group-cell group-{{ grp.role }}{% endif %}"
                          data-drawer="{{ drawer_id }}"
                          data-rack="{{ rack.uuid }}"
+                         {% if grp %}data-group-master="{{ grp.master }}"{% endif %}
                          {% if span %}style="grid-row: span {{ span.rowspan }}; grid-column: span {{ span.colspan }};"{% endif %}
-                         onclick="openDrawer('{{ rack.name }}', '{{ drawer_id }}', '{{ rack.uuid }}')">
-                        <div class="drawer-label">{{ drawer_id }}{% if span %} <span class="merged-badge">{{ span.rowspan }}×{{ span.colspan }}</span>{% endif %}</div>
+                         onclick="openDrawer('{{ rack.name }}', '{{ effective_id }}', '{{ rack.uuid }}')">
+                        <div class="drawer-label">
+                            {{ drawer_id }}
+                            {% if span %}<span class="merged-badge">{{ span.rowspan }}×{{ span.colspan }}</span>{% endif %}
+                            {% if grp and grp.role == 'master' %}<span class="merged-badge">{{ grp.count }} cells</span>{% endif %}
+                            {% if is_slave %}<span class="merged-badge text-muted">→{{ grp.master }}</span>{% endif %}
+                        </div>
                         <div class="drawer-count">
-                            {% if is_unavailable and entry_count %}
+                            {% if is_slave %}
+                            <span class="text-muted" style="font-size:0.7rem;">part of group</span>
+                            {% elif is_unavailable and entry_count %}
                             <span class="badge bg-secondary">Unavailable</span>
                             <span class="badge bg-info mt-1">{{ entry_count }}</span>
                             {% elif is_unavailable %}
@@ -352,69 +363,127 @@
 .drawer-cell {
     min-width: 0;
     min-height: 120px;
-    border: 2px solid #ddd;
+    border: 2px solid var(--dc-normal-border);
     border-radius: 8px;
     text-align: center;
     padding: 8px;
     cursor: pointer;
     transition: all 0.3s;
     position: relative;
-    background: linear-gradient(145deg, #f8f9fa, #e9ecef);
+    background: linear-gradient(145deg, var(--dc-normal-bg), var(--dc-normal-bg));
+    color: var(--dc-normal-color);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
 }
+.drawer-cell:hover {
+    border-color: var(--dc-merged-border);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
 
+/* ── Normal states ── */
+.drawer-cell.empty {
+    background: linear-gradient(145deg, var(--dc-normal-bg), var(--dc-normal-bg));
+}
+.drawer-cell.has-items {
+    background: linear-gradient(145deg, var(--dc-items-bg-1), var(--dc-items-bg-2));
+    border-color: var(--dc-items-border);
+    color: var(--dc-items-color);
+}
+
+/* ── Rectangular merged ── */
 .drawer-cell.merged-cell {
-    border-color: #0d6efd;
+    border-color: var(--dc-merged-border);
     border-width: 2px;
     border-style: dashed;
-    background: linear-gradient(145deg, #cfe2ff, #b6d4fe);
+    background: linear-gradient(145deg, var(--dc-merged-bg-1), var(--dc-merged-bg-2));
+    color: var(--dc-merged-color);
+}
+.drawer-cell.has-items.merged-cell {
+    background: linear-gradient(145deg, var(--dc-items-bg-1), var(--dc-items-bg-2));
+    border-color: var(--dc-merged-border);
+    border-style: dashed;
+    color: var(--dc-items-color);
+}
+
+/* ── Irregular group ── */
+.drawer-cell.group-cell.group-master {
+    border-color: var(--dc-gmaster-border);
+    border-width: 2px;
+    border-style: dashed;
+    background: linear-gradient(145deg, var(--dc-gmaster-bg-1), var(--dc-gmaster-bg-2));
+    color: var(--dc-gmaster-color);
+}
+.drawer-cell.group-cell.group-slave {
+    border-color: var(--dc-gslave-border);
+    border-width: 2px;
+    border-style: dashed;
+    background: var(--dc-gslave-bg);
+    color: var(--dc-gslave-color);
+    opacity: 0.8;
+}
+.drawer-cell.has-items.group-cell.group-master {
+    background: linear-gradient(145deg, var(--dc-items-bg-1), var(--dc-items-bg-2));
+    border-color: var(--dc-gmaster-border);
+    border-style: dashed;
+    color: var(--dc-items-color);
+}
+
+/* ── Group hover highlight ── */
+.drawer-cell.group-highlight {
+    background: linear-gradient(145deg, var(--dc-ghover-bg-1), var(--dc-ghover-bg-2)) !important;
+    border-color: var(--dc-ghover-border) !important;
+    border-style: solid !important;
+    opacity: 1 !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+/* ── Unavailable (orange, consistent across all pages) ── */
+.drawer-cell.unavailable {
+    background: linear-gradient(145deg, var(--dc-unavail-bg-1), var(--dc-unavail-bg-2));
+    border-color: var(--dc-unavail-border);
+    color: var(--dc-unavail-color);
+    cursor: not-allowed;
+}
+.drawer-cell.unavailable.merged-cell,
+.drawer-cell.unavailable.group-cell {
+    border-style: dashed;
+}
+
+/* ── Search highlight ── */
+.drawer-cell.search-highlighted {
+    background: linear-gradient(145deg, var(--dc-search-bg-1), var(--dc-search-bg-2)) !important;
+    border-color: var(--dc-search-border) !important;
+    border-width: 3px !important;
+    box-shadow: 0 0 10px var(--dc-search-glow) !important;
+    animation: pulse-highlight 1s infinite;
+    position: relative;
+    z-index: 1050;
+}
+@keyframes pulse-highlight {
+    0%, 100% { box-shadow: 0 0 10px var(--dc-search-glow); }
+    50%       { box-shadow: 0 0 20px var(--dc-search-glow); }
 }
 
 .merged-badge {
     font-size: 0.55rem;
-    background: #0d6efd;
+    background: var(--dc-merged-border);
     color: #fff;
     padding: 0 3px;
     border-radius: 3px;
     vertical-align: middle;
 }
 
-.drawer-cell:hover {
-    border-color: #0d6efd;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-.drawer-cell.has-items {
-    background: linear-gradient(145deg, #d1e7dd, #badbcc);
-    border-color: #198754;
-}
-
-.drawer-cell.empty {
-    background: linear-gradient(145deg, #f8f9fa, #dee2e6);
-}
-
-.drawer-cell.unavailable {
-    background: linear-gradient(145deg, #6c757d, #5a6268);
-    border-color: #495057;
-    opacity: 0.7;
-    cursor: not-allowed;
-}
-
-.drawer-cell.unavailable .drawer-label {
-    color: #fff;
-}
-
+/* ── Move-drawer mini-picker (reuses token vars) ── */
 .drawer-grid-container {
     background: transparent !important;
     border-color: var(--bs-border-color) !important;
     border: 1px solid var(--bs-border-color) !important;
     color: var(--bs-body-color);
 }
-
 .move-drawer-cell {
     width: 40px;
     height: 40px;
@@ -424,53 +493,49 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    background-color: var(--bs-body-bg);
-    color: var(--bs-body-color);
+    background-color: var(--dc-normal-bg);
+    color: var(--dc-normal-color);
     transition: all 0.2s;
     font-size: 0.7rem;
     font-weight: bold;
     user-select: none;
     text-align: center;
 }
-
 .move-drawer-cell:not(.unavailable):not(.selected) {
-    background-color: var(--bs-secondary-bg);
+    background-color: var(--dc-normal-bg);
 }
-
 .move-drawer-cell:hover:not(.unavailable) {
-    border-color: var(--bs-primary);
+    border-color: var(--dc-merged-border);
     background-color: var(--bs-primary-bg-subtle);
     transform: scale(1.05);
 }
-
 .move-drawer-cell.selected {
-    background-color: var(--bs-primary);
-    color: #fff;
-    border-color: var(--bs-primary);
+    background-color: var(--dc-selected-bg);
+    color: var(--dc-selected-color);
+    border-color: var(--dc-selected-border);
 }
-
 .move-drawer-cell.unavailable {
-    background-color: var(--bs-secondary);
-    color: var(--bs-secondary-text-emphasis);
-    border-color: var(--bs-secondary);
-    opacity: 0.6;
+    background: linear-gradient(135deg, var(--dc-unavail-bg-1), var(--dc-unavail-bg-2));
+    color: var(--dc-unavail-color);
+    border-color: var(--dc-unavail-border);
+    opacity: 0.8;
     cursor: not-allowed;
 }
-
 .move-drawer-cell.merged {
-    background: linear-gradient(135deg, #cfe2ff, #b6d4fe);
-    border-color: #0d6efd;
+    background: linear-gradient(135deg, var(--dc-merged-bg-1), var(--dc-merged-bg-2));
+    border-color: var(--dc-merged-border);
     border-style: dashed;
-    color: #084298;
+    color: var(--dc-merged-color);
     font-size: 0.65rem;
 }
 
 .drawer-label {
     font-size: 0.75rem;
     font-weight: bold;
-    color: #666;
+    color: var(--dc-normal-color);
     margin-bottom: 4px;
 }
+.drawer-cell.unavailable .drawer-label { color: var(--dc-unavail-color); }
 
 .drawer-count {
     font-size: 0.9rem;
@@ -1142,6 +1207,19 @@ document.addEventListener('DOMContentLoaded', function() {
             highlightAndNavigateToDrawer(data.rackUuid, data.drawer, false);
         }, 500);
     }
+
+    // Group hover highlight for non-rectangular merged cells
+    document.querySelectorAll('.drawer-cell[data-group-master]').forEach(cell => {
+        const master = cell.dataset.groupMaster;
+        cell.addEventListener('mouseenter', () => {
+            document.querySelectorAll(`.drawer-cell[data-group-master="${master}"]`)
+                .forEach(el => el.classList.add('group-highlight'));
+        });
+        cell.addEventListener('mouseleave', () => {
+            document.querySelectorAll(`.drawer-cell[data-group-master="${master}"]`)
+                .forEach(el => el.classList.remove('group-highlight'));
+        });
+    });
 });
 </script>
 {% endblock %}
