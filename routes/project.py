@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 project_bp = Blueprint('project', __name__)
 
 _SAFE_PROJECT_ID_RE = re.compile(r'^[A-Za-z0-9._-]+$')
-_ALLOWED_ATTACHMENT_TYPES = {'picture', 'document', 'schematic', '2d_design', '3d_design'}
+_ALLOWED_ATTACHMENT_TYPES = {'picture', 'document', 'schematic', '2d_design', '3d_design', 'program'}
 
 
 # ==================== HELPERS ====================
@@ -34,6 +34,7 @@ def get_project_file_settings(attachment_type):
         'schematic': ('pdf,zip', '20'),
         '2d_design': ('pdf,zip', '20'),
         '3d_design': ('pdf,zip,stl,step', '50'),
+        'program': ('zip,txt,cpp,py', '10'),
     }
     default_ext, default_size = defaults.get(attachment_type, ('pdf,zip', '10'))
     ext_str = Setting.get(f'project_upload_{attachment_type}_extensions', default_ext)
@@ -246,7 +247,7 @@ def project_detail(project_id):
 
     # Attachments by type
     attachments = {}
-    for atype in ['picture', 'document', 'schematic', '2d_design', '3d_design']:
+    for atype in ['picture', 'document', 'schematic', '2d_design', '3d_design', 'program']:
         attachments[atype] = ProjectAttachment.query.filter_by(project_id=project.id, attachment_type=atype).all()
 
     can_edit = current_user.has_permission('projects', 'edit')
@@ -315,7 +316,7 @@ def project_edit(project_id):
     return render_template('project_form.html', title='Edit Project', project=project,
                            categories=categories, tags=tags, statuses=statuses, users=users, groups=groups,
                            bom_items=ProjectBOMItem.query.filter_by(project_id=project.id).all(),
-                           attachments={atype: ProjectAttachment.query.filter_by(project_id=project.id, attachment_type=atype).all() for atype in ['picture', 'document', 'schematic', '2d_design', '3d_design']},
+                           attachments={atype: ProjectAttachment.query.filter_by(project_id=project.id, attachment_type=atype).all() for atype in ['picture', 'document', 'schematic', '2d_design', '3d_design', 'program']},
                            currency=Setting.get('currency', 'USD'),
                            currency_decimal=int(Setting.get('currency_decimal_places', '2')))
 
@@ -523,7 +524,7 @@ def project_upload(project_id, attachment_type):
         flash('No permission.', 'danger')
         return redirect(url_for('project.project_detail', project_id=project_id))
 
-    valid_types = ['picture', 'document', 'schematic', '2d_design', '3d_design']
+    valid_types = ['picture', 'document', 'schematic', '2d_design', '3d_design', 'program']
     if attachment_type not in valid_types:
         flash('Invalid attachment type.', 'danger')
         return redirect(url_for('project.project_detail', project_id=project_id))
