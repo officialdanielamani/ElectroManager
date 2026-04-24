@@ -146,17 +146,27 @@
                     {% set drawer_id = "R%d-C%d"|format(row + 1, col + 1) %}
                     {% if drawer_id not in rack.skip_cells %}
                     {% set span = rack.cell_spans.get(drawer_id) %}
-                    {% set drawer_data = rack.drawers.get(drawer_id) %}
-                    {% set is_unavailable = drawer_id in rack.unavailable_drawers %}
+                    {% set grp = rack.group_cells.get(drawer_id) if rack.group_cells is defined else None %}
+                    {% set is_slave = grp and grp.role == 'slave' %}
+                    {% set effective_id = grp.master if is_slave else drawer_id %}
+                    {% set drawer_data = rack.drawers.get(effective_id) %}
+                    {% set is_unavailable = effective_id in rack.unavailable_drawers %}
                     {% set entry_count = (drawer_data['items']|length + drawer_data['batches']|length) if drawer_data else 0 %}
-                    <div class="drawer-cell {% if is_unavailable %}unavailable{% elif entry_count %}has-items{% else %}empty{% endif %}{% if span %} merged-cell{% endif %}"
+                    <div class="drawer-cell {% if is_unavailable %}unavailable{% elif entry_count %}has-items{% else %}empty{% endif %}{% if span %} merged-cell{% elif grp %} group-cell group-{{ grp.role }}{% endif %}"
                          data-drawer="{{ drawer_id }}"
                          data-rack="{{ rack.uuid }}"
                          {% if span %}style="grid-row: span {{ span.rowspan }}; grid-column: span {{ span.colspan }};"{% endif %}
-                         onclick="openDrawer('{{ rack.name }}', '{{ drawer_id }}', '{{ rack.uuid }}')">
-                        <div class="drawer-label">{{ drawer_id }}{% if span %} <span class="merged-badge">{{ span.rowspan }}×{{ span.colspan }}</span>{% endif %}</div>
+                         onclick="openDrawer('{{ rack.name }}', '{{ effective_id }}', '{{ rack.uuid }}')">
+                        <div class="drawer-label">
+                            {{ drawer_id }}
+                            {% if span %}<span class="merged-badge">{{ span.rowspan }}×{{ span.colspan }}</span>{% endif %}
+                            {% if grp and grp.role == 'master' %}<span class="merged-badge">{{ grp.count }} cells</span>{% endif %}
+                            {% if is_slave %}<span class="merged-badge text-muted">→{{ grp.master }}</span>{% endif %}
+                        </div>
                         <div class="drawer-count">
-                            {% if is_unavailable and entry_count %}
+                            {% if is_slave %}
+                            <span class="text-muted" style="font-size:0.7rem;">part of group</span>
+                            {% elif is_unavailable and entry_count %}
                             <span class="badge bg-secondary">Unavailable</span>
                             <span class="badge bg-info mt-1">{{ entry_count }}</span>
                             {% elif is_unavailable %}
@@ -371,6 +381,21 @@
     border-width: 2px;
     border-style: dashed;
     background: linear-gradient(145deg, #cfe2ff, #b6d4fe);
+}
+
+.drawer-cell.group-cell.group-master {
+    border-color: #0dcaf0;
+    border-width: 2px;
+    border-style: dashed;
+    background: linear-gradient(145deg, #cff4fc, #9eeaf9);
+}
+
+.drawer-cell.group-cell.group-slave {
+    border-color: #6c757d;
+    border-width: 2px;
+    border-style: dashed;
+    background: linear-gradient(145deg, #e9ecef, #dee2e6);
+    opacity: 0.8;
 }
 
 .merged-badge {

@@ -166,7 +166,7 @@
             <div class="card-body">
                 <div class="alert alert-info py-2 small mb-3">
                     <i class="bi bi-info-circle"></i>
-                    <strong>How to merge:</strong> Click cells to select them (they must form a rectangle), then click <strong>Merge Selected</strong>.
+                    <strong>How to merge:</strong> Click cells to select them (they must all be connected/adjacent — any shape), then click <strong>Merge Selected</strong>.
                     Items are stored in the top-left master cell. Click a merged cell then <strong>Split</strong> to undo.
                 </div>
 
@@ -186,15 +186,17 @@
                 <!-- Rack grid preview -->
                 <div id="layoutGrid" class="layout-grid"
                      style="display:grid; grid-template-columns: repeat({{ rack.cols }}, minmax(0, 1fr)); gap:6px; max-width: {{ rack.cols * 86 }}px;">
-                    {% set skip_cells, cell_spans = rack.compute_merge_layout() %}
+                    {% set skip_cells, cell_spans, group_cells = rack.compute_merge_layout() %}
                     {% for row in range(rack.rows) %}
                     {% for col in range(rack.cols) %}
                     {% set drawer_id = "R%d-C%d"|format(row + 1, col + 1) %}
                     {% if drawer_id not in skip_cells %}
                     {% set span = cell_spans.get(drawer_id) %}
-                    <div class="layout-cell {% if span %}merged{% endif %}"
+                    {% set grp = group_cells.get(drawer_id) %}
+                    <div class="layout-cell {% if span %}merged{% elif grp %}group-{{ grp.role }}{% endif %}"
                          data-drawer="{{ drawer_id }}"
-                         data-is-merged="{{ 'true' if span else 'false' }}"
+                         data-is-merged="{{ 'true' if (span or (grp and grp.role == 'master')) else 'false' }}"
+                         {% if grp and grp.role == 'slave' %}data-group-master="{{ grp.master }}"{% endif %}
                          {% if span %}
                          style="grid-row: span {{ span.rowspan }}; grid-column: span {{ span.colspan }};"
                          data-rowspan="{{ span.rowspan }}"
@@ -206,6 +208,14 @@
                         <div class="layout-cell-badge">
                             <span class="badge bg-primary" style="font-size:0.6rem;">{{ span.rowspan }}×{{ span.colspan }}</span>
                         </div>
+                        {% elif grp %}
+                        <div class="layout-cell-badge">
+                            {% if grp.role == 'master' %}
+                            <span class="badge bg-info" style="font-size:0.6rem;">{{ grp.count }} cells</span>
+                            {% else %}
+                            <span class="badge bg-secondary" style="font-size:0.6rem;">→ {{ grp.master }}</span>
+                            {% endif %}
+                        </div>
                         {% endif %}
                     </div>
                     {% endif %}
@@ -216,7 +226,9 @@
                 <div class="mt-3">
                     <small class="text-muted">
                         <span class="badge bg-light border text-dark me-1">&nbsp;&nbsp;&nbsp;</span> Normal cell &nbsp;
-                        <span class="badge bg-primary me-1">&nbsp;&nbsp;&nbsp;</span> Merged cell &nbsp;
+                        <span class="badge bg-primary me-1">&nbsp;&nbsp;&nbsp;</span> Merged (rect) &nbsp;
+                        <span class="badge bg-info me-1">&nbsp;&nbsp;&nbsp;</span> Merged master &nbsp;
+                        <span class="badge bg-secondary me-1">&nbsp;&nbsp;&nbsp;</span> Merged slave &nbsp;
                         <span class="badge bg-success me-1">&nbsp;&nbsp;&nbsp;</span> Selected
                     </small>
                 </div>
@@ -264,6 +276,25 @@
     background: #fff3cd;
     color: #664d03;
 }
+.layout-cell.group-master {
+    background: linear-gradient(135deg, #cff4fc, #9eeaf9);
+    border-color: #0dcaf0;
+    color: #055160;
+}
+.layout-cell.group-master:hover {
+    background: linear-gradient(135deg, #9eeaf9, #6edff6);
+}
+.layout-cell.group-slave {
+    background: #e2e3e5;
+    border-color: #6c757d;
+    border-style: dashed;
+    color: #41464b;
+    cursor: pointer;
+}
+.layout-cell.group-slave:hover {
+    background: #d3d3d3;
+    border-color: #495057;
+}
 .layout-cell-label {
     font-size: 0.72rem;
     font-weight: 700;
@@ -290,20 +321,52 @@ const RACK_UUID = '{{ rack.uuid }}';
 let selectedCells = new Set();
 let splitTarget = null;
 
+function parseCell(id) {
+    const parts = id.slice(1).split('-C');
+    return [parseInt(parts[0]), parseInt(parts[1])];
+}
+
+function cellsConnected(cells) {
+    if (cells.length <= 1) return true;
+    const cellSet = new Set(cells);
+    const visited = new Set();
+    const queue = [cells[0]];
+    visited.add(cells[0]);
+    while (queue.length) {
+        const curr = queue.pop();
+        const [r, c] = parseCell(curr);
+        for (const [dr, dc] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+            const nb = `R${r+dr}-C${c+dc}`;
+            if (cellSet.has(nb) && !visited.has(nb)) {
+                visited.add(nb);
+                queue.push(nb);
+            }
+        }
+    }
+    return visited.size === cells.length;
+}
+
 function layoutCellClick(cell) {
     const drawerId = cell.dataset.drawer;
     const isMerged = cell.dataset.isMerged === 'true';
+    // Slave cells of a non-rectangular group redirect to master for split
+    const groupMaster = cell.dataset.groupMaster || null;
 
-    // If clicking a merged cell: enter split mode
-    if (isMerged) {
-        // Clear any selection first
+    // If clicking a merged master cell or a group-slave: enter split mode
+    if (isMerged || groupMaster) {
         clearLayoutSelection();
-        splitTarget = drawerId;
+        splitTarget = groupMaster || drawerId;
         document.querySelectorAll('.layout-cell').forEach(c => c.classList.remove('split-target'));
-        cell.classList.add('split-target');
+        // Highlight all cells belonging to this merge group
+        document.querySelectorAll('.layout-cell').forEach(c => {
+            const m = c.dataset.groupMaster;
+            if (c.dataset.drawer === splitTarget || m === splitTarget) {
+                c.classList.add('split-target');
+            }
+        });
         document.getElementById('btnSplit').style.display = 'inline-block';
         document.getElementById('btnMerge').disabled = true;
-        document.getElementById('layoutStatus').textContent = `Selected merged cell ${drawerId} — click Split to undo merge`;
+        document.getElementById('layoutStatus').textContent = `Selected merge group (master: ${splitTarget}) — click Split to undo`;
         return;
     }
 
@@ -334,19 +397,12 @@ function updateMergeButton() {
         return;
     }
 
-    // Check rectangle
-    const rows = cells.map(c => parseInt(c.split('-')[0].replace('R', '')));
-    const cols = cells.map(c => parseInt(c.split('-')[1].replace('C', '')));
-    const minR = Math.min(...rows), maxR = Math.max(...rows);
-    const minC = Math.min(...cols), maxC = Math.max(...cols);
-    const expected = (maxR - minR + 1) * (maxC - minC + 1);
-
-    if (cells.length === expected) {
+    if (cellsConnected(cells)) {
         btn.disabled = false;
-        status.textContent = `${cells.length} cells selected (${maxR-minR+1}×${maxC-minC+1}) — ready to merge`;
+        status.textContent = `${cells.length} cells selected — ready to merge`;
     } else {
         btn.disabled = true;
-        status.textContent = `${cells.length} cells selected — must form a rectangle`;
+        status.textContent = `${cells.length} cells selected — cells must be adjacent (connected)`;
     }
 }
 

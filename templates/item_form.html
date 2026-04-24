@@ -1175,21 +1175,28 @@
         const unavailableDrawers = rackData ? rackData.unavailable_drawers : [];
         const mergedGroups = rackData ? (rackData.merged_cells || []) : [];
 
-        // Build skip/span maps from merged cells
+        // Build skip/span/slave maps from merged cells
         const skipCells = new Set();
+        const slaveCells = new Set();
         const cellSpans = {};
         mergedGroups.forEach(group => {
             const master = group.master;
             const cells = group.cells || [];
-            const rowNums = cells.map(c => parseInt(c.split('-')[0].replace('R',''))).filter(Boolean);
-            const colNums = cells.map(c => parseInt(c.split('-')[1].replace('C',''))).filter(Boolean);
+            const rowNums = cells.map(c => parseInt(c.slice(1).split('-C')[0])).filter(n => !isNaN(n));
+            const colNums = cells.map(c => parseInt(c.slice(1).split('-C')[1])).filter(n => !isNaN(n));
             if (rowNums.length && colNums.length) {
-                cellSpans[master] = {
-                    rowspan: Math.max(...rowNums) - Math.min(...rowNums) + 1,
-                    colspan: Math.max(...colNums) - Math.min(...colNums) + 1,
-                };
+                const isRect = cells.length === (Math.max(...rowNums) - Math.min(...rowNums) + 1) *
+                                                (Math.max(...colNums) - Math.min(...colNums) + 1);
+                if (isRect) {
+                    cellSpans[master] = {
+                        rowspan: Math.max(...rowNums) - Math.min(...rowNums) + 1,
+                        colspan: Math.max(...colNums) - Math.min(...colNums) + 1,
+                    };
+                    cells.forEach(c => { if (c !== master) skipCells.add(c); });
+                } else {
+                    cells.forEach(c => { if (c !== master) slaveCells.add(c); });
+                }
             }
-            cells.forEach(c => { if (c !== master) skipCells.add(c); });
         });
 
         for (let r = 1; r <= rows; r++) {
@@ -1198,6 +1205,7 @@
                 if (skipCells.has(drawerId)) continue;
 
                 const isUnavailable = unavailableDrawers.includes(drawerId);
+                const isSlave = slaveCells.has(drawerId);
                 const span = cellSpans[drawerId];
                 const cell = document.createElement('div');
 
@@ -1211,7 +1219,10 @@
                     cell.style.height = `${span.rowspan * 40 + (span.rowspan - 1) * 4}px`;
                 }
 
-                if (isUnavailable) {
+                if (isSlave) {
+                    cell.classList.add('unavailable');
+                    cell.title = 'Part of a merged group — use the master cell';
+                } else if (isUnavailable) {
                     cell.classList.add('unavailable');
                     cell.title = 'This drawer is unavailable';
                 } else if (!canEditLocation) {
@@ -1222,7 +1233,7 @@
                 cell.textContent = drawerId;
                 if (drawerInput.value === drawerId) cell.classList.add('selected');
 
-                if (!isUnavailable) {
+                if (!isUnavailable && !isSlave) {
                     cell.addEventListener('click', function () {
                         if (!canEditLocation) return;
                         grid.querySelectorAll('.drawer-cell-picker').forEach(d => d.classList.remove('selected'));
@@ -2063,19 +2074,26 @@ function batchUpdateDrawerGrid(prefix) {
     var mergedGroups = rackData ? (rackData.merged_cells || []) : [];
 
     var skipCells = {};
+    var slaveCells = {};
     var cellSpans = {};
     mergedGroups.forEach(function(group) {
         var master = group.master;
         var cells = group.cells || [];
-        var rowNums = cells.map(function(c) { return parseInt(c.split('-')[0].replace('R','')); }).filter(Boolean);
-        var colNums = cells.map(function(c) { return parseInt(c.split('-')[1].replace('C','')); }).filter(Boolean);
+        var rowNums = cells.map(function(c) { var n = parseInt(c.slice(1).split('-C')[0]); return isNaN(n) ? null : n; }).filter(function(n) { return n !== null; });
+        var colNums = cells.map(function(c) { var n = parseInt(c.slice(1).split('-C')[1]); return isNaN(n) ? null : n; }).filter(function(n) { return n !== null; });
         if (rowNums.length && colNums.length) {
-            cellSpans[master] = {
-                rowspan: Math.max.apply(null, rowNums) - Math.min.apply(null, rowNums) + 1,
-                colspan: Math.max.apply(null, colNums) - Math.min.apply(null, colNums) + 1,
-            };
+            var isRect = cells.length === (Math.max.apply(null, rowNums) - Math.min.apply(null, rowNums) + 1) *
+                                          (Math.max.apply(null, colNums) - Math.min.apply(null, colNums) + 1);
+            if (isRect) {
+                cellSpans[master] = {
+                    rowspan: Math.max.apply(null, rowNums) - Math.min.apply(null, rowNums) + 1,
+                    colspan: Math.max.apply(null, colNums) - Math.min.apply(null, colNums) + 1,
+                };
+                cells.forEach(function(c) { if (c !== master) skipCells[c] = true; });
+            } else {
+                cells.forEach(function(c) { if (c !== master) slaveCells[c] = true; });
+            }
         }
-        cells.forEach(function(c) { if (c !== master) skipCells[c] = true; });
     });
 
     grid.innerHTML = '';
@@ -2086,6 +2104,7 @@ function batchUpdateDrawerGrid(prefix) {
         for (var c = 1; c <= cols; c++) {
             (function(drawerId) {
                 if (skipCells[drawerId]) return;
+                var isSlave = slaveCells[drawerId] || false;
                 var span = cellSpans[drawerId];
                 var cell = document.createElement('div');
                 cell.className = 'drawer-cell-picker';
@@ -2099,7 +2118,10 @@ function batchUpdateDrawerGrid(prefix) {
                     cell.style.height = (span.rowspan * 40 + (span.rowspan - 1) * 4) + 'px';
                 }
 
-                if (unavailable.indexOf(drawerId) !== -1) {
+                if (isSlave) {
+                    cell.classList.add('unavailable');
+                    cell.title = 'Part of a merged group — use the master cell';
+                } else if (unavailable.indexOf(drawerId) !== -1) {
                     cell.classList.add('unavailable');
                     cell.title = 'This drawer is unavailable';
                 } else {

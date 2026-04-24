@@ -111,7 +111,7 @@ def visual_storage():
                 if not entry['preview_image']:
                     entry['preview_image'] = _first_image_url(batch.item)
 
-        skip_cells, cell_spans = rack.compute_merge_layout()
+        skip_cells, cell_spans, group_cells = rack.compute_merge_layout()
         rack_data.append({
             'id': rack.id,
             'uuid': rack.uuid,
@@ -126,6 +126,7 @@ def visual_storage():
             'merged_cells': rack.get_merged_cells(),
             'skip_cells': list(skip_cells),
             'cell_spans': cell_spans,
+            'group_cells': group_cells,
         })
     
     # For the dropdown, show all racks for location selection, but filtered by current location for rack selection
@@ -286,11 +287,41 @@ def move_drawer_items():
         logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': 'An error occurred while moving drawer items.'})
 
+def _parse_cell(cell):
+    """Parse 'R{row}-C{col}' → (row, col) ints. Raises ValueError on bad input."""
+    parts = cell[1:].split('-C')
+    return int(parts[0]), int(parts[1])
+
+
+def _cells_connected(cells):
+    """Return True if all cells form a single connected (4-adjacency) component."""
+    if len(cells) <= 1:
+        return True
+    cell_set = set(cells)
+    parsed = {}
+    for c in cells:
+        try:
+            parsed[c] = _parse_cell(c)
+        except (ValueError, IndexError):
+            return False
+    visited = {cells[0]}
+    queue = [cells[0]]
+    while queue:
+        curr = queue.pop()
+        r, col = parsed[curr]
+        for dr, dc in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+            nb = f'R{r + dr}-C{col + dc}'
+            if nb in cell_set and nb not in visited:
+                visited.add(nb)
+                queue.append(nb)
+    return len(visited) == len(cells)
+
+
 @visual_storage_bp.route('/api/rack/<string:rack_uuid>/merge-cells', methods=['POST'])
 @login_required
 @permission_required("settings_sections.location_management", "edit")
 def merge_rack_cells(rack_uuid):
-    """Merge a rectangular selection of cells into one logical cell."""
+    """Merge a connected selection of cells into one logical cell."""
     rack = Rack.query.filter_by(uuid=rack_uuid).first_or_404()
     data = request.get_json()
     cells = data.get('cells', [])
@@ -298,20 +329,19 @@ def merge_rack_cells(rack_uuid):
     if len(cells) < 2:
         return jsonify({'success': False, 'error': 'Select at least 2 cells to merge'})
 
-    rows_set, cols_set = set(), set()
+    cell_coords = []
+    max_row, max_col = 0, 0
     for cell in cells:
         try:
-            parts = cell.replace('R', '').replace('C', '-').split('-')
-            rows_set.add(int(parts[0]))
-            cols_set.add(int(parts[1]))
+            r, c = _parse_cell(cell)
+            cell_coords.append((r, c, cell))
+            max_row = max(max_row, r)
+            max_col = max(max_col, c)
         except (ValueError, IndexError):
             return jsonify({'success': False, 'error': f'Invalid cell ID: {cell}'})
 
-    min_row, max_row = min(rows_set), max(rows_set)
-    min_col, max_col = min(cols_set), max(cols_set)
-
-    if len(cells) != (max_row - min_row + 1) * (max_col - min_col + 1):
-        return jsonify({'success': False, 'error': 'Selected cells must form a rectangle'})
+    if not _cells_connected(cells):
+        return jsonify({'success': False, 'error': 'Selected cells must all be adjacent to each other'})
 
     if max_row > rack.rows or max_col > rack.cols:
         return jsonify({'success': False, 'error': 'Cells are outside rack bounds'})
@@ -326,7 +356,10 @@ def merge_rack_cells(rack_uuid):
         if cell in occupied:
             return jsonify({'success': False, 'error': f'Cell {cell} is already part of a merge group'})
 
-    master = f'R{min_row}-C{min_col}'
+    # Master = top-left selected cell (min row, then min col)
+    cell_coords.sort(key=lambda x: (x[0], x[1]))
+    master = cell_coords[0][2]
+
     existing.append({'master': master, 'cells': cells})
     rack.merged_cells = json.dumps(existing)
     db.session.commit()
