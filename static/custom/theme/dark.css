@@ -16,6 +16,52 @@
 body {
     background-color: #1a1a1a;
     color: #e0e0e0;
+    /* Bootstrap semantic variable overrides for dark mode */
+    --bs-body-bg: #1a1a1a;
+    --bs-body-color: #e0e0e0;
+    --bs-secondary-bg: #3d3d3d;
+    --bs-tertiary-bg: #3d3d3d;
+    --bs-border-color: #4d4d4d;
+    --bs-secondary-border-subtle: #4d4d4d;
+    --bs-primary-bg-subtle: #0a1f3d;
+    --bs-success-bg-subtle: #051b11;
+    --bs-info-bg-subtle: #032830;
+    --bs-warning-bg-subtle: #332701;
+    --bs-danger-bg-subtle: #2c0b0e;
+    --bs-secondary-color: #9a9a9a;
+    /* Drawer cell token overrides for dark mode */
+    --dc-normal-bg: #3d3d3d;
+    --dc-normal-border: #4d4d4d;
+    --dc-normal-color: #e0e0e0;
+    --dc-items-bg-1: #0d3520;
+    --dc-items-bg-2: #0a2a18;
+    --dc-items-border: #198754;
+    --dc-items-color: #75b798;
+    --dc-merged-bg-1: #0a1f3d;
+    --dc-merged-bg-2: #0d2a52;
+    --dc-merged-border: #3d8bfd;
+    --dc-merged-color: #9ec5fe;
+    --dc-gmaster-bg-1: #032830;
+    --dc-gmaster-bg-2: #053740;
+    --dc-gmaster-border: #0dcaf0;
+    --dc-gmaster-color: #6edff6;
+    --dc-gslave-bg: #2d2d2d;
+    --dc-gslave-border: #4d4d4d;
+    --dc-gslave-color: #9a9a9a;
+    --dc-ghover-bg-1: #053740;
+    --dc-ghover-bg-2: #075060;
+    --dc-ghover-border: #0dcaf0;
+    --dc-unavail-bg-1: #3d1a00;
+    --dc-unavail-bg-2: #4d2200;
+    --dc-unavail-border: #fd7e14;
+    --dc-unavail-color: #ffa96b;
+    --dc-search-bg-1: #332701;
+    --dc-search-bg-2: #443300;
+    --dc-search-border: #ffc107;
+    --dc-search-glow: rgba(255, 193, 7, 0.4);
+    --dc-split-bg: #332701;
+    --dc-split-border: #ffc107;
+    --dc-split-color: #ffe08a;
 }
 
 /* Fix text-secondary and text-muted contrast for dark theme */

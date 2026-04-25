@@ -16,4 +16,5 @@
 body {
     background-color: #ffffff;
     color: #212529;
+    --bs-tertiary-bg: #f8f9fa;
 }

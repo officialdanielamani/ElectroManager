@@ -17,6 +17,15 @@ body {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     background-attachment: fixed;
     color: #ffffff;
+    /* Bootstrap semantic variable overrides for blue theme */
+    --bs-tertiary-bg: rgba(255, 255, 255, 0.85);
+    --bs-secondary-bg: rgba(255, 255, 255, 0.9);
+    --bs-border-color: rgba(102, 126, 234, 0.3);
+    --bs-body-color: #000;
+    /* Drawer cell token overrides for blue theme */
+    --dc-normal-bg: rgba(255, 255, 255, 0.85);
+    --dc-normal-border: rgba(102, 126, 234, 0.4);
+    --dc-normal-color: #212529;
 }
 
 /* Fix text-secondary and text-muted contrast for blue theme */
