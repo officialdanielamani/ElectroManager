@@ -686,6 +686,12 @@ class MagicParameter(db.Model):
     number_step = db.Column(db.Float)
     number_decimal_places = db.Column(db.Integer, default=0)
     number_required = db.Column(db.Boolean, default=False)
+    # String-type specific fields
+    string_select_min = db.Column(db.Integer, default=0)
+    string_select_max = db.Column(db.Integer, default=1)
+    string_allow_custom = db.Column(db.Boolean, default=False)
+    string_regex = db.Column(db.String(500))
+    string_regex_info = db.Column(db.String(200))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     units = db.relationship('ParameterUnit', backref='parameter', lazy=True, cascade='all, delete-orphan')
@@ -701,7 +707,29 @@ class MagicParameter(db.Model):
         if self.param_type == 'string':
             return [option.value for option in self.string_options]
         return []
-    
+
+    def validate_string_selections(self, selected_values, custom_values):
+        """Validate selected + custom values against min/max and regex. Returns (ok, error_msg)."""
+        import re as _re
+        total = len(selected_values) + len(custom_values)
+        min_sel = self.string_select_min or 0
+        max_sel = self.string_select_max if self.string_select_max is not None else 1
+        if total < min_sel:
+            return False, f"You must select at least {min_sel} option(s)"
+        if total > max_sel:
+            return False, f"You can select at most {max_sel} option(s)"
+        if custom_values and not self.string_allow_custom:
+            return False, "Custom input is not allowed for this parameter"
+        if self.string_regex and custom_values:
+            pattern = self.string_regex.strip()
+            for val in custom_values:
+                try:
+                    if not _re.fullmatch(pattern, val):
+                        return False, f"'{val}' does not match the required format"
+                except _re.error:
+                    return False, "Invalid regex pattern configured for this parameter"
+        return True, None
+
     def validate_number_value(self, value, is_range_start=False):
         if self.param_type != 'number':
             return True, None
@@ -760,6 +788,18 @@ class ParameterStringOption(db.Model):
         return f'<ParameterStringOption {self.value}>'
 
 
+class ItemParameterStringValue(db.Model):
+    """Stores selected/custom string values for an ItemParameter (supports multi-select)."""
+    __tablename__ = 'item_parameter_string_values'
+    id = db.Column(db.Integer, primary_key=True)
+    item_parameter_id = db.Column(db.Integer, db.ForeignKey('item_parameters.id'), nullable=False)
+    value = db.Column(db.String(200), nullable=False)
+    is_custom = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    def __repr__(self):
+        return f'<ItemParameterStringValue {self.value} custom={self.is_custom}>'
+
+
 class ItemParameter(db.Model):
     __tablename__ = 'item_parameters'
     id = db.Column(db.Integer, primary_key=True)
@@ -774,7 +814,14 @@ class ItemParameter(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     item = db.relationship('Item', backref=db.backref('magic_parameters', cascade='all, delete-orphan', lazy=True))
-    
+    string_values = db.relationship('ItemParameterStringValue', backref='item_parameter', lazy=True, cascade='all, delete-orphan')
+
+    def get_selected_string_values(self):
+        """Return (predefined_list, custom_list) for string-type parameters."""
+        predefined = [sv.value for sv in self.string_values if not sv.is_custom]
+        custom = [sv.value for sv in self.string_values if sv.is_custom]
+        return predefined, custom
+
     def get_display_text(self):
         param = self.parameter
         if not param:
@@ -798,9 +845,15 @@ class ItemParameter(db.Model):
             else:
                 return f"{param.name} on {self.value} {self.description or ''}".strip()
         elif param.param_type == 'string':
-            return f"{param.name}: {self.string_option} {self.description or ''}".strip()
+            predefined, custom = self.get_selected_string_values()
+            all_vals = predefined + [f"{v} (custom)" for v in custom]
+            if all_vals:
+                return f"{param.name}: {', '.join(all_vals)} {self.description or ''}".strip()
+            if self.string_option:
+                return f"{param.name}: {self.string_option} {self.description or ''}".strip()
+            return f"{param.name}: (none selected) {self.description or ''}".strip()
         return "Invalid Parameter"
-    
+
     def check_notification(self):
         if self.parameter.param_type == 'date' and self.parameter.notify_enabled:
             from datetime import datetime

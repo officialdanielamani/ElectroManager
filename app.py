@@ -233,6 +233,30 @@ with app.app_context():
     except Exception:
         pass
 
+# Add string-parameter columns to magic_parameters table (migration for existing DBs)
+with app.app_context():
+    try:
+        from sqlalchemy import text, inspect as sa_inspect
+        inspector = sa_inspect(db.engine)
+        mp_columns = [c['name'] for c in inspector.get_columns('magic_parameters')]
+        with db.engine.connect() as conn:
+            if 'string_select_min' not in mp_columns:
+                conn.execute(text("ALTER TABLE magic_parameters ADD COLUMN string_select_min INTEGER DEFAULT 0"))
+            if 'string_select_max' not in mp_columns:
+                conn.execute(text("ALTER TABLE magic_parameters ADD COLUMN string_select_max INTEGER DEFAULT 1"))
+            if 'string_allow_custom' not in mp_columns:
+                conn.execute(text("ALTER TABLE magic_parameters ADD COLUMN string_allow_custom BOOLEAN DEFAULT 0"))
+            if 'string_regex' not in mp_columns:
+                conn.execute(text("ALTER TABLE magic_parameters ADD COLUMN string_regex VARCHAR(500)"))
+            if 'string_regex_info' not in mp_columns:
+                conn.execute(text("ALTER TABLE magic_parameters ADD COLUMN string_regex_info VARCHAR(200)"))
+            conn.commit()
+        # Ensure the new item_parameter_string_values table exists
+        from models import ItemParameterStringValue
+        db.create_all()
+    except Exception:
+        pass
+
 
 if __name__ == '__main__':
     with app.app_context():

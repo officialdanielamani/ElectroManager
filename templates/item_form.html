@@ -1736,7 +1736,7 @@
 <div class="modal fade" id="addParameterModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <form method="POST" action="{{ url_for('item.item_add_parameter', id=item.id) }}">
+            <form method="POST" action="{{ url_for('item.item_add_parameter', id=item.id) }}" id="addParameterForm">
                 <div class="modal-header">
                     <h5 class="modal-title">Add Magic Parameter</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -1793,11 +1793,31 @@
 
                     <div id="number_constraints_info" style="display: none;"></div>
 
-                    <div class="mb-3" id="string_option_group" style="display: none;">
-                        <label class="form-label">Option</label>
-                        <select name="string_option" id="modal_string_option" class="form-select">
-                            <option value="">-- Select Option --</option>
-                        </select>
+                    <div id="string_option_group" style="display: none;">
+                        <div class="alert alert-info py-2 mb-2 small" id="string_selection_info"></div>
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold">Options</label>
+                            <div class="border rounded p-2" id="modal_string_options_box"></div>
+                            <small class="text-danger" id="modal_selection_count_error" style="display:none"></small>
+                        </div>
+                        <div id="modal_custom_section" style="display:none">
+                            <div class="mb-2 border rounded p-2 bg-light">
+                                <label class="form-label fw-semibold"><i class="bi bi-pencil-square"></i> Custom Value</label>
+                                <div id="modal_regex_info_block" class="alert alert-secondary py-1 mb-1 small" style="display:none"></div>
+                                <div class="input-group">
+                                    <input type="text" id="modal_custom_value_input" class="form-control" maxlength="200"
+                                           placeholder="Enter custom value (max 200 chars)"
+                                           oninput="modalValidateSelectionCount()">
+                                    <button type="button" class="btn btn-outline-secondary" id="modal_validate_btn"
+                                            onclick="modalValidateCustomInput()" style="display:none">
+                                        <i class="bi bi-check-circle"></i> Validate
+                                    </button>
+                                </div>
+                                <small class="text-muted">Max 200 characters.</small>
+                                <div id="modal_custom_validate_msg" class="mt-1" style="display:none"></div>
+                            </div>
+                        </div>
+                        <input type="hidden" name="string_custom_value" id="modal_string_custom_value">
                     </div>
 
                     <div class="mb-3">
@@ -1897,21 +1917,55 @@
             <option value="duration">Duration</option>
         `;
         } else if (paramType === 'string') {
-            // Show string options
             document.getElementById('number_constraints_info').style.display = 'none';
             fetch(`/api/magic-parameters/string`)
                 .then(response => response.json())
                 .then(data => {
                     const param = data.find(p => p.id == parameterId);
-                    if (param && param.options) {
-                        const optionSelect = document.getElementById('modal_string_option');
-                        optionSelect.innerHTML = '<option value="">-- Select Option --</option>';
-                        param.options.forEach(opt => {
-                            const option = new Option(opt, opt);
-                            optionSelect.add(option);
+                    if (!param) return;
+
+                    // Store string param config for validation
+                    window._strParam = param;
+
+                    // Selection info
+                    const infoEl = document.getElementById('string_selection_info');
+                    infoEl.textContent = `Select ${param.string_select_min} to ${param.string_select_max} option(s).`;
+
+                    // Build checkboxes
+                    const box = document.getElementById('modal_string_options_box');
+                    box.innerHTML = '';
+                    if (param.options && param.options.length > 0) {
+                        param.options.forEach((opt, i) => {
+                            const div = document.createElement('div');
+                            div.className = 'form-check';
+                            div.innerHTML = `<input type="checkbox" class="form-check-input modal-string-opt-check"
+                                name="string_options" value="${opt}" id="mopt_${i}"
+                                onchange="modalValidateSelectionCount()">
+                                <label class="form-check-label" for="mopt_${i}">${opt}</label>`;
+                            box.appendChild(div);
                         });
-                        document.getElementById('string_option_group').style.display = 'block';
+                    } else {
+                        box.innerHTML = '<span class="text-muted">No predefined options.</span>';
                     }
+
+                    // Custom section
+                    const customSection = document.getElementById('modal_custom_section');
+                    if (param.string_allow_custom) {
+                        customSection.style.display = 'block';
+                        const regexInfoBlock = document.getElementById('modal_regex_info_block');
+                        if (param.string_regex_info) {
+                            regexInfoBlock.textContent = param.string_regex_info;
+                            regexInfoBlock.style.display = 'block';
+                        } else {
+                            regexInfoBlock.style.display = 'none';
+                        }
+                        const validateBtn = document.getElementById('modal_validate_btn');
+                        validateBtn.style.display = param.string_regex ? 'block' : 'none';
+                    } else {
+                        customSection.style.display = 'none';
+                    }
+
+                    document.getElementById('string_option_group').style.display = 'block';
                 });
         }
     }
@@ -2008,6 +2062,95 @@
             }
         }
     }
+
+    function modalGetStringSelectionCount() {
+        const checks = document.querySelectorAll('.modal-string-opt-check:checked');
+        const customInput = document.getElementById('modal_custom_value_input');
+        let customCount = 0;
+        if (customInput && customInput.value.trim()) customCount = 1;
+        return checks.length + customCount;
+    }
+
+    function modalValidateSelectionCount() {
+        if (!window._strParam) return true;
+        const total = modalGetStringSelectionCount();
+        const errEl = document.getElementById('modal_selection_count_error');
+        if (!errEl) return true;
+        if (total < window._strParam.string_select_min) {
+            errEl.textContent = `Select at least ${window._strParam.string_select_min} option(s). Currently: ${total}`;
+            errEl.style.display = 'block';
+            return false;
+        }
+        if (total > window._strParam.string_select_max) {
+            errEl.textContent = `Select at most ${window._strParam.string_select_max} option(s). Currently: ${total}`;
+            errEl.style.display = 'block';
+            return false;
+        }
+        errEl.style.display = 'none';
+        return true;
+    }
+
+    function modalValidateCustomInput() {
+        if (!window._strParam) return true;
+        const input = document.getElementById('modal_custom_value_input');
+        const msgEl = document.getElementById('modal_custom_validate_msg');
+        if (!input || !msgEl) return true;
+        const val = input.value.trim();
+        if (!val) {
+            msgEl.innerHTML = '<span class="text-muted">Nothing to validate.</span>';
+            msgEl.style.display = 'block';
+            return true;
+        }
+        if (val.length > 200) {
+            msgEl.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Value too long (max 200 characters).</span>';
+            msgEl.style.display = 'block';
+            return false;
+        }
+        const regex = window._strParam.string_regex;
+        if (regex) {
+            try {
+                const re = new RegExp('^(?:' + regex + ')$');
+                if (!re.test(val)) {
+                    msgEl.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Does not match required format.</span>';
+                    msgEl.style.display = 'block';
+                    return false;
+                }
+            } catch(e) {
+                msgEl.innerHTML = '<span class="text-warning"><i class="bi bi-exclamation-triangle"></i> Regex check unavailable in browser.</span>';
+                msgEl.style.display = 'block';
+            }
+        }
+        msgEl.innerHTML = '<span class="text-success"><i class="bi bi-check-circle"></i> Valid!</span>';
+        msgEl.style.display = 'block';
+        return true;
+    }
+
+    // Hook Add Parameter form submit for string validation
+    document.addEventListener('DOMContentLoaded', function() {
+        const addParamForm = document.getElementById('addParameterForm');
+        if (!addParamForm) return;
+        addParamForm.addEventListener('submit', function(e) {
+            const paramType = document.getElementById('modal_param_type');
+            if (!paramType || paramType.value !== 'string') return;
+            // Sync custom value hidden field
+            const customInput = document.getElementById('modal_custom_value_input');
+            const hiddenField = document.getElementById('modal_string_custom_value');
+            if (customInput && hiddenField) {
+                hiddenField.value = customInput.value.trim();
+            }
+            // Validate custom input if filled
+            if (customInput && customInput.value.trim()) {
+                if (!modalValidateCustomInput()) {
+                    e.preventDefault();
+                    return false;
+                }
+            }
+            if (!modalValidateSelectionCount()) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    });
 </script>
 {% endif %}
 
