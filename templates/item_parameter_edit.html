@@ -264,6 +264,12 @@ function validateCustomInput() {
         msgEl.style.display = 'block';
         return false;
     }
+    const predefinedValues = Array.from(document.querySelectorAll('.string-option-check')).map(cb => cb.value);
+    if (predefinedValues.includes(val)) {
+        msgEl.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Already a predefined option — select it from the list instead.</span>';
+        msgEl.style.display = 'block';
+        return false;
+    }
     if (paramConstraints.strRegex) {
         try {
             const re = new RegExp('^(?:' + paramConstraints.strRegex + ')$');

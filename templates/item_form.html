@@ -2116,6 +2116,12 @@
             msgEl.style.display = 'block';
             return false;
         }
+        const predefinedValues = Array.from(document.querySelectorAll('#modal_string_options_box input[type="checkbox"]')).map(cb => cb.value);
+        if (predefinedValues.includes(val)) {
+            msgEl.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Already a predefined option — select it from the list instead.</span>';
+            msgEl.style.display = 'block';
+            return false;
+        }
         const regex = window._strParam.string_regex;
         if (regex) {
             try {

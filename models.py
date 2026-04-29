@@ -721,6 +721,10 @@ class MagicParameter(db.Model):
             return False, f"You can select at most {max_sel} option(s)"
         if custom_values and not self.string_allow_custom:
             return False, "Custom input is not allowed for this parameter"
+        predefined_values = [opt.value for opt in self.string_options]
+        for cv in custom_values:
+            if cv in predefined_values:
+                return False, f"'{cv}' is already a predefined option — select it from the list instead"
         if self.string_regex and custom_values:
             pattern = self.string_regex.strip()
             for val in custom_values:
