@@ -433,140 +433,85 @@ def generate_barcode_svg(data, format_type, width, height, show_label=False):
         return placeholder
 
 def generate_icon_svg(icon_name, icon_size, icon_color, container_width, container_height):
-    """Generate icon as actual SVG <path> extracted from the Bootstrap Icons font.
-
-    Extracting the glyph outline as an SVG path works everywhere: browser
-    preview, PDF, SVG download, PNG export.
+    """Generate an icon SVG fragment by embedding the Bootstrap Icons font and rendering
+    the glyph as a <text> element.  Works in browser preview, SVG/PNG download, and
+    WeasyPrint PDF without requiring fontTools.
     """
+    import os
+    import base64
+
     print(f"[ICON] Generating icon: {icon_name} (size: {icon_size}px, color: {icon_color})")
 
     try:
         center_x = container_width / 2
         center_y = container_height / 2
 
-        path_data, glyph_bounds, units_per_em = get_icon_path(icon_name)
-        
-        if not path_data:
-            print(f"[ICON] Warning: Could not extract path for {icon_name}")
+        icon_unicode_char = get_icon_unicode(icon_name)
+        if not icon_unicode_char:
+            print(f"[ICON] Warning: Could not find unicode for {icon_name}")
             svg = f'<circle cx="{center_x}" cy="{center_y}" r="{min(container_width, container_height) * 0.3}" fill="{icon_color}" opacity="0.5"/>'
             return svg
-        
-        # Scale the glyph path to fit the icon_size within the container
-        if glyph_bounds:
-            gx_min, gy_min, gx_max, gy_max = glyph_bounds
-        else:
-            gx_min, gy_min, gx_max, gy_max = 0, 0, units_per_em, units_per_em
-        
-        glyph_width = gx_max - gx_min
-        glyph_height = gy_max - gy_min
-        
-        if glyph_width == 0 or glyph_height == 0:
-            print(f"[ICON] Warning: Zero-size glyph for {icon_name}")
+
+        # Locate the Bootstrap Icons font file (prefer woff, then woff2)
+        icons_dir = os.path.join(current_app.root_path, 'static', 'icons')
+        fonts_subdir = os.path.join(icons_dir, 'fonts')
+        font_path = None
+        font_ext = None
+        for ext in ['.woff', '.woff2', '.ttf', '.otf']:
+            for search_dir in [fonts_subdir, icons_dir]:
+                candidate = os.path.join(search_dir, 'bootstrap-icons' + ext)
+                if os.path.exists(candidate):
+                    font_path = candidate
+                    font_ext = ext
+                    break
+            if font_path:
+                break
+
+        if not font_path:
+            print("[ICON] Bootstrap Icons font not found, falling back to circle")
             svg = f'<circle cx="{center_x}" cy="{center_y}" r="{min(container_width, container_height) * 0.3}" fill="{icon_color}" opacity="0.5"/>'
             return svg
-        
-        # Calculate scale to fit icon_size
-        scale = icon_size / max(glyph_width, glyph_height)
-        
-        # Calculate translation to center the icon in the container
-        # Font Y-axis goes up, SVG Y-axis goes down, so we flip Y via negative scale
-        scaled_width = glyph_width * scale
-        scaled_height = glyph_height * scale
-        
-        tx = center_x - (gx_min * scale) - (scaled_width / 2)
-        ty = center_y + (gy_max * scale) - (scaled_height / 2)
-        
-        svg = f'<path d="{path_data}" fill="{icon_color}" transform="translate({tx:.2f}, {ty:.2f}) scale({scale:.6f}, {-scale:.6f})"/>'
-        
-        print(f"[ICON] Success! Generated icon SVG path, {len(svg)} bytes")
+
+        # Embed font as base64 so SVG is self-contained in all output formats
+        fmt_map = {'.woff': 'woff', '.woff2': 'woff2', '.ttf': 'truetype', '.otf': 'opentype'}
+        font_format = fmt_map.get(font_ext, 'woff')
+        if font_path not in _icon_font_b64_cache:
+            with open(font_path, 'rb') as f:
+                _icon_font_b64_cache[font_path] = base64.b64encode(f.read()).decode('utf-8')
+        font_b64 = _icon_font_b64_cache[font_path]
+
+        codepoint = ord(icon_unicode_char)
+        unicode_escape = f'&#x{codepoint:04X};'
+
+        font_face = (
+            f'<defs><style>'
+            f'@font-face{{font-family:"bootstrap-icons";'
+            f'src:url("data:font/{font_format};base64,{font_b64}") format("{font_format}");}}'
+            f'</style></defs>'
+        )
+        text_el = (
+            f'<text x="{center_x}" y="{center_y}" '
+            f'font-family="bootstrap-icons" font-size="{icon_size}" '
+            f'fill="{icon_color}" text-anchor="middle" dominant-baseline="central">'
+            f'{unicode_escape}</text>'
+        )
+
+        svg = font_face + text_el
+        print(f"[ICON] Success! Generated embedded-font icon SVG, {len(svg)} bytes")
         return svg
-        
+
     except Exception as e:
         print(f"[ICON] ERROR: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
-        placeholder = f'<rect width="{container_width}" height="{container_height}" fill="lightgray" stroke="red" stroke-width="2"/><text x="{container_width/2}" y="{container_height/2}" font-size="12" text-anchor="middle" dominant-baseline="middle">Icon Error</text>'
+        placeholder = (
+            f'<rect width="{container_width}" height="{container_height}" fill="lightgray" stroke="red" stroke-width="2"/>'
+            f'<text x="{container_width/2}" y="{container_height/2}" font-size="12" text-anchor="middle" dominant-baseline="middle">Icon Error</text>'
+        )
         return placeholder
 
+_icon_font_b64_cache = {}  # font_path -> (b64_string, format_string)
 
-# Cache for loaded font data to avoid re-reading font files repeatedly
-_font_cache = {}
-
-_BS_ICON_PACKAGE = 'bootstrap-icons'
-
-
-def get_icon_path(icon_name):
-    """Extract SVG path data for a Bootstrap Icons glyph using fontTools.
-
-    Returns: (path_data, bounds, units_per_em) or (None, None, None)
-    """
-    import os
-
-    try:
-        from fontTools.ttLib import TTFont
-        from fontTools.pens.svgPathPen import SVGPathPen
-        from fontTools.pens.boundsPen import BoundsPen
-    except ImportError:
-        print("[ICON] fontTools not available, cannot extract icon paths")
-        return None, None, None
-
-    try:
-        icon_unicode_char = get_icon_unicode(icon_name)
-        if not icon_unicode_char:
-            return None, None, None
-
-        codepoint = ord(icon_unicode_char)
-
-        if _BS_ICON_PACKAGE not in _font_cache:
-            icons_dir = os.path.join(current_app.root_path, 'static', 'icons')
-            font_path = None
-            for ext in ['.woff2', '.woff', '.ttf', '.otf']:
-                candidate = os.path.join(icons_dir, _BS_ICON_PACKAGE + ext)
-                if os.path.exists(candidate):
-                    font_path = candidate
-                    break
-
-            if not font_path:
-                print("[ICON] No Bootstrap Icons font file found in static/icons/")
-                return None, None, None
-
-            _font_cache[_BS_ICON_PACKAGE] = TTFont(font_path)
-            print(f"[ICON] Loaded and cached font: {font_path}")
-
-        font = _font_cache[_BS_ICON_PACKAGE]
-        cmap = font.getBestCmap()
-        units_per_em = font['head'].unitsPerEm
-        
-        if codepoint not in cmap:
-            print(f"[ICON] Codepoint U+{codepoint:04X} not in font cmap")
-            return None, None, None
-        
-        glyph_name = cmap[codepoint]
-        glyph_set = font.getGlyphSet()
-        glyph = glyph_set[glyph_name]
-        
-        # Extract SVG path
-        pen = SVGPathPen(glyph_set)
-        glyph.draw(pen)
-        path_data = pen.getCommands()
-        
-        # Get bounds
-        bpen = BoundsPen(glyph_set)
-        glyph.draw(bpen)
-        bounds = bpen.bounds
-        
-        if not path_data:
-            print(f"[ICON] Empty path for glyph '{glyph_name}'")
-            return None, None, None
-        
-        print(f"[ICON] Extracted path for '{icon_name}' (glyph: {glyph_name}, U+{codepoint:04X}, bounds: {bounds})")
-        return path_data, bounds, units_per_em
-        
-    except Exception as e:
-        print(f"[ICON] Error extracting path: {e}")
-        import traceback
-        traceback.print_exc()
-        return None, None, None
 
 def get_icon_unicode(icon_name):
     """Extract unicode character for a Bootstrap Icon from bootstrap-icons.css."""

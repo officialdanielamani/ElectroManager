@@ -45,8 +45,8 @@
 @media (min-width: 577px) and (max-width: 768px) { .image-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (min-width: 769px) { .image-grid { grid-template-columns: repeat(4, 1fr); } }
 .modal-dialog-centered img { max-height: 80vh; width: auto; max-width: 100%; }
-.batch-card { border-left: 4px solid #0d6efd; margin-bottom: 12px; }
-.batch-card .card-header { background: #f8f9fa; cursor: pointer; }
+.batch-card { border-left: 4px solid var(--bs-primary); margin-bottom: 12px; }
+.batch-card .card-header { background: var(--bs-tertiary-bg, #f8f9fa); cursor: pointer; }
 .sn-table th, .sn-table td { padding: 4px 8px; font-size: 0.85rem; }
 </style>
 
@@ -124,7 +124,7 @@
                         <strong><i class="bi bi-chevron-down"></i> Description</strong>
                     </button>
                     <div class="collapse" id="descriptionCollapse">
-                        <div class="markdown-content p-3 bg-light rounded mt-2" style="border-left: 4px solid #0dcaf0;">
+                        <div class="markdown-content p-3 bg-light rounded mt-2" style="border-left: 4px solid var(--bs-info, #0dcaf0);">
                             {{ item.description|markdown }}
                         </div>
                     </div>
@@ -199,7 +199,7 @@
                                 <span class="badge bg-info ms-1">Price: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_price()) }}</span>
                                 <span class="badge bg-secondary ms-1">Value: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_value()) }}</span>
                                 {% if not batch.follow_main_location %}
-                                <span class="badge bg-secondary ms-1"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>
+                                <span class="badge ms-1" style="background-color: {{ batch.get_effective_location_color() }};"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>
                                 {% endif %}
                                 {% if batch.purchase_date %}
                                 <small class="text-muted ms-2"><i class="bi bi-calendar"></i> {{ batch.purchase_date.strftime('%d/%m/%Y') }}</small>
@@ -237,7 +237,7 @@
                                         <span class="text-muted"><i class="bi bi-link-45deg"></i> Follow Main</span>
                                         <small class="text-muted">({{ batch.get_effective_location_text() }})</small>
                                         {% else %}
-                                        <span class="badge bg-secondary">{{ batch.get_effective_location_text() }}</span>
+                                        <span class="badge" style="background-color: {{ batch.get_effective_location_color() }};">{{ batch.get_effective_location_text() }}</span>
                                         {% endif %}
                                     </div>
                                 </div>

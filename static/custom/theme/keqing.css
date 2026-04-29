@@ -17,6 +17,52 @@ body {
     background: linear-gradient(135deg, #1a0d2e 0%, #2d1b4e 100%);
     background-attachment: fixed;
     color: #d4af37;
+    /* Bootstrap semantic variable overrides */
+    --bs-body-bg: #1a0d2e;
+    --bs-body-color: #d4af37;
+    --bs-secondary-bg: #3d2a5c;
+    --bs-tertiary-bg: #3d2a5c;
+    --bs-border-color: rgba(212, 175, 55, 0.3);
+    --bs-secondary-border-subtle: rgba(212, 175, 55, 0.25);
+    --bs-primary-bg-subtle: #1a0d2e;
+    --bs-success-bg-subtle: #0d2a1a;
+    --bs-info-bg-subtle: #0d1a2a;
+    --bs-warning-bg-subtle: #2a1a00;
+    --bs-danger-bg-subtle: #2a0d0d;
+    --bs-secondary-color: #a8a8a8;
+    /* Drawer cell token overrides for Keqing theme */
+    --dc-normal-bg: #3d2a5c;
+    --dc-normal-border: rgba(212, 175, 55, 0.3);
+    --dc-normal-color: #e8e8e8;
+    --dc-items-bg-1: #0d2a1a;
+    --dc-items-bg-2: #0a1f14;
+    --dc-items-border: #4a8c60;
+    --dc-items-color: #90c4a2;
+    --dc-merged-bg-1: #1a1a3a;
+    --dc-merged-bg-2: #1a1a4a;
+    --dc-merged-border: #d4af37;
+    --dc-merged-color: #ffd700;
+    --dc-gmaster-bg-1: #1a0d2e;
+    --dc-gmaster-bg-2: #250f3e;
+    --dc-gmaster-border: #d4af37;
+    --dc-gmaster-color: #ffd700;
+    --dc-gslave-bg: #2d1b4e;
+    --dc-gslave-border: rgba(212, 175, 55, 0.4);
+    --dc-gslave-color: #c0c0c0;
+    --dc-ghover-bg-1: #3d2a5c;
+    --dc-ghover-bg-2: #4a3370;
+    --dc-ghover-border: #ffd700;
+    --dc-unavail-bg-1: #3a1a00;
+    --dc-unavail-bg-2: #4a2200;
+    --dc-unavail-border: #c41e3a;
+    --dc-unavail-color: #ff9090;
+    --dc-search-bg-1: #2a1a00;
+    --dc-search-bg-2: #3a2500;
+    --dc-search-border: #d4af37;
+    --dc-search-glow: rgba(212, 175, 55, 0.4);
+    --dc-split-bg: #2a1a00;
+    --dc-split-border: #d4af37;
+    --dc-split-color: #ffd700;
 }
 
 /* Fix text-secondary and text-muted contrast for keqing theme */

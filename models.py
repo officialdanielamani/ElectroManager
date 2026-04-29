@@ -513,6 +513,21 @@ class ItemBatch(db.Model):
             return self.batch_location.name
         return 'Not specified'
 
+    def get_effective_location_color(self):
+        """Return the hex color of the effective location for badge styling."""
+        if self.follow_main_location:
+            if self.item:
+                if self.item.rack_id and self.item.rack and self.item.rack.physical_location:
+                    return self.item.rack.physical_location.color or '#6c757d'
+                if self.item.location_id and self.item.general_location:
+                    return self.item.general_location.color or '#6c757d'
+            return '#6c757d'
+        if self.rack_id and self.batch_rack and self.batch_rack.physical_location:
+            return self.batch_rack.physical_location.color or '#6c757d'
+        if self.location_id and self.batch_location:
+            return self.batch_location.color or '#6c757d'
+        return '#6c757d'
+
     def get_batch_total_price(self):
         """Display price reference: qty=0 treated as 1 so price/unit is visible when out of stock."""
         if not self.price_per_unit:

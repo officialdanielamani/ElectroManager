@@ -248,7 +248,7 @@
                         {% endif %}
 
                         {% for batch in item.batches %}
-                        <div class="card batch-card mb-2" style="border-left: 4px solid #0d6efd;">
+                        <div class="card batch-card mb-2">
                             <div class="card-header p-2 d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#batchBody{{ batch.id }}" style="cursor:pointer; background: var(--bs-tertiary-bg, #f8f9fa);">
                                 <div>
                                     <strong><i class="bi bi-box-seam"></i> {{ batch.get_display_label() }}</strong>
@@ -260,7 +260,7 @@
                                     {% if batch.get_lend_quantity() > 0 %}<span class="badge bg-warning ms-1">Lend: {{ batch.get_lend_quantity() }}</span>{% endif %}
                                     {% set proj_names = batch.get_project_names_for_batch() %}
                                     {% if proj_names %}<span class="badge bg-info ms-1">Proj: {{ proj_names|join(', ') }}</span>{% endif %}
-                                    {% if not batch.follow_main_location %}<span class="badge bg-secondary ms-1"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>{% endif %}
+                                    {% if not batch.follow_main_location %}<span class="badge ms-1" style="background-color: {{ batch.get_effective_location_color() }};"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>{% endif %}
                                     {% if batch.purchase_date %}<small class="text-muted ms-2"><i class="bi bi-calendar"></i> {{ batch.purchase_date.strftime('%d/%m/%Y') }}</small>{% endif %}
                                     {% if batch.note %}<small class="text-muted ms-2"><i class="bi bi-sticky"></i> {{ batch.note }}</small>{% endif %}
                                 </div>
@@ -302,7 +302,7 @@
                                             <span class="text-muted"><i class="bi bi-link-45deg"></i> Follow Main</span>
                                             <small class="text-muted">({{ batch.get_effective_location_text() }})</small>
                                             {% else %}
-                                            <span class="badge bg-secondary">{{ batch.get_effective_location_text() }}</span>
+                                            <span class="badge" style="background-color: {{ batch.get_effective_location_color() }};">{{ batch.get_effective_location_text() }}</span>
                                             {% endif %}
                                         </div>
                                     </div>
@@ -1028,6 +1028,10 @@
 </script>
 
 <style>
+    .batch-card {
+        border-left: 4px solid var(--bs-primary);
+    }
+
     .form-label-sm {
         margin-bottom: 0.25rem;
         font-size: 0.875rem;
@@ -1246,19 +1250,6 @@
             }
         });
 
-        for (let r = 1; r <= rows; r++) {
-            for (let c = 1; c <= cols; c++) {
-                const drawerId = `R${r}-C${c}`;
-                if (skipCells.has(drawerId)) continue;
-
-                const isUnavailable = unavailableDrawers.includes(drawerId);
-                const groupInfo = groupMap[drawerId] || null;
-                const span = cellSpans[drawerId];
-                const cell = document.createElement('div');
-                cell.className = 'drawer-cell-picker';
-                cell.dataset.drawer = drawerId;
-
-        // Single toggle helper used by all cell types
         function pickDrawer(targetId) {
             grid.querySelectorAll('.drawer-cell-picker').forEach(d => d.classList.remove('selected'));
             if (drawerInput.value === targetId) {

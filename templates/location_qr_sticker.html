@@ -108,6 +108,20 @@ const locationName = '{{ location.name }}';
 let currentTemplate = null;
 let currentSvgData = null;
 
+function injectSvgFontFaces(svgString) {
+    const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+    let fontCss = '';
+    let match;
+    while ((match = styleRegex.exec(svgString)) !== null) {
+        if (match[1].includes('@font-face')) fontCss += match[1];
+    }
+    if (!fontCss) return;
+    const id = 'svg-injected-font-faces';
+    let el = document.getElementById(id);
+    if (!el) { el = document.createElement('style'); el.id = id; document.head.appendChild(el); }
+    el.textContent = fontCss;
+}
+
 document.getElementById('btn-load-preview').addEventListener('click', async function() {
     const templateId = document.getElementById('qr-template-select').value;
     
@@ -140,7 +154,8 @@ document.getElementById('btn-load-preview').addEventListener('click', async func
             name: data.template_name
         };
         
-        // Insert SVG into preview
+        // Insert SVG into preview; also hoist @font-face into <head> so browsers apply it
+        injectSvgFontFaces(data.svg);
         document.getElementById('preview-svg').innerHTML = data.svg;
         document.getElementById('preview-dimensions').textContent = 
             `Template: ${data.template_name} | Size: ${data.width_mm}×${data.height_mm}mm | Location: ${locationName}`;

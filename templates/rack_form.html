@@ -387,19 +387,34 @@ function layoutCellClick(cell) {
 
     // If clicking a merged master cell or a group-slave: enter split mode
     if (isMerged || groupMaster) {
-        clearLayoutSelection();
+        // Clear previous selection without using clearLayoutSelection() so we can repopulate
+        selectedCells.clear();
+        document.querySelectorAll('.layout-cell').forEach(c => c.classList.remove('selected', 'split-target'));
+        document.getElementById('btnSplit').style.display = 'none';
+        document.getElementById('btnMerge').disabled = true;
+
         splitTarget = groupMaster || drawerId;
-        document.querySelectorAll('.layout-cell').forEach(c => c.classList.remove('split-target'));
-        // Highlight all cells belonging to this merge group
+
+        // Highlight all cells in the merge group and collect them for availability toggling
         document.querySelectorAll('.layout-cell').forEach(c => {
             const m = c.dataset.groupMaster;
             if (c.dataset.drawer === splitTarget || m === splitTarget) {
                 c.classList.add('split-target');
+                selectedCells.add(c.dataset.drawer);
             }
         });
+
         document.getElementById('btnSplit').style.display = 'inline-block';
-        document.getElementById('btnMerge').disabled = true;
-        document.getElementById('layoutStatus').textContent = `Selected merge group (master: ${splitTarget}) — click Split to undo`;
+
+        // Show unavailable / available buttons based on the group's current state
+        const groupCells = Array.from(selectedCells);
+        const hasUnavail = groupCells.some(id => UNAVAILABLE_DRAWERS.has(id));
+        const hasAvail   = groupCells.some(id => !UNAVAILABLE_DRAWERS.has(id));
+        document.getElementById('btnMarkUnavailable').style.display = hasAvail   ? 'inline-block' : 'none';
+        document.getElementById('btnMarkAvailable').style.display   = hasUnavail ? 'inline-block' : 'none';
+
+        document.getElementById('layoutStatus').textContent =
+            `Selected merge group (master: ${splitTarget}) — Split to undo merge, or toggle availability`;
         return;
     }
 
