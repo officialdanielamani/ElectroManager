@@ -582,7 +582,14 @@
                                                 {% if param.operation != 'value' %}on {% endif %}{{ param.value }} {% if
                                                 param.operation == 'duration' %}to {{ param.value2 }}{% endif %}
                                                 {% elif param.parameter.param_type == 'string' %}
-                                                {{ param.string_option }}
+                                                {% set _sv = param.get_selected_string_values() %}
+                                                {% set _pre = _sv[0] %}
+                                                {% set _cust = _sv[1] %}
+                                                {% if _pre or _cust %}
+                                                    {% if _pre %}{{ _pre | join(', ') }}{% endif %}
+                                                    {% if _cust %} | Custom: {{ _cust | join(', ') }}{% endif %}
+                                                {% elif param.string_option %}{{ param.string_option }}
+                                                {% else %}(none){% endif %}
                                                 {% endif %}
                                                 {% if param.description %}{{ param.description }}{% endif %}
                                                 {% if param.parameter.param_type == 'date' and
@@ -593,7 +600,7 @@
                                             </small>
                                         </div>
                                         <div>
-                                            <a href="{{ url_for('item.item_edit_parameter', item_id=item.id, param_id=param.id) }}"
+                                            <a href="{{ url_for('item.item_edit_parameter', uuid=item.uuid, param_id=param.id) }}"
                                                 class="btn btn-sm btn-warning btn-sm" title="Edit"
                                                 {% if item_perms and not item_perms.can_edit_advance %}onclick="event.preventDefault(); alert('You do not have permission to edit parameters.'); return false;"{% endif %}>
                                                 <i class="bi bi-pencil"></i>
@@ -1736,7 +1743,7 @@
 <div class="modal fade" id="addParameterModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <form method="POST" action="{{ url_for('item.item_add_parameter', id=item.id) }}">
+            <form method="POST" action="{{ url_for('item.item_add_parameter', id=item.id) }}" id="addParameterForm">
                 <div class="modal-header">
                     <h5 class="modal-title">Add Magic Parameter</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -1793,11 +1800,31 @@
 
                     <div id="number_constraints_info" style="display: none;"></div>
 
-                    <div class="mb-3" id="string_option_group" style="display: none;">
-                        <label class="form-label">Option</label>
-                        <select name="string_option" id="modal_string_option" class="form-select">
-                            <option value="">-- Select Option --</option>
-                        </select>
+                    <div id="string_option_group" style="display: none;">
+                        <div class="alert alert-info py-2 mb-2 small" id="string_selection_info"></div>
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold">Options</label>
+                            <div class="border rounded p-2" id="modal_string_options_box"></div>
+                            <small class="text-danger" id="modal_selection_count_error" style="display:none"></small>
+                        </div>
+                        <div id="modal_custom_section" style="display:none">
+                            <div class="mb-2 border rounded p-2 bg-light">
+                                <label class="form-label fw-semibold"><i class="bi bi-pencil-square"></i> Custom Value</label>
+                                <div id="modal_regex_info_block" class="alert alert-secondary py-1 mb-1 small" style="display:none"></div>
+                                <div class="input-group">
+                                    <input type="text" id="modal_custom_value_input" class="form-control" maxlength="128"
+                                           placeholder="Enter custom value (max 128 chars)"
+                                           oninput="modalValidateSelectionCount()">
+                                    <button type="button" class="btn btn-outline-secondary" id="modal_validate_btn"
+                                            onclick="modalValidateCustomInput()" style="display:none">
+                                        <i class="bi bi-check-circle"></i> Validate
+                                    </button>
+                                </div>
+                                <small class="text-muted">Max 128 characters.</small>
+                                <div id="modal_custom_validate_msg" class="mt-1" style="display:none"></div>
+                            </div>
+                        </div>
+                        <input type="hidden" name="string_custom_value" id="modal_string_custom_value">
                     </div>
 
                     <div class="mb-3">
@@ -1897,21 +1924,58 @@
             <option value="duration">Duration</option>
         `;
         } else if (paramType === 'string') {
-            // Show string options
             document.getElementById('number_constraints_info').style.display = 'none';
             fetch(`/api/magic-parameters/string`)
                 .then(response => response.json())
                 .then(data => {
                     const param = data.find(p => p.id == parameterId);
-                    if (param && param.options) {
-                        const optionSelect = document.getElementById('modal_string_option');
-                        optionSelect.innerHTML = '<option value="">-- Select Option --</option>';
-                        param.options.forEach(opt => {
-                            const option = new Option(opt, opt);
-                            optionSelect.add(option);
+                    if (!param) return;
+
+                    // Store string param config for validation
+                    window._strParam = param;
+
+                    // Selection info
+                    const infoEl = document.getElementById('string_selection_info');
+                    const maxLabel = param.string_select_max === -1 ? 'unlimited' : param.string_select_max;
+                    let infoText = `Select ${param.string_select_min} to ${maxLabel} option(s).`;
+                    if (param.string_allow_custom) infoText += ' A non-empty custom value counts as one selection.';
+                    infoEl.textContent = infoText;
+
+                    // Build checkboxes
+                    const box = document.getElementById('modal_string_options_box');
+                    box.innerHTML = '';
+                    if (param.options && param.options.length > 0) {
+                        param.options.forEach((opt, i) => {
+                            const div = document.createElement('div');
+                            div.className = 'form-check';
+                            div.innerHTML = `<input type="checkbox" class="form-check-input modal-string-opt-check"
+                                name="string_options" value="${opt}" id="mopt_${i}"
+                                onchange="modalValidateSelectionCount()">
+                                <label class="form-check-label" for="mopt_${i}">${opt}</label>`;
+                            box.appendChild(div);
                         });
-                        document.getElementById('string_option_group').style.display = 'block';
+                    } else {
+                        box.innerHTML = '<span class="text-muted">No predefined options.</span>';
                     }
+
+                    // Custom section
+                    const customSection = document.getElementById('modal_custom_section');
+                    if (param.string_allow_custom) {
+                        customSection.style.display = 'block';
+                        const regexInfoBlock = document.getElementById('modal_regex_info_block');
+                        if (param.string_regex_info) {
+                            regexInfoBlock.textContent = param.string_regex_info;
+                            regexInfoBlock.style.display = 'block';
+                        } else {
+                            regexInfoBlock.style.display = 'none';
+                        }
+                        const validateBtn = document.getElementById('modal_validate_btn');
+                        validateBtn.style.display = param.string_regex ? 'block' : 'none';
+                    } else {
+                        customSection.style.display = 'none';
+                    }
+
+                    document.getElementById('string_option_group').style.display = 'block';
                 });
         }
     }
@@ -2008,6 +2072,101 @@
             }
         }
     }
+
+    function modalGetStringSelectionCount() {
+        const checks = document.querySelectorAll('.modal-string-opt-check:checked');
+        const customInput = document.getElementById('modal_custom_value_input');
+        let customCount = 0;
+        if (customInput && customInput.value.trim()) customCount = 1;
+        return checks.length + customCount;
+    }
+
+    function modalValidateSelectionCount() {
+        if (!window._strParam) return true;
+        const total = modalGetStringSelectionCount();
+        const errEl = document.getElementById('modal_selection_count_error');
+        if (!errEl) return true;
+        if (total < window._strParam.string_select_min) {
+            errEl.textContent = `Select at least ${window._strParam.string_select_min} option(s). Currently: ${total}`;
+            errEl.style.display = 'block';
+            return false;
+        }
+        if (window._strParam.string_select_max !== -1 && total > window._strParam.string_select_max) {
+            errEl.textContent = `Select at most ${window._strParam.string_select_max} option(s). Currently: ${total}`;
+            errEl.style.display = 'block';
+            return false;
+        }
+        errEl.style.display = 'none';
+        return true;
+    }
+
+    function modalValidateCustomInput() {
+        if (!window._strParam) return true;
+        const input = document.getElementById('modal_custom_value_input');
+        const msgEl = document.getElementById('modal_custom_validate_msg');
+        if (!input || !msgEl) return true;
+        const val = input.value.trim();
+        if (!val) {
+            msgEl.innerHTML = '<span class="text-muted">Nothing to validate.</span>';
+            msgEl.style.display = 'block';
+            return true;
+        }
+        if (val.length > 128) {
+            msgEl.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Value too long (max 128 characters).</span>';
+            msgEl.style.display = 'block';
+            return false;
+        }
+        const predefinedValues = Array.from(document.querySelectorAll('#modal_string_options_box input[type="checkbox"]')).map(cb => cb.value);
+        if (predefinedValues.includes(val)) {
+            msgEl.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Already a predefined option — select it from the list instead.</span>';
+            msgEl.style.display = 'block';
+            return false;
+        }
+        const regex = window._strParam.string_regex;
+        if (regex) {
+            try {
+                const re = new RegExp('^(?:' + regex + ')$');
+                if (!re.test(val)) {
+                    msgEl.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Does not match required format.</span>';
+                    msgEl.style.display = 'block';
+                    return false;
+                }
+            } catch(e) {
+                msgEl.innerHTML = '<span class="text-warning"><i class="bi bi-exclamation-triangle"></i> Regex check unavailable in browser.</span>';
+                msgEl.style.display = 'block';
+            }
+        }
+        msgEl.innerHTML = '<span class="text-success"><i class="bi bi-check-circle"></i> Valid!</span>';
+        msgEl.style.display = 'block';
+        return true;
+    }
+
+    // Hook Add Parameter form submit for string validation
+    document.addEventListener('DOMContentLoaded', function() {
+        const addParamForm = document.getElementById('addParameterForm');
+        if (!addParamForm) return;
+        addParamForm.addEventListener('submit', function(e) {
+            const paramType = document.getElementById('modal_param_type');
+            if (!paramType || paramType.value !== 'string') return;
+            // Sync custom value hidden field
+            const customInput = document.getElementById('modal_custom_value_input');
+            const hiddenField = document.getElementById('modal_string_custom_value');
+            if (customInput && hiddenField) {
+                hiddenField.value = customInput.value.trim();
+            }
+            // Validate custom input if filled
+            if (customInput && customInput.value.trim()) {
+                if (!modalValidateCustomInput()) {
+                    e.preventDefault();
+                    return false;
+                }
+            }
+            if (!modalValidateSelectionCount()) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    });
 </script>
 {% endif %}
 
@@ -3060,12 +3219,13 @@ function saveEditDetails() {
                     <label class="form-label form-label-sm">Batch Name / Label</label>
                     <input type="text" class="form-control form-control-sm" id="pbLabel" maxlength="32" placeholder="Optional label">
                 </div>
-                <div class="mb-2">
-                    <label class="form-label form-label-sm">Type</label>
-                    <select class="form-select form-select-sm" id="pbTracking">
-                        <option value="0">Non-Tracking (simple qty)</option>
-                        <option value="1">Tracking (serial numbers)</option>
-                    </select>
+                <div class="mb-2 p-2 border rounded">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="pbTrackingCheck" onchange="togglePbTracking()">
+                        <label class="form-check-label" for="pbTrackingCheck"><strong><i class="bi bi-upc-scan"></i> Enable Serial Number Tracking</strong></label>
+                    </div>
+                    <small class="text-muted d-block mt-1" id="pbTrackingInfo"><strong>OFF:</strong> Simple batch — unlimited quantity, manual lending.</small>
+                    <small class="text-danger d-block mt-1"><i class="bi bi-exclamation-triangle"></i> <strong>Warning:</strong> This setting cannot be changed after the batch is created. Choose carefully.</small>
                 </div>
                 <div class="mb-2">
                     <label class="form-label form-label-sm">Quantity</label>
@@ -3226,7 +3386,8 @@ function saveEditDetails() {
         document.getElementById('pendingBatchModalTitle').innerHTML = '<i class="bi bi-collection"></i> Add Batch';
         document.getElementById('pendingBatchEditIndex').value = '';
         document.getElementById('pbLabel').value = '';
-        document.getElementById('pbTracking').value = '0';
+        document.getElementById('pbTrackingCheck').checked = false;
+        togglePbTracking();
         document.getElementById('pbQty').value = '0';
         document.getElementById('pbQty').max = '99999';
         document.getElementById('pbQtyNote').textContent = '';
@@ -3253,7 +3414,8 @@ function saveEditDetails() {
         document.getElementById('pendingBatchModalTitle').innerHTML = '<i class="bi bi-pencil"></i> Edit Batch';
         document.getElementById('pendingBatchEditIndex').value = idx;
         document.getElementById('pbLabel').value = b.label || '';
-        document.getElementById('pbTracking').value = b.sn_tracking ? '1' : '0';
+        document.getElementById('pbTrackingCheck').checked = !!b.sn_tracking;
+        togglePbTracking();
         document.getElementById('pbQty').value = b.quantity;
         document.getElementById('pbQty').max = b.sn_tracking ? '100' : '99999';
         document.getElementById('pbQtyNote').textContent = b.sn_tracking ? 'Max 100 for tracking batches.' : '';
@@ -3295,7 +3457,7 @@ function saveEditDetails() {
 
     window.pendingBatchSave = function() {
         var label = document.getElementById('pbLabel').value.trim().slice(0, 32);
-        var tracking = document.getElementById('pbTracking').value === '1';
+        var tracking = document.getElementById('pbTrackingCheck').checked;
         var qty = parseInt(document.getElementById('pbQty').value, 10) || 0;
         var maxQty = tracking ? 100 : 99999;
         if (qty < 0) qty = 0;
@@ -3328,11 +3490,13 @@ function saveEditDetails() {
         bootstrap.Modal.getInstance(document.getElementById('pendingBatchModal')).hide();
     };
 
-    // Update qty max when type changes
-    document.getElementById('pbTracking').addEventListener('change', function() {
-        var tracking = this.value === '1';
+    // Update qty max when tracking toggle changes
+    window.togglePbTracking = function() {
+        var tracking = document.getElementById('pbTrackingCheck').checked;
+        var infoEl = document.getElementById('pbTrackingInfo');
         var qtyInput = document.getElementById('pbQty');
         var note = document.getElementById('pbQtyNote');
+        if (infoEl) infoEl.innerHTML = tracking ? '<strong>ON:</strong> Serial number tracking — max 100 per batch, individual item management.' : '<strong>OFF:</strong> Simple batch — unlimited quantity, manual lending.';
         if (tracking) {
             qtyInput.max = '100';
             note.textContent = 'Max 100 for tracking batches.';
@@ -3341,7 +3505,7 @@ function saveEditDetails() {
             qtyInput.max = '99999';
             note.textContent = '';
         }
-    });
+    };
 
     // Inject pending_batches into form before submit so the hidden field is up-to-date
     var form = document.getElementById('itemForm');

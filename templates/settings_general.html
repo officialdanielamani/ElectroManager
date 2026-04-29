@@ -154,6 +154,101 @@
             </div>
         </div>
 
+        <!-- Account Management -->
+        {% if current_user.allow_password_reset or current_user.allow_profile_picture_change %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5><i class="bi bi-shield-check"></i> Account Management</h5>
+            </div>
+            <div class="card-body">
+                <!-- Profile Picture Section -->
+                {% if current_user.allow_profile_picture_change %}
+                <div class="mb-4">
+                    <h6 class="text-muted border-bottom pb-2 mb-3">
+                        <i class="bi bi-image"></i> Profile Picture
+                    </h6>
+
+                    {% if current_user.profile_photo %}
+                    <div class="mb-3 text-center">
+                        <img id="settingsPhotoPreview" src="{{ url_for('user_role.serve_user_picture', filename=current_user.profile_photo) }}" alt="{{ current_user.username }}" style="max-width: 150px; max-height: 150px; border-radius: 8px; border: 2px solid #dee2e6; cursor: pointer;" data-bs-toggle="modal" data-bs-target="#settingsPhotoModal" title="Click to view full size">
+
+                        <!-- Full Size Photo Modal -->
+                        <div class="modal fade" id="settingsPhotoModal" tabindex="-1">
+                            <div class="modal-dialog modal-dialog-centered modal-lg">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Profile Photo</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body text-center">
+                                        <img id="settingsFullSizePhoto" src="{{ url_for('user_role.serve_user_picture', filename=current_user.profile_photo) }}" alt="{{ current_user.username }}" style="max-width: 100%; height: auto; border-radius: 8px;">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="row g-2" style="align-items: flex-start;">
+                        <div class="col-6">
+                            <form method="POST" action="{{ url_for('settings.upload_profile_photo') }}" enctype="multipart/form-data">
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-image"></i></span>
+                                    <input type="file" class="form-control" id="profilePhoto" name="profile_photo" accept=".jpg,.jpeg,.png">
+                                </div>
+                                <small class="text-muted d-block mt-1">Max 1MB, JPEG/PNG</small>
+                                <button type="submit" class="btn btn-primary w-100 mt-2">
+                                    <i class="bi bi-upload"></i> Upload
+                                </button>
+                            </form>
+                        </div>
+                        {% if current_user.profile_photo %}
+                        <div class="col-6">
+                            <form method="POST" action="{{ url_for('settings.delete_profile_photo') }}">
+                                <button type="submit" class="btn btn-danger w-100" onclick="return confirm('Delete profile photo?')">
+                                    <i class="bi bi-trash"></i> Delete
+                                </button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Change Password Section -->
+                {% if current_user.allow_password_reset %}
+                <div>
+                    <h6 class="text-muted border-bottom pb-2 mb-3">
+                        <i class="bi bi-lock"></i> Change Password
+                    </h6>
+
+                    <form method="POST" action="{{ url_for('user_role.change_password') }}">
+                        <div class="mb-3">
+                            <label for="oldPassword" class="form-label">Old Password</label>
+                            <input type="password" class="form-control" id="oldPassword" name="old_password" autocomplete="current-password" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="newPassword" class="form-label">New Password</label>
+                            <input type="password" class="form-control" id="newPassword" name="new_password" autocomplete="new-password" required minlength="6">
+                            <small class="text-muted">Minimum 6 characters</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="confirmPassword" class="form-label">Confirm New Password</label>
+                            <input type="password" class="form-control" id="confirmPassword" name="confirm_password" autocomplete="new-password" required minlength="6">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check"></i> Update Password
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Table Columns View Customization -->
         <div class="card mt-3">
             <div class="card-header">
@@ -218,101 +313,6 @@
                 </form>
             </div>
         </div>
-
-        <!-- Account Management -->
-        {% if current_user.allow_password_reset or current_user.allow_profile_picture_change %}
-        <div class="card mt-3">
-            <div class="card-header">
-                <h5><i class="bi bi-shield-check"></i> Account Management</h5>
-            </div>
-            <div class="card-body">
-                <!-- Profile Picture Section -->
-                {% if current_user.allow_profile_picture_change %}
-                <div class="mb-4">
-                    <h6 class="text-muted border-bottom pb-2 mb-3">
-                        <i class="bi bi-image"></i> Profile Picture
-                    </h6>
-                    
-                    {% if current_user.profile_photo %}
-                    <div class="mb-3 text-center">
-                        <img id="settingsPhotoPreview" src="{{ url_for('user_role.serve_user_picture', filename=current_user.profile_photo) }}" alt="{{ current_user.username }}" style="max-width: 150px; max-height: 150px; border-radius: 8px; border: 2px solid #dee2e6; cursor: pointer;" data-bs-toggle="modal" data-bs-target="#settingsPhotoModal" title="Click to view full size">
-                        
-                        <!-- Full Size Photo Modal -->
-                        <div class="modal fade" id="settingsPhotoModal" tabindex="-1">
-                            <div class="modal-dialog modal-dialog-centered modal-lg">
-                                <div class="modal-content">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title">Profile Photo</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <div class="modal-body text-center">
-                                        <img id="settingsFullSizePhoto" src="{{ url_for('user_role.serve_user_picture', filename=current_user.profile_photo) }}" alt="{{ current_user.username }}" style="max-width: 100%; height: auto; border-radius: 8px;">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                    
-                    <div class="row g-2" style="align-items: flex-start;">
-                        <div class="col-6">
-                            <form method="POST" action="{{ url_for('settings.upload_profile_photo') }}" enctype="multipart/form-data">
-                                <div class="input-group">
-                                    <span class="input-group-text"><i class="bi bi-image"></i></span>
-                                    <input type="file" class="form-control" id="profilePhoto" name="profile_photo" accept=".jpg,.jpeg,.png">
-                                </div>
-                                <small class="text-muted d-block mt-1">Max 1MB, JPEG/PNG</small>
-                                <button type="submit" class="btn btn-primary w-100 mt-2">
-                                    <i class="bi bi-upload"></i> Upload
-                                </button>
-                            </form>
-                        </div>
-                        {% if current_user.profile_photo %}
-                        <div class="col-6">
-                            <form method="POST" action="{{ url_for('settings.delete_profile_photo') }}">
-                                <button type="submit" class="btn btn-danger w-100" onclick="return confirm('Delete profile photo?')">
-                                    <i class="bi bi-trash"></i> Delete
-                                </button>
-                            </form>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endif %}
-
-                <!-- Change Password Section -->
-                {% if current_user.allow_password_reset %}
-                <div>
-                    <h6 class="text-muted border-bottom pb-2 mb-3">
-                        <i class="bi bi-lock"></i> Change Password
-                    </h6>
-                    
-                    <form method="POST" action="{{ url_for('user_role.change_password') }}">
-                        <div class="mb-3">
-                            <label for="oldPassword" class="form-label">Old Password</label>
-                            <input type="password" class="form-control" id="oldPassword" name="old_password" autocomplete="current-password" required>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="newPassword" class="form-label">New Password</label>
-                            <input type="password" class="form-control" id="newPassword" name="new_password" autocomplete="new-password" required minlength="6">
-                            <small class="text-muted">Minimum 6 characters</small>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="confirmPassword" class="form-label">Confirm New Password</label>
-                            <input type="password" class="form-control" id="confirmPassword" name="confirm_password" autocomplete="new-password" required minlength="6">
-                        </div>
-                        
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check"></i> Update Password
-                        </button>
-                    </form>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
 
         </div>
     </div>

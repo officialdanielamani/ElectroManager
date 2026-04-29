@@ -811,49 +811,58 @@ def item_add_parameter(id):
     value = request.form.get('value', '').strip()
     value2 = request.form.get('value2', '').strip()
     unit = request.form.get('unit', '').strip()
-    string_option = request.form.get('string_option', '').strip()
     description = request.form.get('description', '').strip()
-    
+
     # Validate parameter exists
     parameter = MagicParameter.query.get(parameter_id)
     if not parameter:
         flash('Invalid parameter selected!', 'danger')
         return redirect(url_for('item.item_edit', uuid=item.uuid))
-    
-    # Validate number parameters if type is number
+
     errors = []
-    if param_type == 'number':
-        # Check if required
+
+    if param_type == 'string':
+        from models import ItemParameterStringValue
+        selected_options = request.form.getlist('string_options')
+        custom_value = request.form.get('string_custom_value', '').strip()
+        custom_values = [custom_value] if custom_value else []
+
+        # Validate option length (max 128 chars)
+        for opt in selected_options:
+            if len(opt) > 128:
+                errors.append(f"Option value too long (max 128 characters): {opt[:30]}...")
+        for cv in custom_values:
+            if len(cv) > 128:
+                errors.append(f"Custom value too long (max 128 characters)")
+
+        if not errors:
+            ok, err = parameter.validate_string_selections(selected_options, custom_values)
+            if not ok:
+                errors.append(err)
+
+    elif param_type == 'number':
         if parameter.number_required and not value:
             errors.append('This number parameter is required')
-        
-        # Validate value if provided
         if value:
             is_valid, error_msg = parameter.validate_number_value(value, False)
             if not is_valid:
                 errors.append(f"Value: {error_msg}")
-        
-        # Validate value2 for range if provided
         if value2 and operation == 'range':
             is_valid, error_msg = parameter.validate_number_value(value2, True)
             if not is_valid:
                 errors.append(f"Value2: {error_msg}")
-        
-        # Cross-check min/max for range operation
         if operation == 'range' and value and value2:
             try:
-                val1 = float(value)
-                val2 = float(value2)
-                if val1 >= val2:
+                if float(value) >= float(value2):
                     errors.append('Range start must be less than range end')
             except ValueError:
                 pass
-    
+
     if errors:
         for error in errors:
             flash(error, 'danger')
         return redirect(url_for('item.item_edit', uuid=item.uuid))
-    
+
     # Create new item parameter
     item_param = ItemParameter(
         item_id=id,
@@ -862,11 +871,19 @@ def item_add_parameter(id):
         value=value if param_type in ['number', 'date'] else None,
         value2=value2 if operation in ['range', 'duration'] else None,
         unit=unit if param_type == 'number' else None,
-        string_option=string_option if param_type == 'string' else None,
         description=description
     )
-    
+
     db.session.add(item_param)
+    db.session.flush()
+
+    if param_type == 'string':
+        from models import ItemParameterStringValue
+        for opt in selected_options:
+            db.session.add(ItemParameterStringValue(item_parameter_id=item_param.id, value=opt, is_custom=False))
+        for cv in custom_values:
+            db.session.add(ItemParameterStringValue(item_parameter_id=item_param.id, value=cv, is_custom=True))
+
     db.session.commit()
     
     log_audit(current_user.id, 'update', 'item', id, f'Added parameter to item: {item.name}')
@@ -904,67 +921,83 @@ def item_delete_parameter(item_id, param_id):
 
 
 
-@item_bp.route('/item/<int:item_id>/edit-parameter/<int:param_id>', methods=['GET', 'POST'])
+@item_bp.route('/item/<string:uuid>/edit-parameter/<int:param_id>', methods=['GET', 'POST'])
 @login_required
 @item_permission_required
-def item_edit_parameter(item_id, param_id):
+def item_edit_parameter(uuid, param_id):
     from models import ItemParameter, MagicParameter
-    item = Item.query.get_or_404(item_id)
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    item_id = item.id
     item_param = ItemParameter.query.get_or_404(param_id)
-    
+
     if item_param.item_id != item_id:
         flash('Invalid parameter!', 'danger')
         return redirect(url_for('item.item_edit', uuid=item.uuid))
     
     if request.method == 'POST':
-        # Validate number parameters if type is number
         param = item_param.parameter
         operation = request.form.get('operation')
         value = request.form.get('value', '').strip()
         value2 = request.form.get('value2', '').strip() if operation in ['range', 'duration'] else None
-        
+
         errors = []
-        
-        if param.param_type == 'number':
-            # Check if required
+
+        if param.param_type == 'string':
+            from models import ItemParameterStringValue
+            selected_options = request.form.getlist('string_options')
+            custom_value = request.form.get('string_custom_value', '').strip()
+            custom_values = [custom_value] if custom_value else []
+
+            for opt in selected_options:
+                if len(opt) > 128:
+                    errors.append(f"Option value too long (max 128 characters): {opt[:30]}...")
+            for cv in custom_values:
+                if len(cv) > 128:
+                    errors.append("Custom value too long (max 128 characters)")
+
+            if not errors:
+                ok, err = param.validate_string_selections(selected_options, custom_values)
+                if not ok:
+                    errors.append(err)
+
+        elif param.param_type == 'number':
             if param.number_required and not value:
                 errors.append('This number parameter is required')
-            
-            # Validate value if provided
             if value:
                 is_valid, error_msg = param.validate_number_value(value, False)
                 if not is_valid:
                     errors.append(f"Value: {error_msg}")
-            
-            # Validate value2 for range/duration if provided
             if value2 and operation in ['range', 'duration']:
                 is_valid, error_msg = param.validate_number_value(value2, True)
                 if not is_valid:
                     errors.append(f"Value2: {error_msg}")
-            
-            # Cross-check min/max for range operation
             if operation == 'range' and value and value2:
                 try:
-                    val1 = float(value)
-                    val2 = float(value2)
-                    if val1 >= val2:
+                    if float(value) >= float(value2):
                         errors.append('Range start must be less than range end')
                 except ValueError:
                     pass
-        
+
         if errors:
             for error in errors:
                 flash(error, 'danger')
-            return redirect(url_for('item.item_edit_parameter', item_id=item_id, param_id=param_id))
-        
-        # Update parameter values
+            return redirect(url_for('item.item_edit_parameter', uuid=item.uuid, param_id=param_id))
+
         item_param.operation = operation
         item_param.value = value
         item_param.value2 = value2
         item_param.unit = request.form.get('unit', '').strip()
-        item_param.string_option = request.form.get('string_option', '').strip()
         item_param.description = request.form.get('description', '').strip()
-        
+
+        if param.param_type == 'string':
+            from models import ItemParameterStringValue
+            # Replace all existing string values
+            ItemParameterStringValue.query.filter_by(item_parameter_id=item_param.id).delete()
+            for opt in selected_options:
+                db.session.add(ItemParameterStringValue(item_parameter_id=item_param.id, value=opt, is_custom=False))
+            for cv in custom_values:
+                db.session.add(ItemParameterStringValue(item_parameter_id=item_param.id, value=cv, is_custom=True))
+
         db.session.commit()
         
         log_audit(current_user.id, 'update', 'item', item_id, f'Updated parameter for item: {item.name}')

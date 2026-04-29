@@ -125,14 +125,73 @@
             
             {% elif item_param.parameter.param_type == 'string' %}
             <!-- String Type Fields -->
-            <div class="mb-3">
-                <label class="form-label">Option</label>
-                <select name="string_option" class="form-select">
-                    {% for option in item_param.parameter.string_options %}
-                    <option value="{{ option.value }}" {% if item_param.string_option == option.value %}selected{% endif %}>{{ option.value }}</option>
-                    {% endfor %}
-                </select>
+            {% set param = item_param.parameter %}
+            {% set sel_min = param.string_select_min or 0 %}
+            {% set sel_max = param.string_select_max if param.string_select_max is not none else 1 %}
+            {% set _str_vals = item_param.get_selected_string_values() %}
+            {% set cur_predefined = _str_vals[0] %}
+            {% set cur_custom = _str_vals[1] %}
+
+            <div class="alert alert-info py-2 mb-3">
+                <i class="bi bi-info-circle"></i>
+                {% if sel_max == -1 %}
+                    Select at least <strong>{{ sel_min }}</strong> option(s) (no upper limit).
+                {% else %}
+                    Select <strong>{{ sel_min }}</strong> to <strong>{{ sel_max }}</strong> option(s).
+                {% endif %}
+                {% if param.string_allow_custom %}
+                    <br><small class="text-muted">A non-empty custom value counts as one selection toward this total.</small>
+                {% endif %}
             </div>
+
+            <!-- Predefined options as checkboxes -->
+            {% if param.string_options %}
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Options</label>
+                <div class="border rounded p-2" id="predefined-options-box">
+                    {% for option in param.string_options %}
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input string-option-check"
+                               name="string_options" value="{{ option.value }}"
+                               id="opt_{{ loop.index }}"
+                               {% if option.value in cur_predefined %}checked{% endif %}
+                               onchange="validateStringSelectionCount()">
+                        <label class="form-check-label" for="opt_{{ loop.index }}">{{ option.value }}</label>
+                    </div>
+                    {% endfor %}
+                </div>
+                <small class="text-danger" id="selectionCountError" style="display:none"></small>
+            </div>
+            {% else %}
+            <p class="text-muted">No predefined options available.</p>
+            {% endif %}
+
+            {% if param.string_allow_custom %}
+            <!-- Custom input section -->
+            <div class="mb-3 border rounded p-3 bg-light">
+                <label class="form-label fw-semibold"><i class="bi bi-pencil-square"></i> Custom Value</label>
+                {% if param.string_regex_info %}
+                <div class="alert alert-secondary py-1 mb-2 small">
+                    <i class="bi bi-info-circle"></i> {{ param.string_regex_info }}
+                </div>
+                {% endif %}
+                <div class="input-group">
+                    <input type="text" id="customValueInput" class="form-control" maxlength="128"
+                           placeholder="Enter custom value (max 128 chars)"
+                           value="{{ cur_custom[0] if cur_custom else '' }}">
+                    {% if param.string_regex %}
+                    <button type="button" class="btn btn-outline-secondary" onclick="validateCustomInput()">
+                        <i class="bi bi-check-circle"></i> Validate
+                    </button>
+                    {% endif %}
+                </div>
+                <small class="text-muted">Max 128 characters.</small>
+                <div id="customValidateMsg" class="mt-1" style="display:none"></div>
+            </div>
+            <!-- Hidden field that carries custom value on submit -->
+            <input type="hidden" name="string_custom_value" id="string_custom_value_hidden"
+                   value="{{ cur_custom[0] if cur_custom else '' }}">
+            {% endif %}
             {% endif %}
             
             <!-- Description -->
@@ -157,8 +216,77 @@ const paramConstraints = {
     min: {{ item_param.parameter.number_min if item_param.parameter.param_type == 'number' and item_param.parameter.number_min is not none else 'null' }},
     max: {{ item_param.parameter.number_max if item_param.parameter.param_type == 'number' and item_param.parameter.number_max is not none else 'null' }},
     step: {{ item_param.parameter.number_step if item_param.parameter.param_type == 'number' and item_param.parameter.number_step is not none else 'null' }},
-    paramType: '{{ item_param.parameter.param_type }}'
+    paramType: '{{ item_param.parameter.param_type }}',
+    strSelectMin: {{ item_param.parameter.string_select_min or 0 }},
+    strSelectMax: {{ item_param.parameter.string_select_max if item_param.parameter.string_select_max is not none else 1 }},  // -1 = unlimited
+    strAllowCustom: {{ 'true' if item_param.parameter.string_allow_custom else 'false' }},
+    strRegex: {{ item_param.parameter.string_regex | tojson }}
 };
+
+function getStringSelectionCount() {
+    const checks = document.querySelectorAll('.string-option-check:checked');
+    const customInput = document.getElementById('customValueInput');
+    let customCount = 0;
+    if (customInput && customInput.value.trim()) customCount = 1;
+    return checks.length + customCount;
+}
+
+function validateStringSelectionCount() {
+    const total = getStringSelectionCount();
+    const errEl = document.getElementById('selectionCountError');
+    if (!errEl) return true;
+    if (total < paramConstraints.strSelectMin) {
+        errEl.textContent = `Select at least ${paramConstraints.strSelectMin} option(s). Currently: ${total}`;
+        errEl.style.display = 'block';
+        return false;
+    }
+    if (paramConstraints.strSelectMax !== -1 && total > paramConstraints.strSelectMax) {
+        errEl.textContent = `Select at most ${paramConstraints.strSelectMax} option(s). Currently: ${total}`;
+        errEl.style.display = 'block';
+        return false;
+    }
+    errEl.style.display = 'none';
+    return true;
+}
+
+function validateCustomInput() {
+    const input = document.getElementById('customValueInput');
+    const msgEl = document.getElementById('customValidateMsg');
+    if (!input || !msgEl) return true;
+    const val = input.value.trim();
+    if (!val) {
+        msgEl.innerHTML = '<span class="text-muted">Nothing to validate.</span>';
+        msgEl.style.display = 'block';
+        return true;
+    }
+    if (val.length > 128) {
+        msgEl.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Value too long (max 128 characters).</span>';
+        msgEl.style.display = 'block';
+        return false;
+    }
+    const predefinedValues = Array.from(document.querySelectorAll('.string-option-check')).map(cb => cb.value);
+    if (predefinedValues.includes(val)) {
+        msgEl.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Already a predefined option — select it from the list instead.</span>';
+        msgEl.style.display = 'block';
+        return false;
+    }
+    if (paramConstraints.strRegex) {
+        try {
+            const re = new RegExp('^(?:' + paramConstraints.strRegex + ')$');
+            if (!re.test(val)) {
+                msgEl.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Does not match required format.</span>';
+                msgEl.style.display = 'block';
+                return false;
+            }
+        } catch(e) {
+            msgEl.innerHTML = '<span class="text-warning"><i class="bi bi-exclamation-triangle"></i> Regex check unavailable in browser.</span>';
+            msgEl.style.display = 'block';
+        }
+    }
+    msgEl.innerHTML = '<span class="text-success"><i class="bi bi-check-circle"></i> Valid!</span>';
+    msgEl.style.display = 'block';
+    return true;
+}
 
 function validateNumberInput(input, fieldId) {
     if (paramConstraints.paramType !== 'number') return true;
@@ -253,8 +381,40 @@ function updateFields() {
     }
 }
 
+// Sync custom value to hidden field before submit
+document.addEventListener('DOMContentLoaded', function() {
+    const customInput = document.getElementById('customValueInput');
+    const hiddenField = document.getElementById('string_custom_value_hidden');
+    if (customInput && hiddenField) {
+        customInput.addEventListener('input', function() {
+            hiddenField.value = this.value;
+            validateStringSelectionCount();
+        });
+    }
+});
+
 // Form submission validation
 document.getElementById('parameterForm').addEventListener('submit', function(e) {
+    if (paramConstraints.paramType === 'string') {
+        // Sync hidden field
+        const customInput = document.getElementById('customValueInput');
+        const hiddenField = document.getElementById('string_custom_value_hidden');
+        if (customInput && hiddenField) {
+            hiddenField.value = customInput.value.trim();
+        }
+        // Validate custom input if filled
+        if (customInput && customInput.value.trim()) {
+            if (!validateCustomInput()) {
+                e.preventDefault();
+                return false;
+            }
+        }
+        if (!validateStringSelectionCount()) {
+            e.preventDefault();
+            return false;
+        }
+        return true;
+    }
     if (paramConstraints.paramType === 'number') {
         const value1 = document.getElementById('value1Input').value.trim();
         const operation = document.getElementById('operation').value;

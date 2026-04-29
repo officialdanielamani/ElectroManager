@@ -63,7 +63,6 @@ def magic_parameter_new():
     param_type = request.form.get('param_type', '').strip()
     description = request.form.get('description', '').strip()
     unit = request.form.get('unit', '').strip()
-    string_option = request.form.get('string_option', '').strip()
     notify_enabled = 'notify_enabled' in request.form
     
     # Number type fields
@@ -162,11 +161,6 @@ def magic_parameter_new():
             unit_obj = ParameterUnit(parameter_id=parameter.id, unit=unit)
             db.session.add(unit_obj)
         
-        # Add initial option for string type
-        if param_type == 'string' and string_option:
-            option_obj = ParameterStringOption(parameter_id=parameter.id, value=string_option)
-            db.session.add(option_obj)
-        
         db.session.commit()
         
         log_audit(current_user.id, 'create', 'magic_parameter', parameter.id, f'Created parameter: {name}')
@@ -197,10 +191,30 @@ def magic_parameter_edit(id):
     
     parameter.name = request.form.get('name', '').strip()
     parameter.description = request.form.get('description', '').strip()
-    
+
     if parameter.param_type == 'date':
         parameter.notify_enabled = 'notify_enabled' in request.form
-    
+
+    if parameter.param_type == 'string':
+        string_select_min = request.form.get('string_select_min', 0, type=int)
+        string_select_max = request.form.get('string_select_max', 1, type=int)
+        errors = []
+        if string_select_min < 0:
+            errors.append('Minimum selection cannot be negative')
+        if string_select_max < 1:
+            errors.append('Maximum selection must be at least 1')
+        if string_select_min > string_select_max:
+            errors.append('Minimum selection cannot exceed maximum selection')
+        if errors:
+            for error in errors:
+                flash(error, 'danger')
+            return redirect(url_for('magic_parameter.magic_parameter_manage', id=parameter.id))
+        parameter.string_select_min = string_select_min
+        parameter.string_select_max = string_select_max
+        parameter.string_allow_custom = 'string_allow_custom' in request.form
+        parameter.string_regex = request.form.get('string_regex', '').strip() or None
+        parameter.string_regex_info = request.form.get('string_regex_info', '').strip() or None
+
     # Update number validation fields if type is number
     if parameter.param_type == 'number':
         parameter.is_whole_number = 'is_whole_number' in request.form
@@ -380,15 +394,24 @@ def magic_parameter_add_option(id):
 @login_required
 @permission_required("settings_sections.magic_parameters", "edit")
 def magic_parameter_delete_option(id, option_id):
-    from models import ParameterStringOption, ItemParameter
+    from models import ParameterStringOption, ItemParameter, ItemParameterStringValue
     option = ParameterStringOption.query.get_or_404(option_id)
-    
+
     if option.parameter_id != id:
         flash('Invalid option!', 'danger')
         return redirect(url_for('magic_parameter.magic_parameter_manage', id=id))
-    
-    # Check if any items use this option
-    items_using = ItemParameter.query.filter_by(parameter_id=id, string_option=option.value).count()
+
+    # Check if any items use this option (legacy field or new multi-select table)
+    legacy_count = ItemParameter.query.filter_by(parameter_id=id, string_option=option.value).count()
+    param_item_ids = [ip.id for ip in ItemParameter.query.filter_by(parameter_id=id).all()]
+    new_count = 0
+    if param_item_ids:
+        new_count = ItemParameterStringValue.query.filter(
+            ItemParameterStringValue.item_parameter_id.in_(param_item_ids),
+            ItemParameterStringValue.value == option.value,
+            ItemParameterStringValue.is_custom == False
+        ).count()
+    items_using = legacy_count + new_count
     if items_using > 0:
         flash(f'Cannot delete option "{option.value}" - it is used by {items_using} item(s)!', 'danger')
         return redirect(url_for('magic_parameter.magic_parameter_manage', id=id))
@@ -450,6 +473,11 @@ def api_magic_parameters(type):
             data['number_required'] = param.number_required
         elif type == 'string':
             data['options'] = param.get_string_options_list()
+            data['string_select_min'] = param.string_select_min or 0
+            data['string_select_max'] = param.string_select_max if param.string_select_max is not None else 1
+            data['string_allow_custom'] = param.string_allow_custom or False
+            data['string_regex'] = param.string_regex or ''
+            data['string_regex_info'] = param.string_regex_info or ''
         
         result.append(data)
     

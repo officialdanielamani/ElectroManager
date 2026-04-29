@@ -335,7 +335,7 @@
 
                 <!-- Magic Parameters -->
                 {% if item.magic_parameters %}
-                <div class="mb-3">
+                <div class="mb-3 px-1">
                     <strong><i class="bi bi-magic"></i> Magic Parameters:</strong>
                     <div class="list-group mt-2">
                         {% for param in item.magic_parameters %}
@@ -354,7 +354,14 @@
                                         {% elif param.parameter.param_type == 'date' %}
                                             {% if param.operation != 'value' %}on {% endif %}{{ param.value }} {% if param.operation == 'duration' %}to {{ param.value2 }}{% endif %}
                                         {% elif param.parameter.param_type == 'string' %}
-                                            {{ param.string_option }}
+                                            {% set _sv = param.get_selected_string_values() %}
+                                            {% set _pre = _sv[0] %}
+                                            {% set _cust = _sv[1] %}
+                                            {% if _pre or _cust %}
+                                                {% if _pre %}{{ _pre | join(', ') }}{% endif %}
+                                                {% if _cust %} | Custom: {{ _cust | join(', ') }}{% endif %}
+                                            {% elif param.string_option %}{{ param.string_option }}
+                                            {% else %}(none){% endif %}
                                         {% endif %}
                                         {% if param.description %}{{ param.description }}{% endif %}
                                         {% if param.parameter.param_type == 'date' and param.parameter.notify_enabled %}
@@ -409,8 +416,8 @@
 
                 <!-- Datasheet URLs -->
                 {% if item.datasheet_urls %}
-                <div class="mb-3">
-                    <strong>📄 Datasheets:</strong>
+                <div class="mb-3 px-1">
+                    <strong><i class="bi bi-file-earmark-text"></i> Datasheets:</strong>
                     <div id="datasheet-display" class="mt-2"></div>
                 </div>
                 <hr>
@@ -449,11 +456,15 @@ document.addEventListener('DOMContentLoaded', function() { renderDatasheets(); }
 </script>
 
                 <!-- Info -->
-                <div class="mb-3">
-                    <small class="text-muted">
-                        Created: {{ item.created_at.strftime('%Y-%m-%d %H:%M') }}{% if item.creator %} - by {{ item.creator.username }}{% endif %}<br>
-                        Updated: {{ item.updated_at.strftime('%Y-%m-%d %H:%M') }}{% if item.updater %} - by {{ item.updater.username }}{% endif %}
-                    </small>
+                <hr>
+                <div class="mb-3 px-1">
+                    <strong><i class="bi bi-clock-history"></i> Created &amp; Updated:</strong>
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            Created: {{ item.created_at.strftime('%Y-%m-%d %H:%M') }}{% if item.creator %} - by {{ item.creator.username }}{% endif %}<br>
+                            Updated: {{ item.updated_at.strftime('%Y-%m-%d %H:%M') }}{% if item.updater %} - by {{ item.updater.username }}{% endif %}
+                        </small>
+                    </div>
                 </div>
             </div>
         </div>
