@@ -87,48 +87,161 @@
                         </div>
                     </div>
 
-                    <!-- Row 6: Users, Persons, Organizations -->
+                    <!-- Row 6: Users, Persons, Organizations — search-and-select -->
+                    {% set selected_user_ids = [] %}
+                    {% if project and project.users %}{% set selected_user_ids = project.users | from_json %}{% endif %}
+                    {% set selected_person_ids = [] %}
+                    {% if project and project.persons %}{% set selected_person_ids = project.persons | from_json %}{% endif %}
+                    {% set selected_org_ids = [] %}
+                    {% if project and project.organizations %}{% set selected_org_ids = project.organizations | from_json %}{% endif %}
+
                     <div class="mb-2">
                         <label class="form-label form-label-sm">Users</label>
-                        {% set selected_user_ids = [] %}
-                        {% if project and project.users %}{% set selected_user_ids = project.users | from_json %}{% endif %}
-                        <select class="form-select form-select-sm" name="users" multiple size="3">
-                            {% for u in users %}
-                            <option value="{{ u.id }}" {% if u.id in selected_user_ids %}selected{% endif %}>{{ u.username }}</option>
-                            {% endfor %}
-                        </select>
-                        <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple</small>
+                        <div class="ss-widget" id="ss-users">
+                            <div class="ss-chips" id="ss-users-chips"></div>
+                            <input type="text" class="form-control form-control-sm ss-input" placeholder="Search users…" autocomplete="off">
+                            <div class="ss-dropdown" id="ss-users-dropdown"></div>
+                        </div>
+                        <div id="ss-users-hidden"></div>
                     </div>
+
                     <div class="row mb-2">
                         <div class="col-6">
                             <label class="form-label form-label-sm">Persons</label>
-                            {% set selected_person_ids = [] %}
-                            {% if project and project.persons %}{% set selected_person_ids = project.persons | from_json %}{% endif %}
-                            <select class="form-select form-select-sm" name="persons" multiple size="3">
-                                {% for p in contact_persons %}
-                                <option value="{{ p.id }}" {% if p.id in selected_person_ids %}selected{% endif %}>
-                                    {{ p.name }}{% if p.organization %} ({{ p.organization.name }}){% endif %}{% if p.email %} — {{ p.email }}{% endif %}
-                                </option>
-                                {% endfor %}
-                            </select>
-                            <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple</small>
-                            {% if not contact_persons %}<small class="text-muted d-block">No persons. Add in <a href="{{ url_for('contacts.contacts_settings') }}">Contacts</a>.</small>{% endif %}
+                            {% if contact_persons %}
+                            <div class="ss-widget" id="ss-persons">
+                                <div class="ss-chips" id="ss-persons-chips"></div>
+                                <input type="text" class="form-control form-control-sm ss-input" placeholder="Search persons…" autocomplete="off">
+                                <div class="ss-dropdown" id="ss-persons-dropdown"></div>
+                            </div>
+                            <div id="ss-persons-hidden"></div>
+                            {% else %}
+                            <p class="text-muted small mb-0">No persons. Add in <a href="{{ url_for('contacts.contacts_settings') }}">Contacts</a>.</p>
+                            {% endif %}
                         </div>
                         <div class="col-6">
                             <label class="form-label form-label-sm">Organizations</label>
-                            {% set selected_org_ids = [] %}
-                            {% if project and project.organizations %}{% set selected_org_ids = project.organizations | from_json %}{% endif %}
-                            <select class="form-select form-select-sm" name="organizations" multiple size="3">
-                                {% for o in contact_orgs %}
-                                <option value="{{ o.id }}" {% if o.id in selected_org_ids %}selected{% endif %}>
-                                    {{ o.name }}{% if o.email %} — {{ o.email }}{% endif %}
-                                </option>
-                                {% endfor %}
-                            </select>
-                            <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple</small>
-                            {% if not contact_orgs %}<small class="text-muted d-block">No organizations. Add in <a href="{{ url_for('contacts.contacts_settings') }}">Contacts</a>.</small>{% endif %}
+                            {% if contact_orgs %}
+                            <div class="ss-widget" id="ss-orgs">
+                                <div class="ss-chips" id="ss-orgs-chips"></div>
+                                <input type="text" class="form-control form-control-sm ss-input" placeholder="Search organizations…" autocomplete="off">
+                                <div class="ss-dropdown" id="ss-orgs-dropdown"></div>
+                            </div>
+                            <div id="ss-orgs-hidden"></div>
+                            {% else %}
+                            <p class="text-muted small mb-0">No organizations. Add in <a href="{{ url_for('contacts.contacts_settings') }}">Contacts</a>.</p>
+                            {% endif %}
                         </div>
                     </div>
+
+                    <script>
+                    /* Search-and-select widget */
+                    (function() {
+                        var usersData = [{% for u in users %}{"id":{{ u.id }},"label":"{{ u.username }}"}{% if not loop.last %},{% endif %}{% endfor %}];
+                        var personsData = [{% for p in contact_persons %}{"id":{{ p.id }},"label":"{{ p.name }}{% if p.organization %} ({{ p.organization.name }}){% endif %}{% if p.email %} — {{ p.email }}{% endif %}"}{% if not loop.last %},{% endif %}{% endfor %}];
+                        var orgsData = [{% for o in contact_orgs %}{"id":{{ o.id }},"label":"{{ o.name }}{% if o.email %} — {{ o.email }}{% endif %}"}{% if not loop.last %},{% endif %}{% endfor %}];
+
+                        var preUsers   = {{ selected_user_ids | tojson }};
+                        var prePersons = {{ selected_person_ids | tojson }};
+                        var preOrgs    = {{ selected_org_ids | tojson }};
+
+                        function initWidget(containerId, chipsId, dropdownId, hiddenId, fieldName, data, preselected) {
+                            var container = document.getElementById(containerId);
+                            if (!container) return;
+                            var chipsEl   = document.getElementById(chipsId);
+                            var dropEl    = document.getElementById(dropdownId);
+                            var hiddenEl  = document.getElementById(hiddenId);
+                            var input     = container.querySelector('.ss-input');
+                            var selected  = {};
+
+                            function renderChips() {
+                                chipsEl.innerHTML = '';
+                                Object.keys(selected).forEach(function(id) {
+                                    var chip = document.createElement('span');
+                                    chip.className = 'badge bg-secondary me-1 mb-1 ss-chip';
+                                    chip.textContent = selected[id];
+                                    var btn = document.createElement('button');
+                                    btn.type = 'button';
+                                    btn.className = 'btn-close btn-close-white ms-1';
+                                    btn.style.fontSize = '0.55rem';
+                                    btn.addEventListener('click', function() { delete selected[id]; renderChips(); renderHidden(); });
+                                    chip.appendChild(btn);
+                                    chipsEl.appendChild(chip);
+                                });
+                            }
+
+                            function renderHidden() {
+                                hiddenEl.innerHTML = '';
+                                Object.keys(selected).forEach(function(id) {
+                                    var inp = document.createElement('input');
+                                    inp.type = 'hidden';
+                                    inp.name = fieldName;
+                                    inp.value = id;
+                                    hiddenEl.appendChild(inp);
+                                });
+                            }
+
+                            function renderDropdown(q) {
+                                var q2 = q.toLowerCase();
+                                var matches = data.filter(function(d) {
+                                    return d.label.toLowerCase().indexOf(q2) !== -1 && !selected[d.id];
+                                });
+                                dropEl.innerHTML = '';
+                                if (matches.length === 0) {
+                                    dropEl.style.display = 'none';
+                                    return;
+                                }
+                                matches.slice(0, 10).forEach(function(d) {
+                                    var item = document.createElement('div');
+                                    item.className = 'ss-dropdown-item';
+                                    item.textContent = d.label;
+                                    item.addEventListener('mousedown', function(e) {
+                                        e.preventDefault();
+                                        selected[d.id] = d.label;
+                                        input.value = '';
+                                        renderChips();
+                                        renderHidden();
+                                        dropEl.style.display = 'none';
+                                    });
+                                    dropEl.appendChild(item);
+                                });
+                                dropEl.style.display = 'block';
+                            }
+
+                            input.addEventListener('input', function() { renderDropdown(input.value); });
+                            input.addEventListener('focus', function() { renderDropdown(input.value); });
+                            input.addEventListener('blur',  function() { setTimeout(function() { dropEl.style.display = 'none'; }, 150); });
+
+                            // Preselect
+                            preselected.forEach(function(id) {
+                                var match = data.find(function(d) { return d.id === id; });
+                                if (match) selected[id] = match.label;
+                            });
+                            renderChips();
+                            renderHidden();
+                        }
+
+                        document.addEventListener('DOMContentLoaded', function() {
+                            initWidget('ss-users',   'ss-users-chips',   'ss-users-dropdown',   'ss-users-hidden',   'users',         usersData,   preUsers);
+                            initWidget('ss-persons', 'ss-persons-chips', 'ss-persons-dropdown', 'ss-persons-hidden', 'persons',       personsData, prePersons);
+                            initWidget('ss-orgs',    'ss-orgs-chips',    'ss-orgs-dropdown',    'ss-orgs-hidden',    'organizations', orgsData,    preOrgs);
+                        });
+                    })();
+                    </script>
+
+                    <style>
+                    .ss-widget { position: relative; }
+                    .ss-chips  { min-height: 0; margin-bottom: 2px; }
+                    .ss-chip   { display: inline-flex; align-items: center; }
+                    .ss-dropdown {
+                        display: none; position: absolute; z-index: 1000; width: 100%;
+                        background: var(--bs-body-bg, #fff); border: 1px solid var(--bs-border-color, #dee2e6);
+                        border-radius: 0.25rem; max-height: 180px; overflow-y: auto;
+                        box-shadow: 0 2px 6px rgba(0,0,0,.12);
+                    }
+                    .ss-dropdown-item { padding: 5px 10px; cursor: pointer; font-size: 0.85rem; }
+                    .ss-dropdown-item:hover { background: var(--bs-primary, #0d6efd); color: #fff; }
+                    </style>
 
                     {% if project %}
                     <!-- Description (edit only) -->
