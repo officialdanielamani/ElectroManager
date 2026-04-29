@@ -220,7 +220,7 @@ const paramConstraints = {
     strSelectMin: {{ item_param.parameter.string_select_min or 0 }},
     strSelectMax: {{ item_param.parameter.string_select_max if item_param.parameter.string_select_max is not none else 1 }},  // -1 = unlimited
     strAllowCustom: {{ 'true' if item_param.parameter.string_allow_custom else 'false' }},
-    strRegex: {{ ('"' + item_param.parameter.string_regex + '"') if item_param.parameter.string_regex else 'null' }}
+    strRegex: {{ item_param.parameter.string_regex | tojson }}
 };
 
 function getStringSelectionCount() {

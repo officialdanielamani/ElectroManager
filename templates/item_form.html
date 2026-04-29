@@ -3213,12 +3213,13 @@ function saveEditDetails() {
                     <label class="form-label form-label-sm">Batch Name / Label</label>
                     <input type="text" class="form-control form-control-sm" id="pbLabel" maxlength="32" placeholder="Optional label">
                 </div>
-                <div class="mb-2">
-                    <label class="form-label form-label-sm">Type</label>
-                    <select class="form-select form-select-sm" id="pbTracking">
-                        <option value="0">Non-Tracking (simple qty)</option>
-                        <option value="1">Tracking (serial numbers)</option>
-                    </select>
+                <div class="mb-2 p-2 border rounded">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="pbTrackingCheck" onchange="togglePbTracking()">
+                        <label class="form-check-label" for="pbTrackingCheck"><strong><i class="bi bi-upc-scan"></i> Enable Serial Number Tracking</strong></label>
+                    </div>
+                    <small class="text-muted d-block mt-1" id="pbTrackingInfo"><strong>OFF:</strong> Simple batch — unlimited quantity, manual lending.</small>
+                    <small class="text-danger d-block mt-1"><i class="bi bi-exclamation-triangle"></i> <strong>Warning:</strong> This setting cannot be changed after the batch is created. Choose carefully.</small>
                 </div>
                 <div class="mb-2">
                     <label class="form-label form-label-sm">Quantity</label>
@@ -3379,7 +3380,8 @@ function saveEditDetails() {
         document.getElementById('pendingBatchModalTitle').innerHTML = '<i class="bi bi-collection"></i> Add Batch';
         document.getElementById('pendingBatchEditIndex').value = '';
         document.getElementById('pbLabel').value = '';
-        document.getElementById('pbTracking').value = '0';
+        document.getElementById('pbTrackingCheck').checked = false;
+        togglePbTracking();
         document.getElementById('pbQty').value = '0';
         document.getElementById('pbQty').max = '99999';
         document.getElementById('pbQtyNote').textContent = '';
@@ -3406,7 +3408,8 @@ function saveEditDetails() {
         document.getElementById('pendingBatchModalTitle').innerHTML = '<i class="bi bi-pencil"></i> Edit Batch';
         document.getElementById('pendingBatchEditIndex').value = idx;
         document.getElementById('pbLabel').value = b.label || '';
-        document.getElementById('pbTracking').value = b.sn_tracking ? '1' : '0';
+        document.getElementById('pbTrackingCheck').checked = !!b.sn_tracking;
+        togglePbTracking();
         document.getElementById('pbQty').value = b.quantity;
         document.getElementById('pbQty').max = b.sn_tracking ? '100' : '99999';
         document.getElementById('pbQtyNote').textContent = b.sn_tracking ? 'Max 100 for tracking batches.' : '';
@@ -3448,7 +3451,7 @@ function saveEditDetails() {
 
     window.pendingBatchSave = function() {
         var label = document.getElementById('pbLabel').value.trim().slice(0, 32);
-        var tracking = document.getElementById('pbTracking').value === '1';
+        var tracking = document.getElementById('pbTrackingCheck').checked;
         var qty = parseInt(document.getElementById('pbQty').value, 10) || 0;
         var maxQty = tracking ? 100 : 99999;
         if (qty < 0) qty = 0;
@@ -3481,11 +3484,13 @@ function saveEditDetails() {
         bootstrap.Modal.getInstance(document.getElementById('pendingBatchModal')).hide();
     };
 
-    // Update qty max when type changes
-    document.getElementById('pbTracking').addEventListener('change', function() {
-        var tracking = this.value === '1';
+    // Update qty max when tracking toggle changes
+    window.togglePbTracking = function() {
+        var tracking = document.getElementById('pbTrackingCheck').checked;
+        var infoEl = document.getElementById('pbTrackingInfo');
         var qtyInput = document.getElementById('pbQty');
         var note = document.getElementById('pbQtyNote');
+        if (infoEl) infoEl.innerHTML = tracking ? '<strong>ON:</strong> Serial number tracking — max 100 per batch, individual item management.' : '<strong>OFF:</strong> Simple batch — unlimited quantity, manual lending.';
         if (tracking) {
             qtyInput.max = '100';
             note.textContent = 'Max 100 for tracking batches.';
@@ -3494,7 +3499,7 @@ function saveEditDetails() {
             qtyInput.max = '99999';
             note.textContent = '';
         }
-    });
+    };
 
     // Inject pending_batches into form before submit so the hidden field is up-to-date
     var form = document.getElementById('itemForm');
