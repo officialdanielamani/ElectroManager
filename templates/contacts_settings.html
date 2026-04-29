@@ -3,337 +3,273 @@
 {% block title %}Contacts - Inventory Manager{% endblock %}
 
 {% block content %}
-<div class="row mb-3">
+<div class="row mb-4">
     <div class="col-md-12">
         <h2><i class="bi bi-person-lines-fill"></i> Contacts</h2>
         <p class="text-muted">Manage external persons, organizations, and contact groups</p>
     </div>
 </div>
 
-<!-- Tabs -->
-<ul class="nav nav-tabs mb-4" id="contactsTabs" role="tablist">
-    <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="persons-tab" data-bs-toggle="tab" data-bs-target="#persons-pane" type="button" role="tab">
-            <i class="bi bi-person"></i> Persons (External) <span class="badge bg-secondary">{{ persons|length }}</span>
-        </button>
-    </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link" id="orgs-tab" data-bs-toggle="tab" data-bs-target="#orgs-pane" type="button" role="tab">
-            <i class="bi bi-building"></i> Organizations <span class="badge bg-secondary">{{ organizations|length }}</span>
-        </button>
-    </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link" id="groups-tab" data-bs-toggle="tab" data-bs-target="#groups-pane" type="button" role="tab">
-            <i class="bi bi-people"></i> Groups <span class="badge bg-secondary">{{ groups|length }}</span>
-        </button>
-    </li>
-</ul>
+<div class="row">
 
-<div class="tab-content" id="contactsTabContent">
-
-    <!-- ==================== PERSONS TAB ==================== -->
-    <div class="tab-pane fade show active" id="persons-pane" role="tabpanel">
-        <div class="card">
-            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-person"></i> Persons (External)</h5>
-                {% if can_edit %}
-                <button class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#addPersonModal">
-                    <i class="bi bi-plus-circle"></i> Add Person
-                </button>
-                {% endif %}
-            </div>
-            <div class="card-body">
-                {% if persons %}
-                <div class="table-responsive">
-                    <table class="table table-hover table-sm">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Organization</th>
-                                <th>Email</th>
-                                <th>Tel</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for p in persons %}
-                            <tr>
-                                <td><strong>{{ p.name }}</strong></td>
-                                <td>{{ p.organization.name if p.organization else '<span class="text-muted">—</span>' | safe }}</td>
-                                <td>{{ p.email or '<span class="text-muted">—</span>' | safe }}</td>
-                                <td>{{ p.tel or '<span class="text-muted">—</span>' | safe }}</td>
-                                <td class="text-end">
-                                    {% if can_edit %}
-                                    <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editPerson{{ p.id }}"><i class="bi bi-pencil"></i></button>
-                                    {% endif %}
-                                    {% if can_delete %}
-                                    <form method="POST" action="{{ url_for('contacts.contact_person_delete', id=p.id) }}" style="display:inline;">
-                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete person {{ p.name }}?')"><i class="bi bi-trash"></i></button>
-                                    </form>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            <!-- Edit Person Modal -->
-                            <div class="modal fade" id="editPerson{{ p.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
-                                <form method="POST" action="{{ url_for('contacts.contact_person_edit', id=p.id) }}">
-                                    <div class="modal-header"><h5 class="modal-title">Edit Person</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                                    <div class="modal-body">
-                                        <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" value="{{ p.name }}" required></div>
-                                        <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email" value="{{ p.email or '' }}"></div>
-                                        <div class="mb-3"><label class="form-label">Tel</label><input type="text" class="form-control" name="tel" value="{{ p.tel or '' }}"></div>
-                                        <div class="mb-3">
-                                            <label class="form-label">Organization</label>
-                                            <select class="form-select" name="organization_id">
-                                                <option value="">— None —</option>
-                                                {% for org in organizations %}
-                                                <option value="{{ org.id }}" {% if p.organization_id == org.id %}selected{% endif %}>{{ org.name }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
-                                </form>
-                            </div></div></div>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+    <!-- ==================== PERSONS ==================== -->
+    <div class="col-lg-4 col-md-12 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-secondary text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-person"></i> Persons (External) <span class="badge bg-dark">{{ persons|length }}</span></h5>
+                    {% if can_edit %}
+                    <button class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#addPersonModal"><i class="bi bi-plus-circle"></i> Add</button>
+                    {% endif %}
                 </div>
-                {% else %}
-                <p class="text-center text-muted py-3">No persons added yet.</p>
-                {% endif %}
             </div>
-        </div>
-    </div>
-
-    <!-- ==================== ORGANIZATIONS TAB ==================== -->
-    <div class="tab-pane fade" id="orgs-pane" role="tabpanel">
-        <div class="card">
-            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-building"></i> Organizations</h5>
-                {% if can_edit %}
-                <button class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#addOrgModal">
-                    <i class="bi bi-plus-circle"></i> Add Organization
-                </button>
-                {% endif %}
-            </div>
-            <div class="card-body">
-                {% if organizations %}
-                <div class="row">
-                    {% for org in organizations %}
-                    <div class="col-lg-6 col-md-12 mb-3">
-                        <div class="card border">
-                            <div class="card-body p-3">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <div>
-                                        <h6 class="mb-1"><strong>{{ org.name }}</strong></h6>
-                                        {% if org.email %}<div><small><i class="bi bi-envelope"></i> {{ org.email }}</small></div>{% endif %}
-                                        {% if org.tel %}<div><small><i class="bi bi-telephone"></i> {{ org.tel }}</small></div>{% endif %}
-                                        {% if org.url %}<div><small><i class="bi bi-link-45deg"></i> <a href="{{ org.url }}" target="_blank" rel="noopener">{{ org.url }}</a></small></div>{% endif %}
-                                        {% if org.info %}<div class="mt-1"><small class="text-muted">{{ org.info }}</small></div>{% endif %}
-                                    </div>
-                                    <div class="ms-2 text-nowrap">
-                                        {% if can_edit %}
-                                        <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editOrg{{ org.id }}"><i class="bi bi-pencil"></i></button>
-                                        {% endif %}
-                                        {% if can_delete %}
-                                        <form method="POST" action="{{ url_for('contacts.contact_org_delete', id=org.id) }}" style="display:inline;">
-                                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete organization {{ org.name }}?')"><i class="bi bi-trash"></i></button>
-                                        </form>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                {% if org.persons %}
-                                <div class="mt-2 pt-2 border-top">
-                                    <small class="text-muted fw-bold">Persons:</small>
-                                    <div class="mt-1">
-                                        {% for person in org.persons %}
-                                        <span class="badge bg-secondary me-1 mb-1">{{ person.name }}</span>
-                                        {% endfor %}
-                                    </div>
-                                </div>
-                                {% endif %}
+            <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                {% for p in persons %}
+                <div class="card mb-2 border">
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>{{ p.name }}</strong>
+                                {% if p.organization %}<br><small class="text-muted"><i class="bi bi-building"></i> {{ p.organization.name }}</small>{% endif %}
+                                {% if p.email %}<br><small><i class="bi bi-envelope"></i> {{ p.email }}</small>{% endif %}
+                                {% if p.tel %}<br><small><i class="bi bi-telephone"></i> {{ p.tel }}</small>{% endif %}
                             </div>
-                        </div>
-                    </div>
-                    <!-- Edit Org Modal -->
-                    <div class="modal fade" id="editOrg{{ org.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
-                        <form method="POST" action="{{ url_for('contacts.contact_org_edit', id=org.id) }}">
-                            <div class="modal-header"><h5 class="modal-title">Edit Organization</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                            <div class="modal-body">
-                                <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" value="{{ org.name }}" required></div>
-                                <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email" value="{{ org.email or '' }}"></div>
-                                <div class="mb-3"><label class="form-label">Tel</label><input type="text" class="form-control" name="tel" value="{{ org.tel or '' }}"></div>
-                                <div class="mb-3"><label class="form-label">URL</label><input type="url" class="form-control" name="url" value="{{ org.url or '' }}"></div>
-                                <div class="mb-3"><label class="form-label">Info</label><textarea class="form-control" name="info" rows="3">{{ org.info or '' }}</textarea></div>
-                            </div>
-                            <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
-                        </form>
-                    </div></div></div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <p class="text-center text-muted py-3">No organizations added yet.</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-
-    <!-- ==================== GROUPS TAB ==================== -->
-    <div class="tab-pane fade" id="groups-pane" role="tabpanel">
-        <div class="card">
-            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-people"></i> Groups</h5>
-                {% if can_edit %}
-                <button class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#addGroupModal">
-                    <i class="bi bi-plus-circle"></i> Add Group
-                </button>
-                {% endif %}
-            </div>
-            <div class="card-body">
-                {% if groups %}
-                <div class="row">
-                    {% for grp in groups %}
-                    <div class="col-lg-6 col-md-12 mb-3">
-                        <div class="card border">
-                            <div class="card-body p-3">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <div>
-                                        <h6 class="mb-0"><strong>{{ grp.name }}</strong></h6>
-                                        {% if grp.description %}<small class="text-muted">{{ grp.description }}</small>{% endif %}
-                                    </div>
-                                    <div class="ms-2 text-nowrap">
-                                        {% if can_edit %}
-                                        <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editGrp{{ grp.id }}"><i class="bi bi-pencil"></i></button>
-                                        {% endif %}
-                                        {% if can_delete %}
-                                        <form method="POST" action="{{ url_for('contacts.contact_group_delete', id=grp.id) }}" style="display:inline;">
-                                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete group {{ grp.name }} and all its members?')"><i class="bi bi-trash"></i></button>
-                                        </form>
-                                        {% endif %}
-                                    </div>
-                                </div>
-
-                                <!-- Users -->
-                                <div class="mb-2">
-                                    <small class="fw-bold text-muted">Users:</small>
-                                    <div class="mt-1">
-                                        {% for m in grp.get_users() %}
-                                        <span class="badge bg-primary me-1 mb-1">
-                                            {{ m.user.username }}
-                                            {% if can_edit %}
-                                            <form method="POST" action="{{ url_for('contacts.contact_group_remove_member', member_id=m.id) }}" style="display:inline;">
-                                                <button type="submit" class="btn-close btn-close-white ms-1" style="font-size:0.5rem;" onclick="return confirm('Remove?')"></button>
-                                            </form>
-                                            {% endif %}
-                                        </span>
-                                        {% endfor %}
-                                        {% if not grp.get_users() %}<small class="text-muted">None</small>{% endif %}
-                                    </div>
-                                </div>
-
-                                <!-- Persons -->
-                                <div class="mb-2">
-                                    <small class="fw-bold text-muted">Persons:</small>
-                                    <div class="mt-1">
-                                        {% for m in grp.get_persons() %}
-                                        <span class="badge bg-secondary me-1 mb-1" title="{{ m.person.organization.name if m.person.organization else '' }}{% if m.person.email %} · {{ m.person.email }}{% endif %}">
-                                            {{ m.person.name }}{% if m.person.organization %} <small>({{ m.person.organization.name }})</small>{% endif %}
-                                            {% if can_edit %}
-                                            <form method="POST" action="{{ url_for('contacts.contact_group_remove_member', member_id=m.id) }}" style="display:inline;">
-                                                <button type="submit" class="btn-close btn-close-white ms-1" style="font-size:0.5rem;" onclick="return confirm('Remove?')"></button>
-                                            </form>
-                                            {% endif %}
-                                        </span>
-                                        {% endfor %}
-                                        {% if not grp.get_persons() %}<small class="text-muted">None</small>{% endif %}
-                                    </div>
-                                </div>
-
-                                <!-- Organizations -->
-                                <div class="mb-2">
-                                    <small class="fw-bold text-muted">Organizations:</small>
-                                    <div class="mt-1">
-                                        {% for m in grp.get_organizations() %}
-                                        <span class="badge bg-info text-dark me-1 mb-1">
-                                            {{ m.org.name }}{% if m.org.email %} <small>({{ m.org.email }})</small>{% endif %}
-                                            {% if can_edit %}
-                                            <form method="POST" action="{{ url_for('contacts.contact_group_remove_member', member_id=m.id) }}" style="display:inline;">
-                                                <button type="submit" class="btn-close ms-1" style="font-size:0.5rem;" onclick="return confirm('Remove?')"></button>
-                                            </form>
-                                            {% endif %}
-                                        </span>
-                                        {% endfor %}
-                                        {% if not grp.get_organizations() %}<small class="text-muted">None</small>{% endif %}
-                                    </div>
-                                </div>
-
+                            <div class="ms-2 text-nowrap">
                                 {% if can_edit %}
-                                <!-- Add Member inline -->
-                                <div class="border-top pt-2 mt-2">
-                                    <form method="POST" action="{{ url_for('contacts.contact_group_add_member', id=grp.id) }}" class="row g-2 align-items-end">
-                                        <div class="col-4">
-                                            <label class="form-label small mb-1">Add</label>
-                                            <select class="form-select form-select-sm" name="member_type" onchange="toggleContactSelect(this, {{ grp.id }})">
-                                                <option value="user">User</option>
-                                                <option value="person">Person</option>
-                                                <option value="organization">Organization</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-5">
-                                            <label class="form-label small mb-1">&nbsp;</label>
-                                            <select class="form-select form-select-sm contact-user-sel" id="cUserSel{{ grp.id }}" name="member_id">
-                                                {% for u in users %}
-                                                <option value="{{ u.id }}">{{ u.username }}</option>
-                                                {% endfor %}
-                                            </select>
-                                            <select class="form-select form-select-sm contact-person-sel" id="cPersonSel{{ grp.id }}" name="member_id" style="display:none;" disabled>
-                                                {% for p in persons %}
-                                                <option value="{{ p.id }}">{{ p.name }}{% if p.organization %} ({{ p.organization.name }}){% endif %}{% if p.email %} — {{ p.email }}{% endif %}</option>
-                                                {% endfor %}
-                                            </select>
-                                            <select class="form-select form-select-sm contact-org-sel" id="cOrgSel{{ grp.id }}" name="member_id" style="display:none;" disabled>
-                                                {% for o in organizations %}
-                                                <option value="{{ o.id }}">{{ o.name }}{% if o.email %} — {{ o.email }}{% endif %}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                        <div class="col-3">
-                                            <button type="submit" class="btn btn-sm btn-success w-100"><i class="bi bi-plus"></i> Add</button>
-                                        </div>
-                                    </form>
-                                </div>
+                                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editPerson{{ p.id }}"><i class="bi bi-pencil"></i></button>
+                                {% endif %}
+                                {% if can_delete %}
+                                <form method="POST" action="{{ url_for('contacts.contact_person_delete', id=p.id) }}" style="display:inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete {{ p.name }}?')"><i class="bi bi-trash"></i></button>
+                                </form>
                                 {% endif %}
                             </div>
                         </div>
                     </div>
-
-                    <!-- Edit Group Modal -->
-                    <div class="modal fade" id="editGrp{{ grp.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
-                        <form method="POST" action="{{ url_for('contacts.contact_group_edit', id=grp.id) }}">
-                            <div class="modal-header"><h5 class="modal-title">Edit Group</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                            <div class="modal-body">
-                                <div class="mb-3"><label class="form-label">Group Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" value="{{ grp.name }}" required></div>
-                                <div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" rows="2">{{ grp.description or '' }}</textarea></div>
-                            </div>
-                            <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
-                        </form>
-                    </div></div></div>
-                    {% endfor %}
                 </div>
-                {% else %}
-                <p class="text-center text-muted py-3">No groups created yet.</p>
-                {% endif %}
+                <!-- Edit Person Modal -->
+                <div class="modal fade" id="editPerson{{ p.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+                    <form method="POST" action="{{ url_for('contacts.contact_person_edit', id=p.id) }}">
+                        <div class="modal-header"><h5 class="modal-title">Edit Person</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                        <div class="modal-body">
+                            <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" value="{{ p.name }}" required></div>
+                            <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email" value="{{ p.email or '' }}"></div>
+                            <div class="mb-3"><label class="form-label">Tel</label><input type="text" class="form-control" name="tel" value="{{ p.tel or '' }}"></div>
+                            <div class="mb-3">
+                                <label class="form-label">Organization</label>
+                                <select class="form-select" name="organization_id">
+                                    <option value="">— None —</option>
+                                    {% for org in organizations %}
+                                    <option value="{{ org.id }}" {% if p.organization_id == org.id %}selected{% endif %}>{{ org.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
+                    </form>
+                </div></div></div>
+                {% endfor %}
+                {% if not persons %}<p class="text-center text-muted">No persons added yet</p>{% endif %}
             </div>
         </div>
     </div>
+
+    <!-- ==================== ORGANIZATIONS ==================== -->
+    <div class="col-lg-4 col-md-12 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-info text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-building"></i> Organizations <span class="badge bg-dark">{{ organizations|length }}</span></h5>
+                    {% if can_edit %}
+                    <button class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#addOrgModal"><i class="bi bi-plus-circle"></i> Add</button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                {% for org in organizations %}
+                <div class="card mb-2 border">
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>{{ org.name }}</strong>
+                                {% if org.email %}<br><small><i class="bi bi-envelope"></i> {{ org.email }}</small>{% endif %}
+                                {% if org.tel %}<br><small><i class="bi bi-telephone"></i> {{ org.tel }}</small>{% endif %}
+                                {% if org.url %}<br><small><i class="bi bi-link-45deg"></i> <a href="{{ org.url }}" target="_blank" rel="noopener">{{ org.url }}</a></small>{% endif %}
+                                {% if org.info %}<br><small class="text-muted">{{ org.info }}</small>{% endif %}
+                                {% if org.persons %}
+                                <div class="mt-1">
+                                    {% for pp in org.persons %}<span class="badge bg-light text-dark border me-1">{{ pp.name }}</span>{% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="ms-2 text-nowrap">
+                                {% if can_edit %}
+                                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editOrg{{ org.id }}"><i class="bi bi-pencil"></i></button>
+                                {% endif %}
+                                {% if can_delete %}
+                                <form method="POST" action="{{ url_for('contacts.contact_org_delete', id=org.id) }}" style="display:inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete {{ org.name }}?')"><i class="bi bi-trash"></i></button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Edit Org Modal -->
+                <div class="modal fade" id="editOrg{{ org.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+                    <form method="POST" action="{{ url_for('contacts.contact_org_edit', id=org.id) }}">
+                        <div class="modal-header"><h5 class="modal-title">Edit Organization</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                        <div class="modal-body">
+                            <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" value="{{ org.name }}" required></div>
+                            <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email" value="{{ org.email or '' }}"></div>
+                            <div class="mb-3"><label class="form-label">Tel</label><input type="text" class="form-control" name="tel" value="{{ org.tel or '' }}"></div>
+                            <div class="mb-3"><label class="form-label">URL</label><input type="url" class="form-control" name="url" value="{{ org.url or '' }}"></div>
+                            <div class="mb-3"><label class="form-label">Info</label><textarea class="form-control" name="info" rows="3">{{ org.info or '' }}</textarea></div>
+                        </div>
+                        <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
+                    </form>
+                </div></div></div>
+                {% endfor %}
+                {% if not organizations %}<p class="text-center text-muted">No organizations added yet</p>{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== GROUPS ==================== -->
+    <div class="col-lg-4 col-md-12 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-people"></i> Groups <span class="badge bg-dark">{{ groups|length }}</span></h5>
+                    {% if can_edit %}
+                    <button class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#addGroupModal"><i class="bi bi-plus-circle"></i> Add</button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                {% for grp in groups %}
+                <div class="card mb-3 border">
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <strong>{{ grp.name }}</strong>
+                                {% if grp.description %}<br><small class="text-muted">{{ grp.description }}</small>{% endif %}
+                            </div>
+                            <div class="ms-2 text-nowrap">
+                                {% if can_edit %}
+                                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editGrp{{ grp.id }}"><i class="bi bi-pencil"></i></button>
+                                {% endif %}
+                                {% if can_delete %}
+                                <form method="POST" action="{{ url_for('contacts.contact_group_delete', id=grp.id) }}" style="display:inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete group {{ grp.name }}?')"><i class="bi bi-trash"></i></button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Users -->
+                        <div class="mb-1"><small class="fw-bold text-muted">Users:</small></div>
+                        <div class="mb-2">
+                            {% for m in grp.get_users() %}
+                            <span class="badge bg-primary me-1 mb-1">
+                                {{ m.user.username }}
+                                {% if can_edit %}
+                                <form method="POST" action="{{ url_for('contacts.contact_group_remove_member', member_id=m.id) }}" style="display:inline;">
+                                    <button type="submit" class="btn-close btn-close-white ms-1" style="font-size:0.5rem;" onclick="return confirm('Remove?')"></button>
+                                </form>
+                                {% endif %}
+                            </span>
+                            {% endfor %}
+                            {% if not grp.get_users() %}<small class="text-muted">None</small>{% endif %}
+                        </div>
+
+                        <!-- Persons -->
+                        <div class="mb-1"><small class="fw-bold text-muted">Persons:</small></div>
+                        <div class="mb-2">
+                            {% for m in grp.get_persons() %}
+                            <span class="badge bg-secondary me-1 mb-1" title="{% if m.person.organization %}{{ m.person.organization.name }}{% endif %}{% if m.person.email %} · {{ m.person.email }}{% endif %}">
+                                {{ m.person.name }}{% if m.person.organization %} <small>({{ m.person.organization.name }})</small>{% endif %}
+                                {% if can_edit %}
+                                <form method="POST" action="{{ url_for('contacts.contact_group_remove_member', member_id=m.id) }}" style="display:inline;">
+                                    <button type="submit" class="btn-close btn-close-white ms-1" style="font-size:0.5rem;" onclick="return confirm('Remove?')"></button>
+                                </form>
+                                {% endif %}
+                            </span>
+                            {% endfor %}
+                            {% if not grp.get_persons() %}<small class="text-muted">None</small>{% endif %}
+                        </div>
+
+                        <!-- Organizations -->
+                        <div class="mb-1"><small class="fw-bold text-muted">Organizations:</small></div>
+                        <div class="mb-2">
+                            {% for m in grp.get_organizations() %}
+                            <span class="badge bg-info text-dark me-1 mb-1">
+                                {{ m.org.name }}{% if m.org.email %} <small>({{ m.org.email }})</small>{% endif %}
+                                {% if can_edit %}
+                                <form method="POST" action="{{ url_for('contacts.contact_group_remove_member', member_id=m.id) }}" style="display:inline;">
+                                    <button type="submit" class="btn-close ms-1" style="font-size:0.5rem;" onclick="return confirm('Remove?')"></button>
+                                </form>
+                                {% endif %}
+                            </span>
+                            {% endfor %}
+                            {% if not grp.get_organizations() %}<small class="text-muted">None</small>{% endif %}
+                        </div>
+
+                        {% if can_edit %}
+                        <!-- Add Member -->
+                        <div class="border-top pt-2 mt-1">
+                            <form method="POST" action="{{ url_for('contacts.contact_group_add_member', id=grp.id) }}" class="row g-1 align-items-end">
+                                <div class="col-4">
+                                    <select class="form-select form-select-sm" name="member_type" onchange="toggleContactSelect(this, {{ grp.id }})">
+                                        <option value="user">User</option>
+                                        <option value="person">Person</option>
+                                        <option value="organization">Org</option>
+                                    </select>
+                                </div>
+                                <div class="col-5">
+                                    <select class="form-select form-select-sm" id="cUserSel{{ grp.id }}" name="member_id">
+                                        {% for u in users %}<option value="{{ u.id }}">{{ u.username }}</option>{% endfor %}
+                                    </select>
+                                    <select class="form-select form-select-sm" id="cPersonSel{{ grp.id }}" name="member_id" style="display:none;" disabled>
+                                        {% for p in persons %}<option value="{{ p.id }}">{{ p.name }}{% if p.organization %} ({{ p.organization.name }}){% endif %}</option>{% endfor %}
+                                    </select>
+                                    <select class="form-select form-select-sm" id="cOrgSel{{ grp.id }}" name="member_id" style="display:none;" disabled>
+                                        {% for o in organizations %}<option value="{{ o.id }}">{{ o.name }}</option>{% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-3">
+                                    <button type="submit" class="btn btn-sm btn-success w-100"><i class="bi bi-plus"></i></button>
+                                </div>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Edit Group Modal -->
+                <div class="modal fade" id="editGrp{{ grp.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+                    <form method="POST" action="{{ url_for('contacts.contact_group_edit', id=grp.id) }}">
+                        <div class="modal-header"><h5 class="modal-title">Edit Group</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                        <div class="modal-body">
+                            <div class="mb-3"><label class="form-label">Group Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" value="{{ grp.name }}" required></div>
+                            <div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" rows="2">{{ grp.description or '' }}</textarea></div>
+                        </div>
+                        <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
+                    </form>
+                </div></div></div>
+                {% endfor %}
+                {% if not groups %}<p class="text-center text-muted">No groups created yet</p>{% endif %}
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <!-- ==================== ADD MODALS ==================== -->
 
-<!-- Add Person Modal -->
 <div class="modal fade" id="addPersonModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
     <form method="POST" action="{{ url_for('contacts.contact_person_add') }}">
-        <div class="modal-header"><h5 class="modal-title"><i class="bi bi-person-plus"></i> Add Person</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-header"><h5 class="modal-title">Add Person</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
             <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required></div>
             <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email"></div>
@@ -342,21 +278,18 @@
                 <label class="form-label">Organization</label>
                 <select class="form-select" name="organization_id">
                     <option value="">— None —</option>
-                    {% for org in organizations %}
-                    <option value="{{ org.id }}">{{ org.name }}</option>
-                    {% endfor %}
+                    {% for org in organizations %}<option value="{{ org.id }}">{{ org.name }}</option>{% endfor %}
                 </select>
-                {% if not organizations %}<small class="text-muted">No organizations yet. Add one in the Organizations tab first.</small>{% endif %}
+                {% if not organizations %}<small class="text-muted">No organizations yet — add one first if needed.</small>{% endif %}
             </div>
         </div>
         <div class="modal-footer"><button type="submit" class="btn btn-success"><i class="bi bi-plus-circle"></i> Add Person</button></div>
     </form>
 </div></div></div>
 
-<!-- Add Organization Modal -->
 <div class="modal fade" id="addOrgModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
     <form method="POST" action="{{ url_for('contacts.contact_org_add') }}">
-        <div class="modal-header"><h5 class="modal-title"><i class="bi bi-building-add"></i> Add Organization</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-header"><h5 class="modal-title">Add Organization</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
             <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required></div>
             <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email"></div>
@@ -368,10 +301,9 @@
     </form>
 </div></div></div>
 
-<!-- Add Group Modal -->
 <div class="modal fade" id="addGroupModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
     <form method="POST" action="{{ url_for('contacts.contact_group_add') }}">
-        <div class="modal-header"><h5 class="modal-title"><i class="bi bi-people-fill"></i> Add Group</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-header"><h5 class="modal-title">Create Group</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
             <div class="mb-3"><label class="form-label">Group Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required></div>
             <div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" rows="2"></textarea></div>
@@ -385,10 +317,10 @@ function toggleContactSelect(sel, grpId) {
     const uSel = document.getElementById('cUserSel' + grpId);
     const pSel = document.getElementById('cPersonSel' + grpId);
     const oSel = document.getElementById('cOrgSel' + grpId);
-    [uSel, pSel, oSel].forEach(s => { s.style.display = 'none'; s.disabled = true; s.name = ''; });
-    if (sel.value === 'user') { uSel.style.display = ''; uSel.disabled = false; uSel.name = 'member_id'; }
-    else if (sel.value === 'person') { pSel.style.display = ''; pSel.disabled = false; pSel.name = 'member_id'; }
-    else { oSel.style.display = ''; oSel.disabled = false; oSel.name = 'member_id'; }
+    [uSel, pSel, oSel].forEach(function(s) { s.style.display = 'none'; s.disabled = true; s.name = ''; });
+    if (sel.value === 'user')         { uSel.style.display = ''; uSel.disabled = false; uSel.name = 'member_id'; }
+    else if (sel.value === 'person')  { pSel.style.display = ''; pSel.disabled = false; pSel.name = 'member_id'; }
+    else                              { oSel.style.display = ''; oSel.disabled = false; oSel.name = 'member_id'; }
 }
 </script>
 {% endblock %}
