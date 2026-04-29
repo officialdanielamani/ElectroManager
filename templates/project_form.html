@@ -87,27 +87,46 @@
                         </div>
                     </div>
 
-                    <!-- Row 6: Users & Group -->
+                    <!-- Row 6: Users, Persons, Organizations -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm">Users</label>
+                        {% set selected_user_ids = [] %}
+                        {% if project and project.users %}{% set selected_user_ids = project.users | from_json %}{% endif %}
+                        <select class="form-select form-select-sm" name="users" multiple size="3">
+                            {% for u in users %}
+                            <option value="{{ u.id }}" {% if u.id in selected_user_ids %}selected{% endif %}>{{ u.username }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple</small>
+                    </div>
                     <div class="row mb-2">
-                        <div class="col-8">
-                            <label class="form-label form-label-sm">Users</label>
-                            {% set selected_user_ids = [] %}
-                            {% if project and project.users %}{% set selected_user_ids = project.users | from_json %}{% endif %}
-                            <select class="form-select form-select-sm" name="users" multiple size="4">
-                                {% for u in users %}
-                                <option value="{{ u.id }}" {% if u.id in selected_user_ids %}selected{% endif %}>{{ u.username }}</option>
+                        <div class="col-6">
+                            <label class="form-label form-label-sm">Persons</label>
+                            {% set selected_person_ids = [] %}
+                            {% if project and project.persons %}{% set selected_person_ids = project.persons | from_json %}{% endif %}
+                            <select class="form-select form-select-sm" name="persons" multiple size="3">
+                                {% for p in contact_persons %}
+                                <option value="{{ p.id }}" {% if p.id in selected_person_ids %}selected{% endif %}>
+                                    {{ p.name }}{% if p.organization %} ({{ p.organization.name }}){% endif %}{% if p.email %} — {{ p.email }}{% endif %}
+                                </option>
                                 {% endfor %}
                             </select>
                             <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple</small>
+                            {% if not contact_persons %}<small class="text-muted d-block">No persons. Add in <a href="{{ url_for('contacts.contacts_settings') }}">Contacts</a>.</small>{% endif %}
                         </div>
-                        <div class="col-4">
-                            <label class="form-label form-label-sm">Group</label>
-                            <select class="form-select form-select-sm" name="group_id">
-                                <option value="">-- Select --</option>
-                                {% for grp in groups %}
-                                <option value="{{ grp.id }}" {% if project and project.group_id == grp.id %}selected{% endif %}>{{ grp.name }}</option>
+                        <div class="col-6">
+                            <label class="form-label form-label-sm">Organizations</label>
+                            {% set selected_org_ids = [] %}
+                            {% if project and project.organizations %}{% set selected_org_ids = project.organizations | from_json %}{% endif %}
+                            <select class="form-select form-select-sm" name="organizations" multiple size="3">
+                                {% for o in contact_orgs %}
+                                <option value="{{ o.id }}" {% if o.id in selected_org_ids %}selected{% endif %}>
+                                    {{ o.name }}{% if o.email %} — {{ o.email }}{% endif %}
+                                </option>
                                 {% endfor %}
                             </select>
+                            <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple</small>
+                            {% if not contact_orgs %}<small class="text-muted d-block">No organizations. Add in <a href="{{ url_for('contacts.contacts_settings') }}">Contacts</a>.</small>{% endif %}
                         </div>
                     </div>
 

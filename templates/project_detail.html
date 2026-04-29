@@ -48,9 +48,26 @@
 
                 <hr>
 
-                <div class="row mb-3">
-                    <div class="col-md-6"><strong>Users:</strong> {% for u in project.get_users_list() %}<span class="badge bg-secondary">{{ u.username }}</span> {% endfor %}{% if not project.get_users_list() %}<span class="text-muted">None</span>{% endif %}</div>
-                    <div class="col-md-6"><strong>Group:</strong> {{ project.group.name if project.group else 'None' }}</div>
+                <div class="row mb-2">
+                    <div class="col-md-12"><strong>Users:</strong> {% for u in project.get_users_list() %}<span class="badge bg-secondary me-1">{{ u.username }}</span>{% endfor %}{% if not project.get_users_list() %}<span class="text-muted">None</span>{% endif %}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-6">
+                        <strong>Persons:</strong>
+                        {% set persons_list = project.get_persons_list() %}
+                        {% for p in persons_list %}
+                        <span class="badge bg-dark me-1">{{ p.name }}{% if p.organization %} ({{ p.organization.name }}){% endif %}</span>
+                        {% endfor %}
+                        {% if not persons_list %}<span class="text-muted">None</span>{% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Organizations:</strong>
+                        {% set orgs_list = project.get_organizations_list() %}
+                        {% for o in orgs_list %}
+                        <span class="badge bg-info text-dark me-1">{{ o.name }}</span>
+                        {% endfor %}
+                        {% if not orgs_list %}<span class="text-muted">None</span>{% endif %}
+                    </div>
                 </div>
 
                 {% if project.description %}

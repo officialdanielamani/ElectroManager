@@ -1034,6 +1034,57 @@ class ProjectGroupMember(db.Model):
     user = db.relationship('User', backref='project_group_memberships')
     person = db.relationship('ProjectPerson', backref='group_memberships')
 
+
+# ==================== CONTACTS MODELS ====================
+
+class ContactOrganization(db.Model):
+    __tablename__ = 'contact_organizations'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    email = db.Column(db.String(200))
+    tel = db.Column(db.String(50))
+    url = db.Column(db.String(500))
+    info = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    persons = db.relationship('ContactPerson', backref='organization', lazy=True)
+
+class ContactPerson(db.Model):
+    __tablename__ = 'contact_persons'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    email = db.Column(db.String(200))
+    tel = db.Column(db.String(50))
+    organization_id = db.Column(db.Integer, db.ForeignKey('contact_organizations.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+class ContactGroup(db.Model):
+    __tablename__ = 'contact_groups'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), unique=True, nullable=False)
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    members = db.relationship('ContactGroupMember', backref='group', lazy=True, cascade='all, delete-orphan')
+    def get_users(self):
+        return [m for m in self.members if m.user_id is not None]
+    def get_persons(self):
+        return [m for m in self.members if m.person_id is not None]
+    def get_organizations(self):
+        return [m for m in self.members if m.organization_id is not None]
+
+class ContactGroupMember(db.Model):
+    __tablename__ = 'contact_group_members'
+    id = db.Column(db.Integer, primary_key=True)
+    group_id = db.Column(db.Integer, db.ForeignKey('contact_groups.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    person_id = db.Column(db.Integer, db.ForeignKey('contact_persons.id'), nullable=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey('contact_organizations.id'), nullable=True)
+    user = db.relationship('User', backref='contact_group_memberships')
+    person = db.relationship('ContactPerson', backref='group_memberships')
+    org = db.relationship('ContactOrganization', backref='group_memberships')
+
 class Project(db.Model):
     __tablename__ = 'projects'
     id = db.Column(db.Integer, primary_key=True)
@@ -1047,8 +1098,9 @@ class Project(db.Model):
     date_start = db.Column(db.Date)
     date_end = db.Column(db.Date)
     quantity = db.Column(db.Integer, default=1)
-    group_id = db.Column(db.Integer, db.ForeignKey('project_groups.id'))
     users = db.Column(db.Text)
+    persons = db.Column(db.Text)
+    organizations = db.Column(db.Text)
     enable_dateline_notification = db.Column(db.Boolean, default=False)
     notify_before_days = db.Column(db.Integer, default=3)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -1057,7 +1109,6 @@ class Project(db.Model):
     updated_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     category = db.relationship('ProjectCategory', backref='projects')
     status = db.relationship('ProjectStatus', backref='projects')
-    group = db.relationship('ProjectGroup', backref='projects')
     creator = db.relationship('User', foreign_keys=[created_by], backref='projects_created')
     updater = db.relationship('User', foreign_keys=[updated_by], backref='projects_updated')
     bom_items = db.relationship('ProjectBOMItem', backref='project', lazy=True, cascade='all, delete-orphan')
@@ -1079,6 +1130,18 @@ class Project(db.Model):
         try:
             user_ids = json.loads(self.users)
             return User.query.filter(User.id.in_(user_ids)).all()
+        except (json.JSONDecodeError, TypeError): return []
+    def get_persons_list(self):
+        if not self.persons: return []
+        try:
+            ids = json.loads(self.persons)
+            return ContactPerson.query.filter(ContactPerson.id.in_(ids)).all()
+        except (json.JSONDecodeError, TypeError): return []
+    def get_organizations_list(self):
+        if not self.organizations: return []
+        try:
+            ids = json.loads(self.organizations)
+            return ContactOrganization.query.filter(ContactOrganization.id.in_(ids)).all()
         except (json.JSONDecodeError, TypeError): return []
     def get_bom_total_cost(self):
         """Estimated BOM cost based on required_quantity"""

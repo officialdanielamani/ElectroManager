@@ -32,7 +32,8 @@ def register_blueprints(app: Flask):
     from routes.qr_template import qr_template_bp
     from routes.batch import batch_bp
     from routes.project import project_bp
-    
+    from routes.contacts import contacts_bp
+
     # Register blueprints
     app.register_blueprint(auth_bp)
     app.register_blueprint(item_bp)
@@ -51,5 +52,6 @@ def register_blueprints(app: Flask):
     app.register_blueprint(qr_template_bp)
     app.register_blueprint(batch_bp)
     app.register_blueprint(project_bp)
-    
+    app.register_blueprint(contacts_bp)
+
     logger.info("✓ All blueprints registered successfully")
