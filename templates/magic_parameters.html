@@ -392,35 +392,48 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function showNewParameterModal(type) {
-    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('newParameterModal'));
-    document.getElementById('modalParamType').value = type;
-    document.getElementById('paramTypeTitle').textContent = type.charAt(0).toUpperCase() + type.slice(1);
-    
+    const modalEl = document.getElementById('newParameterModal');
+    if (!modalEl) return;
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+    const paramTypeInput = document.getElementById('modalParamType');
+    if (paramTypeInput) paramTypeInput.value = type;
+    const paramTypeTitle = document.getElementById('paramTypeTitle');
+    if (paramTypeTitle) paramTypeTitle.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+
     // Reset form
-    document.getElementById('newParameterForm').reset();
-    document.getElementById('formErrors').style.display = 'none';
-    
+    const form = document.getElementById('newParameterForm');
+    if (form) form.reset();
+    const formErrors = document.getElementById('formErrors');
+    if (formErrors) formErrors.style.display = 'none';
+
     // Reset button
     const submitBtn = document.getElementById('submitBtn');
-    submitBtn.disabled = false;
-    submitBtn.innerHTML = 'Create Parameter';
-    
-    // Hide all fields first
-    document.getElementById('numberFields').style.display = 'none';
-    document.getElementById('dateFields').style.display = 'none';
-    document.getElementById('stringFields').style.display = 'none';
-    
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Create Parameter';
+    }
+
+    // Hide all type-specific fields first
+    ['numberFields', 'dateFields', 'stringFields'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+
     // Show relevant fields
     if (type === 'number') {
-        document.getElementById('numberFields').style.display = 'block';
-        document.getElementById('wholeNumberCheck').checked = true;
-        toggleDecimalPlacesNew();
+        const nf = document.getElementById('numberFields');
+        if (nf) nf.style.display = 'block';
+        const wc = document.getElementById('wholeNumberCheck');
+        if (wc) { wc.checked = true; toggleDecimalPlacesNew(); }
     } else if (type === 'date') {
-        document.getElementById('dateFields').style.display = 'block';
+        const df = document.getElementById('dateFields');
+        if (df) df.style.display = 'block';
     } else if (type === 'string') {
-        document.getElementById('stringFields').style.display = 'block';
+        const sf = document.getElementById('stringFields');
+        if (sf) sf.style.display = 'block';
     }
-    
+
     modal.show();
 }
 

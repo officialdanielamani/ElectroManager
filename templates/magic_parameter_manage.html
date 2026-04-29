@@ -204,7 +204,8 @@
                             </div>
                         </div>
                         <small class="text-muted">
-                            How many options a user must/can select. E.g. Min 1, Max 1 = exactly one; Min 0, Max 5 = zero to five.
+                            How many options a user must/can select. E.g. Min 1, Max 1 = exactly one; Min 0, Max 5 = zero to five; Max <strong>-1</strong> = unlimited.
+                            If <em>Allow Custom Input</em> is enabled, a non-empty custom value counts as one selection toward this total.
                         </small>
                     </div>
 
@@ -260,18 +261,18 @@
         <div class="card mb-3">
             <div class="card-header bg-dark text-white">
                 <h5 class="mb-0"><i class="bi bi-list-ul"></i> Predefined Options
-                    <small class="fw-normal">(max 200 chars each)</small>
+                    <small class="fw-normal">(max 128 chars each)</small>
                 </h5>
             </div>
             <div class="card-body">
                 <form method="POST" action="{{ url_for('magic_parameter.magic_parameter_add_option', id=parameter.id) }}" class="mb-3">
                     <div class="input-group">
-                        <input type="text" name="option" class="form-control" placeholder="Add new option" maxlength="200" required>
+                        <input type="text" name="option" class="form-control" placeholder="Add new option" maxlength="128" required>
                         <button type="submit" class="btn btn-dark">
                             <i class="bi bi-plus-circle"></i> Add Option
                         </button>
                     </div>
-                    <small class="text-muted">Maximum 200 characters per option.</small>
+                    <small class="text-muted">Maximum 128 characters per option.</small>
                 </form>
 
                 {% if parameter.string_options %}

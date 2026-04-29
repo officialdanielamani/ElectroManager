@@ -827,13 +827,13 @@ def item_add_parameter(id):
         custom_value = request.form.get('string_custom_value', '').strip()
         custom_values = [custom_value] if custom_value else []
 
-        # Validate option length (max 200 chars)
+        # Validate option length (max 128 chars)
         for opt in selected_options:
-            if len(opt) > 200:
-                errors.append(f"Option value too long (max 200 characters): {opt[:30]}...")
+            if len(opt) > 128:
+                errors.append(f"Option value too long (max 128 characters): {opt[:30]}...")
         for cv in custom_values:
-            if len(cv) > 200:
-                errors.append(f"Custom value too long (max 200 characters)")
+            if len(cv) > 128:
+                errors.append(f"Custom value too long (max 128 characters)")
 
         if not errors:
             ok, err = parameter.validate_string_selections(selected_options, custom_values)
@@ -921,14 +921,15 @@ def item_delete_parameter(item_id, param_id):
 
 
 
-@item_bp.route('/item/<int:item_id>/edit-parameter/<int:param_id>', methods=['GET', 'POST'])
+@item_bp.route('/item/<string:uuid>/edit-parameter/<int:param_id>', methods=['GET', 'POST'])
 @login_required
 @item_permission_required
-def item_edit_parameter(item_id, param_id):
+def item_edit_parameter(uuid, param_id):
     from models import ItemParameter, MagicParameter
-    item = Item.query.get_or_404(item_id)
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    item_id = item.id
     item_param = ItemParameter.query.get_or_404(param_id)
-    
+
     if item_param.item_id != item_id:
         flash('Invalid parameter!', 'danger')
         return redirect(url_for('item.item_edit', uuid=item.uuid))
@@ -948,11 +949,11 @@ def item_edit_parameter(item_id, param_id):
             custom_values = [custom_value] if custom_value else []
 
             for opt in selected_options:
-                if len(opt) > 200:
-                    errors.append(f"Option value too long (max 200 characters): {opt[:30]}...")
+                if len(opt) > 128:
+                    errors.append(f"Option value too long (max 128 characters): {opt[:30]}...")
             for cv in custom_values:
-                if len(cv) > 200:
-                    errors.append("Custom value too long (max 200 characters)")
+                if len(cv) > 128:
+                    errors.append("Custom value too long (max 128 characters)")
 
             if not errors:
                 ok, err = param.validate_string_selections(selected_options, custom_values)
@@ -980,7 +981,7 @@ def item_edit_parameter(item_id, param_id):
         if errors:
             for error in errors:
                 flash(error, 'danger')
-            return redirect(url_for('item.item_edit_parameter', item_id=item_id, param_id=param_id))
+            return redirect(url_for('item.item_edit_parameter', uuid=item.uuid, param_id=param_id))
 
         item_param.operation = operation
         item_param.value = value

@@ -354,7 +354,14 @@
                                         {% elif param.parameter.param_type == 'date' %}
                                             {% if param.operation != 'value' %}on {% endif %}{{ param.value }} {% if param.operation == 'duration' %}to {{ param.value2 }}{% endif %}
                                         {% elif param.parameter.param_type == 'string' %}
-                                            {{ param.string_option }}
+                                            {% set _sv = param.get_selected_string_values() %}
+                                            {% set _pre = _sv[0] %}
+                                            {% set _cust = _sv[1] %}
+                                            {% if _pre or _cust %}
+                                                {% if _pre %}{{ _pre | join(', ') }}{% endif %}
+                                                {% if _cust %} | Custom: {{ _cust | join(', ') }}{% endif %}
+                                            {% elif param.string_option %}{{ param.string_option }}
+                                            {% else %}(none){% endif %}
                                         {% endif %}
                                         {% if param.description %}{{ param.description }}{% endif %}
                                         {% if param.parameter.param_type == 'date' and param.parameter.notify_enabled %}

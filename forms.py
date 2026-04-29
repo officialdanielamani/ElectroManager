@@ -263,7 +263,7 @@ class RoleForm(FlaskForm):
 
 
 class ParameterStringOptionForm(FlaskForm):
-    value = StringField('Option Value', validators=[DataRequired(), Length(max=200)])
+    value = StringField('Option Value', validators=[DataRequired(), Length(max=128)])
     submit = SubmitField('Add Option')
 
 

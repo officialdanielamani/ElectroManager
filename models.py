@@ -709,14 +709,15 @@ class MagicParameter(db.Model):
         return []
 
     def validate_string_selections(self, selected_values, custom_values):
-        """Validate selected + custom values against min/max and regex. Returns (ok, error_msg)."""
+        """Validate selected + custom values against min/max and regex. Returns (ok, error_msg).
+        string_select_max = -1 means unlimited."""
         import re as _re
         total = len(selected_values) + len(custom_values)
         min_sel = self.string_select_min or 0
         max_sel = self.string_select_max if self.string_select_max is not None else 1
         if total < min_sel:
             return False, f"You must select at least {min_sel} option(s)"
-        if total > max_sel:
+        if max_sel != -1 and total > max_sel:
             return False, f"You can select at most {max_sel} option(s)"
         if custom_values and not self.string_allow_custom:
             return False, "Custom input is not allowed for this parameter"
@@ -781,7 +782,7 @@ class ParameterStringOption(db.Model):
     __tablename__ = 'parameter_string_options'
     id = db.Column(db.Integer, primary_key=True)
     parameter_id = db.Column(db.Integer, db.ForeignKey('magic_parameters.id'), nullable=False)
-    value = db.Column(db.String(200), nullable=False)
+    value = db.Column(db.String(128), nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     __table_args__ = (db.UniqueConstraint('parameter_id', 'value', name='_parameter_value_uc'),)
     def __repr__(self):
@@ -793,7 +794,7 @@ class ItemParameterStringValue(db.Model):
     __tablename__ = 'item_parameter_string_values'
     id = db.Column(db.Integer, primary_key=True)
     item_parameter_id = db.Column(db.Integer, db.ForeignKey('item_parameters.id'), nullable=False)
-    value = db.Column(db.String(200), nullable=False)
+    value = db.Column(db.String(128), nullable=False)
     is_custom = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     def __repr__(self):
@@ -809,7 +810,7 @@ class ItemParameter(db.Model):
     value = db.Column(db.String(200))
     value2 = db.Column(db.String(200))
     unit = db.Column(db.String(50))
-    string_option = db.Column(db.String(200))
+    string_option = db.Column(db.String(128))
     description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -846,9 +847,13 @@ class ItemParameter(db.Model):
                 return f"{param.name} on {self.value} {self.description or ''}".strip()
         elif param.param_type == 'string':
             predefined, custom = self.get_selected_string_values()
-            all_vals = predefined + [f"{v} (custom)" for v in custom]
-            if all_vals:
-                return f"{param.name}: {', '.join(all_vals)} {self.description or ''}".strip()
+            parts = []
+            if predefined:
+                parts.append(', '.join(predefined))
+            if custom:
+                parts.append(f"Custom: {', '.join(custom)}")
+            if parts:
+                return f"{param.name}: {' | '.join(parts)} {self.description or ''}".strip()
             if self.string_option:
                 return f"{param.name}: {self.string_option} {self.description or ''}".strip()
             return f"{param.name}: (none selected) {self.description or ''}".strip()

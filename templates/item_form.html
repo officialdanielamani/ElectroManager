@@ -582,7 +582,14 @@
                                                 {% if param.operation != 'value' %}on {% endif %}{{ param.value }} {% if
                                                 param.operation == 'duration' %}to {{ param.value2 }}{% endif %}
                                                 {% elif param.parameter.param_type == 'string' %}
-                                                {{ param.string_option }}
+                                                {% set _sv = param.get_selected_string_values() %}
+                                                {% set _pre = _sv[0] %}
+                                                {% set _cust = _sv[1] %}
+                                                {% if _pre or _cust %}
+                                                    {% if _pre %}{{ _pre | join(', ') }}{% endif %}
+                                                    {% if _cust %} | Custom: {{ _cust | join(', ') }}{% endif %}
+                                                {% elif param.string_option %}{{ param.string_option }}
+                                                {% else %}(none){% endif %}
                                                 {% endif %}
                                                 {% if param.description %}{{ param.description }}{% endif %}
                                                 {% if param.parameter.param_type == 'date' and
@@ -593,7 +600,7 @@
                                             </small>
                                         </div>
                                         <div>
-                                            <a href="{{ url_for('item.item_edit_parameter', item_id=item.id, param_id=param.id) }}"
+                                            <a href="{{ url_for('item.item_edit_parameter', uuid=item.uuid, param_id=param.id) }}"
                                                 class="btn btn-sm btn-warning btn-sm" title="Edit"
                                                 {% if item_perms and not item_perms.can_edit_advance %}onclick="event.preventDefault(); alert('You do not have permission to edit parameters.'); return false;"{% endif %}>
                                                 <i class="bi bi-pencil"></i>
@@ -1805,15 +1812,15 @@
                                 <label class="form-label fw-semibold"><i class="bi bi-pencil-square"></i> Custom Value</label>
                                 <div id="modal_regex_info_block" class="alert alert-secondary py-1 mb-1 small" style="display:none"></div>
                                 <div class="input-group">
-                                    <input type="text" id="modal_custom_value_input" class="form-control" maxlength="200"
-                                           placeholder="Enter custom value (max 200 chars)"
+                                    <input type="text" id="modal_custom_value_input" class="form-control" maxlength="128"
+                                           placeholder="Enter custom value (max 128 chars)"
                                            oninput="modalValidateSelectionCount()">
                                     <button type="button" class="btn btn-outline-secondary" id="modal_validate_btn"
                                             onclick="modalValidateCustomInput()" style="display:none">
                                         <i class="bi bi-check-circle"></i> Validate
                                     </button>
                                 </div>
-                                <small class="text-muted">Max 200 characters.</small>
+                                <small class="text-muted">Max 128 characters.</small>
                                 <div id="modal_custom_validate_msg" class="mt-1" style="display:none"></div>
                             </div>
                         </div>
@@ -1929,7 +1936,10 @@
 
                     // Selection info
                     const infoEl = document.getElementById('string_selection_info');
-                    infoEl.textContent = `Select ${param.string_select_min} to ${param.string_select_max} option(s).`;
+                    const maxLabel = param.string_select_max === -1 ? 'unlimited' : param.string_select_max;
+                    let infoText = `Select ${param.string_select_min} to ${maxLabel} option(s).`;
+                    if (param.string_allow_custom) infoText += ' A non-empty custom value counts as one selection.';
+                    infoEl.textContent = infoText;
 
                     // Build checkboxes
                     const box = document.getElementById('modal_string_options_box');
@@ -2081,7 +2091,7 @@
             errEl.style.display = 'block';
             return false;
         }
-        if (total > window._strParam.string_select_max) {
+        if (window._strParam.string_select_max !== -1 && total > window._strParam.string_select_max) {
             errEl.textContent = `Select at most ${window._strParam.string_select_max} option(s). Currently: ${total}`;
             errEl.style.display = 'block';
             return false;
@@ -2101,8 +2111,8 @@
             msgEl.style.display = 'block';
             return true;
         }
-        if (val.length > 200) {
-            msgEl.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Value too long (max 200 characters).</span>';
+        if (val.length > 128) {
+            msgEl.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Value too long (max 128 characters).</span>';
             msgEl.style.display = 'block';
             return false;
         }

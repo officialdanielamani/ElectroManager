@@ -134,7 +134,14 @@
 
             <div class="alert alert-info py-2 mb-3">
                 <i class="bi bi-info-circle"></i>
-                You can select <strong>{{ sel_min }}</strong> to <strong>{{ sel_max }}</strong> option(s).
+                {% if sel_max == -1 %}
+                    Select at least <strong>{{ sel_min }}</strong> option(s) (no upper limit).
+                {% else %}
+                    Select <strong>{{ sel_min }}</strong> to <strong>{{ sel_max }}</strong> option(s).
+                {% endif %}
+                {% if param.string_allow_custom %}
+                    <br><small class="text-muted">A non-empty custom value counts as one selection toward this total.</small>
+                {% endif %}
             </div>
 
             <!-- Predefined options as checkboxes -->
@@ -169,8 +176,8 @@
                 </div>
                 {% endif %}
                 <div class="input-group">
-                    <input type="text" id="customValueInput" class="form-control" maxlength="200"
-                           placeholder="Enter custom value (max 200 chars)"
+                    <input type="text" id="customValueInput" class="form-control" maxlength="128"
+                           placeholder="Enter custom value (max 128 chars)"
                            value="{{ cur_custom[0] if cur_custom else '' }}">
                     {% if param.string_regex %}
                     <button type="button" class="btn btn-outline-secondary" onclick="validateCustomInput()">
@@ -178,7 +185,7 @@
                     </button>
                     {% endif %}
                 </div>
-                <small class="text-muted">Max 200 characters.</small>
+                <small class="text-muted">Max 128 characters.</small>
                 <div id="customValidateMsg" class="mt-1" style="display:none"></div>
             </div>
             <!-- Hidden field that carries custom value on submit -->
@@ -211,7 +218,7 @@ const paramConstraints = {
     step: {{ item_param.parameter.number_step if item_param.parameter.param_type == 'number' and item_param.parameter.number_step is not none else 'null' }},
     paramType: '{{ item_param.parameter.param_type }}',
     strSelectMin: {{ item_param.parameter.string_select_min or 0 }},
-    strSelectMax: {{ item_param.parameter.string_select_max if item_param.parameter.string_select_max is not none else 1 }},
+    strSelectMax: {{ item_param.parameter.string_select_max if item_param.parameter.string_select_max is not none else 1 }},  // -1 = unlimited
     strAllowCustom: {{ 'true' if item_param.parameter.string_allow_custom else 'false' }},
     strRegex: {{ ('"' + item_param.parameter.string_regex + '"') if item_param.parameter.string_regex else 'null' }}
 };
@@ -233,7 +240,7 @@ function validateStringSelectionCount() {
         errEl.style.display = 'block';
         return false;
     }
-    if (total > paramConstraints.strSelectMax) {
+    if (paramConstraints.strSelectMax !== -1 && total > paramConstraints.strSelectMax) {
         errEl.textContent = `Select at most ${paramConstraints.strSelectMax} option(s). Currently: ${total}`;
         errEl.style.display = 'block';
         return false;
@@ -252,8 +259,8 @@ function validateCustomInput() {
         msgEl.style.display = 'block';
         return true;
     }
-    if (val.length > 200) {
-        msgEl.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Value too long (max 200 characters).</span>';
+    if (val.length > 128) {
+        msgEl.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Value too long (max 128 characters).</span>';
         msgEl.style.display = 'block';
         return false;
     }
