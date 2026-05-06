@@ -35,6 +35,7 @@
                                 {% if p.tel %}<br><small><i class="bi bi-telephone"></i> {{ p.tel }}</small>{% endif %}
                             </div>
                             <div class="ms-2 text-nowrap">
+                                <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#viewPerson{{ p.id }}"><i class="bi bi-eye"></i></button>
                                 {% if can_edit %}
                                 <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editPerson{{ p.id }}"><i class="bi bi-pencil"></i></button>
                                 {% endif %}
@@ -47,6 +48,22 @@
                         </div>
                     </div>
                 </div>
+                <!-- View Person Modal -->
+                <div class="modal fade" id="viewPerson{{ p.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+                    <div class="modal-header bg-secondary text-white">
+                        <h5 class="modal-title"><i class="bi bi-person"></i> {{ p.name }}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <table class="table table-sm table-borderless mb-0">
+                            <tr><th style="width:35%">Name</th><td>{{ p.name }}</td></tr>
+                            <tr><th>Organization</th><td>{{ p.organization.name if p.organization else '—' }}</td></tr>
+                            <tr><th>Email</th><td>{% if p.email %}<a href="mailto:{{ p.email }}">{{ p.email }}</a>{% else %}—{% endif %}</td></tr>
+                            <tr><th>Tel</th><td>{{ p.tel or '—' }}</td></tr>
+                        </table>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+                </div></div></div>
                 <!-- Edit Person Modal -->
                 <div class="modal fade" id="editPerson{{ p.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
                     <form method="POST" action="{{ url_for('contacts.contact_person_edit', id=p.id) }}">
@@ -103,6 +120,7 @@
                                 {% endif %}
                             </div>
                             <div class="ms-2 text-nowrap">
+                                <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#viewOrg{{ org.id }}"><i class="bi bi-eye"></i></button>
                                 {% if can_edit %}
                                 <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editOrg{{ org.id }}"><i class="bi bi-pencil"></i></button>
                                 {% endif %}
@@ -115,6 +133,40 @@
                         </div>
                     </div>
                 </div>
+                <!-- View Org Modal -->
+                <div class="modal fade" id="viewOrg{{ org.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+                    <div class="modal-header bg-info text-white">
+                        <h5 class="modal-title"><i class="bi bi-building"></i> {{ org.name }}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <table class="table table-sm table-borderless mb-0">
+                            <tr><th style="width:35%">Name</th><td>{{ org.name }}</td></tr>
+                            <tr><th>Email</th><td>{% if org.email %}<a href="mailto:{{ org.email }}">{{ org.email }}</a>{% else %}—{% endif %}</td></tr>
+                            <tr><th>Tel</th><td>{{ org.tel or '—' }}</td></tr>
+                            <tr><th>URL</th><td>{% if org.url %}<a href="{{ org.url }}" target="_blank" rel="noopener">{{ org.url }}</a>{% else %}—{% endif %}</td></tr>
+                            <tr><th>Info</th><td>{{ org.info or '—' }}</td></tr>
+                        </table>
+                        {% if org.persons %}
+                        <hr class="my-2">
+                        <strong class="small">Persons in this organization:</strong>
+                        <div class="mt-2">
+                            {% for pp in org.persons %}
+                            <div class="d-flex align-items-center mb-1">
+                                <i class="bi bi-person me-2 text-muted"></i>
+                                <span>{{ pp.name }}</span>
+                                {% if pp.email %}<small class="text-muted ms-2">— {{ pp.email }}</small>{% endif %}
+                                {% if pp.tel %}<small class="text-muted ms-2"><i class="bi bi-telephone"></i> {{ pp.tel }}</small>{% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <hr class="my-2">
+                        <small class="text-muted">No persons linked to this organization.</small>
+                        {% endif %}
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+                </div></div></div>
                 <!-- Edit Org Modal -->
                 <div class="modal fade" id="editOrg{{ org.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
                     <form method="POST" action="{{ url_for('contacts.contact_org_edit', id=org.id) }}">
@@ -156,6 +208,7 @@
                                 {% if grp.description %}<br><small class="text-muted">{{ grp.description }}</small>{% endif %}
                             </div>
                             <div class="ms-2 text-nowrap">
+                                <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#viewGrp{{ grp.id }}"><i class="bi bi-eye"></i></button>
                                 {% if can_edit %}
                                 <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editGrp{{ grp.id }}"><i class="bi bi-pencil"></i></button>
                                 {% endif %}
@@ -246,6 +299,53 @@
                     </div>
                 </div>
 
+                <!-- View Group Modal -->
+                <div class="modal fade" id="viewGrp{{ grp.id }}" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title"><i class="bi bi-people"></i> {{ grp.name }}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        {% if grp.description %}<p class="text-muted mb-3">{{ grp.description }}</p>{% endif %}
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <h6 class="text-primary"><i class="bi bi-person-badge"></i> Users</h6>
+                                {% for m in grp.get_users() %}
+                                <div class="d-flex align-items-center mb-1">
+                                    <i class="bi bi-person-circle me-2 text-muted"></i>
+                                    <span>{{ m.user.username }}</span>
+                                    {% if m.user.email %}<small class="text-muted ms-1">— {{ m.user.email }}</small>{% endif %}
+                                </div>
+                                {% endfor %}
+                                {% if not grp.get_users() %}<small class="text-muted">None</small>{% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="text-secondary"><i class="bi bi-person"></i> Persons</h6>
+                                {% for m in grp.get_persons() %}
+                                <div class="mb-1">
+                                    <div><i class="bi bi-person me-1 text-muted"></i><strong>{{ m.person.name }}</strong></div>
+                                    {% if m.person.organization %}<small class="text-muted ms-3"><i class="bi bi-building"></i> {{ m.person.organization.name }}</small>{% endif %}
+                                    {% if m.person.email %}<br><small class="text-muted ms-3"><i class="bi bi-envelope"></i> {{ m.person.email }}</small>{% endif %}
+                                    {% if m.person.tel %}<br><small class="text-muted ms-3"><i class="bi bi-telephone"></i> {{ m.person.tel }}</small>{% endif %}
+                                </div>
+                                {% endfor %}
+                                {% if not grp.get_persons() %}<small class="text-muted">None</small>{% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="text-info"><i class="bi bi-building"></i> Organizations</h6>
+                                {% for m in grp.get_organizations() %}
+                                <div class="mb-1">
+                                    <div><i class="bi bi-building me-1 text-muted"></i><strong>{{ m.org.name }}</strong></div>
+                                    {% if m.org.email %}<br><small class="text-muted ms-3"><i class="bi bi-envelope"></i> {{ m.org.email }}</small>{% endif %}
+                                    {% if m.org.tel %}<br><small class="text-muted ms-3"><i class="bi bi-telephone"></i> {{ m.org.tel }}</small>{% endif %}
+                                </div>
+                                {% endfor %}
+                                {% if not grp.get_organizations() %}<small class="text-muted">None</small>{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+                </div></div></div>
                 <!-- Edit Group Modal -->
                 <div class="modal fade" id="editGrp{{ grp.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
                     <form method="POST" action="{{ url_for('contacts.contact_group_edit', id=grp.id) }}">
