@@ -201,6 +201,12 @@
                                 {% if not batch.follow_main_location %}
                                 <span class="badge ms-1" style="background-color: {{ batch.get_effective_location_color() }};"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>
                                 {% endif %}
+                                {% if batch.get_project_used_quantity() > 0 %}
+                                <span class="badge bg-info ms-1"><i class="bi bi-diagram-3"></i> In Project</span>
+                                {% endif %}
+                                {% if batch.get_lend_quantity() > 0 %}
+                                <span class="badge ms-1" style="background-color:#c9a227; color:#fff;"><i class="bi bi-hand-index-thumb"></i> On Lend</span>
+                                {% endif %}
                                 {% if batch.purchase_date %}
                                 <small class="text-muted ms-2"><i class="bi bi-calendar"></i> {{ batch.purchase_date.strftime('%d/%m/%Y') }}</small>
                                 {% endif %}
@@ -222,16 +228,9 @@
                                     </div>
                                 </div>
                                 <div class="row mb-2">
-                                    <div class="col-md-3"><strong>Total Value:</strong> {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_value()) }}</div>
-                                    <div class="col-md-3"><strong>Lending:</strong> {{ batch.get_lend_quantity() }}</div>
                                     <div class="col-md-3"><strong>Available Qty:</strong> {{ batch.get_available_quantity() }}</div>
-                                    {% if not batch.sn_tracking_enabled and batch.lend_to_id %}
-                                    <div class="col-md-3"><strong>Lend to:</strong> {{ batch.get_lend_to_display() }}</div>
-                                    {% endif %}
-                                    {% if batch.lend_start or batch.lend_end %}
-                                    <div class="col-md-3"><strong>Lend period:</strong> {{ batch.lend_start.strftime('%d/%m/%Y') if batch.lend_start else '?' }} — {{ batch.lend_end.strftime('%d/%m/%Y') if batch.lend_end else '?' }}</div>
-                                    {% endif %}
                                     <div class="col-md-3"><strong>Date:</strong> {{ batch.purchase_date.strftime('%d/%m/%Y') if batch.purchase_date else 'N/A' }}</div>
+                                    <div class="col-md-6"><strong>Note:</strong> {{ batch.note or 'N/A' }}</div>
                                 </div>
                                 <div class="row mb-2">
                                     <div class="col-md-12">
@@ -246,13 +245,37 @@
                                 </div>
                                 {% set proj_names = batch.get_project_names_for_batch() %}
                                 {% if proj_names %}
-                                <div class="row mb-2">
-                                    <div class="col-md-12"><strong>Project:</strong> {% for pn in proj_names %}<span class="badge bg-info">{{ pn }}</span> {% endfor %} <small class="text-muted">({{ batch.get_project_used_quantity() }} used)</small></div>
+                                <div class="mb-2">
+                                    <strong>Projects <small class="text-muted">({{ batch.get_project_used_quantity() }} total)</small></strong>
+                                    <table class="table table-sm table-bordered mt-1 mb-0 small">
+                                        <thead><tr><th>Project</th><th class="text-center">Quantity</th></tr></thead>
+                                        <tbody>
+                                        {% for pn in proj_names %}
+                                        <tr><td>{{ pn }}</td><td class="text-center">—</td></tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
                                 </div>
                                 {% endif %}
-                                <div class="row mb-2">
-                                    <div class="col-md-12"><strong>Note:</strong> {{ batch.note or 'N/A' }}</div>
+                                {% if not batch.sn_tracking_enabled and batch.lend_records %}
+                                <div class="mb-2">
+                                    <strong>Lending <small class="text-muted">({{ batch.get_lend_quantity() }} total)</small></strong>
+                                    <table class="table table-sm table-bordered mt-1 mb-0 small">
+                                        <thead><tr><th>Lend To</th><th class="text-center">Qty</th><th>Start</th><th>Due Date</th><th class="text-center">Notify</th></tr></thead>
+                                        <tbody>
+                                        {% for rec in batch.lend_records %}
+                                        <tr>
+                                            <td>{{ rec.get_lend_to_display() or '—' }}</td>
+                                            <td class="text-center">{{ rec.quantity }}</td>
+                                            <td>{{ rec.lend_start.strftime('%d/%m/%Y') if rec.lend_start else '—' }}</td>
+                                            <td>{{ rec.lend_end.strftime('%d/%m/%Y') if rec.lend_end else '—' }}</td>
+                                            <td class="text-center">{% if rec.lend_notify_enabled %}<i class="bi bi-bell-fill text-warning" title="Remind {{ rec.lend_notify_before_days }} days before"></i>{% else %}—{% endif %}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
                                 </div>
+                                {% endif %}
 
                                 <!-- Serial Numbers Table (if enabled) -->
                                 {% if batch.sn_tracking_enabled and batch.serial_numbers|length > 0 %}
@@ -272,7 +295,9 @@
                                                 <th>Internal Serial Number (ISN)</th>
                                                 <th>Info</th>
                                                 <th>Project</th>
-                                                <th>Lend to</th>
+                                                <th>Lend To</th>
+                                                <th>Lend Start</th>
+                                                <th>Lend End</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -303,9 +328,10 @@
                                                     <span class="text-muted" style="opacity:0.5">{{ sn.get_lend_to_display() or '-' }}</span>
                                                     {% else %}
                                                     <span class="lend-val" id="lendVal{{ sn.id }}">{{ sn.get_lend_to_display() or '-' }}</span>
-                                                    {% if sn.lend_end %}<small class="text-muted d-block" style="font-size:0.7rem">until {{ sn.lend_end.strftime('%d/%m/%Y') }}</small>{% endif %}
                                                     {% endif %}
                                                 </td>
+                                                <td class="small">{{ sn.lend_start.strftime('%d/%m/%Y') if sn.lend_start else '—' }}</td>
+                                                <td class="small">{{ sn.lend_end.strftime('%d/%m/%Y') if sn.lend_end else '—' }}</td>
                                             </tr>
                                             {% endfor %}
                                         </tbody>

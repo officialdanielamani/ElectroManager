@@ -484,13 +484,6 @@ class ItemBatch(db.Model):
     price_per_unit = db.Column(db.Float, default=0.0)
     purchase_date = db.Column(db.Date)
     note = db.Column(db.String(128))
-    lend_to_type = db.Column(db.String(20), default='')
-    lend_to_id = db.Column(db.Integer, nullable=True)
-    lend_quantity = db.Column(db.Integer, default=0)
-    lend_start = db.Column(db.Date, nullable=True)
-    lend_end = db.Column(db.Date, nullable=True)
-    lend_notify_enabled = db.Column(db.Boolean, default=False)
-    lend_notify_before_days = db.Column(db.Integer, default=3)
     sn_tracking_enabled = db.Column(db.Boolean, default=False)
 
     follow_main_location = db.Column(db.Boolean, default=True)
@@ -505,6 +498,7 @@ class ItemBatch(db.Model):
     batch_rack = db.relationship('Rack', foreign_keys=[rack_id])
 
     serial_numbers = db.relationship('BatchSerialNumber', backref='batch', lazy=True, cascade='all, delete-orphan', order_by='BatchSerialNumber.sequence_number')
+    lend_records = db.relationship('BatchLendRecord', backref='batch', lazy=True, cascade='all, delete-orphan', order_by='BatchLendRecord.id')
     
     def get_effective_location_text(self):
         """Return human-readable location. Falls back to parent item when follow_main_location is True."""
@@ -549,30 +543,27 @@ class ItemBatch(db.Model):
         return f"Batch {self.batch_number}"
     
     def get_lend_quantity(self):
-        """Get total lend quantity - from individual SNs if tracking enabled, else from batch field"""
+        """Total lend quantity across all lend records (or per-SN count for tracked batches)."""
         if self.sn_tracking_enabled:
             return sum(1 for sn in self.serial_numbers if sn.lend_to_id)
-        return self.lend_quantity or 0
+        return sum(r.quantity for r in self.lend_records)
 
-    def get_lend_to_display(self):
-        if not self.lend_to_id or not self.lend_to_type:
-            return ''
-        try:
-            if self.lend_to_type == 'user':
-                obj = User.query.get(self.lend_to_id)
-                return obj.username if obj else f'User #{self.lend_to_id}'
-            elif self.lend_to_type == 'person':
-                obj = ContactPerson.query.get(self.lend_to_id)
-                return obj.name if obj else f'Person #{self.lend_to_id}'
-            elif self.lend_to_type == 'organization':
-                obj = ContactOrganization.query.get(self.lend_to_id)
-                return obj.name if obj else f'Org #{self.lend_to_id}'
-            elif self.lend_to_type == 'group':
-                obj = ContactGroup.query.get(self.lend_to_id)
-                return obj.name if obj else f'Group #{self.lend_to_id}'
-        except Exception:
-            pass
-        return ''
+    def get_lend_records_data(self):
+        """Serialise lend records to a list of dicts for JS embedding."""
+        result = []
+        for r in self.lend_records:
+            result.append({
+                'id': r.id,
+                'type': r.lend_to_type or '',
+                'contact_id': r.lend_to_id,
+                'label': r.get_lend_to_display(),
+                'qty': r.quantity,
+                'start': r.lend_start.strftime('%Y-%m-%d') if r.lend_start else '',
+                'end': r.lend_end.strftime('%Y-%m-%d') if r.lend_end else '',
+                'notify': r.lend_notify_enabled or False,
+                'days': r.lend_notify_before_days or 3,
+            })
+        return result
 
     def get_project_used_quantity(self):
         """Get total used_quantity across all projects for this batch"""
@@ -702,6 +693,45 @@ class BatchSerialNumber(db.Model):
 
     def __repr__(self):
         return f'<BatchSerialNumber {self.internal_serial_number}>'
+
+
+class BatchLendRecord(db.Model):
+    """One lending record for a non-SN batch (supports multiple per batch)."""
+    __tablename__ = 'batch_lend_records'
+
+    id = db.Column(db.Integer, primary_key=True)
+    batch_id = db.Column(db.Integer, db.ForeignKey('item_batches.id'), nullable=False)
+    lend_to_type = db.Column(db.String(20), default='')
+    lend_to_id = db.Column(db.Integer, nullable=True)
+    quantity = db.Column(db.Integer, default=1)
+    lend_start = db.Column(db.Date, nullable=True)
+    lend_end = db.Column(db.Date, nullable=True)
+    lend_notify_enabled = db.Column(db.Boolean, default=False)
+    lend_notify_before_days = db.Column(db.Integer, default=3)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    def get_lend_to_display(self):
+        if not self.lend_to_id or not self.lend_to_type:
+            return ''
+        try:
+            if self.lend_to_type == 'user':
+                obj = User.query.get(self.lend_to_id)
+                return obj.username if obj else f'User #{self.lend_to_id}'
+            elif self.lend_to_type == 'person':
+                obj = ContactPerson.query.get(self.lend_to_id)
+                return obj.name if obj else f'Person #{self.lend_to_id}'
+            elif self.lend_to_type == 'organization':
+                obj = ContactOrganization.query.get(self.lend_to_id)
+                return obj.name if obj else f'Org #{self.lend_to_id}'
+            elif self.lend_to_type == 'group':
+                obj = ContactGroup.query.get(self.lend_to_id)
+                return obj.name if obj else f'Group #{self.lend_to_id}'
+        except Exception:
+            pass
+        return ''
+
+    def __repr__(self):
+        return f'<BatchLendRecord batch={self.batch_id} to={self.lend_to_type}:{self.lend_to_id}>'
 
 
 class Attachment(db.Model):
