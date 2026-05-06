@@ -509,7 +509,7 @@ def bom_edit(project_id, bom_id):
         new_used = max(0, int(data['used_quantity']))
         if bom.batch:
             available = bom.batch.get_available_quantity() + (bom.used_quantity or 0)
-            new_used = min(new_used, available)
+            new_used = max(0, min(new_used, available))
         bom.used_quantity = new_used
         # Handle SN assignment for used_quantity
         if 'serial_number_ids' in data:

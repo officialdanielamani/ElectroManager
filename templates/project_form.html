@@ -380,7 +380,7 @@
                                     </div>
                                     {% else %}
                                     <div class="input-group input-group-sm" style="width:110px;">
-                                        <input type="number" class="form-control form-control-sm" id="bomUsedQty{{ bom.id }}" value="{{ bom.used_quantity }}" min="0" max="{{ (bom.batch.get_available_quantity() + bom.used_quantity) if bom.batch else 9999 }}">
+                                        <input type="number" class="form-control form-control-sm" id="bomUsedQty{{ bom.id }}" value="{{ [bom.used_quantity, 0]|max }}" min="0" max="{{ ([bom.batch.get_available_quantity() + bom.used_quantity, 0]|max) if bom.batch else 9999 }}">
                                         <button class="btn btn-outline-success btn-sm" onclick="updateBOMUsedQty({{ bom.id }})" title="Save"><i class="bi bi-check"></i></button>
                                     </div>
                                     {% endif %}
