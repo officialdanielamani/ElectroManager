@@ -250,8 +250,8 @@
                                     <table class="table table-sm table-bordered mt-1 mb-0 small">
                                         <thead><tr><th>Project</th><th class="text-center">Quantity</th></tr></thead>
                                         <tbody>
-                                        {% for pn in proj_names %}
-                                        <tr><td>{{ pn }}</td><td class="text-center">—</td></tr>
+                                        {% for bom in batch.bom_uses if bom.used_quantity > 0 %}
+                                        <tr><td><a href="{{ url_for('project.project_detail', project_id=bom.project.project_id) }}" target="_blank">{{ bom.project.name }}</a></td><td class="text-center">{{ bom.used_quantity }}</td></tr>
                                         {% endfor %}
                                         </tbody>
                                     </table>
@@ -315,12 +315,10 @@
                                                 <td>
                                                     {% set sn_project_used = sn.id in (batch.get_project_used_sn_ids() if batch.get_project_used_sn_ids is defined else []) %}
                                                     {% if sn_project_used %}
-                                                    <span class="badge bg-info">
-                                                        {% for bom in batch.bom_uses if bom.used_quantity > 0 and bom.serial_numbers %}
-                                                            {% set sn_ids = bom.serial_numbers | from_json %}
-                                                            {% if sn.id in sn_ids %}{{ bom.project.name }}{% endif %}
-                                                        {% endfor %}
-                                                    </span>
+                                                    {% for bom in batch.bom_uses if bom.used_quantity > 0 and bom.serial_numbers %}
+                                                        {% set sn_ids = bom.serial_numbers | from_json %}
+                                                        {% if sn.id in sn_ids %}<a href="{{ url_for('project.project_detail', project_id=bom.project.project_id) }}" target="_blank" class="badge bg-info text-decoration-none">{{ bom.project.name }}</a>{% endif %}
+                                                    {% endfor %}
                                                     {% else %}-{% endif %}
                                                 </td>
                                                 <td>

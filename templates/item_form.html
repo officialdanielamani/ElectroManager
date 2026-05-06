@@ -312,7 +312,7 @@
                                             <thead class="table-light"><tr><th>Project</th><th style="width:80px">Quantity</th></tr></thead>
                                             <tbody>
                                                 {% for bom in batch.bom_uses if bom.used_quantity > 0 %}
-                                                <tr><td>{{ bom.project.name }}</td><td>{{ bom.used_quantity }}</td></tr>
+                                                <tr><td><a href="{{ url_for('project.project_detail', project_id=bom.project.project_id) }}" target="_blank">{{ bom.project.name }}</a></td><td>{{ bom.used_quantity }}</td></tr>
                                                 {% endfor %}
                                             </tbody>
                                         </table>
@@ -392,12 +392,10 @@
                                                     </td>
                                                     <td>
                                                         {% if sn_project_used %}
-                                                        <span class="badge bg-info">
-                                                            {% for bom in batch.bom_uses if bom.used_quantity > 0 and bom.serial_numbers %}
-                                                                {% set sn_ids = bom.serial_numbers | from_json %}
-                                                                {% if sn.id in sn_ids %}{{ bom.project.name }}{% endif %}
-                                                            {% endfor %}
-                                                        </span>
+                                                        {% for bom in batch.bom_uses if bom.used_quantity > 0 and bom.serial_numbers %}
+                                                            {% set sn_ids = bom.serial_numbers | from_json %}
+                                                            {% if sn.id in sn_ids %}<a href="{{ url_for('project.project_detail', project_id=bom.project.project_id) }}" target="_blank" class="badge bg-info text-decoration-none">{{ bom.project.name }}</a>{% endif %}
+                                                        {% endfor %}
                                                         {% else %}-{% endif %}
                                                     </td>
                                                     <td>
@@ -405,9 +403,6 @@
                                                         <span class="text-muted" style="opacity:0.5">{{ sn.get_lend_to_display() or '-' }}</span>
                                                         {% else %}
                                                         <span id="lendVal{{ sn.id }}" class="small">{{ sn.get_lend_to_display() or '-' }}</span>
-                                                        {% if item_perms and item_perms.can_edit_lending %}
-                                                        <button class="btn btn-xs btn-outline-secondary ms-1 py-0 px-1" style="font-size:0.7rem;" onclick="openSnLendModal({{ sn.id }}, '{{ sn.lend_to_type or '' }}', {{ sn.lend_to_id or 'null' }}, '{{ sn.get_lend_to_display()|e }}', '{{ sn.lend_start.strftime('%Y-%m-%d') if sn.lend_start else '' }}', '{{ sn.lend_end.strftime('%Y-%m-%d') if sn.lend_end else '' }}', {{ 'true' if sn.lend_notify_enabled else 'false' }}, {{ sn.lend_notify_before_days or 3 }})" title="Set lending"><i class="bi bi-pencil"></i></button>
-                                                        {% endif %}
                                                         {% endif %}
                                                     </td>
                                                 </tr>
@@ -415,7 +410,7 @@
                                             </tbody>
                                         </table>
                                     </div>
-                                    <small class="text-muted">Double-click SN, Info to edit inline. Click <i class="bi bi-pencil"></i> to set lending.</small>
+                                    <small class="text-muted">Double-click SN or Info to edit inline. Use <strong>Manage Lending</strong> to set lending.</small>
                                     {% elif batch.sn_tracking_enabled and batch.serial_numbers|length == 0 and item_perms and item_perms.can_edit_batch %}
                                     <hr class="my-2">
                                     <div class="d-flex align-items-center gap-2">
@@ -3497,7 +3492,7 @@ function submitSnBulkLend(clearMode) {
                     </div>
                 </div>
                 <div class="alert alert-info py-1 px-2 small mb-0">
-                    <i class="bi bi-info-circle"></i> To set lending, use the <strong>Manage Lending</strong> button in the batch toolbar or the <i class="bi bi-pencil"></i> button on each SN row.
+                    <i class="bi bi-info-circle"></i> To set lending, use the <strong>Manage Lending</strong> button in the batch toolbar.
                 </div>
             </div>
             <div class="modal-footer">
