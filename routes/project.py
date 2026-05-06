@@ -421,7 +421,7 @@ def bom_available_sns(project_id, bom_id):
             pass
     sns = []
     for sn in batch.serial_numbers:
-        is_lent = bool(sn.lend_to and sn.lend_to.strip())
+        is_lent = bool(sn.lend_to_type and sn.lend_to_type.strip())
         is_used_elsewhere = sn.id in used_sn_ids and sn.id not in own_sn_ids
         if not is_lent and not is_used_elsewhere:
             sns.append({
