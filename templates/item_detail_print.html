@@ -316,10 +316,10 @@
     </div>
     {% endif %}
 
-    <!-- Datasheets -->
+    <!-- URLs -->
     {% if datasheets %}
     <div class="avoid-break">
-        <div class="section-title">Datasheets</div>
+        <div class="section-title">URLs</div>
         {% for ds in datasheets %}
         <div style="padding: 2px 0; font-size: 0.9em;">
             {{ ds.title or ds.url }}{% if ds.info %} &mdash; {{ ds.info }}{% endif %}

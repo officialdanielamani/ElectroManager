@@ -445,7 +445,7 @@
                 <!-- Datasheet URLs -->
                 {% if item.datasheet_urls %}
                 <div class="mb-3 px-1">
-                    <strong><i class="bi bi-file-earmark-text"></i> Datasheets:</strong>
+                    <strong><i class="bi bi-link-45deg"></i> URLs:</strong>
                     <div id="datasheet-display" class="mt-2"></div>
                 </div>
                 <hr>
@@ -464,7 +464,7 @@ function renderDatasheets() {
     const container = document.getElementById('datasheet-display');
     if (!container) return;
     if (datasheets.length === 0) {
-        container.innerHTML = '<p class="text-muted small">No datasheets available.</p>';
+        container.innerHTML = '<p class="text-muted small">No URLs added.</p>';
         return;
     }
     let html = '<div class="list-group">';

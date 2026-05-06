@@ -259,7 +259,7 @@
                                     <span class="badge bg-secondary ms-1">Value: {{ currency }}{{ "%.2f"|format(batch.get_batch_total_value()) }}</span>
                                     {% if batch.get_lend_quantity() > 0 %}<span class="badge ms-1" style="background-color:#c9a227; color:#fff;"><i class="bi bi-hand-index-thumb"></i> On Lend</span>{% endif %}
                                     {% set proj_names = batch.get_project_names_for_batch() %}
-                                    {% if proj_names %}<span class="badge bg-info ms-1">Proj: {{ proj_names|join(', ') }}</span>{% endif %}
+                                    {% if proj_names %}<span class="badge bg-info ms-1"><i class="bi bi-kanban"></i> In Project</span>{% endif %}
                                     {% if not batch.follow_main_location %}<span class="badge ms-1" style="background-color: {{ batch.get_effective_location_color() }};"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>{% endif %}
                                     {% if batch.purchase_date %}<small class="text-muted ms-2"><i class="bi bi-calendar"></i> {{ batch.purchase_date.strftime('%d/%m/%Y') }}</small>{% endif %}
                                     {% if batch.note %}<small class="text-muted ms-2"><i class="bi bi-sticky"></i> {{ batch.note }}</small>{% endif %}
@@ -470,7 +470,7 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label form-label-sm">Datasheet URLs</label>
+                        <label class="form-label form-label-sm">URLs</label>
                         <button type="button" class="btn btn-sm btn-primary float-end" onclick="addDatasheetRow()"
                             {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
                             <i class="bi bi-plus-circle"></i> Add URL
