@@ -448,7 +448,8 @@ def item_edit(uuid):
     max_size_mb = int(Setting.get('max_file_size_mb', '10'))
     extensions_str = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
     
-    return render_template('item_form.html', form=form, item=item, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='Edit Item', currency=Setting.get('currency', '$'), max_file_size_mb=max_size_mb, allowed_file_types=extensions_str, item_perms=perms)
+    batch_lend_data = {b.id: b.get_lend_records_data() for b in item.batches}
+    return render_template('item_form.html', form=form, item=item, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='Edit Item', currency=Setting.get('currency', '$'), max_file_size_mb=max_size_mb, allowed_file_types=extensions_str, item_perms=perms, batch_lend_data=batch_lend_data)
 
 
 

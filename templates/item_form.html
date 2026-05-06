@@ -269,8 +269,9 @@
                                     {% if item_perms and item_perms.can_edit_batch %}
                                     {% if not batch.sn_tracking_enabled %}
                                     <button type="button" class="btn btn-sm btn-outline-info py-0 px-1" onclick="event.stopPropagation(); openTransferModal({{ batch.id }}, {{ batch.get_available_quantity() }})" title="Transfer Quantity"><i class="bi bi-arrow-left-right"></i></button>
+                                    <button type="button" class="btn btn-sm py-0 px-1" style="background-color:#c9a227;color:#fff;border-color:#c9a227;" onclick="event.stopPropagation(); openLendManageModal({{ batch.id }}, {{ batch.quantity }})" title="Manage Lending"><i class="bi bi-hand-index-thumb"></i></button>
                                     {% endif %}
-                                    <button type="button" class="btn btn-sm btn-outline-warning py-0 px-1" onclick="event.stopPropagation(); openEditBatchModal({{ batch.id }}, '{{ batch.batch_label|e if batch.batch_label else '' }}', {{ batch.quantity }}, {{ batch.price_per_unit }}, '{{ batch.purchase_date.strftime('%Y-%m-%d') if batch.purchase_date else '' }}', '{{ batch.note|e if batch.note else '' }}', {{ batch.get_lend_records_data()|tojson }}, {{ 'true' if batch.sn_tracking_enabled else 'false' }}, {{ 'true' if (batch.follow_main_location if batch.follow_main_location is not none else true) else 'false' }}, {{ batch.location_id or 'null' }}, {{ batch.rack_id or 'null' }}, '{{ batch.drawer|e if batch.drawer else '' }}')" title="Edit"><i class="bi bi-pencil"></i></button>
+                                    <button type="button" class="btn btn-sm btn-outline-warning py-0 px-1" onclick="event.stopPropagation(); openEditBatchModal({{ batch.id }}, '{{ batch.batch_label|e if batch.batch_label else '' }}', {{ batch.quantity }}, {{ batch.price_per_unit }}, '{{ batch.purchase_date.strftime('%Y-%m-%d') if batch.purchase_date else '' }}', '{{ batch.note|e if batch.note else '' }}', {{ 'true' if batch.sn_tracking_enabled else 'false' }}, {{ 'true' if (batch.follow_main_location if batch.follow_main_location is not none else true) else 'false' }}, {{ batch.location_id or 'null' }}, {{ batch.rack_id or 'null' }}, '{{ batch.drawer|e if batch.drawer else '' }}')" title="Edit"><i class="bi bi-pencil"></i></button>
                                     <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="event.stopPropagation(); deleteBatchJS({{ batch.id }}, '{{ batch.get_display_label()|e }}')" title="Delete"><i class="bi bi-trash"></i></button>
                                     {% endif %}
                                 </div>
@@ -2487,18 +2488,6 @@ function batchUpdateDrawerGrid(prefix) {
                     <label class="form-label form-label-sm">Note <small class="text-muted">(max 128)</small></label>
                     <input type="text" class="form-control form-control-sm" id="ab_note" maxlength="128">
                 </div>
-                <div id="ab_lendSection">
-                    <div class="card border-warning mb-2">
-                        <div class="card-header py-1 bg-warning bg-opacity-10 d-flex align-items-center justify-content-between">
-                            <span><i class="bi bi-hand-index-thumb me-1 small"></i><strong class="small">Lending</strong></span>
-                            <button type="button" class="btn btn-outline-warning btn-sm py-0 px-1" onclick="showLrForm('add')" style="font-size:0.75rem;"><i class="bi bi-plus"></i> Add</button>
-                        </div>
-                        <div class="card-body p-2">
-                            <div id="ab_lend_records_table" class="mb-2"></div>
-                            <div id="ab_lr_form_slot"></div>
-                        </div>
-                    </div>
-                </div>
                 <div class="border rounded p-2 mb-2">
                     <div class="form-check mb-2">
                         <input class="form-check-input" type="checkbox" id="ab_follow_main" checked onchange="abToggleLocation()">
@@ -2618,18 +2607,6 @@ function batchUpdateDrawerGrid(prefix) {
                     <label class="form-label form-label-sm">Note</label>
                     <input type="text" class="form-control form-control-sm" id="eb_note" maxlength="128">
                 </div>
-                <div id="eb_lendSection">
-                    <div class="card border-warning mb-2">
-                        <div class="card-header py-1 bg-warning bg-opacity-10 d-flex align-items-center justify-content-between">
-                            <span><i class="bi bi-hand-index-thumb me-1 small"></i><strong class="small">Lending</strong></span>
-                            <button type="button" class="btn btn-outline-warning btn-sm py-0 px-1" onclick="showLrForm('add')" style="font-size:0.75rem;"><i class="bi bi-plus"></i> Add</button>
-                        </div>
-                        <div class="card-body p-2">
-                            <div id="eb_lend_records_table" class="mb-2"></div>
-                            <div id="eb_lr_form_slot"></div>
-                        </div>
-                    </div>
-                </div>
                 <div class="border rounded p-2 mb-2">
                     <div class="form-check mb-2">
                         <input class="form-check-input" type="checkbox" id="eb_follow_main" onchange="ebToggleLocation()">
@@ -2726,8 +2703,6 @@ function reloadKeepBatch() {
 
 /* ── Add Batch ── */
 function openAddBatchModal() {
-    _lrPrefix = 'ab';
-    _abLendRecords = [];
     document.getElementById('addBatchSnTracking').checked = false;
     document.getElementById('ab_label').value = '';
     document.getElementById('ab_qty').value = '1';
@@ -2735,7 +2710,6 @@ function openAddBatchModal() {
     document.getElementById('ab_total').value = '0';
     document.getElementById('ab_date').value = '';
     document.getElementById('ab_note').value = '';
-    renderLendRecordsTable();
     document.getElementById('ab_follow_main').checked = true;
     document.getElementById('ab_location_id').value = '';
     document.getElementById('ab_storage_location_select').value = '';
@@ -2782,15 +2756,13 @@ function toggleAddBatchTracking() {
     var on = document.getElementById('addBatchSnTracking').checked;
     var qi = document.getElementById('ab_qty');
     if (on) {
-        qi.max = 100; if (parseInt(qi.value)>100) qi.value=100;
-        document.getElementById('ab_qtyHint').textContent='(max 100)';
-        document.getElementById('ab_lendSection').style.display='none';
-        document.getElementById('addBatchTrackingInfo').innerHTML='<strong>ON:</strong> Each unit gets SN/ISN. Max 100 per batch.';
+        qi.max = 100; if (parseInt(qi.value) > 100) qi.value = 100;
+        document.getElementById('ab_qtyHint').textContent = '(max 100)';
+        document.getElementById('addBatchTrackingInfo').innerHTML = '<strong>ON:</strong> Each unit gets SN/ISN. Max 100 per batch.';
     } else {
         qi.max = 99999;
-        document.getElementById('ab_qtyHint').textContent='(no limit)';
-        document.getElementById('ab_lendSection').style.display='block';
-        document.getElementById('addBatchTrackingInfo').innerHTML='<strong>OFF:</strong> Simple batch — unlimited quantity, manual lending.';
+        document.getElementById('ab_qtyHint').textContent = '(no limit)';
+        document.getElementById('addBatchTrackingInfo').innerHTML = '<strong>OFF:</strong> Simple batch — unlimited quantity, manual lending.';
     }
 }
 function submitAddBatch() {
@@ -2800,7 +2772,6 @@ function submitAddBatch() {
     fd.append('price_per_unit', document.getElementById('ab_price').value);
     fd.append('purchase_date', document.getElementById('ab_date').value);
     fd.append('note', document.getElementById('ab_note').value);
-    fd.append('lend_records', JSON.stringify(_abLendRecords));
     if (document.getElementById('addBatchSnTracking').checked) fd.append('sn_tracking', 'on');
     if (document.getElementById('ab_follow_main').checked) {
         fd.append('follow_main_location', 'on');
@@ -2816,10 +2787,7 @@ function submitAddBatch() {
 }
 
 /* ── Edit Batch ── */
-function openEditBatchModal(batchId, label, qty, price, date, note, lendRecords, snTracking, followMain, batchLocId, batchRackId, batchDrawer) {
-    _lrPrefix = 'eb';
-    _ebLendRecords = Array.isArray(lendRecords) ? lendRecords : [];
-    renderLendRecordsTable();
+function openEditBatchModal(batchId, label, qty, price, date, note, snTracking, followMain, batchLocId, batchRackId, batchDrawer) {
     document.getElementById('eb_id').value = batchId;
     document.getElementById('eb_label').value = label;
     document.getElementById('eb_qty').value = qty;
@@ -2849,13 +2817,11 @@ function openEditBatchModal(batchId, label, qty, price, date, note, lendRecords,
     if (snTracking) {
         document.getElementById('eb_qtySection').style.display = 'none';
         document.getElementById('eb_priceOnlySection').style.display = 'block';
-        document.getElementById('eb_lendSection').style.display = 'none';
         document.getElementById('eb_snInfo').innerHTML = '<i class="bi bi-upc-scan"></i> <strong>Tracking Enabled</strong> — Qty: ' + qty + '. Use Add/Delete in SN table to change quantity.';
         document.getElementById('eb_snInfo').style.display = 'block';
     } else {
         document.getElementById('eb_qtySection').style.display = 'block';
         document.getElementById('eb_priceOnlySection').style.display = 'none';
-        document.getElementById('eb_lendSection').style.display = 'block';
         document.getElementById('eb_snInfo').innerHTML = '<i class="bi bi-upc-scan"></i> Tracking: <span class="badge bg-secondary">Disabled</span>';
         document.getElementById('eb_snInfo').style.display = 'block';
     }
@@ -2909,7 +2875,6 @@ function submitEditBatch() {
     } else {
         fd.append('quantity', document.getElementById('eb_qty').value);
         fd.append('price_per_unit', document.getElementById('eb_price').value);
-        fd.append('lend_records', JSON.stringify(_ebLendRecords));
     }
     fd.append('purchase_date', document.getElementById('eb_date').value);
     fd.append('note', document.getElementById('eb_note').value);
@@ -3218,25 +3183,53 @@ function toggleLendNotify(prefix) {
     document.getElementById(prefix + '_lend_notify_days_section').style.display = on ? '' : 'none';
 }
 
-/* ── Inline Lend Record Management (batch add/edit modals) ── */
-var _ebLendRecords = [];
-var _abLendRecords = [];
-var _lrPrefix = 'eb';
+/* ── Lending Management Modal ── */
+{% if item is defined %}
+var _batchLendData = {{ batch_lend_data|tojson if batch_lend_data is defined else '{}'|safe }};
+{% else %}
+var _batchLendData = {};
+{% endif %}
+var _lmBatchId = null;
+var _lmBatchQty = 0;
+var _lmLendRecords = [];
 var _lrMode = 'add';
 var _lrEditIdx = -1;
 var _lrSearchTimer = null;
 
+function openLendManageModal(batchId, batchQty) {
+    _lmBatchId = batchId;
+    _lmBatchQty = batchQty;
+    _lmLendRecords = JSON.parse(JSON.stringify(_batchLendData[batchId] || []));
+    renderLendRecordsTable();
+    cancelLrForm();
+    new bootstrap.Modal(document.getElementById('lendManageModal')).show();
+}
+
+function submitLendManage() {
+    var fd = new FormData();
+    fd.append('lend_records', JSON.stringify(_lmLendRecords));
+    fetch('/item/{{ item.uuid if item is defined else "" }}/batch/' + _lmBatchId + '/manage_lend', {
+        method: 'POST', body: fd
+    }).then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.success) {
+            _batchLendData[_lmBatchId] = JSON.parse(JSON.stringify(_lmLendRecords));
+            bootstrap.Modal.getInstance(document.getElementById('lendManageModal')).hide();
+            reloadKeepBatch();
+        } else { alert(d.message || 'Error saving lending records.'); }
+    }).catch(function(e) { alert('Error: ' + e); });
+}
+
 function renderLendRecordsTable() {
-    var records = _lrPrefix === 'eb' ? _ebLendRecords : _abLendRecords;
-    var el = document.getElementById(_lrPrefix + '_lend_records_table');
+    var el = document.getElementById('lm_lend_records_table');
     if (!el) return;
-    if (!records.length) {
+    if (!_lmLendRecords.length) {
         el.innerHTML = '<div class="text-muted small p-1">No lending records yet.</div>';
         return;
     }
-    var rows = records.map(function(r, i) {
+    var rows = _lmLendRecords.map(function(r, i) {
         var label = (r.label || '—').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        var notify = r.notify ? '<i class="bi bi-bell-fill text-warning" title="Remind ' + (r.days||3) + ' days before"></i>' : '';
+        var notify = r.notify ? '<i class="bi bi-bell-fill text-warning" title="Remind ' + (r.days||3) + ' days before"></i>' : '—';
         return '<tr>' +
             '<td class="small">' + label + '</td>' +
             '<td class="small text-center">' + (r.qty||1) + '</td>' +
@@ -3249,7 +3242,7 @@ function renderLendRecordsTable() {
             '</td></tr>';
     }).join('');
     el.innerHTML = '<table class="table table-sm table-bordered mb-0 small">' +
-        '<thead><tr><th>To</th><th class="text-center">Qty</th><th>Start</th><th>End</th><th class="text-center">N</th><th></th></tr></thead>' +
+        '<thead class="table-light"><tr><th>Lend To</th><th class="text-center">Qty</th><th>Start</th><th>End</th><th class="text-center"><i class="bi bi-bell" title="Notify"></i></th><th></th></tr></thead>' +
         '<tbody>' + rows + '</tbody></table>';
 }
 
@@ -3271,15 +3264,14 @@ function showLrForm(mode) {
         document.getElementById('lr_search_panel').style.display = 'none';
         document.getElementById('lr_save_btn').innerHTML = '<i class="bi bi-plus"></i> Add';
     }
-    var slot = document.getElementById(_lrPrefix + '_lr_form_slot');
+    var slot = document.getElementById('lm_lr_form_slot');
     var form = document.getElementById('lr_shared_form');
     slot.appendChild(form);
     form.style.display = '';
 }
 
 function editLendRecord(idx) {
-    var records = _lrPrefix === 'eb' ? _ebLendRecords : _abLendRecords;
-    var r = records[idx];
+    var r = _lmLendRecords[idx];
     if (!r) return;
     _lrMode = 'edit';
     _lrEditIdx = idx;
@@ -3296,15 +3288,14 @@ function editLendRecord(idx) {
     document.getElementById('lr_notify_days_section').style.display = r.notify ? '' : 'none';
     document.getElementById('lr_search_panel').style.display = 'none';
     document.getElementById('lr_save_btn').innerHTML = '<i class="bi bi-save"></i> Update';
-    var slot = document.getElementById(_lrPrefix + '_lr_form_slot');
+    var slot = document.getElementById('lm_lr_form_slot');
     var form = document.getElementById('lr_shared_form');
     slot.appendChild(form);
     form.style.display = '';
 }
 
 function deleteLendRecord(idx) {
-    if (_lrPrefix === 'eb') _ebLendRecords.splice(idx, 1);
-    else _abLendRecords.splice(idx, 1);
+    _lmLendRecords.splice(idx, 1);
     renderLendRecordsTable();
 }
 
@@ -3326,13 +3317,8 @@ function saveLrForm() {
         notify: document.getElementById('lr_notify').checked,
         days: parseInt(document.getElementById('lr_notify_days').value) || 3
     };
-    if (_lrPrefix === 'eb') {
-        if (_lrMode === 'edit' && _lrEditIdx >= 0) _ebLendRecords[_lrEditIdx] = record;
-        else _ebLendRecords.push(record);
-    } else {
-        if (_lrMode === 'edit' && _lrEditIdx >= 0) _abLendRecords[_lrEditIdx] = record;
-        else _abLendRecords.push(record);
-    }
+    if (_lrMode === 'edit' && _lrEditIdx >= 0) _lmLendRecords[_lrEditIdx] = record;
+    else _lmLendRecords.push(record);
     cancelLrForm();
     renderLendRecordsTable();
 }
@@ -3883,6 +3869,27 @@ function submitSnLend() {
 })();
 </script>
 {% endif %}
+
+<!-- Manage Lending Modal -->
+<div class="modal fade" id="lendManageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h5 class="modal-title"><i class="bi bi-hand-index-thumb text-warning"></i> Manage Lending</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3">
+                <div id="lm_lend_records_table" class="mb-2"></div>
+                <div id="lm_lr_form_slot"></div>
+                <button type="button" class="btn btn-outline-warning btn-sm mt-1" onclick="showLrForm('add')"><i class="bi bi-plus"></i> Add Lending Record</button>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitLendManage()"><i class="bi bi-save"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Shared Lend Record Sub-form (moved dynamically into active modal slot) -->
 <div id="lr_shared_form" style="display:none;" class="border rounded p-2 bg-light">

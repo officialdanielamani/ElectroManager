@@ -263,7 +263,30 @@ def edit_batch(uuid, batch_id):
     return redirect(url_for('item.item_edit', uuid=uuid) + '#batches-section')
 
 
-@batch_bp.route('/item/<string:uuid>/batch/<int:batch_id>/delete', methods=['POST'])
+@batch_bp.route('/item/<string:uuid>/batch/<int:batch_id>/manage_lend', methods=['POST'])
+@login_required
+def manage_lend(uuid, batch_id):
+    """Save all lend records for a batch (replaces existing records)."""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    batch = ItemBatch.query.filter_by(id=batch_id, item_id=item.id).first_or_404()
+    if batch.sn_tracking_enabled:
+        return jsonify({'success': False, 'message': 'SN batches use per-SN lending.'})
+    can_edit_lending = current_user.has_permission('items', 'edit_lending')
+    if not can_edit_lending:
+        return jsonify({'success': False, 'message': 'No permission.'})
+    lend_records_json = request.form.get('lend_records', '[]')
+    try:
+        lend_records_data = json.loads(lend_records_json)
+    except (ValueError, TypeError):
+        lend_records_data = []
+    BatchLendRecord.query.filter_by(batch_id=batch.id).delete()
+    _save_lend_records(batch, lend_records_data, batch.quantity)
+    db.session.commit()
+    log_audit(current_user.id, 'batch_lend_update', item.id,
+              f'Updated lend records for batch #{batch.batch_number} of item: {item.name}')
+    return jsonify({'success': True, 'lend_qty': batch.get_lend_quantity()})
+
+
 @login_required
 def delete_batch(uuid, batch_id):
     """Delete a batch"""
