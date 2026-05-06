@@ -225,8 +225,11 @@
                                     <div class="col-md-3"><strong>Total Value:</strong> {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_value()) }}</div>
                                     <div class="col-md-3"><strong>Lending:</strong> {{ batch.get_lend_quantity() }}</div>
                                     <div class="col-md-3"><strong>Available Qty:</strong> {{ batch.get_available_quantity() }}</div>
-                                    {% if not batch.sn_tracking_enabled and batch.lend_to %}
-                                    <div class="col-md-3"><strong>Lend to:</strong> {{ batch.lend_to }}</div>
+                                    {% if not batch.sn_tracking_enabled and batch.lend_to_id %}
+                                    <div class="col-md-3"><strong>Lend to:</strong> {{ batch.get_lend_to_display() }}</div>
+                                    {% endif %}
+                                    {% if batch.lend_start or batch.lend_end %}
+                                    <div class="col-md-3"><strong>Lend period:</strong> {{ batch.lend_start.strftime('%d/%m/%Y') if batch.lend_start else '?' }} — {{ batch.lend_end.strftime('%d/%m/%Y') if batch.lend_end else '?' }}</div>
                                     {% endif %}
                                     <div class="col-md-3"><strong>Date:</strong> {{ batch.purchase_date.strftime('%d/%m/%Y') if batch.purchase_date else 'N/A' }}</div>
                                 </div>
@@ -297,9 +300,10 @@
                                                 </td>
                                                 <td>
                                                     {% if sn_project_used %}
-                                                    <span class="text-muted" style="opacity:0.5">{{ sn.lend_to or '-' }}</span>
+                                                    <span class="text-muted" style="opacity:0.5">{{ sn.get_lend_to_display() or '-' }}</span>
                                                     {% else %}
-                                                    <span class="lend-val" id="lendVal{{ sn.id }}">{{ sn.lend_to or '-' }}</span>
+                                                    <span class="lend-val" id="lendVal{{ sn.id }}">{{ sn.get_lend_to_display() or '-' }}</span>
+                                                    {% if sn.lend_end %}<small class="text-muted d-block" style="font-size:0.7rem">until {{ sn.lend_end.strftime('%d/%m/%Y') }}</small>{% endif %}
                                                     {% endif %}
                                                 </td>
                                             </tr>

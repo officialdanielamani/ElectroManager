@@ -270,7 +270,7 @@
                                     {% if not batch.sn_tracking_enabled %}
                                     <button type="button" class="btn btn-sm btn-outline-info py-0 px-1" onclick="event.stopPropagation(); openTransferModal({{ batch.id }}, {{ batch.get_available_quantity() }})" title="Transfer Quantity"><i class="bi bi-arrow-left-right"></i></button>
                                     {% endif %}
-                                    <button type="button" class="btn btn-sm btn-outline-warning py-0 px-1" onclick="event.stopPropagation(); openEditBatchModal({{ batch.id }}, '{{ batch.batch_label|e if batch.batch_label else '' }}', {{ batch.quantity }}, {{ batch.price_per_unit }}, '{{ batch.purchase_date.strftime('%Y-%m-%d') if batch.purchase_date else '' }}', '{{ batch.note|e if batch.note else '' }}', '{{ batch.lend_to|e if batch.lend_to else '' }}', {{ batch.lend_quantity or 0 }}, {{ 'true' if batch.sn_tracking_enabled else 'false' }}, {{ 'true' if (batch.follow_main_location if batch.follow_main_location is not none else true) else 'false' }}, {{ batch.location_id or 'null' }}, {{ batch.rack_id or 'null' }}, '{{ batch.drawer|e if batch.drawer else '' }}')" title="Edit"><i class="bi bi-pencil"></i></button>
+                                    <button type="button" class="btn btn-sm btn-outline-warning py-0 px-1" onclick="event.stopPropagation(); openEditBatchModal({{ batch.id }}, '{{ batch.batch_label|e if batch.batch_label else '' }}', {{ batch.quantity }}, {{ batch.price_per_unit }}, '{{ batch.purchase_date.strftime('%Y-%m-%d') if batch.purchase_date else '' }}', '{{ batch.note|e if batch.note else '' }}', '{{ batch.lend_to_type or '' }}', {{ batch.lend_to_id or 'null' }}, '{{ batch.get_lend_to_display()|e }}', {{ batch.lend_quantity or 0 }}, '{{ batch.lend_start.strftime('%Y-%m-%d') if batch.lend_start else '' }}', '{{ batch.lend_end.strftime('%Y-%m-%d') if batch.lend_end else '' }}', {{ 'true' if batch.lend_notify_enabled else 'false' }}, {{ batch.lend_notify_before_days or 3 }}, {{ 'true' if batch.sn_tracking_enabled else 'false' }}, {{ 'true' if (batch.follow_main_location if batch.follow_main_location is not none else true) else 'false' }}, {{ batch.location_id or 'null' }}, {{ batch.rack_id or 'null' }}, '{{ batch.drawer|e if batch.drawer else '' }}')" title="Edit"><i class="bi bi-pencil"></i></button>
                                     <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="event.stopPropagation(); deleteBatchJS({{ batch.id }}, '{{ batch.get_display_label()|e }}')" title="Delete"><i class="bi bi-trash"></i></button>
                                     {% endif %}
                                 </div>
@@ -290,8 +290,11 @@
                                         <div class="col-md-3"><strong>Total Value:</strong> {{ currency }}{{ "%.2f"|format(batch.get_batch_total_value()) }}</div>
                                         <div class="col-md-3"><strong>Lending:</strong> {{ batch.get_lend_quantity() }}</div>
                                         <div class="col-md-3"><strong>Available:</strong> {{ batch.get_available_quantity() }}</div>
-                                        {% if not batch.sn_tracking_enabled and batch.lend_to %}
-                                        <div class="col-md-3"><strong>Lend to:</strong> {{ batch.lend_to }}</div>
+                                        {% if not batch.sn_tracking_enabled and batch.lend_to_id %}
+                                        <div class="col-md-3"><strong>Lend to:</strong> {{ batch.get_lend_to_display() }}</div>
+                                        {% endif %}
+                                        {% if batch.lend_start or batch.lend_end %}
+                                        <div class="col-md-3"><strong>Lend period:</strong> {{ batch.lend_start.strftime('%d/%m/%Y') if batch.lend_start else '?' }} — {{ batch.lend_end.strftime('%d/%m/%Y') if batch.lend_end else '?' }}</div>
                                         {% endif %}
                                         <div class="col-md-3"><strong>Date:</strong> {{ batch.purchase_date.strftime('%d/%m/%Y') if batch.purchase_date else 'N/A' }}</div>
                                     </div>
@@ -371,9 +374,12 @@
                                                     </td>
                                                     <td>
                                                         {% if sn_project_used %}
-                                                        <span class="text-muted" style="opacity:0.5">{{ sn.lend_to or '-' }}</span>
+                                                        <span class="text-muted" style="opacity:0.5">{{ sn.get_lend_to_display() or '-' }}</span>
                                                         {% else %}
-                                                        <span id="lendVal{{ sn.id }}" ondblclick="inlineEdit(this, {{ sn.id }}, 'lend', '{{ sn.lend_to|e if sn.lend_to else '-' }}', {{ batch.id }})">{{ sn.lend_to or '-' }}</span>
+                                                        <span id="lendVal{{ sn.id }}" class="small">{{ sn.get_lend_to_display() or '-' }}</span>
+                                                        {% if item_perms and item_perms.can_edit_lending %}
+                                                        <button class="btn btn-xs btn-outline-secondary ms-1 py-0 px-1" style="font-size:0.7rem;" onclick="openSnLendModal({{ sn.id }}, '{{ sn.lend_to_type or '' }}', {{ sn.lend_to_id or 'null' }}, '{{ sn.get_lend_to_display()|e }}', '{{ sn.lend_start.strftime('%Y-%m-%d') if sn.lend_start else '' }}', '{{ sn.lend_end.strftime('%Y-%m-%d') if sn.lend_end else '' }}', {{ 'true' if sn.lend_notify_enabled else 'false' }}, {{ sn.lend_notify_before_days or 3 }})" title="Set lending"><i class="bi bi-pencil"></i></button>
+                                                        {% endif %}
                                                         {% endif %}
                                                     </td>
                                                 </tr>
@@ -381,7 +387,7 @@
                                             </tbody>
                                         </table>
                                     </div>
-                                    <small class="text-muted">Double-click SN, Info, or Lend to edit inline.</small>
+                                    <small class="text-muted">Double-click SN, Info to edit inline. Click <i class="bi bi-pencil"></i> to set lending.</small>
                                     {% elif batch.sn_tracking_enabled and batch.serial_numbers|length == 0 and item_perms and item_perms.can_edit_batch %}
                                     <hr class="my-2">
                                     <div class="d-flex align-items-center gap-2">
@@ -2458,14 +2464,47 @@ function batchUpdateDrawerGrid(prefix) {
                     <input type="text" class="form-control form-control-sm" id="ab_note" maxlength="128">
                 </div>
                 <div id="ab_lendSection">
-                    <div class="row mb-2">
-                        <div class="col-8">
-                            <label class="form-label form-label-sm">Lend to</label>
-                            <input type="text" class="form-control form-control-sm" id="ab_lend_to" maxlength="200">
+                    <div class="card border-warning mb-2">
+                        <div class="card-header py-1 bg-warning bg-opacity-10 d-flex align-items-center">
+                            <i class="bi bi-hand-index-thumb me-2 small"></i><strong class="small">Lending</strong>
                         </div>
-                        <div class="col-4">
-                            <label class="form-label form-label-sm">Lend Qty</label>
-                            <input type="number" class="form-control form-control-sm" id="ab_lend_qty" min="0" value="0">
+                        <div class="card-body p-2">
+                            <div class="mb-2">
+                                <label class="form-label form-label-sm mb-1">Lend To</label>
+                                <input type="hidden" id="ab_lend_to_type">
+                                <input type="hidden" id="ab_lend_to_id">
+                                <div class="form-control form-control-sm d-flex align-items-center justify-content-between" style="cursor:pointer; min-height:31px;" onclick="openLendContactPicker('ab')">
+                                    <span id="ab_lend_label" class="text-muted small">Click to select contact...</span>
+                                    <i class="bi bi-x-circle text-danger" id="ab_lend_clear" style="display:none;" onclick="event.stopPropagation(); clearLendContact('ab')"></i>
+                                </div>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label form-label-sm mb-1">Lend Quantity</label>
+                                <input type="number" class="form-control form-control-sm" id="ab_lend_qty" min="0" value="0">
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label class="form-label form-label-sm mb-1">Start Date</label>
+                                    <input type="date" class="form-control form-control-sm" id="ab_lend_start">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label form-label-sm mb-1">End Date</label>
+                                    <input type="date" class="form-control form-control-sm" id="ab_lend_end">
+                                </div>
+                            </div>
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" id="ab_lend_notify" onchange="toggleLendNotify('ab')">
+                                    <label class="form-check-label small" for="ab_lend_notify">Notification</label>
+                                </div>
+                                <div id="ab_lend_notify_days_section" style="display:none;">
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text">Remind</span>
+                                        <input type="number" class="form-control" id="ab_lend_notify_days" min="1" value="3" style="width:55px">
+                                        <span class="input-group-text">days before</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2589,14 +2628,47 @@ function batchUpdateDrawerGrid(prefix) {
                     <input type="text" class="form-control form-control-sm" id="eb_note" maxlength="128">
                 </div>
                 <div id="eb_lendSection">
-                    <div class="row mb-2">
-                        <div class="col-8">
-                            <label class="form-label form-label-sm">Lend to</label>
-                            <input type="text" class="form-control form-control-sm" id="eb_lend_to" maxlength="200">
+                    <div class="card border-warning mb-2">
+                        <div class="card-header py-1 bg-warning bg-opacity-10 d-flex align-items-center">
+                            <i class="bi bi-hand-index-thumb me-2 small"></i><strong class="small">Lending</strong>
                         </div>
-                        <div class="col-4">
-                            <label class="form-label form-label-sm">Lend Qty</label>
-                            <input type="number" class="form-control form-control-sm" id="eb_lend_qty" min="0">
+                        <div class="card-body p-2">
+                            <div class="mb-2">
+                                <label class="form-label form-label-sm mb-1">Lend To</label>
+                                <input type="hidden" id="eb_lend_to_type">
+                                <input type="hidden" id="eb_lend_to_id">
+                                <div class="form-control form-control-sm d-flex align-items-center justify-content-between" style="cursor:pointer; min-height:31px;" onclick="openLendContactPicker('eb')">
+                                    <span id="eb_lend_label" class="text-muted small">Click to select contact...</span>
+                                    <i class="bi bi-x-circle text-danger" id="eb_lend_clear" style="display:none;" onclick="event.stopPropagation(); clearLendContact('eb')"></i>
+                                </div>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label form-label-sm mb-1">Lend Quantity</label>
+                                <input type="number" class="form-control form-control-sm" id="eb_lend_qty" min="0">
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label class="form-label form-label-sm mb-1">Start Date</label>
+                                    <input type="date" class="form-control form-control-sm" id="eb_lend_start">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label form-label-sm mb-1">End Date</label>
+                                    <input type="date" class="form-control form-control-sm" id="eb_lend_end">
+                                </div>
+                            </div>
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" id="eb_lend_notify" onchange="toggleLendNotify('eb')">
+                                    <label class="form-check-label small" for="eb_lend_notify">Notification</label>
+                                </div>
+                                <div id="eb_lend_notify_days_section" style="display:none;">
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text">Remind</span>
+                                        <input type="number" class="form-control" id="eb_lend_notify_days" min="1" value="3" style="width:55px">
+                                        <span class="input-group-text">days before</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2703,8 +2775,13 @@ function openAddBatchModal() {
     document.getElementById('ab_total').value = '0';
     document.getElementById('ab_date').value = '';
     document.getElementById('ab_note').value = '';
-    document.getElementById('ab_lend_to').value = '';
+    clearLendContact('ab');
     document.getElementById('ab_lend_qty').value = '0';
+    document.getElementById('ab_lend_start').value = '';
+    document.getElementById('ab_lend_end').value = '';
+    document.getElementById('ab_lend_notify').checked = false;
+    document.getElementById('ab_lend_notify_days').value = '3';
+    document.getElementById('ab_lend_notify_days_section').style.display = 'none';
     document.getElementById('ab_follow_main').checked = true;
     document.getElementById('ab_location_id').value = '';
     document.getElementById('ab_storage_location_select').value = '';
@@ -2760,8 +2837,13 @@ function submitAddBatch() {
     fd.append('price_per_unit', document.getElementById('ab_price').value);
     fd.append('purchase_date', document.getElementById('ab_date').value);
     fd.append('note', document.getElementById('ab_note').value);
-    fd.append('lend_to', document.getElementById('ab_lend_to').value);
+    fd.append('lend_to_type', document.getElementById('ab_lend_to_type').value);
+    fd.append('lend_to_id', document.getElementById('ab_lend_to_id').value);
     fd.append('lend_quantity', document.getElementById('ab_lend_qty').value);
+    fd.append('lend_start', document.getElementById('ab_lend_start').value);
+    fd.append('lend_end', document.getElementById('ab_lend_end').value);
+    fd.append('lend_notify_enabled', document.getElementById('ab_lend_notify').checked ? '1' : '0');
+    fd.append('lend_notify_before_days', document.getElementById('ab_lend_notify_days').value);
     if (document.getElementById('addBatchSnTracking').checked) fd.append('sn_tracking', 'on');
     if (document.getElementById('ab_follow_main').checked) {
         fd.append('follow_main_location', 'on');
@@ -2777,7 +2859,7 @@ function submitAddBatch() {
 }
 
 /* ── Edit Batch ── */
-function openEditBatchModal(batchId, label, qty, price, date, note, lendTo, lendQty, snTracking, followMain, batchLocId, batchRackId, batchDrawer) {
+function openEditBatchModal(batchId, label, qty, price, date, note, lendToType, lendToId, lendLabel, lendQty, lendStart, lendEnd, lendNotify, lendDays, snTracking, followMain, batchLocId, batchRackId, batchDrawer) {
     document.getElementById('eb_id').value = batchId;
     document.getElementById('eb_label').value = label;
     document.getElementById('eb_qty').value = qty;
@@ -2785,8 +2867,25 @@ function openEditBatchModal(batchId, label, qty, price, date, note, lendTo, lend
     document.getElementById('eb_price2').value = price;
     document.getElementById('eb_date').value = date;
     document.getElementById('eb_note').value = note;
-    document.getElementById('eb_lend_to').value = lendTo;
+    // Lending contact
+    document.getElementById('eb_lend_to_type').value = lendToType || '';
+    document.getElementById('eb_lend_to_id').value = lendToId || '';
+    var ebLendLbl = document.getElementById('eb_lend_label');
+    if (lendLabel && lendLabel.trim() !== '' && lendLabel.trim() !== '-') {
+        ebLendLbl.textContent = lendLabel;
+        ebLendLbl.classList.remove('text-muted');
+        document.getElementById('eb_lend_clear').style.display = '';
+    } else {
+        ebLendLbl.textContent = 'Click to select contact...';
+        ebLendLbl.classList.add('text-muted');
+        document.getElementById('eb_lend_clear').style.display = 'none';
+    }
     document.getElementById('eb_lend_qty').value = lendQty;
+    document.getElementById('eb_lend_start').value = lendStart || '';
+    document.getElementById('eb_lend_end').value = lendEnd || '';
+    document.getElementById('eb_lend_notify').checked = !!lendNotify;
+    document.getElementById('eb_lend_notify_days').value = lendDays || 3;
+    document.getElementById('eb_lend_notify_days_section').style.display = lendNotify ? '' : 'none';
     // Per-batch location
     document.getElementById('eb_follow_main').checked = followMain !== false;
     document.getElementById('eb_location_id').value = batchLocId || '';
@@ -2869,9 +2968,14 @@ function submitEditBatch() {
     } else {
         fd.append('quantity', document.getElementById('eb_qty').value);
         fd.append('price_per_unit', document.getElementById('eb_price').value);
-        fd.append('lend_to', document.getElementById('eb_lend_to').value);
+        fd.append('lend_to_type', document.getElementById('eb_lend_to_type').value);
+        fd.append('lend_to_id', document.getElementById('eb_lend_to_id').value);
         fd.append('lend_quantity', document.getElementById('eb_lend_qty').value);
     }
+    fd.append('lend_start', document.getElementById('eb_lend_start').value);
+    fd.append('lend_end', document.getElementById('eb_lend_end').value);
+    fd.append('lend_notify_enabled', document.getElementById('eb_lend_notify').checked ? '1' : '0');
+    fd.append('lend_notify_before_days', document.getElementById('eb_lend_notify_days').value);
     fd.append('purchase_date', document.getElementById('eb_date').value);
     fd.append('note', document.getElementById('eb_note').value);
     if (document.getElementById('eb_follow_main').checked) {
@@ -3068,10 +3172,14 @@ function openEditDetailsModal(batchId) {
     editDetailsSelectedIds = [];
     checked.forEach(function(cb) { editDetailsSelectedIds.push(parseInt(cb.value)); });
     document.getElementById('editDetailsCount').textContent = editDetailsSelectedIds.length;
-    ['bulkSnEdit', 'bulkInfoEdit', 'bulkLendEdit'].forEach(function(id) {
+    ['bulkSnEdit', 'bulkInfoEdit'].forEach(function(id) {
         var inp = document.getElementById(id);
         inp.value = ''; inp.dataset.cleared = ''; inp.placeholder = 'Leave empty to keep current'; inp.classList.remove('border-danger');
     });
+    // Reset bulk lend picker
+    clearBulkLendContact();
+    document.getElementById('bulk_lend_status').textContent = '';
+    _bulkLendCleared = false;
     new bootstrap.Modal(document.getElementById('editDetailsModalDialog')).show();
 }
 function clearBulkField(inputId) {
@@ -3079,20 +3187,154 @@ function clearBulkField(inputId) {
     if (!confirm('Clear this field to empty for all selected?')) return;
     inp.value = ''; inp.dataset.cleared = 'true'; inp.placeholder = '(will be cleared)'; inp.classList.add('border-danger');
 }
+var _bulkLendCleared = false;
+function clearBulkLendContact() {
+    document.getElementById('bulk_lend_to_type').value = '';
+    document.getElementById('bulk_lend_to_id').value = '';
+    var lbl = document.getElementById('bulk_lend_label');
+    lbl.textContent = 'Leave empty to keep current';
+    lbl.classList.add('text-muted');
+    document.getElementById('bulk_lend_clear').style.display = 'none';
+    _bulkLendCleared = false;
+}
+function setBulkLendClear() {
+    if (!confirm('Clear lending for all selected SNs?')) return;
+    clearBulkLendContact();
+    _bulkLendCleared = true;
+    document.getElementById('bulk_lend_status').textContent = '(will clear lending for all selected)';
+    document.getElementById('bulk_lend_label').textContent = '(clear lending)';
+    document.getElementById('bulk_lend_label').classList.remove('text-muted');
+}
 function saveEditDetails() {
     var payload = { sn_ids: editDetailsSelectedIds, fields: {} };
     var snVal = document.getElementById('bulkSnEdit');
     var infoVal = document.getElementById('bulkInfoEdit');
-    var lendVal = document.getElementById('bulkLendEdit');
     if (snVal.value.trim() !== '' || snVal.dataset.cleared === 'true') payload.fields.sn = snVal.value.trim();
     if (infoVal.value.trim() !== '' || infoVal.dataset.cleared === 'true') payload.fields.info = infoVal.value.trim();
-    if (lendVal.value.trim() !== '' || lendVal.dataset.cleared === 'true') payload.fields.lend = lendVal.value.trim();
+    var bulkType = document.getElementById('bulk_lend_to_type').value;
+    var bulkId = document.getElementById('bulk_lend_to_id').value;
+    if (bulkType && bulkId) {
+        payload.fields.lend = {type: bulkType, id: parseInt(bulkId)};
+    } else if (_bulkLendCleared) {
+        payload.fields.lend = null;
+    }
     if (Object.keys(payload.fields).length === 0) { alert('No changes. Enter a value or use Clear.'); return; }
     fetch('{{ url_for("batch.bulk_update_sn", uuid=item.uuid) }}', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
     }).then(function(r) { return r.json(); }).then(function(d) {
         if (d.success) reloadKeepBatch(); else alert(d.message || 'Error');
+    }).catch(function(e) { alert('Error: ' + e); });
+}
+
+/* ── Lend Contact Picker ── */
+var _lendPickerTarget = null;
+function openLendContactPicker(prefix) {
+    _lendPickerTarget = prefix;
+    document.getElementById('lendContactSearch').value = '';
+    document.getElementById('lendContactResults').innerHTML = '<div class="text-muted text-center p-2 small">Type to search or leave blank for all...</div>';
+    new bootstrap.Modal(document.getElementById('lendContactPickerModal')).show();
+    searchLendContacts();
+}
+function searchLendContacts() {
+    var q = document.getElementById('lendContactSearch').value.trim();
+    var resultsDiv = document.getElementById('lendContactResults');
+    resultsDiv.innerHTML = '<div class="text-muted text-center p-2 small">Loading...</div>';
+    fetch('/api/contacts/all?q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.length) { resultsDiv.innerHTML = '<div class="text-muted text-center p-2 small">No contacts found.</div>'; return; }
+            var icons = {user:'bi-person-circle', person:'bi-person', organization:'bi-building', group:'bi-people'};
+            var badges = {user:'bg-primary', person:'bg-secondary', organization:'bg-success', group:'bg-info'};
+            resultsDiv.innerHTML = data.map(function(c) {
+                var icon = icons[c.type] || 'bi-person';
+                var badge = badges[c.type] || 'bg-secondary';
+                var extra = c.extra ? '<small class="text-muted d-block">' + c.extra.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</small>' : '';
+                return '<div class="d-flex align-items-center gap-2 p-2 border-bottom lend-contact-item" style="cursor:pointer;" ' +
+                    'onclick="selectLendContact(\'' + c.type + '\',' + c.id + ',\'' + (c.label||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/</g,'&lt;') + '\')">' +
+                    '<i class="bi ' + icon + ' text-muted"></i>' +
+                    '<div class="flex-grow-1"><div class="small">' + (c.label||'').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>' + extra + '</div>' +
+                    '<span class="badge ' + badge + ' ms-auto" style="font-size:0.65rem">' + c.type + '</span></div>';
+            }).join('');
+        })
+        .catch(function() { resultsDiv.innerHTML = '<div class="text-danger p-2 small">Search failed.</div>'; });
+}
+function selectLendContact(type, id, label) {
+    var p = _lendPickerTarget;
+    document.getElementById(p + '_lend_to_type').value = type;
+    document.getElementById(p + '_lend_to_id').value = id;
+    var lbl = document.getElementById(p + '_lend_label');
+    lbl.textContent = label;
+    lbl.classList.remove('text-muted');
+    document.getElementById(p + '_lend_clear').style.display = '';
+    if (p === 'bulk') { document.getElementById('bulk_lend_status').textContent = ''; _bulkLendCleared = false; }
+    bootstrap.Modal.getInstance(document.getElementById('lendContactPickerModal')).hide();
+}
+function clearLendContact(prefix) {
+    document.getElementById(prefix + '_lend_to_type').value = '';
+    document.getElementById(prefix + '_lend_to_id').value = '';
+    var lbl = document.getElementById(prefix + '_lend_label');
+    lbl.textContent = 'Click to select contact...';
+    lbl.classList.add('text-muted');
+    document.getElementById(prefix + '_lend_clear').style.display = 'none';
+}
+function toggleLendNotify(prefix) {
+    var on = document.getElementById(prefix + '_lend_notify').checked;
+    document.getElementById(prefix + '_lend_notify_days_section').style.display = on ? '' : 'none';
+}
+
+/* ── Per-SN Lend Modal ── */
+function openSnLendModal(snId, lendType, lendId, lendLabel, lendStart, lendEnd, lendNotify, lendDays) {
+    document.getElementById('snLend_sn_id').value = snId;
+    document.getElementById('snLend_lend_to_type').value = lendType || '';
+    document.getElementById('snLend_lend_to_id').value = lendId || '';
+    var lbl = document.getElementById('snLend_lend_label');
+    if (lendLabel && lendLabel.trim() !== '' && lendLabel.trim() !== '-') {
+        lbl.textContent = lendLabel;
+        lbl.classList.remove('text-muted');
+        document.getElementById('snLend_lend_clear').style.display = '';
+    } else {
+        lbl.textContent = 'Click to select contact...';
+        lbl.classList.add('text-muted');
+        document.getElementById('snLend_lend_clear').style.display = 'none';
+    }
+    document.getElementById('snLend_lend_start').value = lendStart || '';
+    document.getElementById('snLend_lend_end').value = lendEnd || '';
+    document.getElementById('snLend_lend_notify').checked = !!lendNotify;
+    document.getElementById('snLend_lend_notify_days').value = lendDays || 3;
+    document.getElementById('snLend_lend_notify_days_section').style.display = lendNotify ? '' : 'none';
+    new bootstrap.Modal(document.getElementById('snLendModal')).show();
+}
+function clearSnLendModal() {
+    clearLendContact('snLend');
+    document.getElementById('snLend_lend_start').value = '';
+    document.getElementById('snLend_lend_end').value = '';
+    document.getElementById('snLend_lend_notify').checked = false;
+    document.getElementById('snLend_lend_notify_days').value = 3;
+    document.getElementById('snLend_lend_notify_days_section').style.display = 'none';
+}
+function submitSnLend() {
+    var snId = parseInt(document.getElementById('snLend_sn_id').value);
+    var lendType = document.getElementById('snLend_lend_to_type').value;
+    var lendIdRaw = document.getElementById('snLend_lend_to_id').value;
+    var payload = {
+        sn_id: snId, field: 'lend',
+        lend_to_type: lendType,
+        lend_to_id: lendIdRaw ? parseInt(lendIdRaw) : null,
+        lend_start: document.getElementById('snLend_lend_start').value,
+        lend_end: document.getElementById('snLend_lend_end').value,
+        lend_notify_enabled: document.getElementById('snLend_lend_notify').checked,
+        lend_notify_before_days: parseInt(document.getElementById('snLend_lend_notify_days').value) || 3
+    };
+    fetch('{{ url_for("batch.inline_update_sn", uuid=item.uuid) }}', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            var lendVal = document.getElementById('lendVal' + snId);
+            if (lendVal) lendVal.textContent = data.display || '-';
+            bootstrap.Modal.getInstance(document.getElementById('snLendModal')).hide();
+        } else { alert('Error: ' + data.message); }
     }).catch(function(e) { alert('Error: ' + e); });
 }
 </script>
@@ -3121,11 +3363,17 @@ function saveEditDetails() {
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Lend to</label>
-                    <div class="input-group input-group-sm">
-                        <input type="text" class="form-control" id="bulkLendEdit" placeholder="Leave empty to keep current">
-                        <button class="btn btn-outline-danger" type="button" onclick="clearBulkField('bulkLendEdit')"><i class="bi bi-x-circle"></i> Clear</button>
+                    <label class="form-label">Lend To</label>
+                    <input type="hidden" id="bulk_lend_to_type">
+                    <input type="hidden" id="bulk_lend_to_id">
+                    <div class="d-flex gap-2 align-items-center">
+                        <div class="form-control form-control-sm flex-grow-1 d-flex align-items-center justify-content-between" style="cursor:pointer; min-height:31px;" onclick="openLendContactPicker('bulk')">
+                            <span id="bulk_lend_label" class="text-muted small">Leave empty to keep current</span>
+                            <i class="bi bi-x-circle text-danger" id="bulk_lend_clear" style="display:none;" onclick="event.stopPropagation(); clearBulkLendContact()"></i>
+                        </div>
+                        <button class="btn btn-outline-danger btn-sm" type="button" onclick="setBulkLendClear()"><i class="bi bi-x-circle"></i> Clear All</button>
                     </div>
+                    <small class="text-muted d-block mt-1" id="bulk_lend_status"></small>
                 </div>
             </div>
             <div class="modal-footer">
@@ -3519,5 +3767,83 @@ function saveEditDetails() {
 })();
 </script>
 {% endif %}
+
+<!-- Lend Contact Picker Modal -->
+<div class="modal fade" id="lendContactPickerModal" tabindex="-1" style="z-index:1200;">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title"><i class="bi bi-person-lines-fill"></i> Select Contact for Lending</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-2">
+                <input type="text" class="form-control form-control-sm mb-2" id="lendContactSearch"
+                       placeholder="Search by name, email..." oninput="searchLendContacts()">
+                <div id="lendContactResults" style="max-height:320px; overflow-y:auto; border:1px solid #dee2e6; border-radius:4px;">
+                    <div class="text-muted text-center p-2 small">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Per-SN Lending Modal -->
+<div class="modal fade" id="snLendModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h5 class="modal-title"><i class="bi bi-hand-index-thumb"></i> Set Lending for Serial Number</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="snLend_sn_id">
+                <div class="mb-2">
+                    <label class="form-label form-label-sm mb-1">Lend To</label>
+                    <input type="hidden" id="snLend_lend_to_type">
+                    <input type="hidden" id="snLend_lend_to_id">
+                    <div class="form-control form-control-sm d-flex align-items-center justify-content-between"
+                         style="cursor:pointer; min-height:31px;" onclick="openLendContactPicker('snLend')">
+                        <span id="snLend_lend_label" class="text-muted small">Click to select contact...</span>
+                        <i class="bi bi-x-circle text-danger" id="snLend_lend_clear" style="display:none;"
+                           onclick="event.stopPropagation(); clearLendContact('snLend')"></i>
+                    </div>
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label class="form-label form-label-sm mb-1">Start Date</label>
+                        <input type="date" class="form-control form-control-sm" id="snLend_lend_start">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label form-label-sm mb-1">End Date</label>
+                        <input type="date" class="form-control form-control-sm" id="snLend_lend_end">
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="snLend_lend_notify"
+                               onchange="toggleLendNotify('snLend')">
+                        <label class="form-check-label small" for="snLend_lend_notify">Enable notification</label>
+                    </div>
+                    <div id="snLend_lend_notify_days_section" style="display:none;">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">Remind</span>
+                            <input type="number" class="form-control" id="snLend_lend_notify_days" min="1" value="3" style="width:55px">
+                            <span class="input-group-text">days before</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-outline-warning" onclick="clearSnLendModal()">
+                    <i class="bi bi-x"></i> Clear Lending
+                </button>
+                <button type="button" class="btn btn-primary" onclick="submitSnLend()">
+                    <i class="bi bi-save"></i> Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 {% endblock %}
