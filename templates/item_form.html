@@ -358,6 +358,9 @@
                                             <button class="btn btn-outline-success" type="button" onclick="addSnToBatch({{ batch.id }}, {{ batch.quantity }})"><i class="bi bi-plus"></i></button>
                                         </div>
                                         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="remapIsn({{ batch.id }})"><i class="bi bi-arrow-repeat"></i> Remap ISN</button>
+                                        {% if item_perms and item_perms.can_edit_lending %}
+                                        <button type="button" class="btn btn-sm btn-outline-warning" onclick="openSnBulkLendModal({{ batch.id }})"><i class="bi bi-hand-index-thumb"></i> Manage Lending</button>
+                                        {% endif %}
                                     </div>
                                     {% endif %}
 
@@ -2887,7 +2890,15 @@ function submitEditBatch() {
         fd.append('batch_location_id', document.getElementById('eb_location_id').value);
     }
     fetch('/item/{{ item.uuid }}/batch/' + batchId + '/edit', { method: 'POST', body: fd })
-        .then(function(r) { if (r.redirected) { window.location.href = r.url; } else { reloadKeepBatch(); } })
+        .then(function(r) {
+            if (r.ok || r.redirected) {
+                bootstrap.Modal.getInstance(document.getElementById('editBatchModalDialog')).hide();
+                lastOpenBatchId = batchId;
+                reloadKeepBatch();
+            } else {
+                alert('Error saving batch changes.');
+            }
+        })
         .catch(function(e) { alert('Error: ' + e); });
 }
 
@@ -3076,10 +3087,6 @@ function openEditDetailsModal(batchId) {
         var inp = document.getElementById(id);
         inp.value = ''; inp.dataset.cleared = ''; inp.placeholder = 'Leave empty to keep current'; inp.classList.remove('border-danger');
     });
-    // Reset bulk lend picker
-    clearBulkLendContact();
-    document.getElementById('bulk_lend_status').textContent = '';
-    _bulkLendCleared = false;
     new bootstrap.Modal(document.getElementById('editDetailsModalDialog')).show();
 }
 function clearBulkField(inputId) {
@@ -3087,37 +3094,12 @@ function clearBulkField(inputId) {
     if (!confirm('Clear this field to empty for all selected?')) return;
     inp.value = ''; inp.dataset.cleared = 'true'; inp.placeholder = '(will be cleared)'; inp.classList.add('border-danger');
 }
-var _bulkLendCleared = false;
-function clearBulkLendContact() {
-    document.getElementById('bulk_lend_to_type').value = '';
-    document.getElementById('bulk_lend_to_id').value = '';
-    var lbl = document.getElementById('bulk_lend_label');
-    lbl.textContent = 'Leave empty to keep current';
-    lbl.classList.add('text-muted');
-    document.getElementById('bulk_lend_clear').style.display = 'none';
-    _bulkLendCleared = false;
-}
-function setBulkLendClear() {
-    if (!confirm('Clear lending for all selected SNs?')) return;
-    clearBulkLendContact();
-    _bulkLendCleared = true;
-    document.getElementById('bulk_lend_status').textContent = '(will clear lending for all selected)';
-    document.getElementById('bulk_lend_label').textContent = '(clear lending)';
-    document.getElementById('bulk_lend_label').classList.remove('text-muted');
-}
 function saveEditDetails() {
     var payload = { sn_ids: editDetailsSelectedIds, fields: {} };
     var snVal = document.getElementById('bulkSnEdit');
     var infoVal = document.getElementById('bulkInfoEdit');
     if (snVal.value.trim() !== '' || snVal.dataset.cleared === 'true') payload.fields.sn = snVal.value.trim();
     if (infoVal.value.trim() !== '' || infoVal.dataset.cleared === 'true') payload.fields.info = infoVal.value.trim();
-    var bulkType = document.getElementById('bulk_lend_to_type').value;
-    var bulkId = document.getElementById('bulk_lend_to_id').value;
-    if (bulkType && bulkId) {
-        payload.fields.lend = {type: bulkType, id: parseInt(bulkId)};
-    } else if (_bulkLendCleared) {
-        payload.fields.lend = null;
-    }
     if (Object.keys(payload.fields).length === 0) { alert('No changes. Enter a value or use Clear.'); return; }
     fetch('{{ url_for("batch.bulk_update_sn", uuid=item.uuid) }}', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -3127,61 +3109,6 @@ function saveEditDetails() {
     }).catch(function(e) { alert('Error: ' + e); });
 }
 
-/* ── Lend Contact Picker (for bulk SN and snLend modal) ── */
-var _lendPickerTarget = null;
-function openLendContactPicker(prefix) {
-    _lendPickerTarget = prefix;
-    document.getElementById('lendContactSearch').value = '';
-    document.getElementById('lendContactResults').innerHTML = '<div class="text-muted text-center p-2 small">Type to search or leave blank for all...</div>';
-    new bootstrap.Modal(document.getElementById('lendContactPickerModal')).show();
-    searchLendContacts();
-}
-function searchLendContacts() {
-    var q = document.getElementById('lendContactSearch').value.trim();
-    var resultsDiv = document.getElementById('lendContactResults');
-    resultsDiv.innerHTML = '<div class="text-muted text-center p-2 small">Loading...</div>';
-    fetch('/api/contacts/all?q=' + encodeURIComponent(q))
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (!data.length) { resultsDiv.innerHTML = '<div class="text-muted text-center p-2 small">No contacts found.</div>'; return; }
-            var icons = {user:'bi-person-circle', person:'bi-person', organization:'bi-building', group:'bi-people'};
-            var badges = {user:'bg-primary', person:'bg-secondary', organization:'bg-success', group:'bg-info'};
-            resultsDiv.innerHTML = data.map(function(c) {
-                var icon = icons[c.type] || 'bi-person';
-                var badge = badges[c.type] || 'bg-secondary';
-                var extra = c.extra ? '<small class="text-muted d-block">' + c.extra.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</small>' : '';
-                return '<div class="d-flex align-items-center gap-2 p-2 border-bottom lend-contact-item" style="cursor:pointer;" ' +
-                    'onclick="selectLendContact(\'' + c.type + '\',' + c.id + ',\'' + (c.label||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/</g,'&lt;') + '\')">' +
-                    '<i class="bi ' + icon + ' text-muted"></i>' +
-                    '<div class="flex-grow-1"><div class="small">' + (c.label||'').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>' + extra + '</div>' +
-                    '<span class="badge ' + badge + ' ms-auto" style="font-size:0.65rem">' + c.type + '</span></div>';
-            }).join('');
-        })
-        .catch(function() { resultsDiv.innerHTML = '<div class="text-danger p-2 small">Search failed.</div>'; });
-}
-function selectLendContact(type, id, label) {
-    var p = _lendPickerTarget;
-    document.getElementById(p + '_lend_to_type').value = type;
-    document.getElementById(p + '_lend_to_id').value = id;
-    var lbl = document.getElementById(p + '_lend_label');
-    lbl.textContent = label;
-    lbl.classList.remove('text-muted');
-    document.getElementById(p + '_lend_clear').style.display = '';
-    if (p === 'bulk') { document.getElementById('bulk_lend_status').textContent = ''; _bulkLendCleared = false; }
-    bootstrap.Modal.getInstance(document.getElementById('lendContactPickerModal')).hide();
-}
-function clearLendContact(prefix) {
-    document.getElementById(prefix + '_lend_to_type').value = '';
-    document.getElementById(prefix + '_lend_to_id').value = '';
-    var lbl = document.getElementById(prefix + '_lend_label');
-    lbl.textContent = 'Click to select contact...';
-    lbl.classList.add('text-muted');
-    document.getElementById(prefix + '_lend_clear').style.display = 'none';
-}
-function toggleLendNotify(prefix) {
-    var on = document.getElementById(prefix + '_lend_notify').checked;
-    document.getElementById(prefix + '_lend_notify_days_section').style.display = on ? '' : 'none';
-}
 
 /* ── Lending Management Modal ── */
 {% if item is defined %}
@@ -3385,48 +3312,112 @@ function toggleLrNotify() {
         document.getElementById('lr_notify').checked ? '' : 'none';
 }
 
+/* ── SN Lend Shared Form (snlend + snbulk) ── */
+var _snlActiveBatchId = null;
+var _snlSearchTimer = null;
+
+function _snlMoveForm(slotId) {
+    var slot = document.getElementById(slotId);
+    var form = document.getElementById('snl_shared_form');
+    slot.appendChild(form);
+    form.style.display = '';
+}
+function _snlResetForm(lendType, lendId, lendLabel, lendStart, lendEnd, lendNotify, lendDays) {
+    document.getElementById('snl_to_type').value = lendType || '';
+    document.getElementById('snl_to_id').value = lendId || '';
+    var lbl = document.getElementById('snl_to_label');
+    if (lendLabel && lendLabel.trim() !== '' && lendLabel.trim() !== '-') {
+        lbl.textContent = lendLabel; lbl.className = 'small';
+        document.getElementById('snl_to_clear').style.display = '';
+    } else {
+        lbl.textContent = 'Click to search contact...'; lbl.className = 'small text-muted';
+        document.getElementById('snl_to_clear').style.display = 'none';
+    }
+    document.getElementById('snl_start').value = lendStart || '';
+    document.getElementById('snl_end').value = lendEnd || '';
+    document.getElementById('snl_notify').checked = !!lendNotify;
+    document.getElementById('snl_notify_days').value = lendDays || 3;
+    document.getElementById('snl_notify_days_section').style.display = lendNotify ? '' : 'none';
+    document.getElementById('snl_search_panel').style.display = 'none';
+}
+function toggleSnlSearch() {
+    var panel = document.getElementById('snl_search_panel');
+    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    document.getElementById('snl_search_input').value = '';
+    document.getElementById('snl_search_input').focus();
+    doSnlSearch();
+}
+function doSnlSearch() {
+    clearTimeout(_snlSearchTimer);
+    _snlSearchTimer = setTimeout(function() {
+        var q = document.getElementById('snl_search_input').value.trim();
+        var el = document.getElementById('snl_search_results');
+        el.innerHTML = '<div class="text-muted small p-1">Loading...</div>';
+        fetch('/api/contacts/all?q=' + encodeURIComponent(q))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.length) { el.innerHTML = '<div class="text-muted small p-1">No contacts found.</div>'; return; }
+                var icons = {user:'bi-person-circle', person:'bi-person', organization:'bi-building', group:'bi-people'};
+                var badges = {user:'bg-primary', person:'bg-secondary', organization:'bg-success', group:'bg-info'};
+                el.innerHTML = data.map(function(c) {
+                    var icon = icons[c.type] || 'bi-person';
+                    var badge = badges[c.type] || 'bg-secondary';
+                    var lbl = (c.label||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                    var rawLabel = (c.label||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+                    var extra = c.extra ? '<small class="text-muted d-block">' + c.extra.replace(/</g,'&lt;') + '</small>' : '';
+                    return '<div class="d-flex align-items-center gap-2 p-1 border-bottom" style="cursor:pointer;" ' +
+                        'onclick="selectSnlContact(\'' + c.type + '\',' + c.id + ',\'' + rawLabel + '\')">' +
+                        '<i class="bi ' + icon + ' text-muted small"></i>' +
+                        '<div class="flex-grow-1"><div class="small">' + lbl + '</div>' + extra + '</div>' +
+                        '<span class="badge ' + badge + '" style="font-size:0.65rem">' + c.type + '</span></div>';
+                }).join('');
+            })
+            .catch(function() { el.innerHTML = '<div class="text-danger small p-1">Search failed.</div>'; });
+    }, 300);
+}
+function selectSnlContact(type, id, label) {
+    document.getElementById('snl_to_type').value = type;
+    document.getElementById('snl_to_id').value = id;
+    var lbl = document.getElementById('snl_to_label');
+    lbl.textContent = label; lbl.className = 'small';
+    document.getElementById('snl_to_clear').style.display = '';
+    document.getElementById('snl_search_panel').style.display = 'none';
+}
+function clearSnlContact() {
+    document.getElementById('snl_to_type').value = '';
+    document.getElementById('snl_to_id').value = '';
+    var lbl = document.getElementById('snl_to_label');
+    lbl.textContent = 'Click to search contact...'; lbl.className = 'small text-muted';
+    document.getElementById('snl_to_clear').style.display = 'none';
+}
+function toggleSnlNotify() {
+    document.getElementById('snl_notify_days_section').style.display =
+        document.getElementById('snl_notify').checked ? '' : 'none';
+}
+
 /* ── Per-SN Lend Modal ── */
 function openSnLendModal(snId, lendType, lendId, lendLabel, lendStart, lendEnd, lendNotify, lendDays) {
     document.getElementById('snLend_sn_id').value = snId;
-    document.getElementById('snLend_lend_to_type').value = lendType || '';
-    document.getElementById('snLend_lend_to_id').value = lendId || '';
-    var lbl = document.getElementById('snLend_lend_label');
-    if (lendLabel && lendLabel.trim() !== '' && lendLabel.trim() !== '-') {
-        lbl.textContent = lendLabel;
-        lbl.classList.remove('text-muted');
-        document.getElementById('snLend_lend_clear').style.display = '';
-    } else {
-        lbl.textContent = 'Click to select contact...';
-        lbl.classList.add('text-muted');
-        document.getElementById('snLend_lend_clear').style.display = 'none';
-    }
-    document.getElementById('snLend_lend_start').value = lendStart || '';
-    document.getElementById('snLend_lend_end').value = lendEnd || '';
-    document.getElementById('snLend_lend_notify').checked = !!lendNotify;
-    document.getElementById('snLend_lend_notify_days').value = lendDays || 3;
-    document.getElementById('snLend_lend_notify_days_section').style.display = lendNotify ? '' : 'none';
+    document.getElementById('snLend_sn_ref').textContent = 'SN #' + snId;
+    _snlMoveForm('snlend_form_slot');
+    _snlResetForm(lendType, lendId, lendLabel, lendStart, lendEnd, lendNotify, lendDays);
     new bootstrap.Modal(document.getElementById('snLendModal')).show();
 }
-function clearSnLendModal() {
-    clearLendContact('snLend');
-    document.getElementById('snLend_lend_start').value = '';
-    document.getElementById('snLend_lend_end').value = '';
-    document.getElementById('snLend_lend_notify').checked = false;
-    document.getElementById('snLend_lend_notify_days').value = 3;
-    document.getElementById('snLend_lend_notify_days_section').style.display = 'none';
+function clearSnlModal() {
+    _snlResetForm('', '', '', '', '', false, 3);
 }
 function submitSnLend() {
     var snId = parseInt(document.getElementById('snLend_sn_id').value);
-    var lendType = document.getElementById('snLend_lend_to_type').value;
-    var lendIdRaw = document.getElementById('snLend_lend_to_id').value;
+    var lendIdRaw = document.getElementById('snl_to_id').value;
     var payload = {
         sn_id: snId, field: 'lend',
-        lend_to_type: lendType,
+        lend_to_type: document.getElementById('snl_to_type').value,
         lend_to_id: lendIdRaw ? parseInt(lendIdRaw) : null,
-        lend_start: document.getElementById('snLend_lend_start').value,
-        lend_end: document.getElementById('snLend_lend_end').value,
-        lend_notify_enabled: document.getElementById('snLend_lend_notify').checked,
-        lend_notify_before_days: parseInt(document.getElementById('snLend_lend_notify_days').value) || 3
+        lend_start: document.getElementById('snl_start').value,
+        lend_end: document.getElementById('snl_end').value,
+        lend_notify_enabled: document.getElementById('snl_notify').checked,
+        lend_notify_before_days: parseInt(document.getElementById('snl_notify_days').value) || 3
     };
     fetch('{{ url_for("batch.inline_update_sn", uuid=item.uuid) }}', {
         method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
@@ -3437,6 +3428,47 @@ function submitSnLend() {
             if (lendVal) lendVal.textContent = data.display || '-';
             bootstrap.Modal.getInstance(document.getElementById('snLendModal')).hide();
         } else { alert('Error: ' + data.message); }
+    }).catch(function(e) { alert('Error: ' + e); });
+}
+
+/* ── Bulk SN Lend Modal ── */
+var _snBulkBatchId = null;
+function openSnBulkLendModal(batchId) {
+    _snBulkBatchId = batchId;
+    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
+    if (!checked.length) { alert('Select at least one serial number first.'); return; }
+    document.getElementById('snBulkLend_info').textContent = checked.length + ' SN(s) selected';
+    _snlMoveForm('snbulk_form_slot');
+    _snlResetForm('', '', '', '', '', false, 3);
+    new bootstrap.Modal(document.getElementById('snBulkLendModal')).show();
+}
+function submitSnBulkLend(clearMode) {
+    var checked = document.querySelectorAll('.sn-check-' + _snBulkBatchId + ':checked');
+    if (!checked.length) { alert('No SNs selected.'); return; }
+    var snIds = Array.from(checked).map(function(cb) { return parseInt(cb.value); });
+    var lendData;
+    if (clearMode) {
+        lendData = null;
+    } else {
+        var lendIdRaw = document.getElementById('snl_to_id').value;
+        lendData = {
+            type: document.getElementById('snl_to_type').value,
+            id: lendIdRaw ? parseInt(lendIdRaw) : null,
+            start: document.getElementById('snl_start').value || '',
+            end: document.getElementById('snl_end').value || '',
+            notify: document.getElementById('snl_notify').checked,
+            days: parseInt(document.getElementById('snl_notify_days').value) || 3
+        };
+    }
+    var payload = { sn_ids: snIds, fields: { lend: lendData } };
+    fetch('{{ url_for("batch.bulk_update_sn", uuid=item.uuid) }}', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('snBulkLendModal')).hide();
+            reloadKeepBatch();
+        } else { alert(data.message || 'Error'); }
     }).catch(function(e) { alert('Error: ' + e); });
 }
 </script>
@@ -3464,18 +3496,8 @@ function submitSnLend() {
                         <button class="btn btn-outline-danger" type="button" onclick="clearBulkField('bulkInfoEdit')"><i class="bi bi-x-circle"></i> Clear</button>
                     </div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Lend To</label>
-                    <input type="hidden" id="bulk_lend_to_type">
-                    <input type="hidden" id="bulk_lend_to_id">
-                    <div class="d-flex gap-2 align-items-center">
-                        <div class="form-control form-control-sm flex-grow-1 d-flex align-items-center justify-content-between" style="cursor:pointer; min-height:31px;" onclick="openLendContactPicker('bulk')">
-                            <span id="bulk_lend_label" class="text-muted small">Leave empty to keep current</span>
-                            <i class="bi bi-x-circle text-danger" id="bulk_lend_clear" style="display:none;" onclick="event.stopPropagation(); clearBulkLendContact()"></i>
-                        </div>
-                        <button class="btn btn-outline-danger btn-sm" type="button" onclick="setBulkLendClear()"><i class="bi bi-x-circle"></i> Clear All</button>
-                    </div>
-                    <small class="text-muted d-block mt-1" id="bulk_lend_status"></small>
+                <div class="alert alert-info py-1 px-2 small mb-0">
+                    <i class="bi bi-info-circle"></i> To set lending, use the <strong>Manage Lending</strong> button in the batch toolbar or the <i class="bi bi-pencil"></i> button on each SN row.
                 </div>
             </div>
             <div class="modal-footer">
@@ -3945,19 +3967,46 @@ function submitSnLend() {
 </div>
 
 <!-- Lend Contact Picker Modal -->
-<div class="modal fade" id="lendContactPickerModal" tabindex="-1" style="z-index:1200;">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header py-2">
-                <h6 class="modal-title"><i class="bi bi-person-lines-fill"></i> Select Contact for Lending</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-2">
-                <input type="text" class="form-control form-control-sm mb-2" id="lendContactSearch"
-                       placeholder="Search by name, email..." oninput="searchLendContacts()">
-                <div id="lendContactResults" style="max-height:320px; overflow-y:auto; border:1px solid #dee2e6; border-radius:4px;">
-                    <div class="text-muted text-center p-2 small">Loading...</div>
-                </div>
+<!-- Shared SN Lend Form (moved dynamically into active SN modal slot) -->
+<div id="snl_shared_form" style="display:none;">
+    <div class="mb-2">
+        <label class="form-label form-label-sm mb-1">Contact</label>
+        <input type="hidden" id="snl_to_type">
+        <input type="hidden" id="snl_to_id">
+        <div class="border rounded px-2 py-1 d-flex align-items-center justify-content-between"
+             style="cursor:pointer; background:var(--bs-body-bg); min-height:31px;"
+             onclick="toggleSnlSearch()">
+            <span id="snl_to_label" class="small text-muted">Click to search contact...</span>
+            <i class="bi bi-x text-danger" id="snl_to_clear" style="display:none;"
+               onclick="event.stopPropagation(); clearSnlContact()"></i>
+        </div>
+        <div id="snl_search_panel" style="display:none;" class="mt-1">
+            <input type="text" class="form-control form-control-sm" id="snl_search_input"
+                   placeholder="Search by name, email..." oninput="doSnlSearch()">
+            <div id="snl_search_results" class="border rounded"
+                 style="max-height:200px; overflow-y:auto; background:var(--bs-body-bg);"></div>
+        </div>
+    </div>
+    <div class="row g-2 mb-2">
+        <div class="col-6">
+            <label class="form-label form-label-sm mb-1">Start Date</label>
+            <input type="date" class="form-control form-control-sm" id="snl_start">
+        </div>
+        <div class="col-6">
+            <label class="form-label form-label-sm mb-1">End Date</label>
+            <input type="date" class="form-control form-control-sm" id="snl_end">
+        </div>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="snl_notify" onchange="toggleSnlNotify()">
+            <label class="form-check-label small" for="snl_notify">Enable notification</label>
+        </div>
+        <div id="snl_notify_days_section" style="display:none;">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text">Remind</span>
+                <input type="number" class="form-control" id="snl_notify_days" min="1" value="3" style="width:55px">
+                <span class="input-group-text">days before end</span>
             </div>
         </div>
     </div>
@@ -3968,55 +4017,44 @@ function submitSnLend() {
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header py-2">
-                <h5 class="modal-title"><i class="bi bi-hand-index-thumb"></i> Set Lending for Serial Number</h5>
+                <h6 class="modal-title"><i class="bi bi-hand-index-thumb text-warning"></i> Set Lending — <span id="snLend_sn_ref" class="text-muted small"></span></h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="snLend_sn_id">
-                <div class="mb-2">
-                    <label class="form-label form-label-sm mb-1">Lend To</label>
-                    <input type="hidden" id="snLend_lend_to_type">
-                    <input type="hidden" id="snLend_lend_to_id">
-                    <div class="form-control form-control-sm d-flex align-items-center justify-content-between"
-                         style="cursor:pointer; min-height:31px;" onclick="openLendContactPicker('snLend')">
-                        <span id="snLend_lend_label" class="text-muted small">Click to select contact...</span>
-                        <i class="bi bi-x-circle text-danger" id="snLend_lend_clear" style="display:none;"
-                           onclick="event.stopPropagation(); clearLendContact('snLend')"></i>
-                    </div>
-                </div>
-                <div class="row g-2 mb-2">
-                    <div class="col-6">
-                        <label class="form-label form-label-sm mb-1">Start Date</label>
-                        <input type="date" class="form-control form-control-sm" id="snLend_lend_start">
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label form-label-sm mb-1">End Date</label>
-                        <input type="date" class="form-control form-control-sm" id="snLend_lend_end">
-                    </div>
-                </div>
-                <div class="d-flex flex-wrap align-items-center gap-2">
-                    <div class="form-check form-switch mb-0">
-                        <input class="form-check-input" type="checkbox" id="snLend_lend_notify"
-                               onchange="toggleLendNotify('snLend')">
-                        <label class="form-check-label small" for="snLend_lend_notify">Enable notification</label>
-                    </div>
-                    <div id="snLend_lend_notify_days_section" style="display:none;">
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text">Remind</span>
-                            <input type="number" class="form-control" id="snLend_lend_notify_days" min="1" value="3" style="width:55px">
-                            <span class="input-group-text">days before</span>
-                        </div>
-                    </div>
-                </div>
+                <div id="snlend_form_slot" class="mb-2"></div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer py-2">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-outline-warning" onclick="clearSnLendModal()">
-                    <i class="bi bi-x"></i> Clear Lending
+                <button type="button" class="btn btn-outline-warning btn-sm" onclick="clearSnlModal()">
+                    <i class="bi bi-x"></i> Clear
                 </button>
                 <button type="button" class="btn btn-primary" onclick="submitSnLend()">
                     <i class="bi bi-save"></i> Save
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk SN Lending Modal -->
+<div class="modal fade" id="snBulkLendModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title"><i class="bi bi-hand-index-thumb text-warning"></i> Manage Lending — <span id="snBulkLend_info" class="text-muted small"></span></h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-2">Apply lending info to all <strong>selected</strong> serial numbers. Leave contact blank to only update dates/notify.</p>
+                <div id="snbulk_form_slot" class="mb-2"></div>
+                <button type="button" class="btn btn-outline-danger btn-sm mt-1" onclick="submitSnBulkLend(true)">
+                    <i class="bi bi-x-circle"></i> Clear Lending for Selected
+                </button>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitSnBulkLend(false)"><i class="bi bi-save"></i> Save to Selected</button>
             </div>
         </div>
     </div>

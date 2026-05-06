@@ -279,6 +279,14 @@ def manage_lend(uuid, batch_id):
         lend_records_data = json.loads(lend_records_json)
     except (ValueError, TypeError):
         lend_records_data = []
+    total_lend_qty = sum(
+        max(1, int(r.get('qty', 1))) for r in lend_records_data if isinstance(r, dict)
+    )
+    if total_lend_qty > batch.quantity:
+        return jsonify({
+            'success': False,
+            'message': f'Total lend quantity ({total_lend_qty}) exceeds batch quantity ({batch.quantity}).'
+        })
     BatchLendRecord.query.filter_by(batch_id=batch.id).delete()
     _save_lend_records(batch, lend_records_data, batch.quantity)
     db.session.commit()
@@ -626,6 +634,10 @@ def bulk_update_sn(uuid):
             if lend_data is None:
                 sn.lend_to_type = ''
                 sn.lend_to_id = None
+                sn.lend_start = None
+                sn.lend_end = None
+                sn.lend_notify_enabled = False
+                sn.lend_notify_before_days = 3
             elif isinstance(lend_data, dict):
                 sn.lend_to_type = lend_data.get('type', '').strip()
                 lend_id_raw = lend_data.get('id')
@@ -633,6 +645,13 @@ def bulk_update_sn(uuid):
                     sn.lend_to_id = int(lend_id_raw) if lend_id_raw else None
                 except (ValueError, TypeError):
                     sn.lend_to_id = None
+                sn.lend_start = _parse_date(lend_data.get('start', ''))
+                sn.lend_end = _parse_date(lend_data.get('end', ''))
+                sn.lend_notify_enabled = bool(lend_data.get('notify', False))
+                try:
+                    sn.lend_notify_before_days = int(lend_data.get('days', 3))
+                except (ValueError, TypeError):
+                    sn.lend_notify_before_days = 3
             count += 1
 
     db.session.commit()
