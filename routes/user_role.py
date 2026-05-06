@@ -398,7 +398,8 @@ def role_new():
                     "users_edit": False,
                     "users_delete": False
                 },
-                "backup_restore": {"view": False, "upload_export": False, "delete": False}
+                "backup_restore": {"view": False, "upload_export": False, "delete": False},
+                "contacts": {"view": False, "edit": False, "delete": False}
             }
         }
         
@@ -542,6 +543,12 @@ def role_edit(id):
                 'view': 'settings_sections_project_settings_view' in request.form,
                 'edit': 'settings_sections_project_settings_edit' in request.form,
                 'delete': 'settings_sections_project_settings_delete' in request.form
+            }
+
+            perms['settings_sections']['contacts'] = {
+                'view': 'settings_sections_contacts_view' in request.form,
+                'edit': 'settings_sections_contacts_edit' in request.form,
+                'delete': 'settings_sections_contacts_delete' in request.form
             }
             
             role.set_permissions(perms)

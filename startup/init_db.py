@@ -16,8 +16,9 @@ def init_db():
         print("Creating database tables...")
         db.create_all()
         print("Database tables created!")
-        
+
         create_default_roles()
+        update_system_roles()
         
         admin_username = os.getenv('ADMIN_USERNAME', 'admin')
         admin_password = os.getenv('ADMIN_PASSWORD', 'admin123')
@@ -102,7 +103,8 @@ def create_default_roles():
                     "users_create": True, "users_edit": True, "users_delete": True
                 },
                 "project_settings": {"view": True, "edit": True, "delete": True},
-                "backup_restore": {"view": True, "upload_export": True, "delete": True}
+                "backup_restore": {"view": True, "upload_export": True, "delete": True},
+                "contacts": {"view": True, "edit": True, "delete": True}
             }
         }
         admin_role = Role(
@@ -146,7 +148,8 @@ def create_default_roles():
                     "users_create": False, "users_edit": False, "users_delete": False
                 },
                 "project_settings": {"view": True, "edit": True, "delete": False},
-                "backup_restore": {"view": False, "upload_export": False, "delete": False}
+                "backup_restore": {"view": False, "upload_export": False, "delete": False},
+                "contacts": {"view": True, "edit": True, "delete": False}
             }
         }
         manager_role = Role(
@@ -190,7 +193,8 @@ def create_default_roles():
                     "users_create": False, "users_edit": False, "users_delete": False
                 },
                 "project_settings": {"view": False, "edit": False, "delete": False},
-                "backup_restore": {"view": False, "upload_export": False, "delete": False}
+                "backup_restore": {"view": False, "upload_export": False, "delete": False},
+                "contacts": {"view": False, "edit": False, "delete": False}
             }
         }
         viewer_role = Role(
@@ -203,6 +207,30 @@ def create_default_roles():
         print("Created Viewer role")
     
     db.session.commit()
+
+def update_system_roles():
+    """Patch existing system roles to add any missing permission keys introduced by new features."""
+    updates = {
+        'Admin':   {"contacts": {"view": True,  "edit": True,  "delete": True}},
+        'Manager': {"contacts": {"view": True,  "edit": True,  "delete": False}},
+        'Viewer':  {"contacts": {"view": False, "edit": False, "delete": False}},
+    }
+    for role_name, new_keys in updates.items():
+        role = Role.query.filter_by(name=role_name).first()
+        if not role:
+            continue
+        perms = role.get_permissions()
+        ss = perms.setdefault('settings_sections', {})
+        changed = False
+        for key, val in new_keys.items():
+            if key not in ss:
+                ss[key] = val
+                changed = True
+        if changed:
+            role.set_permissions(perms)
+            print(f"Updated permissions for role: {role_name}")
+    db.session.commit()
+
 
 def create_default_settings():
     default_settings = [

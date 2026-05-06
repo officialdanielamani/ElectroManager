@@ -4,8 +4,10 @@ Project Routes Blueprint
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, current_app, abort
 from flask_login import login_required, current_user
 from models import (db, User, Item, ItemBatch, BatchSerialNumber, Setting,
-                    Project, ProjectCategory, ProjectTag, ProjectStatus, ProjectPerson,
-                    ProjectGroup, ProjectGroupMember, ProjectBOMItem, ProjectAttachment, ProjectURL)
+                    Project, ProjectCategory, ProjectTag, ProjectStatus,
+                    ProjectPerson, ProjectGroup, ProjectGroupMember,
+                    ContactPerson, ContactOrganization,
+                    ProjectBOMItem, ProjectAttachment, ProjectURL)
 from utils import log_audit, permission_required, allowed_file
 from werkzeug.utils import secure_filename
 from datetime import datetime, timezone
@@ -174,21 +176,22 @@ def project_new():
     tags = ProjectTag.query.order_by(ProjectTag.name).all()
     statuses = ProjectStatus.query.order_by(ProjectStatus.name).all()
     users = User.query.filter_by(is_active=True).order_by(User.username).all()
-    groups = ProjectGroup.query.order_by(ProjectGroup.name).all()
+    contact_persons = ContactPerson.query.order_by(ContactPerson.name).all()
+    contact_orgs = ContactOrganization.query.order_by(ContactOrganization.name).all()
 
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
         if not name:
             flash('Project name is required.', 'danger')
             return render_template('project_form.html', title='New Project', project=None,
-                                   categories=categories, tags=tags, statuses=statuses, users=users, groups=groups)
+                                   categories=categories, tags=tags, statuses=statuses,
+                                   users=users, contact_persons=contact_persons, contact_orgs=contact_orgs)
 
         project = Project(
             name=name,
             info=request.form.get('info', '').strip(),
             category_id=request.form.get('category_id', type=int) or None,
             status_id=request.form.get('status_id', type=int) or None,
-            group_id=request.form.get('group_id', type=int) or None,
             quantity=request.form.get('quantity', 1, type=int),
             created_by=current_user.id,
             updated_by=current_user.id
@@ -203,6 +206,16 @@ def project_new():
         selected_users = request.form.getlist('users')
         if selected_users:
             project.users = json.dumps([int(u) for u in selected_users])
+
+        # Persons
+        selected_persons = request.form.getlist('persons')
+        if selected_persons:
+            project.persons = json.dumps([int(p) for p in selected_persons])
+
+        # Organizations
+        selected_orgs = request.form.getlist('organizations')
+        if selected_orgs:
+            project.organizations = json.dumps([int(o) for o in selected_orgs])
 
         # Dates
         date_start = request.form.get('date_start')
@@ -226,7 +239,8 @@ def project_new():
         return redirect(url_for('project.project_detail', project_id=project.project_id))
 
     return render_template('project_form.html', title='New Project', project=None,
-                           categories=categories, tags=tags, statuses=statuses, users=users, groups=groups)
+                           categories=categories, tags=tags, statuses=statuses,
+                           users=users, contact_persons=contact_persons, contact_orgs=contact_orgs)
 
 
 # ==================== PROJECT DETAIL ====================
@@ -277,7 +291,8 @@ def project_edit(project_id):
     tags = ProjectTag.query.order_by(ProjectTag.name).all()
     statuses = ProjectStatus.query.order_by(ProjectStatus.name).all()
     users = User.query.filter_by(is_active=True).order_by(User.username).all()
-    groups = ProjectGroup.query.order_by(ProjectGroup.name).all()
+    contact_persons = ContactPerson.query.order_by(ContactPerson.name).all()
+    contact_orgs = ContactOrganization.query.order_by(ContactOrganization.name).all()
 
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
@@ -290,7 +305,6 @@ def project_edit(project_id):
         project.description = request.form.get('description', '').strip()
         project.category_id = request.form.get('category_id', type=int) or None
         project.status_id = request.form.get('status_id', type=int) or None
-        project.group_id = request.form.get('group_id', type=int) or None
         project.quantity = request.form.get('quantity', 1, type=int)
         project.updated_by = current_user.id
 
@@ -303,6 +317,12 @@ def project_edit(project_id):
         selected_users = request.form.getlist('users')
         project.users = json.dumps([int(u) for u in selected_users]) if selected_users else None
 
+        selected_persons = request.form.getlist('persons')
+        project.persons = json.dumps([int(p) for p in selected_persons]) if selected_persons else None
+
+        selected_orgs = request.form.getlist('organizations')
+        project.organizations = json.dumps([int(o) for o in selected_orgs]) if selected_orgs else None
+
         date_start = request.form.get('date_start')
         project.date_start = datetime.strptime(date_start, '%Y-%m-%d').date() if date_start else None
         date_end = request.form.get('date_end')
@@ -314,7 +334,8 @@ def project_edit(project_id):
         return redirect(url_for('project.project_detail', project_id=project.project_id))
 
     return render_template('project_form.html', title='Edit Project', project=project,
-                           categories=categories, tags=tags, statuses=statuses, users=users, groups=groups,
+                           categories=categories, tags=tags, statuses=statuses,
+                           users=users, contact_persons=contact_persons, contact_orgs=contact_orgs,
                            bom_items=ProjectBOMItem.query.filter_by(project_id=project.id).all(),
                            attachments={atype: ProjectAttachment.query.filter_by(project_id=project.id, attachment_type=atype).all() for atype in ['picture', 'document', 'schematic', '2d_design', '3d_design', 'program']},
                            currency=Setting.get('currency', 'USD'),
@@ -633,16 +654,12 @@ def project_settings():
     categories = ProjectCategory.query.order_by(ProjectCategory.name).all()
     tags = ProjectTag.query.order_by(ProjectTag.name).all()
     statuses = ProjectStatus.query.order_by(ProjectStatus.name).all()
-    groups = ProjectGroup.query.order_by(ProjectGroup.name).all()
-    persons = ProjectPerson.query.order_by(ProjectPerson.name).all()
-    users = User.query.filter_by(is_active=True).order_by(User.username).all()
 
     can_edit = current_user.has_permission('settings_sections.project_settings', 'edit')
     can_delete = current_user.has_permission('settings_sections.project_settings', 'delete')
 
     return render_template('project_settings.html',
                            categories=categories, tags=tags, statuses=statuses,
-                           groups=groups, persons=persons, users=users,
                            can_edit=can_edit, can_delete=can_delete)
 
 
@@ -793,148 +810,6 @@ def project_status_delete(id):
     db.session.delete(st)
     db.session.commit()
     flash('Status deleted.', 'success')
-    return redirect(url_for('project.project_settings'))
-
-
-# --- Person CRUD ---
-@project_bp.route('/settings/project/person/add', endpoint='project_person_add', methods=['POST'])
-@login_required
-def project_person_add():
-    if not current_user.has_permission('settings_sections.project_settings', 'edit'):
-        flash('No permission.', 'danger')
-        return redirect(url_for('project.project_settings'))
-    name = request.form.get('name', '').strip()
-    if not name:
-        flash('Name required.', 'danger')
-        return redirect(url_for('project.project_settings'))
-    person = ProjectPerson(name=name, email=request.form.get('email', '').strip(),
-                           organization=request.form.get('organization', '').strip(),
-                           tel=request.form.get('tel', '').strip())
-    db.session.add(person)
-    db.session.commit()
-    flash(f'Person "{name}" added.', 'success')
-    return redirect(url_for('project.project_settings'))
-
-
-@project_bp.route('/settings/project/person/<int:id>/edit', endpoint='project_person_edit', methods=['POST'])
-@login_required
-def project_person_edit(id):
-    if not current_user.has_permission('settings_sections.project_settings', 'edit'):
-        flash('No permission.', 'danger')
-        return redirect(url_for('project.project_settings'))
-    p = ProjectPerson.query.get_or_404(id)
-    p.name = request.form.get('name', p.name).strip()
-    p.email = request.form.get('email', '').strip()
-    p.organization = request.form.get('organization', '').strip()
-    p.tel = request.form.get('tel', '').strip()
-    db.session.commit()
-    flash('Person updated.', 'success')
-    return redirect(url_for('project.project_settings'))
-
-
-@project_bp.route('/settings/project/person/<int:id>/delete', endpoint='project_person_delete', methods=['POST'])
-@login_required
-def project_person_delete(id):
-    if not current_user.has_permission('settings_sections.project_settings', 'delete'):
-        flash('No permission.', 'danger')
-        return redirect(url_for('project.project_settings'))
-    p = ProjectPerson.query.get_or_404(id)
-    db.session.delete(p)
-    db.session.commit()
-    flash('Person deleted.', 'success')
-    return redirect(url_for('project.project_settings'))
-
-
-# --- Group CRUD ---
-@project_bp.route('/settings/project/group/add', endpoint='project_group_add', methods=['POST'])
-@login_required
-def project_group_add():
-    if not current_user.has_permission('settings_sections.project_settings', 'edit'):
-        flash('No permission.', 'danger')
-        return redirect(url_for('project.project_settings'))
-    name = request.form.get('name', '').strip()
-    if not name:
-        flash('Name required.', 'danger')
-        return redirect(url_for('project.project_settings'))
-    if ProjectGroup.query.filter_by(name=name).first():
-        flash('Group already exists.', 'danger')
-        return redirect(url_for('project.project_settings'))
-    grp = ProjectGroup(name=name, description=request.form.get('description', '').strip())
-    db.session.add(grp)
-    db.session.commit()
-    flash(f'Group "{name}" created.', 'success')
-    return redirect(url_for('project.project_settings'))
-
-
-@project_bp.route('/settings/project/group/<int:id>/edit', endpoint='project_group_edit', methods=['POST'])
-@login_required
-def project_group_edit(id):
-    if not current_user.has_permission('settings_sections.project_settings', 'edit'):
-        flash('No permission.', 'danger')
-        return redirect(url_for('project.project_settings'))
-    grp = ProjectGroup.query.get_or_404(id)
-    grp.name = request.form.get('name', grp.name).strip()
-    grp.description = request.form.get('description', '').strip()
-    db.session.commit()
-    flash('Group updated.', 'success')
-    return redirect(url_for('project.project_settings'))
-
-
-@project_bp.route('/settings/project/group/<int:id>/delete', endpoint='project_group_delete', methods=['POST'])
-@login_required
-def project_group_delete(id):
-    if not current_user.has_permission('settings_sections.project_settings', 'delete'):
-        flash('No permission.', 'danger')
-        return redirect(url_for('project.project_settings'))
-    grp = ProjectGroup.query.get_or_404(id)
-    db.session.delete(grp)
-    db.session.commit()
-    flash('Group deleted.', 'success')
-    return redirect(url_for('project.project_settings'))
-
-
-@project_bp.route('/settings/project/group/<int:id>/add-member', endpoint='project_group_add_member', methods=['POST'])
-@login_required
-def project_group_add_member(id):
-    if not current_user.has_permission('settings_sections.project_settings', 'edit'):
-        flash('No permission.', 'danger')
-        return redirect(url_for('project.project_settings'))
-    grp = ProjectGroup.query.get_or_404(id)
-    member_type = request.form.get('member_type', 'user')
-    member_id = request.form.get('member_id', type=int)
-    if not member_id:
-        flash('Select a member.', 'danger')
-        return redirect(url_for('project.project_settings'))
-
-    if member_type == 'user':
-        existing = ProjectGroupMember.query.filter_by(group_id=id, user_id=member_id).first()
-        if existing:
-            flash('User already in group.', 'warning')
-            return redirect(url_for('project.project_settings'))
-        m = ProjectGroupMember(group_id=id, user_id=member_id)
-    else:
-        existing = ProjectGroupMember.query.filter_by(group_id=id, person_id=member_id).first()
-        if existing:
-            flash('Person already in group.', 'warning')
-            return redirect(url_for('project.project_settings'))
-        m = ProjectGroupMember(group_id=id, person_id=member_id)
-
-    db.session.add(m)
-    db.session.commit()
-    flash('Member added to group.', 'success')
-    return redirect(url_for('project.project_settings'))
-
-
-@project_bp.route('/settings/project/group/member/<int:member_id>/remove', endpoint='project_group_remove_member', methods=['POST'])
-@login_required
-def project_group_remove_member(member_id):
-    if not current_user.has_permission('settings_sections.project_settings', 'edit'):
-        flash('No permission.', 'danger')
-        return redirect(url_for('project.project_settings'))
-    m = ProjectGroupMember.query.get_or_404(member_id)
-    db.session.delete(m)
-    db.session.commit()
-    flash('Member removed.', 'success')
     return redirect(url_for('project.project_settings'))
 
 
