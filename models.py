@@ -128,7 +128,7 @@ class User(UserMixin, db.Model):
     allow_password_reset = db.Column(db.Boolean, default=True)
     profile_photo = db.Column(db.String(255))
     allow_profile_picture_change = db.Column(db.Boolean, default=True)
-    profile_picture_source = db.Column(db.String(10), default='upload')  # 'upload', 'share', 'both'
+    profile_picture_source = db.Column(db.String(10), default='share')  # 'upload', 'share', 'both'
     failed_login_attempts = db.Column(db.Integer, default=0)
     account_locked_until = db.Column(db.DateTime)
     auto_unlock_enabled = db.Column(db.Boolean, default=True)

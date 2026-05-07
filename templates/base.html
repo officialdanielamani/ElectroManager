@@ -210,7 +210,12 @@
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown" style="min-width: 220px;">
                             {% if current_user.profile_photo %}
                             <li style="padding: 12px; text-align: center; border-bottom: 1px solid #dee2e6;">
-                                <img src="{{ url_for('user_role.serve_user_picture', filename=current_user.profile_photo) }}" alt="{{ current_user.username }}" style="width: 120px; height: 120px; border-radius: 50%; border: 2px solid #dee2e6; object-fit: cover;">
+                                {% if current_user.profile_photo.startswith('share/') %}
+                                    {% set _nav_photo_url = url_for('share.share_serve', category='profile', filename=current_user.profile_photo[6:]) %}
+                                {% else %}
+                                    {% set _nav_photo_url = url_for('user_role.serve_user_picture', filename=current_user.profile_photo) %}
+                                {% endif %}
+                                <img src="{{ _nav_photo_url }}" alt="{{ current_user.username }}" style="width: 120px; height: 120px; border-radius: 50%; border: 2px solid #dee2e6; object-fit: cover;">
                             </li>
                             {% endif %}
                             <li style="padding: 10px 16px; text-align: center; border-bottom: 1px solid #dee2e6;">

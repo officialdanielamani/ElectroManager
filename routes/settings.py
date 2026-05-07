@@ -293,8 +293,8 @@ def upload_profile_photo():
         flash('Profile photo must be smaller than 1MB.', 'danger')
         return redirect(url_for('settings.settings_general'))
     
-    # Delete old photo if exists
-    if current_user.profile_photo:
+    # Delete old photo if exists (skip if it's a share-sourced photo)
+    if current_user.profile_photo and not current_user.profile_photo.startswith('share/'):
         old_file = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', current_user.profile_photo)
         if is_safe_file_path(old_file, os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture')) and os.path.exists(old_file):
             os.remove(old_file)
@@ -319,13 +319,14 @@ def upload_profile_photo():
 def delete_profile_photo():
     """Delete user profile photo"""
     if current_user.profile_photo:
-        filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', current_user.profile_photo)
-        if is_safe_file_path(filepath, os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture')) and os.path.exists(filepath):
-            os.remove(filepath)
-        
+        if not current_user.profile_photo.startswith('share/'):
+            filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', current_user.profile_photo)
+            if is_safe_file_path(filepath, os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture')) and os.path.exists(filepath):
+                os.remove(filepath)
+
         current_user.profile_photo = None
         db.session.commit()
-        
+
         log_audit(current_user.id, 'update', 'user', current_user.id, 'Deleted profile photo')
         flash('Profile photo deleted successfully!', 'success')
     

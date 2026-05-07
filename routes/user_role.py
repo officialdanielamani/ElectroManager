@@ -133,9 +133,9 @@ def user_new():
             flash(f'Email "{form.email.data}" already registered!', 'danger')
             return render_template('user_form.html', form=form, title='New User')
         
-        _pps = request.form.get('profile_picture_source', 'upload')
+        _pps = request.form.get('profile_picture_source', 'share')
         if _pps not in ('upload', 'share', 'both'):
-            _pps = 'upload'
+            _pps = 'share'
         user = User(
             username=form.username.data,
             email=form.email.data,
@@ -200,9 +200,10 @@ def user_edit(id):
         # Handle profile photo delete (stay on form)
         if action == 'delete_photo':
             if user.profile_photo:
-                filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
-                if is_safe_file_path(filepath) and os.path.exists(filepath):
-                    os.remove(filepath)
+                if not user.profile_photo.startswith('share/'):
+                    filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
+                    if is_safe_file_path(filepath) and os.path.exists(filepath):
+                        os.remove(filepath)
                 user.profile_photo = None
                 log_audit(current_user.id, 'update', 'user', user.id, f'Deleted profile photo for user: {user.username}')
                 db.session.commit()
@@ -223,8 +224,8 @@ def user_edit(id):
                         flash('Profile photo must be smaller than 1MB', 'danger')
                         return render_template('user_form.html', form=form, user=user, title='Edit User', config=current_app.config)
                     
-                    # Delete old photo if exists
-                    if user.profile_photo:
+                    # Delete old photo if exists (skip if it's a share-sourced photo)
+                    if user.profile_photo and not user.profile_photo.startswith('share/'):
                         old_file = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
                         if is_safe_file_path(old_file) and os.path.exists(old_file):
                             os.remove(old_file)
@@ -253,9 +254,9 @@ def user_edit(id):
         user.auto_unlock_enabled = form.auto_unlock_enabled.data
         user.auto_unlock_minutes = form.auto_unlock_minutes.data
         if form.allow_profile_picture_change.data:
-            src = request.form.get('profile_picture_source', 'upload')
+            src = request.form.get('profile_picture_source', 'share')
             if src not in ('upload', 'share', 'both'):
-                src = 'upload'
+                src = 'share'
             user.profile_picture_source = src
 
         # Check if admin is unlocking the account

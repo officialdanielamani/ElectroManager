@@ -163,15 +163,20 @@
             <div class="card-body">
                 <!-- Profile Picture Section -->
                 {% if current_user.allow_profile_picture_change %}
-                {% set pps = current_user.profile_picture_source or 'upload' %}
+                {% set pps = current_user.profile_picture_source or 'share' %}
                 <div class="mb-4">
                     <h6 class="text-muted border-bottom pb-2 mb-3">
                         <i class="bi bi-image"></i> Profile Picture
                     </h6>
 
                     {% if current_user.profile_photo %}
+                    {% if current_user.profile_photo.startswith('share/') %}
+                        {% set _profile_img_url = url_for('share.share_serve', category='profile', filename=current_user.profile_photo[6:]) %}
+                    {% else %}
+                        {% set _profile_img_url = url_for('user_role.serve_user_picture', filename=current_user.profile_photo) %}
+                    {% endif %}
                     <div class="mb-3 text-center">
-                        <img id="settingsPhotoPreview" src="{{ url_for('user_role.serve_user_picture', filename=current_user.profile_photo) }}" alt="{{ current_user.username }}" style="max-width: 150px; max-height: 150px; border-radius: 8px; border: 2px solid #dee2e6; cursor: pointer;" data-bs-toggle="modal" data-bs-target="#settingsPhotoModal" title="Click to view full size">
+                        <img id="settingsPhotoPreview" src="{{ _profile_img_url }}" alt="{{ current_user.username }}" style="max-width: 150px; max-height: 150px; border-radius: 8px; border: 2px solid #dee2e6; cursor: pointer;" data-bs-toggle="modal" data-bs-target="#settingsPhotoModal" title="Click to view full size">
 
                         <!-- Full Size Photo Modal -->
                         <div class="modal fade" id="settingsPhotoModal" tabindex="-1">
@@ -182,7 +187,7 @@
                                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body text-center">
-                                        <img id="settingsFullSizePhoto" src="{{ url_for('user_role.serve_user_picture', filename=current_user.profile_photo) }}" alt="{{ current_user.username }}" style="max-width: 100%; height: auto; border-radius: 8px;">
+                                        <img id="settingsFullSizePhoto" src="{{ _profile_img_url }}" alt="{{ current_user.username }}" style="max-width: 100%; height: auto; border-radius: 8px;">
                                     </div>
                                 </div>
                             </div>
