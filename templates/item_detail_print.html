@@ -89,6 +89,10 @@
         .qr-block img { width: 100px; height: 100px; display: block; border: 1px solid #ddd; padding: 3px; border-radius: 3px; }
         .qr-block .qr-label { font-size: 0.75em; color: #777; margin-top: 3px; }
 
+        /* ── Thumbnail block ── */
+        .thumb-block { flex-shrink: 0; }
+        .thumb-block img { width: 100px; height: 100px; display: block; object-fit: contain; border: 1px solid #ddd; padding: 3px; border-radius: 3px; background: #f8f9fa; }
+
         /* ── Info grid ── */
         .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin-bottom: 14px; }
         .info-item { padding: 3px 0; }
@@ -183,6 +187,17 @@
             <img src="{{ url_for('item.item_qr_svg', uuid=item.uuid) }}" alt="QR Code">
             <div class="qr-label">{{ item.uuid }}</div>
         </div>
+        {% if item.thumbnail %}
+        <div class="thumb-block">
+            {% if item.thumbnail.startswith('share:') %}
+            <img src="{{ url_for('share.share_serve', category='item', filename=item.thumbnail[6:]) }}" alt="Thumbnail">
+            {% elif item.thumbnail.startswith('icon:') %}
+            <img src="{{ url_for('share.share_serve', category='icon', filename=item.thumbnail[5:]) }}" alt="Thumbnail" style="object-fit:contain;">
+            {% else %}
+            <img src="{{ url_for('uploaded_file', filename=item.thumbnail) }}" alt="Thumbnail">
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
 
     <!-- Basic info -->
