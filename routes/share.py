@@ -4,7 +4,6 @@ Share Files Blueprint - Manages shared file library
 import io
 import logging
 import os
-import uuid
 import zipfile
 
 logger = logging.getLogger(__name__)
@@ -61,6 +60,25 @@ def _share_file_path(upload_folder: str, category: str, filename: str) -> str:
     if not path.startswith(folder + os.sep):
         raise ValueError(f'Path traversal detected for filename: {filename!r}')
     return path
+
+
+def _unique_filename(folder: str, filename: str) -> str:
+    """Return a filename that does not already exist in folder.
+
+    If ``filename`` is free, it is returned as-is.  Otherwise a numeric
+    suffix is inserted before the extension: ``file_1.pdf``, ``file_2.pdf`` …
+    """
+    if not os.path.exists(os.path.join(folder, filename)):
+        return filename
+    base, _, ext = filename.rpartition('.')
+    if not base:          # no extension
+        base, ext = filename, ''
+    counter = 1
+    while True:
+        candidate = f'{base}_{counter}.{ext}' if ext else f'{base}_{counter}'
+        if not os.path.exists(os.path.join(folder, candidate)):
+            return candidate
+        counter += 1
 
 
 def get_share_config(category):
@@ -167,9 +185,9 @@ def share_upload():
             continue
 
         safe_base = secure_filename(file.filename)
-        stored_name = f"{uuid.uuid4().hex}_{safe_base}"
+        stored_name = _unique_filename(share_folder, safe_base)
         file.save(os.path.join(share_folder, stored_name))
-        name_base = safe_base.rsplit('.', 1)[0] if '.' in safe_base else safe_base
+        name_base = stored_name.rsplit('.', 1)[0] if '.' in stored_name else stored_name
 
         sf = SharedFile(
             name=name_base,
