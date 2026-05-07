@@ -1,9 +1,11 @@
 """
 Share Files Blueprint - Manages shared file library
 """
+import io
 import os
 import uuid
-from flask import Blueprint, render_template, redirect, url_for, flash, request, send_from_directory, current_app
+import zipfile
+from flask import Blueprint, render_template, redirect, url_for, flash, request, send_from_directory, current_app, jsonify, send_file
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from models import db, SharedFile, Setting
@@ -89,52 +91,63 @@ def share_upload():
         flash('No permission.', 'danger')
         return redirect(url_for('share.share_files'))
 
-    file = request.files.get('file')
+    files = request.files.getlist('files')
     category = request.form.get('category', '').strip()
-    display_name = request.form.get('name', '').strip()
 
-    if not file or not file.filename:
-        flash('No file selected.', 'danger')
+    if not files or all(not f.filename for f in files):
+        flash('No files selected.', 'danger')
         return redirect(url_for('share.share_files'))
 
     if category not in SHARE_CATEGORIES:
         flash('Invalid category.', 'danger')
         return redirect(url_for('share.share_files'))
 
-    ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
     allowed_exts, max_bytes = get_share_config(category)
-
-    if ext not in allowed_exts:
-        flash(f'File type .{ext} is not allowed for {category}. Allowed: {", ".join(sorted(allowed_exts))}', 'danger')
-        return redirect(url_for('share.share_files', category=category))
-
-    file.seek(0, os.SEEK_END)
-    file_size = file.tell()
-    file.seek(0)
-
-    if file_size > max_bytes:
-        flash(f'File too large. Maximum size for {category} is {max_bytes // (1024 * 1024)} MB.', 'danger')
-        return redirect(url_for('share.share_files', category=category))
-
     share_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', category)
     os.makedirs(share_folder, exist_ok=True)
 
-    safe_base = secure_filename(file.filename)
-    stored_name = f"{uuid.uuid4().hex}_{safe_base}"
-    file.save(os.path.join(share_folder, stored_name))
+    uploaded = 0
+    errors = []
+    for file in files:
+        if not file or not file.filename:
+            continue
 
-    sf = SharedFile(
-        name=display_name or safe_base,
-        filename=stored_name,
-        category=category,
-        file_size=file_size,
-        uploaded_by_id=current_user.id,
-    )
-    db.session.add(sf)
+        ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+        if ext not in allowed_exts:
+            errors.append(f'"{file.filename}": type .{ext} not allowed')
+            continue
+
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)
+
+        if file_size > max_bytes:
+            errors.append(f'"{file.filename}": exceeds {max_bytes // (1024 * 1024)} MB limit')
+            continue
+
+        safe_base = secure_filename(file.filename)
+        stored_name = f"{uuid.uuid4().hex}_{safe_base}"
+        file.save(os.path.join(share_folder, stored_name))
+
+        sf = SharedFile(
+            name=safe_base,
+            filename=stored_name,
+            category=category,
+            file_size=file_size,
+            uploaded_by_id=current_user.id,
+        )
+        db.session.add(sf)
+        db.session.flush()
+        log_audit(current_user.id, 'create', 'shared_file', sf.id, f'Uploaded shared file: {sf.name}')
+        uploaded += 1
+
     db.session.commit()
 
-    log_audit(current_user.id, 'create', 'shared_file', sf.id, f'Uploaded shared file: {sf.name}')
-    flash(f'File "{sf.name}" uploaded successfully.', 'success')
+    if uploaded:
+        flash(f'{uploaded} file(s) uploaded successfully.', 'success')
+    for err in errors:
+        flash(err, 'danger')
+
     return redirect(url_for('share.share_files', category=category))
 
 
@@ -178,6 +191,75 @@ def share_delete(id):
     log_audit(current_user.id, 'delete', 'shared_file', id, f'Deleted shared file: {name}')
     flash(f'File "{name}" deleted.', 'success')
     return redirect(url_for('share.share_files', category=category))
+
+
+@share_bp.route('/settings/share-files/bulk-delete', endpoint='share_bulk_delete', methods=['POST'])
+@login_required
+def share_bulk_delete():
+    if not current_user.has_permission('settings_sections.share_files', 'delete'):
+        return jsonify({'success': False, 'error': 'No permission.'}), 403
+
+    data = request.get_json(silent=True) or {}
+    ids = data.get('ids', [])
+    if not ids:
+        return jsonify({'success': False, 'error': 'No files specified.'}), 400
+
+    files = SharedFile.query.filter(SharedFile.id.in_(ids)).all()
+    count = 0
+    for sf in files:
+        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', sf.category, sf.filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        log_audit(current_user.id, 'delete', 'shared_file', sf.id, f'Bulk deleted shared file: {sf.name}')
+        db.session.delete(sf)
+        count += 1
+
+    db.session.commit()
+    return jsonify({'success': True, 'deleted': count})
+
+
+@share_bp.route('/settings/share-files/bulk-download', endpoint='share_bulk_download')
+@login_required
+def share_bulk_download():
+    if not current_user.has_permission('settings_sections.share_files', 'view'):
+        flash('No permission.', 'danger')
+        return redirect(url_for('share.share_files'))
+
+    ids_param = request.args.get('ids', '')
+    try:
+        ids = [int(i) for i in ids_param.split(',') if i.strip()]
+    except ValueError:
+        ids = []
+
+    if not ids:
+        flash('No files selected.', 'danger')
+        return redirect(url_for('share.share_files'))
+
+    files = SharedFile.query.filter(SharedFile.id.in_(ids)).all()
+    if not files:
+        flash('No files found.', 'danger')
+        return redirect(url_for('share.share_files'))
+
+    buf = io.BytesIO()
+    seen_names = {}
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for sf in files:
+            file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', sf.category, sf.filename)
+            if not os.path.exists(file_path):
+                continue
+            # Use display name with extension, deduplicate if needed
+            ext = sf.ext
+            arc_name = sf.name if sf.name.lower().endswith(f'.{ext}') else f'{sf.name}.{ext}'
+            if arc_name in seen_names:
+                seen_names[arc_name] += 1
+                base, dot_ext = arc_name.rsplit('.', 1)
+                arc_name = f'{base}_{seen_names[arc_name]}.{dot_ext}'
+            else:
+                seen_names[arc_name] = 0
+            zf.write(file_path, arc_name)
+
+    buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name='share_files.zip', mimetype='application/zip')
 
 
 @share_bp.route('/uploads/share/<category>/<path:filename>', endpoint='share_serve')

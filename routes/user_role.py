@@ -133,6 +133,9 @@ def user_new():
             flash(f'Email "{form.email.data}" already registered!', 'danger')
             return render_template('user_form.html', form=form, title='New User')
         
+        _pps = request.form.get('profile_picture_source', 'upload')
+        if _pps not in ('upload', 'share', 'both'):
+            _pps = 'upload'
         user = User(
             username=form.username.data,
             email=form.email.data,
@@ -140,6 +143,8 @@ def user_new():
             is_active=form.is_active.data,
             max_login_attempts=form.max_login_attempts.data or 0,
             allow_password_reset=form.allow_password_reset.data,
+            allow_profile_picture_change=form.allow_profile_picture_change.data,
+            profile_picture_source=_pps if form.allow_profile_picture_change.data else 'upload',
             auto_unlock_enabled=form.auto_unlock_enabled.data,
             auto_unlock_minutes=form.auto_unlock_minutes.data
         )
@@ -244,9 +249,15 @@ def user_edit(id):
         user.is_active = form.is_active.data
         user.max_login_attempts = form.max_login_attempts.data or 0
         user.allow_password_reset = form.allow_password_reset.data
+        user.allow_profile_picture_change = form.allow_profile_picture_change.data
         user.auto_unlock_enabled = form.auto_unlock_enabled.data
         user.auto_unlock_minutes = form.auto_unlock_minutes.data
-        
+        if form.allow_profile_picture_change.data:
+            src = request.form.get('profile_picture_source', 'upload')
+            if src not in ('upload', 'share', 'both'):
+                src = 'upload'
+            user.profile_picture_source = src
+
         # Check if admin is unlocking the account
         unlock_account = request.form.get('unlock_account')
         if unlock_account and user.account_locked_until:
@@ -634,9 +645,13 @@ def role_clone(id):
 
 
 
-@user_role_bp.route('/uploads/userpicture/<filename>', endpoint='serve_user_picture')
+@user_role_bp.route('/uploads/userpicture/<path:filename>', endpoint='serve_user_picture')
 def serve_user_picture(filename):
-    """Serve user profile pictures"""
+    """Serve user profile pictures; filename may be 'share/<actualname>' for share-sourced photos."""
+    if filename.startswith('share/'):
+        share_filename = filename[len('share/'):]
+        folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', 'profile')
+        return send_from_directory(folder, share_filename)
     return send_from_directory(os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture'), filename)
 
 
