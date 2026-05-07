@@ -55,6 +55,8 @@ login_manager.anonymous_user = AnonymousUser  # Use custom anonymous user
 # Create upload folders
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture'), exist_ok=True)
+for _share_cat in ('item', 'profile', 'projects', 'sticker'):
+    os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'share', _share_cat), exist_ok=True)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

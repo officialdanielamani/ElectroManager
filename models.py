@@ -1301,3 +1301,32 @@ class ProjectURL(db.Model):
     title = db.Column(db.String(300))
     description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class SharedFile(db.Model):
+    __tablename__ = 'shared_files'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    filename = db.Column(db.String(255), nullable=False)
+    category = db.Column(db.String(20), nullable=False)  # item, profile, project, sticker
+    file_size = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    uploaded_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    uploader = db.relationship('User', backref='shared_files', foreign_keys=[uploaded_by_id])
+
+    def size_display(self):
+        """Human-readable file size."""
+        b = self.file_size or 0
+        for unit in ('B', 'KB', 'MB', 'GB'):
+            if b < 1024:
+                return f"{b:.1f} {unit}" if unit != 'B' else f"{b} B"
+            b /= 1024
+        return f"{b:.1f} TB"
+
+    @property
+    def ext(self):
+        return self.filename.rsplit('.', 1)[1].lower() if '.' in self.filename else ''
+
+    @property
+    def is_image(self):
+        return self.ext in {'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'}

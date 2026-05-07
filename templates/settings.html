@@ -120,6 +120,20 @@
     </div>
     {% endif %}
 
+    <!-- Share Files -->
+    {% if current_user.has_permission('settings_sections.share_files', 'view') %}
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-folder-fill" style="font-size: 3rem; color: #f59f00;"></i>
+                <h5 class="card-title mt-3">Share Files</h5>
+                <p class="card-text small">Shared file library</p>
+                <a href="{{ url_for('share.share_files') }}" class="btn btn-primary">Browse Files</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Stickers Template -->
     {% if current_user.has_permission('settings_sections.qr_templates', 'view') %}
     <div class="col-md-6 col-lg-4 mb-3">
