@@ -39,14 +39,13 @@
 
                     <!-- Color Picker -->
                     <div class="mb-3">
-                        <label for="color" class="form-label">Color</label>
+                        <label class="form-label">Color</label>
                         <div class="input-group">
-                            <input type="color" class="form-control form-control-color" id="color" name="color" 
-                                   value="{{ rack.color if rack and rack.color else '#6c757d' }}" style="width: 100px;">
-                            <input type="text" class="form-control" id="color_text" readonly 
-                                   value="{{ rack.color if rack and rack.color else '#6c757d' }}" style="flex: 1;">
+                            <input type="color" class="form-control form-control-color" id="cp_main" value="{{ rack.color if rack and rack.color else '#6c757d' }}" style="width:50px; cursor:pointer; padding:2px;">
+                            <input type="text" class="form-control" id="ch_main" name="color" value="{{ rack.color if rack and rack.color else '#6c757d' }}" placeholder="#6c757d" maxlength="7" style="max-width:110px; font-family:monospace;">
+                            <span class="input-group-text p-1"><span id="cs_main" style="display:inline-block; width:28px; height:28px; border-radius:4px; background:{{ rack.color if rack and rack.color else '#6c757d' }};"></span></span>
                         </div>
-                        <small class="text-muted">Choose a color to identify this rack</small>
+                        <small class="text-muted">Click swatch to pick or type hex code directly</small>
                     </div>
 
                     <!-- Picture Upload -->
@@ -337,15 +336,27 @@
 </style>
 
 <script>
-// Sync color input with text display
-const colorInput = document.getElementById('color');
-const colorText = document.getElementById('color_text');
-
-if (colorInput && colorText) {
-    colorInput.addEventListener('input', function() {
-        colorText.value = this.value;
-    });
-}
+document.addEventListener('DOMContentLoaded', function() {
+    function initColorPicker(pickerId, hexId, swatchId) {
+        const picker = document.getElementById(pickerId);
+        const hex = document.getElementById(hexId);
+        const swatch = document.getElementById(swatchId);
+        if (!picker || !hex) return;
+        picker.addEventListener('input', function() {
+            hex.value = this.value;
+            if (swatch) swatch.style.background = this.value;
+        });
+        hex.addEventListener('input', function() {
+            const val = this.value.startsWith('#') ? this.value : '#' + this.value;
+            if (swatch) swatch.style.background = val;
+            if (/^#[0-9a-fA-F]{6}$/.test(val)) picker.value = val;
+        });
+        hex.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); }
+        });
+    }
+    initColorPicker('cp_main', 'ch_main', 'cs_main');
+});
 
 {% if rack %}
 // ===== Layout Manager Logic =====

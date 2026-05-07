@@ -105,6 +105,8 @@ def contact_org_add():
         email=request.form.get('email', '').strip() or None,
         tel=request.form.get('tel', '').strip() or None,
         url=request.form.get('url', '').strip() or None,
+        address=request.form.get('address', '').strip() or None,
+        zip_code=request.form.get('zip_code', '').strip() or None,
         info=request.form.get('info', '').strip() or None
     )
     db.session.add(org)
@@ -125,6 +127,8 @@ def contact_org_edit(id):
     org.email = request.form.get('email', '').strip() or None
     org.tel = request.form.get('tel', '').strip() or None
     org.url = request.form.get('url', '').strip() or None
+    org.address = request.form.get('address', '').strip() or None
+    org.zip_code = request.form.get('zip_code', '').strip() or None
     org.info = request.form.get('info', '').strip() or None
     db.session.commit()
     log_audit(current_user.id, 'update', 'contact_org', org.id, f'Updated organization: {org.name}')
@@ -291,3 +295,34 @@ def api_contacts_organizations():
             label += f' — {o.email}'
         result.append({'id': o.id, 'label': label, 'name': o.name, 'email': o.email or ''})
     return jsonify(result)
+
+
+@contacts_bp.route('/api/contacts/all', endpoint='api_contacts_all')
+@login_required
+def api_contacts_all():
+    """Unified search across users, persons, organizations, and groups for lending contact picker."""
+    q = request.args.get('q', '').strip().lower()
+    results = []
+
+    users = User.query.filter_by(is_active=True).order_by(User.username).all()
+    for u in users:
+        if not q or q in u.username.lower() or (u.email and q in u.email.lower()):
+            results.append({'id': u.id, 'type': 'user', 'label': u.username, 'extra': u.email or ''})
+
+    persons = ContactPerson.query.order_by(ContactPerson.name).all()
+    for p in persons:
+        if not q or q in p.name.lower() or (p.email and q in p.email.lower()):
+            extra = p.organization.name if p.organization else (p.email or '')
+            results.append({'id': p.id, 'type': 'person', 'label': p.name, 'extra': extra})
+
+    orgs = ContactOrganization.query.order_by(ContactOrganization.name).all()
+    for o in orgs:
+        if not q or q in o.name.lower() or (o.email and q in o.email.lower()):
+            results.append({'id': o.id, 'type': 'organization', 'label': o.name, 'extra': o.email or ''})
+
+    groups = ContactGroup.query.order_by(ContactGroup.name).all()
+    for g in groups:
+        if not q or q in g.name.lower() or (g.description and q in g.description.lower()):
+            results.append({'id': g.id, 'type': 'group', 'label': g.name, 'extra': g.description or ''})
+
+    return jsonify(results[:60])

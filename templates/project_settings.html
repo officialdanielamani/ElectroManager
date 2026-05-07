@@ -47,7 +47,14 @@
                         <div class="modal-body">
                             <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" value="{{ cat.name }}" required></div>
                             <div class="mb-3"><label class="form-label">Description</label><input type="text" class="form-control" name="description" value="{{ cat.description or '' }}"></div>
-                            <div class="mb-3"><label class="form-label">Color</label><input type="color" class="form-control form-control-color" name="color" value="{{ cat.color }}"></div>
+                            <div class="mb-3">
+                                <label class="form-label">Color</label>
+                                <div class="input-group">
+                                    <input type="color" class="form-control form-control-color" id="cp_cat{{ cat.id }}" value="{{ cat.color }}" style="width:50px; cursor:pointer; padding:2px;">
+                                    <input type="text" class="form-control" id="ch_cat{{ cat.id }}" name="color" value="{{ cat.color }}" placeholder="#6c757d" maxlength="7" style="max-width:110px; font-family:monospace;">
+                                    <span class="input-group-text p-1"><span id="cs_cat{{ cat.id }}" style="display:inline-block; width:28px; height:28px; border-radius:4px; background:{{ cat.color }};"></span></span>
+                                </div>
+                            </div>
                         </div>
                         <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
                     </form>
@@ -72,15 +79,20 @@
             <div class="card-body" style="max-height: 600px; overflow-y: auto;">
                 {% for tag in tags %}
                 <div class="card mb-2 border">
-                    <div class="card-body p-2 text-center">
-                        <span class="badge" style="background-color: {{ tag.color }}">{{ tag.name }}</span>
-                        <div class="mt-2">
-                            {% if can_edit %}
-                            <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editTag{{ tag.id }}"><i class="bi bi-pencil"></i></button>
-                            {% endif %}
-                            {% if can_delete %}
-                            <form method="POST" action="{{ url_for('project.project_tag_delete', id=tag.id) }}" style="display:inline;"><button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')"><i class="bi bi-trash"></i></button></form>
-                            {% endif %}
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge" style="background-color: {{ tag.color }}">{{ tag.name }}</span>
+                                {% if tag.description %}<small class="text-muted ms-2">{{ tag.description }}</small>{% endif %}
+                            </div>
+                            <div>
+                                {% if can_edit %}
+                                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editTag{{ tag.id }}"><i class="bi bi-pencil"></i></button>
+                                {% endif %}
+                                {% if can_delete %}
+                                <form method="POST" action="{{ url_for('project.project_tag_delete', id=tag.id) }}" style="display:inline;"><button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')"><i class="bi bi-trash"></i></button></form>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -90,7 +102,14 @@
                         <div class="modal-body">
                             <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" value="{{ tag.name }}" required></div>
                             <div class="mb-3"><label class="form-label">Description</label><input type="text" class="form-control" name="description" value="{{ tag.description or '' }}"></div>
-                            <div class="mb-3"><label class="form-label">Color</label><input type="color" class="form-control form-control-color" name="color" value="{{ tag.color }}"></div>
+                            <div class="mb-3">
+                                <label class="form-label">Color</label>
+                                <div class="input-group">
+                                    <input type="color" class="form-control form-control-color" id="cp_tag{{ tag.id }}" value="{{ tag.color }}" style="width:50px; cursor:pointer; padding:2px;">
+                                    <input type="text" class="form-control" id="ch_tag{{ tag.id }}" name="color" value="{{ tag.color }}" placeholder="#6c757d" maxlength="7" style="max-width:110px; font-family:monospace;">
+                                    <span class="input-group-text p-1"><span id="cs_tag{{ tag.id }}" style="display:inline-block; width:28px; height:28px; border-radius:4px; background:{{ tag.color }};"></span></span>
+                                </div>
+                            </div>
                         </div>
                         <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
                     </form>
@@ -119,7 +138,7 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <span class="badge" style="background-color: {{ st.color }}">{{ st.name }}</span>
-                                {% if st.description %}<br><small class="text-muted">{{ st.description }}</small>{% endif %}
+                                {% if st.description %}<small class="text-muted ms-2">{{ st.description }}</small>{% endif %}
                             </div>
                             <div>
                                 {% if can_edit %}
@@ -137,7 +156,14 @@
                         <div class="modal-header"><h5 class="modal-title">Edit Status</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                         <div class="modal-body">
                             <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" value="{{ st.name }}" required></div>
-                            <div class="mb-3"><label class="form-label">Color</label><input type="color" class="form-control form-control-color" name="color" value="{{ st.color }}"></div>
+                            <div class="mb-3">
+                                <label class="form-label">Color</label>
+                                <div class="input-group">
+                                    <input type="color" class="form-control form-control-color" id="cp_st{{ st.id }}" value="{{ st.color }}" style="width:50px; cursor:pointer; padding:2px;">
+                                    <input type="text" class="form-control" id="ch_st{{ st.id }}" name="color" value="{{ st.color }}" placeholder="#6c757d" maxlength="7" style="max-width:110px; font-family:monospace;">
+                                    <span class="input-group-text p-1"><span id="cs_st{{ st.id }}" style="display:inline-block; width:28px; height:28px; border-radius:4px; background:{{ st.color }};"></span></span>
+                                </div>
+                            </div>
                             <div class="mb-3"><label class="form-label">Description</label><input type="text" class="form-control" name="description" value="{{ st.description or '' }}"></div>
                         </div>
                         <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
@@ -157,7 +183,14 @@
         <div class="modal-body">
             <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required></div>
             <div class="mb-3"><label class="form-label">Description</label><input type="text" class="form-control" name="description"></div>
-            <div class="mb-3"><label class="form-label">Color</label><input type="color" class="form-control form-control-color" name="color" value="#6c757d"></div>
+            <div class="mb-3">
+                <label class="form-label">Color</label>
+                <div class="input-group">
+                    <input type="color" class="form-control form-control-color" id="cp_addCat" value="#6c757d" style="width:50px; cursor:pointer; padding:2px;">
+                    <input type="text" class="form-control" id="ch_addCat" name="color" value="#6c757d" placeholder="#6c757d" maxlength="7" style="max-width:110px; font-family:monospace;">
+                    <span class="input-group-text p-1"><span id="cs_addCat" style="display:inline-block; width:28px; height:28px; border-radius:4px; background:#6c757d;"></span></span>
+                </div>
+            </div>
         </div>
         <div class="modal-footer"><button type="submit" class="btn btn-success"><i class="bi bi-plus-circle"></i> Add Category</button></div>
     </form>
@@ -169,7 +202,14 @@
         <div class="modal-body">
             <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required></div>
             <div class="mb-3"><label class="form-label">Description</label><input type="text" class="form-control" name="description"></div>
-            <div class="mb-3"><label class="form-label">Color</label><input type="color" class="form-control form-control-color" name="color" value="#6c757d"></div>
+            <div class="mb-3">
+                <label class="form-label">Color</label>
+                <div class="input-group">
+                    <input type="color" class="form-control form-control-color" id="cp_addTag" value="#6c757d" style="width:50px; cursor:pointer; padding:2px;">
+                    <input type="text" class="form-control" id="ch_addTag" name="color" value="#6c757d" placeholder="#6c757d" maxlength="7" style="max-width:110px; font-family:monospace;">
+                    <span class="input-group-text p-1"><span id="cs_addTag" style="display:inline-block; width:28px; height:28px; border-radius:4px; background:#6c757d;"></span></span>
+                </div>
+            </div>
         </div>
         <div class="modal-footer"><button type="submit" class="btn btn-success"><i class="bi bi-plus-circle"></i> Add Tag</button></div>
     </form>
@@ -180,11 +220,49 @@
         <div class="modal-header"><h5 class="modal-title">Add Status</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
             <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required></div>
-            <div class="mb-3"><label class="form-label">Color</label><input type="color" class="form-control form-control-color" name="color" value="#6c757d"></div>
+            <div class="mb-3">
+                <label class="form-label">Color</label>
+                <div class="input-group">
+                    <input type="color" class="form-control form-control-color" id="cp_addSt" value="#6c757d" style="width:50px; cursor:pointer; padding:2px;">
+                    <input type="text" class="form-control" id="ch_addSt" name="color" value="#6c757d" placeholder="#6c757d" maxlength="7" style="max-width:110px; font-family:monospace;">
+                    <span class="input-group-text p-1"><span id="cs_addSt" style="display:inline-block; width:28px; height:28px; border-radius:4px; background:#6c757d;"></span></span>
+                </div>
+            </div>
             <div class="mb-3"><label class="form-label">Description</label><input type="text" class="form-control" name="description"></div>
         </div>
         <div class="modal-footer"><button type="submit" class="btn btn-success"><i class="bi bi-plus-circle"></i> Add Status</button></div>
     </form>
 </div></div></div>
 
+<script>
+function initColorPicker(pickerId, hexId, swatchId) {
+    const picker = document.getElementById(pickerId);
+    const hex = document.getElementById(hexId);
+    const swatch = document.getElementById(swatchId);
+    if (!picker || !hex) return;
+    picker.addEventListener('input', function() {
+        hex.value = this.value;
+        if (swatch) swatch.style.background = this.value;
+    });
+    hex.addEventListener('input', function() {
+        const val = this.value.startsWith('#') ? this.value : '#' + this.value;
+        if (swatch) swatch.style.background = val;
+        if (/^#[0-9a-fA-F]{6}$/.test(val)) picker.value = val;
+    });
+    hex.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); }
+    });
+}
+document.addEventListener('DOMContentLoaded', function() {
+    {% for cat in categories %}initColorPicker('cp_cat{{ cat.id }}', 'ch_cat{{ cat.id }}', 'cs_cat{{ cat.id }}');
+    {% endfor %}
+    {% for tag in tags %}initColorPicker('cp_tag{{ tag.id }}', 'ch_tag{{ tag.id }}', 'cs_tag{{ tag.id }}');
+    {% endfor %}
+    {% for st in statuses %}initColorPicker('cp_st{{ st.id }}', 'ch_st{{ st.id }}', 'cs_st{{ st.id }}');
+    {% endfor %}
+    initColorPicker('cp_addCat', 'ch_addCat', 'cs_addCat');
+    initColorPicker('cp_addTag', 'ch_addTag', 'cs_addTag');
+    initColorPicker('cp_addSt', 'ch_addSt', 'cs_addSt');
+});
+</script>
 {% endblock %}

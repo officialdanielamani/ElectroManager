@@ -5,8 +5,8 @@
 {% block content %}
 <div class="row mb-4">
     <div class="col-md-12">
-        <h2><i class="bi bi-bell"></i> Parameter Notifications</h2>
-        <p class="text-muted">Items with date parameter notifications</p>
+        <h2><i class="bi bi-bell"></i> Notifications</h2>
+        <p class="text-muted">Parameter alerts and lending deadlines</p>
     </div>
 </div>
 
@@ -16,7 +16,7 @@
         <div class="alert alert-info">
             <i class="bi bi-info-circle"></i> Found {{ notifications|length }} notification(s)
         </div>
-        
+
         <div class="list-group">
             {% for notif in notifications %}
             <a href="{{ url_for('item.item_detail', uuid=notif.item.uuid) }}" class="list-group-item list-group-item-action">
@@ -27,16 +27,28 @@
                             <strong>{{ notif.message }}</strong>
                         </p>
                         <small class="text-muted">
-                            {{ notif.parameter.get_display_text() }}
+                            {% if notif.batch is defined and notif.batch %}
+                                <i class="bi bi-collection"></i> {{ notif.batch.get_display_label() }}
+                                {% if notif.sn is defined and notif.sn %}
+                                — <i class="bi bi-upc-scan"></i> {{ notif.sn.serial_number or notif.sn.internal_serial_number }}
+                                {% endif %}
+                            {% elif notif.parameter is defined and notif.parameter %}
+                                {{ notif.parameter.get_display_text() }}
+                            {% endif %}
                         </small>
                     </div>
-                    <div>
-                        {% if notif.type == 'overdue' %}
+                    <div class="text-end">
+                        {% if notif.type in ['overdue', 'lend_overdue'] %}
                         <span class="badge bg-danger">Overdue</span>
-                        {% elif notif.type == 'due' %}
-                        <span class="badge bg-warning">Due Today</span>
+                        {% elif notif.type in ['due', 'lend_due'] %}
+                        <span class="badge bg-warning text-dark">Due Today</span>
                         {% elif notif.type == 'active' %}
                         <span class="badge bg-info">Active</span>
+                        {% elif notif.type == 'lend_soon' %}
+                        <span class="badge bg-primary">Lending Due Soon</span>
+                        {% endif %}
+                        {% if notif.type in ['lend_overdue', 'lend_due', 'lend_soon'] %}
+                        <div><span class="badge bg-secondary mt-1"><i class="bi bi-hand-index-thumb"></i> Lending</span></div>
                         {% endif %}
                     </div>
                 </div>

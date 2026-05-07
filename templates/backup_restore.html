@@ -7,32 +7,31 @@
     </div>
 </div>
 
-<!-- Full Database Backup/Restore -->
+<!-- Full DB Backup/Restore -->
 <div class="row mb-4">
     <div class="col-md-6">
         <div class="card">
             <div class="card-header bg-success text-white">
-                <h5 class="mb-0 text-white"><i class="bi bi-download"></i> Backup Database</h5>
+                <h5 class="mb-0"><i class="bi bi-download"></i> Backup Database</h5>
             </div>
             <div class="card-body">
-                <p>Download a copy of your database</p>
+                <p class="mb-3">Download a full copy of your database.</p>
                 <a href="{{ url_for('backup.backup_download') }}" class="btn btn-success">
                     <i class="bi bi-download"></i> Download Backup
                 </a>
             </div>
         </div>
     </div>
-    
     <div class="col-md-6">
         <div class="card">
             <div class="card-header bg-warning">
                 <h5 class="mb-0 text-white"><i class="bi bi-upload"></i> Restore Database</h5>
             </div>
             <div class="card-body">
-                <p class="text-danger"><strong>Warning:</strong> This will replace all current data!</p>
+                <p class="text-danger mb-2"><strong>Warning:</strong> This will replace ALL current data!</p>
                 <form method="POST" action="{{ url_for('backup.backup_restore_upload') }}" enctype="multipart/form-data">
-                    <input type="file" name="backup" class="form-control mb-2" accept=".db" required>
-                    <button type="submit" class="btn btn-warning" onclick="return confirm('Replace all data?')">
+                    <input type="file" name="backup" class="form-control form-control-sm mb-2" accept=".db" required>
+                    <button type="submit" class="btn btn-warning" onclick="return confirm('Replace all data? This cannot be undone.')">
                         <i class="bi bi-upload"></i> Restore
                     </button>
                 </form>
@@ -43,216 +42,302 @@
 
 <hr class="my-4">
 
-<!-- Export/Import Config -->
 <div class="row">
+    <!-- Export -->
     <div class="col-md-6">
         <div class="card">
             <div class="card-header bg-info text-white">
-                <h5 class="mb-0 text-white"><i class="bi bi-download"></i> Export Config</h5>
+                <h5 class="mb-0"><i class="bi bi-download"></i> Export Config</h5>
             </div>
             <div class="card-body">
-                <p>Export selected configurations</p>
                 <form method="POST" action="{{ url_for('backup.export_selective') }}" enctype="multipart/form-data" id="exportForm">
-                    
-                    <!-- Item Parameters Checkbox -->
-                    <div class="mb-3">
+                    <div class="mb-2">
                         <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="include_item_values" name="include_item_values">
-                            <label class="form-check-label" for="include_item_values">
-                                <strong>Include Item Parameter Values</strong>
-                            </label>
+                            <input class="form-check-input" type="checkbox" id="e_item_values" name="include_item_values">
+                            <label class="form-check-label small" for="e_item_values"><strong>Include Item Parameter Values</strong></label>
                         </div>
-                        <small class="text-muted d-block">If checked, item parameter values will be included</small>
                     </div>
-
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <label class="form-label mb-0"><strong>Select Data Types to Export:</strong></label>
+                    <div id="e_sections">
+                        <!-- Location -->
+                        <div class="mb-2 border rounded p-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <strong class="small"><i class="bi bi-geo-alt"></i> Location</strong>
+                                <div class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" id="e_loc_all" onchange="sectionAll('e_loc_all',['e_loc_general','e_loc_rack']);updateExportAll()">
+                                    <label class="form-check-label small" for="e_loc_all">All</label>
+                                </div>
+                            </div>
+                            <div class="ms-3">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input e_loc_child" type="checkbox" id="e_loc_general" name="loc_general" onchange="childChanged('e_loc_all',['e_loc_general','e_loc_rack']);updateExportAll()">
+                                    <label class="form-check-label small" for="e_loc_general">General Storage</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input e_loc_child" type="checkbox" id="e_loc_rack" name="loc_rack" onchange="childChanged('e_loc_all',['e_loc_general','e_loc_rack']);updateExportAll()">
+                                    <label class="form-check-label small" for="e_loc_rack">Rack Storage</label>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Item Management -->
+                        <div class="mb-2 border rounded p-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <strong class="small"><i class="bi bi-box-seam"></i> Item Management</strong>
+                                <div class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" id="e_item_all" onchange="sectionAll('e_item_all',['e_item_cat','e_item_fp','e_item_tags']);updateExportAll()">
+                                    <label class="form-check-label small" for="e_item_all">All</label>
+                                </div>
+                            </div>
+                            <div class="ms-3">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="e_item_cat" name="item_categories" onchange="childChanged('e_item_all',['e_item_cat','e_item_fp','e_item_tags']);updateExportAll()">
+                                    <label class="form-check-label small" for="e_item_cat">Categories</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="e_item_fp" name="item_footprint" onchange="childChanged('e_item_all',['e_item_cat','e_item_fp','e_item_tags']);updateExportAll()">
+                                    <label class="form-check-label small" for="e_item_fp">Footprint</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="e_item_tags" name="item_tags" onchange="childChanged('e_item_all',['e_item_cat','e_item_fp','e_item_tags']);updateExportAll()">
+                                    <label class="form-check-label small" for="e_item_tags">Tags</label>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Magic Parameter -->
+                        <div class="mb-2 border rounded p-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <strong class="small"><i class="bi bi-magic"></i> Magic Parameter</strong>
+                                <div class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" id="e_mp_all" onchange="sectionAll('e_mp_all',['e_mp_number','e_mp_string','e_mp_date','e_mp_template']);updateExportAll()">
+                                    <label class="form-check-label small" for="e_mp_all">All</label>
+                                </div>
+                            </div>
+                            <div class="ms-3">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="e_mp_number" name="mp_number" onchange="childChanged('e_mp_all',['e_mp_number','e_mp_string','e_mp_date','e_mp_template']);updateMpTemplate('e_mp_number','e_mp_string','e_mp_date','e_mp_template');updateExportAll()">
+                                    <label class="form-check-label small" for="e_mp_number">Number</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="e_mp_string" name="mp_string" onchange="childChanged('e_mp_all',['e_mp_number','e_mp_string','e_mp_date','e_mp_template']);updateMpTemplate('e_mp_number','e_mp_string','e_mp_date','e_mp_template');updateExportAll()">
+                                    <label class="form-check-label small" for="e_mp_string">String</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="e_mp_date" name="mp_date" onchange="childChanged('e_mp_all',['e_mp_number','e_mp_string','e_mp_date','e_mp_template']);updateMpTemplate('e_mp_number','e_mp_string','e_mp_date','e_mp_template');updateExportAll()">
+                                    <label class="form-check-label small" for="e_mp_date">Date</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="e_mp_template" name="mp_template" disabled onchange="childChanged('e_mp_all',['e_mp_number','e_mp_string','e_mp_date','e_mp_template']);updateExportAll()">
+                                    <label class="form-check-label small text-muted" for="e_mp_template" id="e_mp_template_label">Template <small>(need Number, String &amp; Date)</small></label>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Project -->
+                        <div class="mb-2 border rounded p-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <strong class="small"><i class="bi bi-kanban"></i> Project</strong>
+                                <div class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" id="e_proj_all" onchange="sectionAll('e_proj_all',['e_proj_cat','e_proj_tags','e_proj_status']);updateExportAll()">
+                                    <label class="form-check-label small" for="e_proj_all">All</label>
+                                </div>
+                            </div>
+                            <div class="ms-3">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="e_proj_cat" name="proj_categories" onchange="childChanged('e_proj_all',['e_proj_cat','e_proj_tags','e_proj_status']);updateExportAll()">
+                                    <label class="form-check-label small" for="e_proj_cat">Categories</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="e_proj_tags" name="proj_tags" onchange="childChanged('e_proj_all',['e_proj_cat','e_proj_tags','e_proj_status']);updateExportAll()">
+                                    <label class="form-check-label small" for="e_proj_tags">Tags</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="e_proj_status" name="proj_status" onchange="childChanged('e_proj_all',['e_proj_cat','e_proj_tags','e_proj_status']);updateExportAll()">
+                                    <label class="form-check-label small" for="e_proj_status">Status</label>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Contact -->
+                        <div class="mb-2 border rounded p-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <strong class="small"><i class="bi bi-people"></i> Contact</strong>
+                                <div class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" id="e_ct_all" onchange="sectionAll('e_ct_all',['e_ct_persons','e_ct_orgs','e_ct_groups']);updateExportAll()">
+                                    <label class="form-check-label small" for="e_ct_all">All</label>
+                                </div>
+                            </div>
+                            <div class="ms-3">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="e_ct_persons" name="contact_persons" onchange="childChanged('e_ct_all',['e_ct_persons','e_ct_orgs','e_ct_groups']);updateContactGroups('e_ct_persons','e_ct_orgs','e_ct_groups');updateExportAll()">
+                                    <label class="form-check-label small" for="e_ct_persons">Persons</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="e_ct_orgs" name="contact_orgs" onchange="childChanged('e_ct_all',['e_ct_persons','e_ct_orgs','e_ct_groups']);updateContactGroups('e_ct_persons','e_ct_orgs','e_ct_groups');updateExportAll()">
+                                    <label class="form-check-label small" for="e_ct_orgs">Organizations</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="e_ct_groups" name="contact_groups" disabled onchange="childChanged('e_ct_all',['e_ct_persons','e_ct_orgs','e_ct_groups']);updateExportAll()">
+                                    <label class="form-check-label small text-muted" for="e_ct_groups" id="e_ct_groups_label">Groups <small>(need Persons &amp; Orgs)</small></label>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Global All -->
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <span class="small text-muted">Quick select:</span>
                             <div class="form-check mb-0">
-                                <input class="form-check-input" type="checkbox" id="export_select_all" onchange="exportSelectAll()">
-                                <label class="form-check-label" for="export_select_all">
-                                    Select All
-                                </label>
+                                <input class="form-check-input" type="checkbox" id="e_all" onchange="exportSelectAll()">
+                                <label class="form-check-label small" for="e_all">Select All</label>
                             </div>
-                        </div>
-                        
-                        <!-- Magic Parameters Section -->
-                        <div class="mb-2">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="export_mp" name="magic_parameters" onchange="toggleMPOptions();updateExportSelectAll()">
-                                <label class="form-check-label" for="export_mp">
-                                    <strong>Magic Parameters</strong>
-                                </label>
-                            </div>
-                            <div id="mp_options" style="display:none; margin-left: 20px; padding: 10px; border-left: 3px solid #17a2b8; border-radius: 3px;">
-                                <small class="text-muted d-block mb-2">Select which Magic Parameter components to export:</small>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="mp_parameters" name="mp_parameters" checked>
-                                    <label class="form-check-label" for="mp_parameters">
-                                        Parameters
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="mp_templates" name="mp_templates" checked>
-                                    <label class="form-check-label" for="mp_templates">
-                                        Templates
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="mp_units" name="mp_units" checked>
-                                    <label class="form-check-label" for="mp_units">
-                                        Units
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="mp_options" name="mp_options" checked>
-                                    <label class="form-check-label" for="mp_options">
-                                        Options
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Other Data Types -->
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="export_loc" name="locations" onchange="updateExportSelectAll()">
-                            <label class="form-check-label" for="export_loc">
-                                Locations & Racks
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="export_racks" name="racks" style="display:none;">
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="export_cat" name="categories" onchange="updateExportSelectAll()">
-                            <label class="form-check-label" for="export_cat">
-                                Categories
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="export_fp" name="footprints" onchange="updateExportSelectAll()">
-                            <label class="form-check-label" for="export_fp">
-                                Footprints
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="export_tags" name="tags" onchange="updateExportSelectAll()">
-                            <label class="form-check-label" for="export_tags">
-                                Tags
-                            </label>
                         </div>
                     </div>
-
-                    <small class="text-muted d-block mb-3">
-                        Example: Select Magic Parameters (with Units, Options), Locations & Racks, and Tags to export only those
-                    </small>
-
-                    <button type="submit" class="btn btn-info" onclick="return validateExportSelection()">
+                    <button type="submit" class="btn btn-info mt-3" onclick="return validateExportSelection()">
                         <i class="bi bi-download"></i> Export
                     </button>
                 </form>
             </div>
         </div>
     </div>
-    
+
+    <!-- Import -->
     <div class="col-md-6">
         <div class="card">
             <div class="card-header bg-info">
                 <h5 class="mb-0 text-white"><i class="bi bi-upload"></i> Import Config</h5>
             </div>
             <div class="card-body">
-                <p>Import configurations from JSON file</p>
                 <form method="POST" action="{{ url_for('backup.import_selective') }}" enctype="multipart/form-data" id="importForm">
-                    
-                    <!-- File Upload -->
                     <div class="mb-3">
-                        <label for="config" class="form-label">Select JSON File:</label>
-                        <input type="file" name="config" id="config" class="form-control" accept=".json" required>
+                        <label class="form-label small">Select JSON file:</label>
+                        <input type="file" name="config" class="form-control form-control-sm" accept=".json" required>
                     </div>
-
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <label class="form-label mb-0"><strong>Select Data Types to Import:</strong></label>
+                    <div id="i_sections">
+                        <!-- Location -->
+                        <div class="mb-2 border rounded p-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <strong class="small"><i class="bi bi-geo-alt"></i> Location</strong>
+                                <div class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" id="i_loc_all" onchange="sectionAll('i_loc_all',['i_loc_general','i_loc_rack']);updateImportAll()">
+                                    <label class="form-check-label small" for="i_loc_all">All</label>
+                                </div>
+                            </div>
+                            <div class="ms-3">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="i_loc_general" name="loc_general" onchange="childChanged('i_loc_all',['i_loc_general','i_loc_rack']);updateImportAll()">
+                                    <label class="form-check-label small" for="i_loc_general">General Storage</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="i_loc_rack" name="loc_rack" onchange="childChanged('i_loc_all',['i_loc_general','i_loc_rack']);updateImportAll()">
+                                    <label class="form-check-label small" for="i_loc_rack">Rack Storage</label>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Item Management -->
+                        <div class="mb-2 border rounded p-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <strong class="small"><i class="bi bi-box-seam"></i> Item Management</strong>
+                                <div class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" id="i_item_all" onchange="sectionAll('i_item_all',['i_item_cat','i_item_fp','i_item_tags']);updateImportAll()">
+                                    <label class="form-check-label small" for="i_item_all">All</label>
+                                </div>
+                            </div>
+                            <div class="ms-3">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="i_item_cat" name="item_categories" onchange="childChanged('i_item_all',['i_item_cat','i_item_fp','i_item_tags']);updateImportAll()">
+                                    <label class="form-check-label small" for="i_item_cat">Categories</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="i_item_fp" name="item_footprint" onchange="childChanged('i_item_all',['i_item_cat','i_item_fp','i_item_tags']);updateImportAll()">
+                                    <label class="form-check-label small" for="i_item_fp">Footprint</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="i_item_tags" name="item_tags" onchange="childChanged('i_item_all',['i_item_cat','i_item_fp','i_item_tags']);updateImportAll()">
+                                    <label class="form-check-label small" for="i_item_tags">Tags</label>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Magic Parameter -->
+                        <div class="mb-2 border rounded p-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <strong class="small"><i class="bi bi-magic"></i> Magic Parameter</strong>
+                                <div class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" id="i_mp_all" onchange="sectionAll('i_mp_all',['i_mp_number','i_mp_string','i_mp_date','i_mp_template']);updateImportAll()">
+                                    <label class="form-check-label small" for="i_mp_all">All</label>
+                                </div>
+                            </div>
+                            <div class="ms-3">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="i_mp_number" name="mp_number" onchange="childChanged('i_mp_all',['i_mp_number','i_mp_string','i_mp_date','i_mp_template']);updateMpTemplate('i_mp_number','i_mp_string','i_mp_date','i_mp_template');updateImportAll()">
+                                    <label class="form-check-label small" for="i_mp_number">Number</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="i_mp_string" name="mp_string" onchange="childChanged('i_mp_all',['i_mp_number','i_mp_string','i_mp_date','i_mp_template']);updateMpTemplate('i_mp_number','i_mp_string','i_mp_date','i_mp_template');updateImportAll()">
+                                    <label class="form-check-label small" for="i_mp_string">String</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="i_mp_date" name="mp_date" onchange="childChanged('i_mp_all',['i_mp_number','i_mp_string','i_mp_date','i_mp_template']);updateMpTemplate('i_mp_number','i_mp_string','i_mp_date','i_mp_template');updateImportAll()">
+                                    <label class="form-check-label small" for="i_mp_date">Date</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="i_mp_template" name="mp_template" disabled onchange="childChanged('i_mp_all',['i_mp_number','i_mp_string','i_mp_date','i_mp_template']);updateImportAll()">
+                                    <label class="form-check-label small text-muted" for="i_mp_template" id="i_mp_template_label">Template <small>(need Number, String &amp; Date)</small></label>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Project -->
+                        <div class="mb-2 border rounded p-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <strong class="small"><i class="bi bi-kanban"></i> Project</strong>
+                                <div class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" id="i_proj_all" onchange="sectionAll('i_proj_all',['i_proj_cat','i_proj_tags','i_proj_status']);updateImportAll()">
+                                    <label class="form-check-label small" for="i_proj_all">All</label>
+                                </div>
+                            </div>
+                            <div class="ms-3">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="i_proj_cat" name="proj_categories" onchange="childChanged('i_proj_all',['i_proj_cat','i_proj_tags','i_proj_status']);updateImportAll()">
+                                    <label class="form-check-label small" for="i_proj_cat">Categories</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="i_proj_tags" name="proj_tags" onchange="childChanged('i_proj_all',['i_proj_cat','i_proj_tags','i_proj_status']);updateImportAll()">
+                                    <label class="form-check-label small" for="i_proj_tags">Tags</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="i_proj_status" name="proj_status" onchange="childChanged('i_proj_all',['i_proj_cat','i_proj_tags','i_proj_status']);updateImportAll()">
+                                    <label class="form-check-label small" for="i_proj_status">Status</label>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Contact -->
+                        <div class="mb-2 border rounded p-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <strong class="small"><i class="bi bi-people"></i> Contact</strong>
+                                <div class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" id="i_ct_all" onchange="sectionAll('i_ct_all',['i_ct_persons','i_ct_orgs','i_ct_groups']);updateImportAll()">
+                                    <label class="form-check-label small" for="i_ct_all">All</label>
+                                </div>
+                            </div>
+                            <div class="ms-3">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="i_ct_persons" name="contact_persons" onchange="childChanged('i_ct_all',['i_ct_persons','i_ct_orgs','i_ct_groups']);updateContactGroups('i_ct_persons','i_ct_orgs','i_ct_groups');updateImportAll()">
+                                    <label class="form-check-label small" for="i_ct_persons">Persons</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="i_ct_orgs" name="contact_orgs" onchange="childChanged('i_ct_all',['i_ct_persons','i_ct_orgs','i_ct_groups']);updateContactGroups('i_ct_persons','i_ct_orgs','i_ct_groups');updateImportAll()">
+                                    <label class="form-check-label small" for="i_ct_orgs">Organizations</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="i_ct_groups" name="contact_groups" disabled onchange="childChanged('i_ct_all',['i_ct_persons','i_ct_orgs','i_ct_groups']);updateImportAll()">
+                                    <label class="form-check-label small text-muted" for="i_ct_groups" id="i_ct_groups_label">Groups <small>(need Persons &amp; Orgs)</small></label>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Global All -->
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <span class="small text-muted">Quick select:</span>
                             <div class="form-check mb-0">
-                                <input class="form-check-input" type="checkbox" id="import_select_all" onchange="importSelectAll()">
-                                <label class="form-check-label" for="import_select_all">
-                                    Select All
-                                </label>
+                                <input class="form-check-input" type="checkbox" id="i_all" onchange="importSelectAll()">
+                                <label class="form-check-label small" for="i_all">Select All</label>
                             </div>
-                        </div>
-                        
-                        <!-- Magic Parameters Section -->
-                        <div class="mb-2">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="import_mp" name="magic_parameters" onchange="toggleImportMPOptions();updateImportSelectAll()">
-                                <label class="form-check-label" for="import_mp">
-                                    <strong>Magic Parameters</strong>
-                                </label>
-                            </div>
-                            <div id="import_mp_options" style="display:none; margin-left: 20px; padding: 10px; border-left: 3px solid #17a2b8; border-radius: 3px;">
-                                <small class="text-muted d-block mb-2">Select which Magic Parameter components to import:</small>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="import_mp_parameters" name="mp_parameters" checked>
-                                    <label class="form-check-label" for="import_mp_parameters">
-                                        Parameters
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="import_mp_templates" name="mp_templates" checked>
-                                    <label class="form-check-label" for="import_mp_templates">
-                                        Templates
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="import_mp_units" name="mp_units" checked>
-                                    <label class="form-check-label" for="import_mp_units">
-                                        Units
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="import_mp_options" name="mp_options" checked>
-                                    <label class="form-check-label" for="import_mp_options">
-                                        Options
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Other Data Types -->
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="import_loc" name="locations" onchange="updateImportSelectAll()">
-                            <label class="form-check-label" for="import_loc">
-                                Locations & Racks
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="import_racks" name="racks" style="display:none;">
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="import_cat" name="categories" onchange="updateImportSelectAll()">
-                            <label class="form-check-label" for="import_cat">
-                                Categories
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="import_fp" name="footprints" onchange="updateImportSelectAll()">
-                            <label class="form-check-label" for="import_fp">
-                                Footprints
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="import_tags" name="tags" onchange="updateImportSelectAll()">
-                            <label class="form-check-label" for="import_tags">
-                                Tags
-                            </label>
                         </div>
                     </div>
-
-                    <small class="text-muted d-block mb-3">
-                        Only selected components will be imported. Results show imported, skipped, and failed items.
-                    </small>
-
-                    <button type="submit" class="btn btn-info" onclick="return validateImportSelection()">
+                    <button type="submit" class="btn btn-info mt-3" onclick="return validateImportSelection()">
                         <i class="bi bi-upload"></i> Import
                     </button>
                 </form>
@@ -262,132 +347,114 @@
 </div>
 
 <script>
-function toggleMPOptions() {
-    const checkbox = document.getElementById('export_mp');
-    const options = document.getElementById('mp_options');
-    options.style.display = checkbox.checked ? 'block' : 'none';
+/* ---- Helper: set all children to match parent ---- */
+function sectionAll(parentId, childIds) {
+    const v = document.getElementById(parentId).checked;
+    childIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el.disabled) el.checked = v;
+        else if (v) el.checked = false; // don't force disabled on
+    });
 }
 
-function toggleImportMPOptions() {
-    const checkbox = document.getElementById('import_mp');
-    const options = document.getElementById('import_mp_options');
-    options.style.display = checkbox.checked ? 'block' : 'none';
+/* ---- Helper: update parent based on children ---- */
+function childChanged(parentId, childIds) {
+    const all = childIds.every(id => {
+        const el = document.getElementById(id);
+        return el.disabled || el.checked;
+    });
+    document.getElementById(parentId).checked = all;
 }
+
+/* ---- Template dependency: needs all 3 base types ---- */
+function updateMpTemplate(numId, strId, dateId, tmplId) {
+    const ok = document.getElementById(numId).checked &&
+               document.getElementById(strId).checked &&
+               document.getElementById(dateId).checked;
+    const tmpl = document.getElementById(tmplId);
+    const lbl = document.getElementById(tmplId + '_label');
+    tmpl.disabled = !ok;
+    if (!ok) tmpl.checked = false;
+    if (lbl) lbl.classList.toggle('text-muted', !ok);
+}
+
+/* ---- Groups dependency: needs Persons + Orgs ---- */
+function updateContactGroups(pId, oId, gId) {
+    const ok = document.getElementById(pId).checked && document.getElementById(oId).checked;
+    const grp = document.getElementById(gId);
+    const lbl = document.getElementById(gId + '_label');
+    grp.disabled = !ok;
+    if (!ok) grp.checked = false;
+    if (lbl) lbl.classList.toggle('text-muted', !ok);
+}
+
+/* ---- Export: global select all ---- */
+const E_CHILDREN = ['e_loc_general','e_loc_rack','e_item_cat','e_item_fp','e_item_tags',
+                    'e_mp_number','e_mp_string','e_mp_date',
+                    'e_proj_cat','e_proj_tags','e_proj_status',
+                    'e_ct_persons','e_ct_orgs'];
+const E_SECTION_ALLS = ['e_loc_all','e_item_all','e_mp_all','e_proj_all','e_ct_all'];
 
 function exportSelectAll() {
-    const selectAll = document.getElementById('export_select_all').checked;
-    document.getElementById('export_mp').checked = selectAll;
-    document.getElementById('export_loc').checked = selectAll;
-    document.getElementById('export_cat').checked = selectAll;
-    document.getElementById('export_fp').checked = selectAll;
-    document.getElementById('export_tags').checked = selectAll;
-    
-    if (selectAll) {
-        document.getElementById('mp_options').style.display = 'block';
+    const v = document.getElementById('e_all').checked;
+    E_CHILDREN.forEach(id => { document.getElementById(id).checked = v; });
+    E_SECTION_ALLS.forEach(id => { document.getElementById(id).checked = v; });
+    // Handle dependents
+    updateMpTemplate('e_mp_number','e_mp_string','e_mp_date','e_mp_template');
+    updateContactGroups('e_ct_persons','e_ct_orgs','e_ct_groups');
+    if (v) {
+        document.getElementById('e_mp_template').checked = true;
+        document.getElementById('e_ct_groups').checked = true;
     }
 }
+
+function updateExportAll() {
+    const all = E_CHILDREN.every(id => document.getElementById(id).checked) &&
+                !document.getElementById('e_mp_template').disabled && document.getElementById('e_mp_template').checked &&
+                !document.getElementById('e_ct_groups').disabled && document.getElementById('e_ct_groups').checked;
+    document.getElementById('e_all').checked = all;
+}
+
+/* ---- Import: global select all ---- */
+const I_CHILDREN = ['i_loc_general','i_loc_rack','i_item_cat','i_item_fp','i_item_tags',
+                    'i_mp_number','i_mp_string','i_mp_date',
+                    'i_proj_cat','i_proj_tags','i_proj_status',
+                    'i_ct_persons','i_ct_orgs'];
+const I_SECTION_ALLS = ['i_loc_all','i_item_all','i_mp_all','i_proj_all','i_ct_all'];
 
 function importSelectAll() {
-    const selectAll = document.getElementById('import_select_all').checked;
-    document.getElementById('import_mp').checked = selectAll;
-    document.getElementById('import_loc').checked = selectAll;
-    document.getElementById('import_cat').checked = selectAll;
-    document.getElementById('import_fp').checked = selectAll;
-    document.getElementById('import_tags').checked = selectAll;
-    
-    if (selectAll) {
-        document.getElementById('import_mp_options').style.display = 'block';
+    const v = document.getElementById('i_all').checked;
+    I_CHILDREN.forEach(id => { document.getElementById(id).checked = v; });
+    I_SECTION_ALLS.forEach(id => { document.getElementById(id).checked = v; });
+    updateMpTemplate('i_mp_number','i_mp_string','i_mp_date','i_mp_template');
+    updateContactGroups('i_ct_persons','i_ct_orgs','i_ct_groups');
+    if (v) {
+        document.getElementById('i_mp_template').checked = true;
+        document.getElementById('i_ct_groups').checked = true;
     }
 }
 
-function updateExportSelectAll() {
-    const allChecked = 
-        document.getElementById('export_mp').checked &&
-        document.getElementById('export_loc').checked &&
-        document.getElementById('export_cat').checked &&
-        document.getElementById('export_fp').checked &&
-        document.getElementById('export_tags').checked;
-    
-    document.getElementById('export_select_all').checked = allChecked;
+function updateImportAll() {
+    const all = I_CHILDREN.every(id => document.getElementById(id).checked) &&
+                !document.getElementById('i_mp_template').disabled && document.getElementById('i_mp_template').checked &&
+                !document.getElementById('i_ct_groups').disabled && document.getElementById('i_ct_groups').checked;
+    document.getElementById('i_all').checked = all;
 }
 
-function updateImportSelectAll() {
-    const allChecked = 
-        document.getElementById('import_mp').checked &&
-        document.getElementById('import_loc').checked &&
-        document.getElementById('import_cat').checked &&
-        document.getElementById('import_fp').checked &&
-        document.getElementById('import_tags').checked;
-    
-    document.getElementById('import_select_all').checked = allChecked;
-}
-
+/* ---- Validation ---- */
 function validateExportSelection() {
-    const selections = [
-        document.getElementById('export_mp').checked,
-        document.getElementById('export_loc').checked,
-        document.getElementById('export_cat').checked,
-        document.getElementById('export_fp').checked,
-        document.getElementById('export_tags').checked
-    ];
-    
-    if (!selections.some(s => s)) {
-        alert('Please select at least one data type to export');
-        return false;
-    }
-    
-    // When Locations is checked, also check Racks
-    if (document.getElementById('export_loc').checked) {
-        document.getElementById('export_racks').checked = true;
-    } else {
-        document.getElementById('export_racks').checked = false;
-    }
-    
+    const any = E_CHILDREN.some(id => document.getElementById(id).checked) ||
+                document.getElementById('e_mp_template').checked ||
+                document.getElementById('e_ct_groups').checked;
+    if (!any) { alert('Please select at least one data type to export.'); return false; }
     return true;
 }
-
 function validateImportSelection() {
-    const selections = [
-        document.getElementById('import_mp').checked,
-        document.getElementById('import_loc').checked,
-        document.getElementById('import_cat').checked,
-        document.getElementById('import_fp').checked,
-        document.getElementById('import_tags').checked
-    ];
-    
-    if (!selections.some(s => s)) {
-        alert('Please select at least one data type to import');
-        return false;
-    }
-    
-    // When Locations is checked, also check Racks
-    if (document.getElementById('import_loc').checked) {
-        document.getElementById('import_racks').checked = true;
-    } else {
-        document.getElementById('import_racks').checked = false;
-    }
-    
+    const any = I_CHILDREN.some(id => document.getElementById(id).checked) ||
+                document.getElementById('i_mp_template').checked ||
+                document.getElementById('i_ct_groups').checked;
+    if (!any) { alert('Please select at least one data type to import.'); return false; }
     return true;
 }
-
-// Helper functions for location and racks auto-linking
-document.addEventListener('DOMContentLoaded', function() {
-    const exportLoc = document.getElementById('export_loc');
-    const exportRacks = document.getElementById('export_racks');
-    const importLoc = document.getElementById('import_loc');
-    const importRacks = document.getElementById('import_racks');
-    
-    if (exportLoc) {
-        exportLoc.addEventListener('change', function() {
-            exportRacks.checked = this.checked;
-        });
-    }
-    
-    if (importLoc) {
-        importLoc.addEventListener('change', function() {
-            importRacks.checked = this.checked;
-        });
-    }
-});
 </script>
 {% endblock %}

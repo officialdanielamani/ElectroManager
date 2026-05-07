@@ -88,36 +88,38 @@ def export_selective():
     from importexport import DataExporter
     
     try:
-        # Handle Magic Parameters granular options
+        any_mp = any(request.form.get(k) == 'on' for k in ['mp_number','mp_string','mp_date','mp_template'])
         mp_selection = None
-        if request.form.get('magic_parameters') == 'on':
+        if any_mp:
             mp_selection = {
-                'parameters': request.form.get('mp_parameters') == 'on',
-                'templates': request.form.get('mp_templates') == 'on',
-                'units': request.form.get('mp_units') == 'on',
-                'options': request.form.get('mp_options') == 'on'
+                'number': request.form.get('mp_number') == 'on',
+                'string': request.form.get('mp_string') == 'on',
+                'date': request.form.get('mp_date') == 'on',
+                'template': request.form.get('mp_template') == 'on',
             }
-        
+
         selections = {
             'magic_parameters': mp_selection,
-            'locations': request.form.get('locations') == 'on',
-            'racks': request.form.get('racks') == 'on',
-            'categories': request.form.get('categories') == 'on',
-            'footprints': request.form.get('footprints') == 'on',
-            'tags': request.form.get('tags') == 'on'
+            'locations': request.form.get('loc_general') == 'on',
+            'racks': request.form.get('loc_rack') == 'on',
+            'categories': request.form.get('item_categories') == 'on',
+            'footprints': request.form.get('item_footprint') == 'on',
+            'tags': request.form.get('item_tags') == 'on',
+            'project_categories': request.form.get('proj_categories') == 'on',
+            'project_tags': request.form.get('proj_tags') == 'on',
+            'project_statuses': request.form.get('proj_status') == 'on',
+            'contact_persons': request.form.get('contact_persons') == 'on',
+            'contact_organizations': request.form.get('contact_orgs') == 'on',
+            'contact_groups': request.form.get('contact_groups') == 'on',
         }
-        
-        # Check if at least one selection is made
-        if not any([selections['magic_parameters'], selections['locations'], selections['racks'], 
-                   selections['categories'], selections['footprints'], selections['tags']]):
+
+        if not any(v for v in selections.values()):
             flash('Please select at least one data type to export', 'warning')
             return redirect(url_for('backup.backup_restore'))
-        
+
         include_item_values = request.form.get('include_item_values') == 'on'
-        
         export_data = DataExporter.export_selective(selections, include_item_values)
-        
-        # Send as file download
+
         response = current_app.make_response(json.dumps(export_data, indent=2))
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         response.headers['Content-Disposition'] = f'attachment; filename=config_export_{timestamp}.json'
@@ -155,28 +157,32 @@ def import_selective():
             flash(f'Invalid JSON file: {str(e)}', 'danger')
             return redirect(url_for('backup.backup_restore'))
         
-        # Handle Magic Parameters granular options
+        any_mp = any(request.form.get(k) == 'on' for k in ['mp_number','mp_string','mp_date','mp_template'])
         mp_selection = None
-        if request.form.get('magic_parameters') == 'on':
+        if any_mp:
             mp_selection = {
-                'parameters': request.form.get('mp_parameters') == 'on',
-                'templates': request.form.get('mp_templates') == 'on',
-                'units': request.form.get('mp_units') == 'on',
-                'options': request.form.get('mp_options') == 'on'
+                'number': request.form.get('mp_number') == 'on',
+                'string': request.form.get('mp_string') == 'on',
+                'date': request.form.get('mp_date') == 'on',
+                'template': request.form.get('mp_template') == 'on',
             }
-        
-        # Get selections from form
+
         selections = {
             'magic_parameters': mp_selection,
-            'locations': request.form.get('locations') == 'on',
-            'racks': request.form.get('racks') == 'on',
-            'categories': request.form.get('categories') == 'on',
-            'footprints': request.form.get('footprints') == 'on',
-            'tags': request.form.get('tags') == 'on'
+            'locations': request.form.get('loc_general') == 'on',
+            'racks': request.form.get('loc_rack') == 'on',
+            'categories': request.form.get('item_categories') == 'on',
+            'footprints': request.form.get('item_footprint') == 'on',
+            'tags': request.form.get('item_tags') == 'on',
+            'project_categories': request.form.get('proj_categories') == 'on',
+            'project_tags': request.form.get('proj_tags') == 'on',
+            'project_statuses': request.form.get('proj_status') == 'on',
+            'contact_persons': request.form.get('contact_persons') == 'on',
+            'contact_organizations': request.form.get('contact_orgs') == 'on',
+            'contact_groups': request.form.get('contact_groups') == 'on',
         }
-        
-        if not any([selections['magic_parameters'], selections['locations'], selections['racks'], 
-                   selections['categories'], selections['footprints'], selections['tags']]):
+
+        if not any(v for v in selections.values()):
             flash('Please select at least one data type to import', 'warning')
             return redirect(url_for('backup.backup_restore'))
         

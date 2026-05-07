@@ -3,14 +3,53 @@ Batch Routes Blueprint - Manages item batches, transfers, and serial numbers
 """
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required, current_user
-from models import db, Item, ItemBatch, BatchSerialNumber, Setting
+from models import db, Item, ItemBatch, BatchSerialNumber, BatchLendRecord, Setting
 from utils import log_audit
-from datetime import datetime
+from datetime import datetime, date
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
 batch_bp = Blueprint('batch', __name__)
+
+
+def _parse_date(s):
+    try:
+        return datetime.strptime(s, '%Y-%m-%d').date() if s else None
+    except ValueError:
+        return None
+
+
+def _save_lend_records(batch, records_data, max_qty):
+    """Create BatchLendRecord rows from a list of dicts (as submitted from JS)."""
+    for r in records_data:
+        if not isinstance(r, dict):
+            continue
+        contact_id_raw = r.get('contact_id')
+        try:
+            contact_id = int(contact_id_raw) if contact_id_raw else None
+        except (ValueError, TypeError):
+            contact_id = None
+        try:
+            qty = max(1, min(int(r.get('qty', 1)), max_qty))
+        except (ValueError, TypeError):
+            qty = 1
+        try:
+            days = int(r.get('days', 3))
+        except (ValueError, TypeError):
+            days = 3
+        rec = BatchLendRecord(
+            batch_id=batch.id,
+            lend_to_type=r.get('type', '').strip(),
+            lend_to_id=contact_id,
+            quantity=qty,
+            lend_start=_parse_date(r.get('start', '')),
+            lend_end=_parse_date(r.get('end', '')),
+            lend_notify_enabled=bool(r.get('notify', False)),
+            lend_notify_before_days=days,
+        )
+        db.session.add(rec)
 
 
 @batch_bp.route('/item/<string:uuid>/batch/add', methods=['POST'])
@@ -34,8 +73,11 @@ def add_batch(uuid):
     price_per_unit = float(request.form.get('price_per_unit', 0)) if can_edit_price else 0.0
     purchase_date_str = request.form.get('purchase_date', '')
     note = request.form.get('note', '').strip()[:128]
-    lend_to = request.form.get('lend_to', '').strip() if can_edit_lending else ''
-    lend_quantity = int(request.form.get('lend_quantity', 0)) if can_edit_lending else 0
+    lend_records_json = request.form.get('lend_records', '[]') if can_edit_lending else '[]'
+    try:
+        lend_records_data = json.loads(lend_records_json)
+    except (ValueError, TypeError):
+        lend_records_data = []
     sn_tracking = (request.form.get('sn_tracking', '') == 'on') if can_edit_sn else False
 
     # Per-batch location
@@ -87,8 +129,6 @@ def add_batch(uuid):
         price_per_unit=price_per_unit,
         purchase_date=purchase_date,
         note=note or None,
-        lend_to=lend_to or '',
-        lend_quantity=min(lend_quantity, quantity),
         sn_tracking_enabled=sn_tracking,
         follow_main_location=follow_main,
         location_id=batch_loc_id,
@@ -97,6 +137,10 @@ def add_batch(uuid):
     )
     db.session.add(batch)
     db.session.flush()  # Get batch id
+
+    # Create lending records (only for non-SN batches)
+    if can_edit_lending and not sn_tracking:
+        _save_lend_records(batch, lend_records_data, quantity)
 
     # Generate serial numbers if tracking is enabled for this batch
     if sn_tracking:
@@ -194,13 +238,15 @@ def edit_batch(uuid, batch_id):
         except (ValueError, TypeError):
             pass
 
-    # Lending (only when SN tracking is off - per-SN lending used otherwise)
+    # Lending records (only when SN tracking is off - per-SN lending used otherwise)
     if can_edit_lending and not batch.sn_tracking_enabled:
-        batch.lend_to = request.form.get('lend_to', '').strip()
+        lend_records_json = request.form.get('lend_records', '[]')
         try:
-            batch.lend_quantity = min(int(request.form.get('lend_quantity', 0)), batch.quantity)
+            lend_records_data = json.loads(lend_records_json)
         except (ValueError, TypeError):
-            pass
+            lend_records_data = []
+        BatchLendRecord.query.filter_by(batch_id=batch.id).delete()
+        _save_lend_records(batch, lend_records_data, batch.quantity)
 
     # Regenerate serial numbers if quantity changed and tracking enabled on this batch
     if batch.sn_tracking_enabled and batch.quantity != old_qty:
@@ -217,7 +263,38 @@ def edit_batch(uuid, batch_id):
     return redirect(url_for('item.item_edit', uuid=uuid) + '#batches-section')
 
 
-@batch_bp.route('/item/<string:uuid>/batch/<int:batch_id>/delete', methods=['POST'])
+@batch_bp.route('/item/<string:uuid>/batch/<int:batch_id>/manage_lend', methods=['POST'])
+@login_required
+def manage_lend(uuid, batch_id):
+    """Save all lend records for a batch (replaces existing records)."""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    batch = ItemBatch.query.filter_by(id=batch_id, item_id=item.id).first_or_404()
+    if batch.sn_tracking_enabled:
+        return jsonify({'success': False, 'message': 'SN batches use per-SN lending.'})
+    can_edit_lending = current_user.has_permission('items', 'edit_lending')
+    if not can_edit_lending:
+        return jsonify({'success': False, 'message': 'No permission.'})
+    lend_records_json = request.form.get('lend_records', '[]')
+    try:
+        lend_records_data = json.loads(lend_records_json)
+    except (ValueError, TypeError):
+        lend_records_data = []
+    total_lend_qty = sum(
+        max(1, int(r.get('qty', 1))) for r in lend_records_data if isinstance(r, dict)
+    )
+    if total_lend_qty > batch.quantity:
+        return jsonify({
+            'success': False,
+            'message': f'Total lend quantity ({total_lend_qty}) exceeds batch quantity ({batch.quantity}).'
+        })
+    BatchLendRecord.query.filter_by(batch_id=batch.id).delete()
+    _save_lend_records(batch, lend_records_data, batch.quantity)
+    db.session.commit()
+    log_audit(current_user.id, 'batch_lend_update', item.id,
+              f'Updated lend records for batch #{batch.batch_number} of item: {item.name}')
+    return jsonify({'success': True, 'lend_qty': batch.get_lend_quantity()})
+
+
 @login_required
 def delete_batch(uuid, batch_id):
     """Delete a batch"""
@@ -347,7 +424,6 @@ def transfer_batch(uuid):
                 internal_serial_number=isn,
                 serial_number='',
                 info='',
-                lend_to=''
             )
             db.session.add(sn)
     
@@ -440,11 +516,31 @@ def update_serial_lend(uuid, batch_id):
         return redirect(url_for('item.item_detail', uuid=uuid))
     
     for sn in batch.serial_numbers:
-        new_lend = request.form.get(f'lend_{sn.id}', '').strip()
-        sn.lend_to = new_lend
-    
+        lend_type = request.form.get(f'lend_type_{sn.id}', '').strip()
+        lend_id_raw = request.form.get(f'lend_id_{sn.id}', '').strip()
+        lend_start_str = request.form.get(f'lend_start_{sn.id}', '').strip()
+        lend_end_str = request.form.get(f'lend_end_{sn.id}', '').strip()
+        sn.lend_to_type = lend_type
+        try:
+            sn.lend_to_id = int(lend_id_raw) if lend_id_raw else None
+        except (ValueError, TypeError):
+            sn.lend_to_id = None
+        try:
+            sn.lend_start = datetime.strptime(lend_start_str, '%Y-%m-%d').date() if lend_start_str else None
+        except ValueError:
+            sn.lend_start = None
+        try:
+            sn.lend_end = datetime.strptime(lend_end_str, '%Y-%m-%d').date() if lend_end_str else None
+        except ValueError:
+            sn.lend_end = None
+        sn.lend_notify_enabled = request.form.get(f'lend_notify_{sn.id}', '0') == '1'
+        try:
+            sn.lend_notify_before_days = int(request.form.get(f'lend_notify_days_{sn.id}', 3))
+        except (ValueError, TypeError):
+            sn.lend_notify_before_days = 3
+
     db.session.commit()
-    
+
     log_audit(current_user.id, 'update', 'serial_lend', batch.id,
               f'Updated lending info for batch #{batch.batch_number} of item: {item.name}')
     flash(f'Lending info updated for "{batch.get_display_label()}".', 'success')
@@ -476,14 +572,37 @@ def inline_update_sn(uuid):
     elif field == 'lend':
         if not current_user.has_permission('items', 'edit_lending'):
             return jsonify({'success': False, 'message': 'Permission denied'}), 403
-        sn.lend_to = value
+        sn.lend_to_type = data.get('lend_to_type', '').strip()
+        lend_to_id_raw = data.get('lend_to_id')
+        try:
+            sn.lend_to_id = int(lend_to_id_raw) if lend_to_id_raw else None
+        except (ValueError, TypeError):
+            sn.lend_to_id = None
+        lend_start_str = data.get('lend_start', '')
+        lend_end_str = data.get('lend_end', '')
+        try:
+            sn.lend_start = datetime.strptime(lend_start_str, '%Y-%m-%d').date() if lend_start_str else None
+        except ValueError:
+            sn.lend_start = None
+        try:
+            sn.lend_end = datetime.strptime(lend_end_str, '%Y-%m-%d').date() if lend_end_str else None
+        except ValueError:
+            sn.lend_end = None
+        sn.lend_notify_enabled = bool(data.get('lend_notify_enabled', False))
+        try:
+            sn.lend_notify_before_days = int(data.get('lend_notify_before_days', 3))
+        except (ValueError, TypeError):
+            sn.lend_notify_before_days = 3
     else:
         return jsonify({'success': False, 'message': 'Invalid field'}), 400
 
     db.session.commit()
     log_audit(current_user.id, 'update', 'serial_number', sn.id,
               f'Inline updated {field} for SN #{sn.sequence_number} in item: {item.name}')
-    return jsonify({'success': True})
+    response = {'success': True}
+    if field == 'lend':
+        response['display'] = sn.get_lend_to_display() or '-'
+    return jsonify(response)
 
 
 @batch_bp.route('/item/<string:uuid>/batch/sn/bulk-update', methods=['POST'])
@@ -511,7 +630,28 @@ def bulk_update_sn(uuid):
             sn.info = fields['info'][:32]
             count += 1
         if 'lend' in fields and can_edit_lending:
-            sn.lend_to = fields['lend']
+            lend_data = fields['lend']
+            if lend_data is None:
+                sn.lend_to_type = ''
+                sn.lend_to_id = None
+                sn.lend_start = None
+                sn.lend_end = None
+                sn.lend_notify_enabled = False
+                sn.lend_notify_before_days = 3
+            elif isinstance(lend_data, dict):
+                sn.lend_to_type = lend_data.get('type', '').strip()
+                lend_id_raw = lend_data.get('id')
+                try:
+                    sn.lend_to_id = int(lend_id_raw) if lend_id_raw else None
+                except (ValueError, TypeError):
+                    sn.lend_to_id = None
+                sn.lend_start = _parse_date(lend_data.get('start', ''))
+                sn.lend_end = _parse_date(lend_data.get('end', ''))
+                sn.lend_notify_enabled = bool(lend_data.get('notify', False))
+                try:
+                    sn.lend_notify_before_days = int(lend_data.get('days', 3))
+                except (ValueError, TypeError):
+                    sn.lend_notify_before_days = 3
             count += 1
 
     db.session.commit()
@@ -693,7 +833,6 @@ def add_sn_to_batch(uuid):
             internal_serial_number=isn,
             serial_number='',
             info='',
-            lend_to=''
         )
         db.session.add(sn)
 

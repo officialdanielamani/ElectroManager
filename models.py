@@ -128,6 +128,7 @@ class User(UserMixin, db.Model):
     allow_password_reset = db.Column(db.Boolean, default=True)
     profile_photo = db.Column(db.String(255))
     allow_profile_picture_change = db.Column(db.Boolean, default=True)
+    profile_picture_source = db.Column(db.String(10), default='share')  # 'upload', 'share', 'both'
     failed_login_attempts = db.Column(db.Integer, default=0)
     account_locked_until = db.Column(db.DateTime)
     auto_unlock_enabled = db.Column(db.Boolean, default=True)
@@ -324,6 +325,19 @@ class Rack(db.Model):
         return f'<Rack {self.name}>'
 
 
+item_share_files = db.Table(
+    'item_share_files',
+    db.Column('item_id', db.Integer, db.ForeignKey('items.id'), primary_key=True),
+    db.Column('shared_file_id', db.Integer, db.ForeignKey('shared_files.id'), primary_key=True),
+)
+
+project_share_files = db.Table(
+    'project_share_files',
+    db.Column('project_id', db.Integer, db.ForeignKey('projects.id'), primary_key=True),
+    db.Column('shared_file_id', db.Integer, db.ForeignKey('shared_files.id'), primary_key=True),
+)
+
+
 class Item(db.Model):
     __tablename__ = 'items'
     
@@ -348,6 +362,7 @@ class Item(db.Model):
     
     datasheet_urls = db.Column(db.Text)
     no_stock_warning = db.Column(db.Boolean, default=True)
+    thumbnail = db.Column(db.String(300))
 
     sn_tracking_enabled = db.Column(db.Boolean, default=False)
     
@@ -366,6 +381,7 @@ class Item(db.Model):
     
     attachments = db.relationship('Attachment', backref='item', lazy=True, cascade='all, delete-orphan')
     batches = db.relationship('ItemBatch', backref='item', lazy=True, cascade='all, delete-orphan', order_by='ItemBatch.batch_number')
+    linked_share_files = db.relationship('SharedFile', secondary=item_share_files, lazy='subquery', backref=db.backref('linked_items', lazy=True))
     
     def __init__(self, **kwargs):
         super(Item, self).__init__(**kwargs)
@@ -484,8 +500,6 @@ class ItemBatch(db.Model):
     price_per_unit = db.Column(db.Float, default=0.0)
     purchase_date = db.Column(db.Date)
     note = db.Column(db.String(128))
-    lend_to = db.Column(db.String(200), default='')
-    lend_quantity = db.Column(db.Integer, default=0)
     sn_tracking_enabled = db.Column(db.Boolean, default=False)
 
     follow_main_location = db.Column(db.Boolean, default=True)
@@ -500,6 +514,7 @@ class ItemBatch(db.Model):
     batch_rack = db.relationship('Rack', foreign_keys=[rack_id])
 
     serial_numbers = db.relationship('BatchSerialNumber', backref='batch', lazy=True, cascade='all, delete-orphan', order_by='BatchSerialNumber.sequence_number')
+    lend_records = db.relationship('BatchLendRecord', backref='batch', lazy=True, cascade='all, delete-orphan', order_by='BatchLendRecord.id')
     
     def get_effective_location_text(self):
         """Return human-readable location. Falls back to parent item when follow_main_location is True."""
@@ -544,10 +559,27 @@ class ItemBatch(db.Model):
         return f"Batch {self.batch_number}"
     
     def get_lend_quantity(self):
-        """Get total lend quantity - from individual SNs if tracking enabled, else from batch field"""
+        """Total lend quantity across all lend records (or per-SN count for tracked batches)."""
         if self.sn_tracking_enabled:
-            return sum(1 for sn in self.serial_numbers if sn.lend_to and sn.lend_to.strip())
-        return self.lend_quantity or 0
+            return sum(1 for sn in self.serial_numbers if sn.lend_to_id)
+        return sum(r.quantity for r in self.lend_records)
+
+    def get_lend_records_data(self):
+        """Serialise lend records to a list of dicts for JS embedding."""
+        result = []
+        for r in self.lend_records:
+            result.append({
+                'id': r.id,
+                'type': r.lend_to_type or '',
+                'contact_id': r.lend_to_id,
+                'label': r.get_lend_to_display(),
+                'qty': r.quantity,
+                'start': r.lend_start.strftime('%Y-%m-%d') if r.lend_start else '',
+                'end': r.lend_end.strftime('%Y-%m-%d') if r.lend_end else '',
+                'notify': r.lend_notify_enabled or False,
+                'days': r.lend_notify_before_days or 3,
+            })
+        return result
 
     def get_project_used_quantity(self):
         """Get total used_quantity across all projects for this batch"""
@@ -594,13 +626,18 @@ class ItemBatch(db.Model):
         item = Item.query.get(self.item_id)
         if not item:
             return
-        # Preserve existing info/lend_to data
+        # Preserve existing info/lend data
         existing_data = {}
         for sn in self.serial_numbers:
             existing_data[sn.sequence_number] = {
                 'serial_number': sn.serial_number,
                 'info': sn.info or '',
-                'lend_to': sn.lend_to or ''
+                'lend_to_type': sn.lend_to_type or '',
+                'lend_to_id': sn.lend_to_id,
+                'lend_start': sn.lend_start,
+                'lend_end': sn.lend_end,
+                'lend_notify_enabled': sn.lend_notify_enabled or False,
+                'lend_notify_before_days': sn.lend_notify_before_days or 3,
             }
         BatchSerialNumber.query.filter_by(batch_id=self.id).delete()
         qty = min(self.quantity, 100)
@@ -615,7 +652,12 @@ class ItemBatch(db.Model):
                 internal_serial_number=isn,
                 serial_number=old.get('serial_number', ''),
                 info=old.get('info', ''),
-                lend_to=old.get('lend_to', '')
+                lend_to_type=old.get('lend_to_type', ''),
+                lend_to_id=old.get('lend_to_id'),
+                lend_start=old.get('lend_start'),
+                lend_end=old.get('lend_end'),
+                lend_notify_enabled=old.get('lend_notify_enabled', False),
+                lend_notify_before_days=old.get('lend_notify_before_days', 3),
             )
             db.session.add(sn)
     
@@ -637,11 +679,75 @@ class BatchSerialNumber(db.Model):
     serial_number = db.Column(db.String(200), default='')
     internal_serial_number = db.Column(db.String(200), nullable=False)
     info = db.Column(db.String(32), default='')
-    lend_to = db.Column(db.String(200), default='')
+    lend_to_type = db.Column(db.String(20), default='')
+    lend_to_id = db.Column(db.Integer, nullable=True)
+    lend_start = db.Column(db.Date, nullable=True)
+    lend_end = db.Column(db.Date, nullable=True)
+    lend_notify_enabled = db.Column(db.Boolean, default=False)
+    lend_notify_before_days = db.Column(db.Integer, default=3)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    
+
+    def get_lend_to_display(self):
+        if not self.lend_to_id or not self.lend_to_type:
+            return ''
+        try:
+            if self.lend_to_type == 'user':
+                obj = User.query.get(self.lend_to_id)
+                return obj.username if obj else f'User #{self.lend_to_id}'
+            elif self.lend_to_type == 'person':
+                obj = ContactPerson.query.get(self.lend_to_id)
+                return obj.name if obj else f'Person #{self.lend_to_id}'
+            elif self.lend_to_type == 'organization':
+                obj = ContactOrganization.query.get(self.lend_to_id)
+                return obj.name if obj else f'Org #{self.lend_to_id}'
+            elif self.lend_to_type == 'group':
+                obj = ContactGroup.query.get(self.lend_to_id)
+                return obj.name if obj else f'Group #{self.lend_to_id}'
+        except Exception:
+            pass
+        return ''
+
     def __repr__(self):
         return f'<BatchSerialNumber {self.internal_serial_number}>'
+
+
+class BatchLendRecord(db.Model):
+    """One lending record for a non-SN batch (supports multiple per batch)."""
+    __tablename__ = 'batch_lend_records'
+
+    id = db.Column(db.Integer, primary_key=True)
+    batch_id = db.Column(db.Integer, db.ForeignKey('item_batches.id'), nullable=False)
+    lend_to_type = db.Column(db.String(20), default='')
+    lend_to_id = db.Column(db.Integer, nullable=True)
+    quantity = db.Column(db.Integer, default=1)
+    lend_start = db.Column(db.Date, nullable=True)
+    lend_end = db.Column(db.Date, nullable=True)
+    lend_notify_enabled = db.Column(db.Boolean, default=False)
+    lend_notify_before_days = db.Column(db.Integer, default=3)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    def get_lend_to_display(self):
+        if not self.lend_to_id or not self.lend_to_type:
+            return ''
+        try:
+            if self.lend_to_type == 'user':
+                obj = User.query.get(self.lend_to_id)
+                return obj.username if obj else f'User #{self.lend_to_id}'
+            elif self.lend_to_type == 'person':
+                obj = ContactPerson.query.get(self.lend_to_id)
+                return obj.name if obj else f'Person #{self.lend_to_id}'
+            elif self.lend_to_type == 'organization':
+                obj = ContactOrganization.query.get(self.lend_to_id)
+                return obj.name if obj else f'Org #{self.lend_to_id}'
+            elif self.lend_to_type == 'group':
+                obj = ContactGroup.query.get(self.lend_to_id)
+                return obj.name if obj else f'Group #{self.lend_to_id}'
+        except Exception:
+            pass
+        return ''
+
+    def __repr__(self):
+        return f'<BatchLendRecord batch={self.batch_id} to={self.lend_to_type}:{self.lend_to_id}>'
 
 
 class Attachment(db.Model):
@@ -1044,6 +1150,8 @@ class ContactOrganization(db.Model):
     email = db.Column(db.String(200))
     tel = db.Column(db.String(50))
     url = db.Column(db.String(500))
+    address = db.Column(db.String(256))
+    zip_code = db.Column(db.String(20))
     info = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -1114,6 +1222,7 @@ class Project(db.Model):
     bom_items = db.relationship('ProjectBOMItem', backref='project', lazy=True, cascade='all, delete-orphan')
     attachments = db.relationship('ProjectAttachment', backref='project', lazy=True, cascade='all, delete-orphan')
     urls = db.relationship('ProjectURL', backref='project', lazy=True, cascade='all, delete-orphan')
+    linked_share_files = db.relationship('SharedFile', secondary=project_share_files, lazy='subquery', backref=db.backref('linked_projects', lazy=True))
     def __init__(self, **kwargs):
         super(Project, self).__init__(**kwargs)
         if not self.project_id:
@@ -1209,3 +1318,32 @@ class ProjectURL(db.Model):
     title = db.Column(db.String(300))
     description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class SharedFile(db.Model):
+    __tablename__ = 'shared_files'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    filename = db.Column(db.String(255), nullable=False)
+    category = db.Column(db.String(20), nullable=False)  # item, profile, project, sticker
+    file_size = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    uploaded_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    uploader = db.relationship('User', backref='shared_files', foreign_keys=[uploaded_by_id])
+
+    def size_display(self):
+        """Human-readable file size."""
+        b = self.file_size or 0
+        for unit in ('B', 'KB', 'MB', 'GB'):
+            if b < 1024:
+                return f"{b:.1f} {unit}" if unit != 'B' else f"{b} B"
+            b /= 1024
+        return f"{b:.1f} TB"
+
+    @property
+    def ext(self):
+        return self.filename.rsplit('.', 1)[1].lower() if '.' in self.filename else ''
+
+    @property
+    def is_image(self):
+        return self.ext in {'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'}

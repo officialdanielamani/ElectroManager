@@ -187,9 +187,28 @@
                                 <input type="checkbox" class="form-check-input" disabled checked>
                                 {{ form.allow_profile_picture_change.label(class="form-check-label") }}
                             {% else %}
-                                {{ form.allow_profile_picture_change(class="form-check-input") }}
+                                {{ form.allow_profile_picture_change(class="form-check-input", id="allowProfilePictureChange") }}
                                 {{ form.allow_profile_picture_change.label(class="form-check-label") }}
                             {% endif %}
+                        </div>
+
+                        <div id="profilePictureSourceSection" class="mb-3 ms-4" style="display:none;">
+                            <label class="form-label fw-semibold">Profile Picture Source</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="profile_picture_source" id="ppsUpload" value="upload"
+                                    {% if user and user.profile_picture_source == 'upload' %}checked{% endif %}>
+                                <label class="form-check-label" for="ppsUpload">Custom Upload</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="profile_picture_source" id="ppsShare" value="share"
+                                    {% if not user or user.profile_picture_source in ('share', None, '') %}checked{% endif %}>
+                                <label class="form-check-label" for="ppsShare">Share Files Profile</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="profile_picture_source" id="ppsBoth" value="both"
+                                    {% if user and user.profile_picture_source == 'both' %}checked{% endif %}>
+                                <label class="form-check-label" for="ppsBoth">Both</label>
+                            </div>
                         </div>
 
                         <div class="mb-3">
@@ -258,4 +277,17 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    const cb = document.getElementById('allowProfilePictureChange');
+    const section = document.getElementById('profilePictureSourceSection');
+    if (!cb || !section) return;
+    function toggle() { section.style.display = cb.checked ? '' : 'none'; }
+    cb.addEventListener('change', toggle);
+    toggle();
+})();
+</script>
 {% endblock %}

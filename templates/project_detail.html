@@ -124,6 +124,39 @@
                 </div>
                 {% endif %}
 
+                <!-- Share Files -->
+                {% if project.linked_share_files %}
+                <hr>
+                <strong><i class="bi bi-folder-fill text-warning"></i> Share Files</strong>
+                <div class="mt-2">
+                    {% set sf_images = project.linked_share_files | selectattr('is_image') | list %}
+                    {% set sf_others = project.linked_share_files | rejectattr('is_image') | list %}
+                    {% if sf_images %}
+                    <div class="image-grid mb-2">
+                        {% for sf in sf_images %}
+                        <div class="image-grid-item">
+                            <a href="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}" target="_blank">
+                                <img src="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}" alt="{{ sf.name }}">
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% if sf_others %}
+                    <ul class="list-group list-group-flush">
+                        {% for sf in sf_others %}
+                        <li class="list-group-item px-0 py-1">
+                            <a href="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}" target="_blank">
+                                <i class="bi bi-file-earmark"></i> {{ sf.name }}.{{ sf.ext }}
+                            </a>
+                            <small class="text-muted ms-1">{{ sf.size_display() }}</small>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                </div>
+                {% endif %}
+
                 <!-- BOM Table -->
                 <hr>
                 <h5><i class="bi bi-list-check"></i> Bill of Materials (BOM)</h5>

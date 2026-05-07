@@ -148,42 +148,74 @@
                     <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-box"></i> Item Uploads</h6>
                     <div class="row mb-4">
                         <div class="col-md-6">
-                            <label for="max_file_size" class="form-label">Max File Size (MB) <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" id="max_file_size" name="max_file_size" value="{{ max_file_size }}" min="1" max="100" required>
-                        </div>
-                        <div class="col-md-6">
                             <label for="allowed_extensions" class="form-label">Allowed File Types <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="allowed_extensions" name="allowed_extensions" value="{{ allowed_extensions }}" required placeholder="pdf,png,jpg,jpeg,gif,txt,doc,docx">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="max_file_size" class="form-label">Max File Size (MB) <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="max_file_size" name="max_file_size" value="{{ max_file_size }}" min="1" max="100" required>
                         </div>
                     </div>
 
                     <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-geo-alt"></i> Location / Rack Uploads</h6>
                     <div class="row mb-4">
                         <div class="col-md-6">
-                            <label class="form-label">Max File Size (MB) <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" name="location_upload_max_size" value="{{ location_upload_max_size }}" min="1" max="100" required>
-                        </div>
-                        <div class="col-md-6">
                             <label class="form-label">Allowed File Types <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" name="location_upload_extensions" value="{{ location_upload_extensions }}" required placeholder="webp,png,svg,jpeg,jpg">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Max File Size (MB) <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" name="location_upload_max_size" value="{{ location_upload_max_size }}" min="1" max="100" required>
                         </div>
                     </div>
 
                     <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-kanban"></i> Project Uploads</h6>
                     {% set proj_types = [('picture', 'Pictures', 'webp,png,svg,jpeg,jpg'), ('document', 'Documents', 'txt,doc,docx,pdf'), ('schematic', 'Schematics', 'pdf,zip'), ('2d_design', '2D Design', 'pdf,zip'), ('3d_design', '3D Design', 'pdf,zip,stl,step'), ('program', 'Programs', 'zip,txt,cpp,py')] %}
+                    <div class="row mb-1">
+                        <div class="col-md-3"></div>
+                        <div class="col-md-5"><small class="text-muted fw-bold">Allowed Types</small></div>
+                        <div class="col-md-4"><small class="text-muted fw-bold">Max Size (MB)</small></div>
+                    </div>
                     {% for ptype, plabel, pdefault in proj_types %}
                     <div class="row mb-2">
                         <div class="col-md-3"><label class="form-label small fw-bold">{{ plabel }}</label></div>
                         <div class="col-md-5">
                             <input type="text" class="form-control form-control-sm" name="project_upload_{{ ptype }}_extensions" value="{{ project_upload_settings.get(ptype, {}).get('extensions', pdefault) }}" required placeholder="{{ pdefault }}">
-                            <small class="text-muted">Allowed types</small>
                         </div>
                         <div class="col-md-4">
                             <input type="number" class="form-control form-control-sm" name="project_upload_{{ ptype }}_max_size" value="{{ project_upload_settings.get(ptype, {}).get('max_size', '10') }}" min="1" max="200" required>
-                            <small class="text-muted">Max MB</small>
                         </div>
                     </div>
                     {% endfor %}
+
+                    <h6 class="border-bottom pb-2 mb-3 mt-4"><i class="bi bi-folder-fill"></i> Share Files Uploads</h6>
+                    {% set share_types = [
+                        ('item',    'Item Files',    'pdf,png,jpg,jpeg,gif,txt,doc,docx', '10'),
+                        ('project', 'Project Files', 'pdf,png,jpg,jpeg,gif,txt,doc,docx', '10'),
+                        ('sticker', 'Sticker Files', 'png,jpg,jpeg',                      '1'),
+                    ] %}
+                    <div class="row mb-1">
+                        <div class="col-md-3"></div>
+                        <div class="col-md-5"><small class="text-muted fw-bold">Allowed Types</small></div>
+                        <div class="col-md-4"><small class="text-muted fw-bold">Max Size (MB)</small></div>
+                    </div>
+                    {% for stype, slabel, sdefault_ext, sdefault_size in share_types %}
+                    <div class="row mb-2">
+                        <div class="col-md-3"><label class="form-label small fw-bold">{{ slabel }}</label></div>
+                        <div class="col-md-5">
+                            <input type="text" class="form-control form-control-sm" name="share_{{ stype }}_extensions" value="{{ share_upload_settings.get(stype, {}).get('extensions', sdefault_ext) }}" required placeholder="{{ sdefault_ext }}">
+                        </div>
+                        <div class="col-md-4">
+                            <input type="number" class="form-control form-control-sm" name="share_{{ stype }}_max_size" value="{{ share_upload_settings.get(stype, {}).get('max_size', sdefault_size) }}" min="1" max="100" required>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    <div class="row mb-2">
+                        <div class="col-md-3"><label class="form-label small fw-bold text-muted">Profile Files</label></div>
+                        <div class="col-md-5"><input type="text" class="form-control form-control-sm" value="jpg, jpeg, png" disabled></div>
+                        <div class="col-md-4"><input type="number" class="form-control form-control-sm" value="1" disabled></div>
+                    </div>
+                    <small class="text-muted"><i class="bi bi-lock"></i> Profile uploads are fixed to JPEG/PNG, max 1 MB.</small>
 
                     {% endif %}
                 </div>

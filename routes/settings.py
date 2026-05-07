@@ -3,7 +3,7 @@ Settings Routes Blueprint
 """
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file, abort, current_app
 from flask_login import login_required, current_user, login_user, logout_user
-from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate
+from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate, SharedFile
 from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEditForm, AttachmentForm, 
                    SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm)
 from helpers import is_safe_url, format_currency, is_safe_file_path
@@ -293,8 +293,8 @@ def upload_profile_photo():
         flash('Profile photo must be smaller than 1MB.', 'danger')
         return redirect(url_for('settings.settings_general'))
     
-    # Delete old photo if exists
-    if current_user.profile_photo:
+    # Delete old photo if exists (skip if it's a share-sourced photo)
+    if current_user.profile_photo and not current_user.profile_photo.startswith('share/'):
         old_file = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', current_user.profile_photo)
         if is_safe_file_path(old_file, os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture')) and os.path.exists(old_file):
             os.remove(old_file)
@@ -319,18 +319,56 @@ def upload_profile_photo():
 def delete_profile_photo():
     """Delete user profile photo"""
     if current_user.profile_photo:
-        filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', current_user.profile_photo)
-        if is_safe_file_path(filepath, os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture')) and os.path.exists(filepath):
-            os.remove(filepath)
-        
+        if not current_user.profile_photo.startswith('share/'):
+            filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', current_user.profile_photo)
+            if is_safe_file_path(filepath, os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture')) and os.path.exists(filepath):
+                os.remove(filepath)
+
         current_user.profile_photo = None
         db.session.commit()
-        
+
         log_audit(current_user.id, 'update', 'user', current_user.id, 'Deleted profile photo')
         flash('Profile photo deleted successfully!', 'success')
     
     return redirect(url_for('settings.settings_general'))
 
+
+
+@settings_bp.route('/choose-profile-photo', endpoint='choose_profile_photo')
+@login_required
+def choose_profile_photo():
+    """Browse share/profile files and let user pick one as their profile picture."""
+    if not current_user.allow_profile_picture_change:
+        flash('Profile picture changes are not allowed.', 'danger')
+        return redirect(url_for('settings.settings_general'))
+    pps = current_user.profile_picture_source or 'upload'
+    if pps not in ('share', 'both'):
+        flash('Share Files profile source is not enabled for your account.', 'danger')
+        return redirect(url_for('settings.settings_general'))
+
+    files = SharedFile.query.filter_by(category='profile').order_by(SharedFile.created_at.desc()).all()
+    return render_template('choose_profile_photo.html', files=files)
+
+
+@settings_bp.route('/choose-profile-photo/select/<int:file_id>', endpoint='select_share_profile_photo', methods=['POST'])
+@login_required
+def select_share_profile_photo(file_id):
+    """Set a share/profile file as the user's profile photo."""
+    if not current_user.allow_profile_picture_change:
+        flash('Profile picture changes are not allowed.', 'danger')
+        return redirect(url_for('settings.settings_general'))
+    pps = current_user.profile_picture_source or 'upload'
+    if pps not in ('share', 'both'):
+        flash('Share Files profile source is not enabled for your account.', 'danger')
+        return redirect(url_for('settings.settings_general'))
+
+    sf = SharedFile.query.filter_by(id=file_id, category='profile').first_or_404()
+    # "share/<filename>" is routed to uploads/share/profile/ by serve_user_picture
+    current_user.profile_photo = f'share/{sf.filename}'
+    db.session.commit()
+    log_audit(current_user.id, 'update', 'user', current_user.id, f'Set profile photo from share: {sf.name}')
+    flash('Profile picture updated.', 'success')
+    return redirect(url_for('settings.settings_general'))
 
 
 @settings_bp.route('/save-table-columns-view', methods=['POST'])
@@ -470,6 +508,11 @@ def settings_system():
                     psize = request.form.get(f'project_upload_{ptype}_max_size', '10')
                     if pext: Setting.set(f'project_upload_{ptype}_extensions', pext)
                     if psize: Setting.set(f'project_upload_{ptype}_max_size', psize)
+                for stype in ['item', 'project', 'sticker']:
+                    sext = request.form.get(f'share_{stype}_extensions', '').strip()
+                    ssize = request.form.get(f'share_{stype}_max_size', '10')
+                    if sext: Setting.set(f'share_{stype}_extensions', sext, f'Share {stype} allowed extensions')
+                    if ssize: Setting.set(f'share_{stype}_max_size', ssize, f'Share {stype} max size MB')
 
             # Update app config dynamically
             current_app.config['MAX_CONTENT_LENGTH'] = max_file_size * 1024 * 1024
@@ -526,6 +569,11 @@ def settings_system():
                               '2d_design': {'extensions': Setting.get('project_upload_2d_design_extensions', 'pdf,zip'), 'max_size': Setting.get('project_upload_2d_design_max_size', '20')},
                               '3d_design': {'extensions': Setting.get('project_upload_3d_design_extensions', 'pdf,zip,stl,step'), 'max_size': Setting.get('project_upload_3d_design_max_size', '50')},
                               'program': {'extensions': Setting.get('project_upload_program_extensions', 'zip,txt,cpp,py'), 'max_size': Setting.get('project_upload_program_max_size', '10')},
+                          },
+                          share_upload_settings={
+                              'item':    {'extensions': Setting.get('share_item_extensions',    'pdf,png,jpg,jpeg,gif,txt,doc,docx'), 'max_size': Setting.get('share_item_max_size',    '10')},
+                              'project': {'extensions': Setting.get('share_project_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx'), 'max_size': Setting.get('share_project_max_size', '10')},
+                              'sticker': {'extensions': Setting.get('share_sticker_extensions', 'png,jpg,jpeg'),                      'max_size': Setting.get('share_sticker_max_size', '1')},
                           })
 
 
@@ -562,7 +610,7 @@ def magic_parameters():
                           can_delete=can_delete)
 
 
-@settings_bp.route('/manage-types', endpoint='manage_types')
+@settings_bp.route('/settings/item-management', endpoint='manage_types')
 @login_required
 def manage_types():
     """Manage item types - Categories, Footprints, Tags"""

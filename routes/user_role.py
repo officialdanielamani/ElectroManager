@@ -133,6 +133,9 @@ def user_new():
             flash(f'Email "{form.email.data}" already registered!', 'danger')
             return render_template('user_form.html', form=form, title='New User')
         
+        _pps = request.form.get('profile_picture_source', 'share')
+        if _pps not in ('upload', 'share', 'both'):
+            _pps = 'share'
         user = User(
             username=form.username.data,
             email=form.email.data,
@@ -140,6 +143,8 @@ def user_new():
             is_active=form.is_active.data,
             max_login_attempts=form.max_login_attempts.data or 0,
             allow_password_reset=form.allow_password_reset.data,
+            allow_profile_picture_change=form.allow_profile_picture_change.data,
+            profile_picture_source=_pps if form.allow_profile_picture_change.data else 'upload',
             auto_unlock_enabled=form.auto_unlock_enabled.data,
             auto_unlock_minutes=form.auto_unlock_minutes.data
         )
@@ -195,9 +200,10 @@ def user_edit(id):
         # Handle profile photo delete (stay on form)
         if action == 'delete_photo':
             if user.profile_photo:
-                filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
-                if is_safe_file_path(filepath) and os.path.exists(filepath):
-                    os.remove(filepath)
+                if not user.profile_photo.startswith('share/'):
+                    filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
+                    if is_safe_file_path(filepath) and os.path.exists(filepath):
+                        os.remove(filepath)
                 user.profile_photo = None
                 log_audit(current_user.id, 'update', 'user', user.id, f'Deleted profile photo for user: {user.username}')
                 db.session.commit()
@@ -218,8 +224,8 @@ def user_edit(id):
                         flash('Profile photo must be smaller than 1MB', 'danger')
                         return render_template('user_form.html', form=form, user=user, title='Edit User', config=current_app.config)
                     
-                    # Delete old photo if exists
-                    if user.profile_photo:
+                    # Delete old photo if exists (skip if it's a share-sourced photo)
+                    if user.profile_photo and not user.profile_photo.startswith('share/'):
                         old_file = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
                         if is_safe_file_path(old_file) and os.path.exists(old_file):
                             os.remove(old_file)
@@ -244,9 +250,15 @@ def user_edit(id):
         user.is_active = form.is_active.data
         user.max_login_attempts = form.max_login_attempts.data or 0
         user.allow_password_reset = form.allow_password_reset.data
+        user.allow_profile_picture_change = form.allow_profile_picture_change.data
         user.auto_unlock_enabled = form.auto_unlock_enabled.data
         user.auto_unlock_minutes = form.auto_unlock_minutes.data
-        
+        if form.allow_profile_picture_change.data:
+            src = request.form.get('profile_picture_source', 'share')
+            if src not in ('upload', 'share', 'both'):
+                src = 'share'
+            user.profile_picture_source = src
+
         # Check if admin is unlocking the account
         unlock_account = request.form.get('unlock_account')
         if unlock_account and user.account_locked_until:
@@ -550,6 +562,13 @@ def role_edit(id):
                 'edit': 'settings_sections_contacts_edit' in request.form,
                 'delete': 'settings_sections_contacts_delete' in request.form
             }
+
+            perms['settings_sections']['share_files'] = {
+                'view':   'settings_sections_share_files_view'   in request.form,
+                'add':    'settings_sections_share_files_add'    in request.form,
+                'edit':   'settings_sections_share_files_edit'   in request.form,
+                'delete': 'settings_sections_share_files_delete' in request.form,
+            }
             
             role.set_permissions(perms)
             db.session.commit()
@@ -627,9 +646,13 @@ def role_clone(id):
 
 
 
-@user_role_bp.route('/uploads/userpicture/<filename>', endpoint='serve_user_picture')
+@user_role_bp.route('/uploads/userpicture/<path:filename>', endpoint='serve_user_picture')
 def serve_user_picture(filename):
-    """Serve user profile pictures"""
+    """Serve user profile pictures; filename may be 'share/<actualname>' for share-sourced photos."""
+    if filename.startswith('share/'):
+        share_filename = filename[len('share/'):]
+        folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', 'profile')
+        return send_from_directory(folder, share_filename)
     return send_from_directory(os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture'), filename)
 
 

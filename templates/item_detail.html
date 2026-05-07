@@ -82,14 +82,28 @@
                 </div>
             </div>
             <div class="card-body">
-                <!-- Header with QR Code -->
+                <!-- Header with QR Code and Thumbnail -->
                 <div class="mb-3 d-flex justify-content-start align-items-flex-start gap-4">
-                    <div style="flex-shrink: 0;">
-                        <div style="background-color: white; padding: 8px; border-radius: 4px; display: inline-block;">
-                            <img src="{{ url_for('item.item_qr_svg', uuid=item.uuid) }}" alt="QR Code" width="160" height="160" style="border: 2px solid #ddd; padding: 5px; border-radius: 4px; display: block;">
+                    <div style="flex-shrink:0; background-color:white; padding:8px; border-radius:4px; display:inline-block;">
+                        <img src="{{ url_for('item.item_qr_svg', uuid=item.uuid) }}" alt="QR Code" width="160" height="160" style="border:2px solid #ddd; padding:5px; border-radius:4px; display:block;">
+                    </div>
+                    {% if item.thumbnail %}
+                    <div style="flex-shrink:0; background-color:white; padding:8px; border-radius:4px; display:inline-block;">
+                        <div style="width:160px;height:160px;border:2px solid #ddd;border-radius:4px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#f8f9fa;">
+                            {% if item.thumbnail.startswith('share:') %}
+                            <img src="{{ url_for('share.share_serve', category='item', filename=item.thumbnail[6:]) }}"
+                                 alt="Thumbnail" style="width:100%;height:100%;object-fit:cover;">
+                            {% elif item.thumbnail.startswith('icon:') %}
+                            <img src="{{ url_for('share.share_serve', category='icon', filename=item.thumbnail[5:]) }}"
+                                 alt="Thumbnail" style="width:100%;height:100%;object-fit:contain;padding:8px;">
+                            {% else %}
+                            <img src="{{ url_for('uploaded_file', filename=item.thumbnail) }}"
+                                 alt="Thumbnail" style="width:100%;height:100%;object-fit:cover;">
+                            {% endif %}
                         </div>
                     </div>
-                    <div style="flex: 1;">
+                    {% endif %}
+                    <div style="flex:1;">
                         <div class="mb-2"><strong>UUID:</strong> <code>{{ item.uuid }}</code></div>
                         <div class="mb-2"><strong>SKU:</strong> {{ item.sku or 'N/A' }}</div>
                         <div><strong>Type / Model:</strong> {{ item.info or 'N/A' }}</div>
@@ -201,6 +215,12 @@
                                 {% if not batch.follow_main_location %}
                                 <span class="badge ms-1" style="background-color: {{ batch.get_effective_location_color() }};"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>
                                 {% endif %}
+                                {% if batch.get_project_used_quantity() > 0 %}
+                                <span class="badge bg-info ms-1"><i class="bi bi-diagram-3"></i> In Project</span>
+                                {% endif %}
+                                {% if batch.get_lend_quantity() > 0 %}
+                                <span class="badge ms-1" style="background-color:#c9a227; color:#fff;"><i class="bi bi-hand-index-thumb"></i> On Lend</span>
+                                {% endif %}
                                 {% if batch.purchase_date %}
                                 <small class="text-muted ms-2"><i class="bi bi-calendar"></i> {{ batch.purchase_date.strftime('%d/%m/%Y') }}</small>
                                 {% endif %}
@@ -222,13 +242,9 @@
                                     </div>
                                 </div>
                                 <div class="row mb-2">
-                                    <div class="col-md-3"><strong>Total Value:</strong> {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_value()) }}</div>
-                                    <div class="col-md-3"><strong>Lending:</strong> {{ batch.get_lend_quantity() }}</div>
                                     <div class="col-md-3"><strong>Available Qty:</strong> {{ batch.get_available_quantity() }}</div>
-                                    {% if not batch.sn_tracking_enabled and batch.lend_to %}
-                                    <div class="col-md-3"><strong>Lend to:</strong> {{ batch.lend_to }}</div>
-                                    {% endif %}
                                     <div class="col-md-3"><strong>Date:</strong> {{ batch.purchase_date.strftime('%d/%m/%Y') if batch.purchase_date else 'N/A' }}</div>
+                                    <div class="col-md-6"><strong>Note:</strong> {{ batch.note or 'N/A' }}</div>
                                 </div>
                                 <div class="row mb-2">
                                     <div class="col-md-12">
@@ -243,13 +259,37 @@
                                 </div>
                                 {% set proj_names = batch.get_project_names_for_batch() %}
                                 {% if proj_names %}
-                                <div class="row mb-2">
-                                    <div class="col-md-12"><strong>Project:</strong> {% for pn in proj_names %}<span class="badge bg-info">{{ pn }}</span> {% endfor %} <small class="text-muted">({{ batch.get_project_used_quantity() }} used)</small></div>
+                                <div class="mb-2">
+                                    <strong>Projects <small class="text-muted">({{ batch.get_project_used_quantity() }} total)</small></strong>
+                                    <table class="table table-sm table-bordered mt-1 mb-0 small">
+                                        <thead><tr><th>Project</th><th class="text-center">Quantity</th></tr></thead>
+                                        <tbody>
+                                        {% for bom in batch.bom_uses if bom.used_quantity > 0 %}
+                                        <tr><td><a href="{{ url_for('project.project_detail', project_id=bom.project.project_id) }}" target="_blank">{{ bom.project.name }}</a></td><td class="text-center">{{ bom.used_quantity }}</td></tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
                                 </div>
                                 {% endif %}
-                                <div class="row mb-2">
-                                    <div class="col-md-12"><strong>Note:</strong> {{ batch.note or 'N/A' }}</div>
+                                {% if not batch.sn_tracking_enabled and batch.lend_records %}
+                                <div class="mb-2">
+                                    <strong>Lending <small class="text-muted">({{ batch.get_lend_quantity() }} total)</small></strong>
+                                    <table class="table table-sm table-bordered mt-1 mb-0 small">
+                                        <thead><tr><th>Lend To</th><th class="text-center">Qty</th><th>Start</th><th>Due Date</th><th class="text-center">Notify</th></tr></thead>
+                                        <tbody>
+                                        {% for rec in batch.lend_records %}
+                                        <tr>
+                                            <td>{{ rec.get_lend_to_display() or '—' }}</td>
+                                            <td class="text-center">{{ rec.quantity }}</td>
+                                            <td>{{ rec.lend_start.strftime('%d/%m/%Y') if rec.lend_start else '—' }}</td>
+                                            <td>{{ rec.lend_end.strftime('%d/%m/%Y') if rec.lend_end else '—' }}</td>
+                                            <td class="text-center">{% if rec.lend_notify_enabled %}<i class="bi bi-bell-fill text-warning" title="Remind {{ rec.lend_notify_before_days }} days before"></i>{% else %}—{% endif %}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
                                 </div>
+                                {% endif %}
 
                                 <!-- Serial Numbers Table (if enabled) -->
                                 {% if batch.sn_tracking_enabled and batch.serial_numbers|length > 0 %}
@@ -269,7 +309,9 @@
                                                 <th>Internal Serial Number (ISN)</th>
                                                 <th>Info</th>
                                                 <th>Project</th>
-                                                <th>Lend to</th>
+                                                <th>Lend To</th>
+                                                <th>Lend Start</th>
+                                                <th>Lend End</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -287,21 +329,21 @@
                                                 <td>
                                                     {% set sn_project_used = sn.id in (batch.get_project_used_sn_ids() if batch.get_project_used_sn_ids is defined else []) %}
                                                     {% if sn_project_used %}
-                                                    <span class="badge bg-info">
-                                                        {% for bom in batch.bom_uses if bom.used_quantity > 0 and bom.serial_numbers %}
-                                                            {% set sn_ids = bom.serial_numbers | from_json %}
-                                                            {% if sn.id in sn_ids %}{{ bom.project.name }}{% endif %}
-                                                        {% endfor %}
-                                                    </span>
+                                                    {% for bom in batch.bom_uses if bom.used_quantity > 0 and bom.serial_numbers %}
+                                                        {% set sn_ids = bom.serial_numbers | from_json %}
+                                                        {% if sn.id in sn_ids %}<a href="{{ url_for('project.project_detail', project_id=bom.project.project_id) }}" target="_blank" class="badge bg-info text-decoration-none">{{ bom.project.name }}</a>{% endif %}
+                                                    {% endfor %}
                                                     {% else %}-{% endif %}
                                                 </td>
                                                 <td>
                                                     {% if sn_project_used %}
-                                                    <span class="text-muted" style="opacity:0.5">{{ sn.lend_to or '-' }}</span>
+                                                    <span class="text-muted" style="opacity:0.5">{{ sn.get_lend_to_display() or '-' }}</span>
                                                     {% else %}
-                                                    <span class="lend-val" id="lendVal{{ sn.id }}">{{ sn.lend_to or '-' }}</span>
+                                                    <span class="lend-val" id="lendVal{{ sn.id }}">{{ sn.get_lend_to_display() or '-' }}</span>
                                                     {% endif %}
                                                 </td>
+                                                <td class="small">{{ sn.lend_start.strftime('%d/%m/%Y') if sn.lend_start else '—' }}</td>
+                                                <td class="small">{{ sn.lend_end.strftime('%d/%m/%Y') if sn.lend_end else '—' }}</td>
                                             </tr>
                                             {% endfor %}
                                         </tbody>
@@ -414,10 +456,44 @@
                 <hr>
                 {% endif %}
 
+                <!-- Share Files -->
+                {% if item.linked_share_files %}
+                {% set sf_images = item.linked_share_files | selectattr('is_image') | list %}
+                {% set sf_others = item.linked_share_files | rejectattr('is_image') | list %}
+                <div class="mb-3">
+                    <strong><i class="bi bi-folder-fill"></i> Share Files ({{ item.linked_share_files|length }})</strong>
+                    {% if sf_images %}
+                    <div class="image-grid mt-2">
+                        {% for sf in sf_images %}
+                        <div class="image-grid-item" onclick="openImageModal('{{ url_for('share.share_serve', category='item', filename=sf.filename) }}', '{{ sf.name }}')">
+                            <img src="{{ url_for('share.share_serve', category='item', filename=sf.filename) }}" alt="{{ sf.name }}">
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% if sf_others %}
+                    <div class="list-group mt-2">
+                        {% for sf in sf_others %}
+                        <a href="{{ url_for('share.share_serve', category='item', filename=sf.filename) }}" target="_blank"
+                           class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="bi bi-file-earmark-{% if sf.ext == 'pdf' %}pdf{% elif sf.ext in ['doc','docx'] %}word{% elif sf.ext == 'txt' %}text{% else %}fill{% endif %}"></i>
+                                <strong>{{ sf.name }}</strong>
+                                <br><small class="text-muted">{{ sf.ext|upper }} - {{ sf.size_display() }}</small>
+                            </div>
+                            <i class="bi bi-download"></i>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <hr>
+                {% endif %}
+
                 <!-- Datasheet URLs -->
                 {% if item.datasheet_urls %}
                 <div class="mb-3 px-1">
-                    <strong><i class="bi bi-file-earmark-text"></i> Datasheets:</strong>
+                    <strong><i class="bi bi-link-45deg"></i> URLs:</strong>
                     <div id="datasheet-display" class="mt-2"></div>
                 </div>
                 <hr>
@@ -436,7 +512,7 @@ function renderDatasheets() {
     const container = document.getElementById('datasheet-display');
     if (!container) return;
     if (datasheets.length === 0) {
-        container.innerHTML = '<p class="text-muted small">No datasheets available.</p>';
+        container.innerHTML = '<p class="text-muted small">No URLs added.</p>';
         return;
     }
     let html = '<div class="list-group">';
