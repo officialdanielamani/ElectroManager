@@ -2,9 +2,12 @@
 Share Files Blueprint - Manages shared file library
 """
 import io
+import logging
 import os
 import uuid
 import zipfile
+
+logger = logging.getLogger(__name__)
 from flask import Blueprint, render_template, redirect, url_for, flash, request, send_from_directory, current_app, jsonify, send_file
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
@@ -229,12 +232,29 @@ def share_rename(id):
         old_path = _share_file_path(current_app.config['UPLOAD_FOLDER'], sf.category, sf.filename)
         share_folder = os.path.dirname(old_path)
         new_path = os.path.join(share_folder, new_filename)
-    except ValueError:
+    except ValueError as e:
+        logger.error('share_rename path error for sf.id=%s: %s', id, e)
         flash('File path error.', 'danger')
         return redirect(url_for('share.share_files', category=sf.category))
+
     old_filename = sf.filename
-    if os.path.exists(old_path) and old_path != new_path:
-        os.rename(old_path, new_path)
+    disk_renamed = False
+
+    if not os.path.exists(old_path):
+        logger.warning('share_rename: source file not found at %s (sf.id=%s)', old_path, id)
+        flash(f'Warning: file not found on disk at expected path ({old_filename}). '
+              'Database entry updated but disk file may need manual cleanup.', 'warning')
+    elif old_path == new_path:
+        disk_renamed = True  # already has the right name
+    else:
+        try:
+            os.rename(old_path, new_path)
+            disk_renamed = True
+            logger.info('share_rename: %s -> %s (sf.id=%s)', old_path, new_path, id)
+        except OSError as e:
+            logger.error('share_rename: os.rename failed %s -> %s: %s', old_path, new_path, e)
+            flash(f'Could not rename file on disk: {e}', 'danger')
+            return redirect(url_for('share.share_files', category=sf.category))
 
     sf.filename = new_filename
     sf.name = new_filename.rsplit('.', 1)[0] if '.' in new_filename else new_filename
@@ -248,7 +268,10 @@ def share_rename(id):
 
     db.session.commit()
     log_audit(current_user.id, 'update', 'shared_file', id, f'Renamed shared file to: {new_filename}')
-    flash(f'File renamed to "{new_filename}".', 'success')
+    if disk_renamed:
+        flash(f'File renamed to "{new_filename}" (disk file updated).', 'success')
+    else:
+        flash(f'Display name updated to "{new_filename}".', 'success')
     return redirect(url_for('share.share_files', category=sf.category))
 
 
