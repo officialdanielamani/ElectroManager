@@ -455,7 +455,8 @@ def item_edit(uuid):
     
     batch_lend_data = {b.id: b.get_lend_records_data() for b in item.batches}
     share_files_item = SharedFile.query.filter_by(category='item').order_by(SharedFile.name).all()
-    return render_template('item_form.html', form=form, item=item, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='Edit Item', currency=Setting.get('currency', '$'), max_file_size_mb=max_size_mb, allowed_file_types=extensions_str, item_perms=perms, batch_lend_data=batch_lend_data, share_files_item=share_files_item)
+    share_files_icon = SharedFile.query.filter_by(category='icon').order_by(SharedFile.name).all()
+    return render_template('item_form.html', form=form, item=item, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='Edit Item', currency=Setting.get('currency', '$'), max_file_size_mb=max_size_mb, allowed_file_types=extensions_str, item_perms=perms, batch_lend_data=batch_lend_data, share_files_item=share_files_item, share_files_icon=share_files_icon)
 
 
 

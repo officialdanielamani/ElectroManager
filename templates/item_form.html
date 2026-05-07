@@ -65,6 +65,8 @@
                                     {% if item.thumbnail %}
                                         {% if item.thumbnail.startswith('share:') %}
                                         <img src="{{ url_for('share.share_serve', category='item', filename=item.thumbnail[6:]) }}" style="width:100%;height:100%;object-fit:cover;">
+                                        {% elif item.thumbnail.startswith('icon:') %}
+                                        <img src="{{ url_for('share.share_serve', category='icon', filename=item.thumbnail[5:]) }}" style="width:100%;height:100%;object-fit:contain;padding:4px;">
                                         {% else %}
                                         <img src="{{ url_for('uploaded_file', filename=item.thumbnail) }}" style="width:100%;height:100%;object-fit:cover;">
                                         {% endif %}
@@ -4151,6 +4153,11 @@ function submitSnBulkLend(clearMode) {
                             <i class="bi bi-folder-fill"></i> Share Images
                         </button>
                     </li>
+                    <li class="nav-item">
+                        <button class="nav-link" onclick="showThumbTab('icon', this)">
+                            <i class="bi bi-stars"></i> Icons
+                        </button>
+                    </li>
                 </ul>
 
                 <!-- Item Images tab -->
@@ -4204,6 +4211,35 @@ function submitSnBulkLend(clearMode) {
                     {% endif %}
                     {% endif %}
                 </div>
+
+                <!-- Icons tab -->
+                <div id="thumbTabIcon" class="d-none">
+                    {% if share_files_icon is defined %}
+                    {% set icon_images = share_files_icon | selectattr('is_image') | list %}
+                    {% if icon_images %}
+                    <div class="row row-cols-3 row-cols-sm-4 row-cols-md-5 g-2">
+                        {% for sf in icon_images %}
+                        <div class="col">
+                            <div class="thumb-option border rounded overflow-hidden"
+                                 data-value="icon:{{ sf.filename }}"
+                                 data-url="{{ url_for('share.share_serve', category='icon', filename=sf.filename) }}"
+                                 style="cursor:pointer; aspect-ratio:1/1; background:#f8f9fa; display:flex; align-items:center; justify-content:center;"
+                                 onclick="selectThumbnail(this)">
+                                <img src="{{ url_for('share.share_serve', category='icon', filename=sf.filename) }}"
+                                     alt="{{ sf.name }}"
+                                     style="width:100%;height:100%;object-fit:contain; padding:4px;">
+                            </div>
+                            <div class="text-truncate mt-1" style="font-size:0.7rem;">{{ sf.name }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-3">No icons in Share / Icon category yet.</p>
+                    {% endif %}
+                    {% else %}
+                    <p class="text-muted text-center py-3">No icons in Share / Icon category yet.</p>
+                    {% endif %}
+                </div>
             </div>
             <div class="modal-footer justify-content-between">
                 <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearThumbnail(); bootstrap.Modal.getInstance(document.getElementById('thumbnailPickerModal')).hide();">
@@ -4227,6 +4263,7 @@ document.getElementById('thumbnailPickerModal').addEventListener('show.bs.modal'
 function showThumbTab(tab, btn) {
     document.getElementById('thumbTabItem').classList.toggle('d-none', tab !== 'item');
     document.getElementById('thumbTabShare').classList.toggle('d-none', tab !== 'share');
+    document.getElementById('thumbTabIcon').classList.toggle('d-none', tab !== 'icon');
     document.querySelectorAll('#thumbTabs .nav-link').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
 }

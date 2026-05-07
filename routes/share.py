@@ -15,11 +15,12 @@ from utils import log_audit
 
 share_bp = Blueprint('share', __name__)
 
-SHARE_CATEGORIES = ['item', 'profile', 'project', 'sticker']
+SHARE_CATEGORIES = ['item', 'icon', 'profile', 'project', 'sticker']
 IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'}
 
 CATEGORY_DEFAULTS = {
     'item':    {'extensions': 'pdf,png,jpg,jpeg,gif,txt,doc,docx', 'max_size': '10'},
+    'icon':    {'extensions': 'svg,png,jpeg,jpg',                  'max_size': '5'},
     'profile': {'extensions': 'jpg,jpeg,png',                      'max_size': '1'},
     'project': {'extensions': 'pdf,png,jpg,jpeg,gif,txt,doc,docx', 'max_size': '10'},
     'sticker': {'extensions': 'png,jpg,jpeg',                      'max_size': '1'},

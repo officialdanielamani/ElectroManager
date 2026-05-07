@@ -471,6 +471,9 @@
                                         {% if item.thumbnail.startswith('share:') %}
                                         <img src="{{ url_for('share.share_serve', category='item', filename=item.thumbnail[6:]) }}"
                                              alt="{{ item.name }}" style="width:100%;height:100%;object-fit:cover;display:block;">
+                                        {% elif item.thumbnail.startswith('icon:') %}
+                                        <img src="{{ url_for('share.share_serve', category='icon', filename=item.thumbnail[5:]) }}"
+                                             alt="{{ item.name }}" style="width:100%;height:100%;object-fit:contain;display:block;padding:8px;">
                                         {% else %}
                                         <img src="{{ url_for('uploaded_file', filename=item.thumbnail) }}"
                                              alt="{{ item.name }}" style="width:100%;height:100%;object-fit:cover;display:block;">
