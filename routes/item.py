@@ -3,7 +3,7 @@ Item Routes Blueprint
 """
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file, abort, current_app
 from flask_login import login_required, current_user, login_user, logout_user
-from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate
+from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate, SharedFile
 from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEditForm, AttachmentForm, 
                    SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm)
 from helpers import is_safe_url, format_currency, is_safe_file_path
@@ -434,6 +434,9 @@ def item_edit(uuid):
         if perms['can_edit_advance']:
             item.description = form.description.data
             item.datasheet_urls = form.datasheet_urls.data
+            # Linked share files
+            sf_ids = [int(i) for i in request.form.getlist('share_file_ids[]') if i]
+            item.linked_share_files = SharedFile.query.filter(SharedFile.id.in_(sf_ids)).all() if sf_ids else []
 
         item.updated_at = datetime.now(timezone.utc)
         item.updated_by = current_user.id
@@ -449,7 +452,8 @@ def item_edit(uuid):
     extensions_str = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
     
     batch_lend_data = {b.id: b.get_lend_records_data() for b in item.batches}
-    return render_template('item_form.html', form=form, item=item, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='Edit Item', currency=Setting.get('currency', '$'), max_file_size_mb=max_size_mb, allowed_file_types=extensions_str, item_perms=perms, batch_lend_data=batch_lend_data)
+    share_files_item = SharedFile.query.filter_by(category='item').order_by(SharedFile.name).all()
+    return render_template('item_form.html', form=form, item=item, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='Edit Item', currency=Setting.get('currency', '$'), max_file_size_mb=max_size_mb, allowed_file_types=extensions_str, item_perms=perms, batch_lend_data=batch_lend_data, share_files_item=share_files_item)
 
 
 

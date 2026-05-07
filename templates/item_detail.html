@@ -442,6 +442,40 @@
                 <hr>
                 {% endif %}
 
+                <!-- Share Files -->
+                {% if item.linked_share_files %}
+                {% set sf_images = item.linked_share_files | selectattr('is_image') | list %}
+                {% set sf_others = item.linked_share_files | rejectattr('is_image') | list %}
+                <div class="mb-3">
+                    <strong><i class="bi bi-folder-fill text-warning"></i> Share Files ({{ item.linked_share_files|length }})</strong>
+                    {% if sf_images %}
+                    <div class="image-grid mt-2">
+                        {% for sf in sf_images %}
+                        <div class="image-grid-item" onclick="openImageModal('{{ url_for('share.share_serve', category='item', filename=sf.filename) }}', '{{ sf.name }}')">
+                            <img src="{{ url_for('share.share_serve', category='item', filename=sf.filename) }}" alt="{{ sf.name }}">
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% if sf_others %}
+                    <div class="list-group mt-2">
+                        {% for sf in sf_others %}
+                        <a href="{{ url_for('share.share_serve', category='item', filename=sf.filename) }}" target="_blank"
+                           class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="bi bi-file-earmark-{% if sf.ext == 'pdf' %}pdf{% elif sf.ext in ['doc','docx'] %}word{% elif sf.ext == 'txt' %}text{% else %}fill{% endif %}"></i>
+                                <strong>{{ sf.name }}</strong>
+                                <br><small class="text-muted">{{ sf.ext|upper }} - {{ sf.size_display() }}</small>
+                            </div>
+                            <i class="bi bi-download"></i>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <hr>
+                {% endif %}
+
                 <!-- Datasheet URLs -->
                 {% if item.datasheet_urls %}
                 <div class="mb-3 px-1">

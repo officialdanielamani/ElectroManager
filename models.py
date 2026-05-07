@@ -325,6 +325,13 @@ class Rack(db.Model):
         return f'<Rack {self.name}>'
 
 
+item_share_files = db.Table(
+    'item_share_files',
+    db.Column('item_id', db.Integer, db.ForeignKey('items.id'), primary_key=True),
+    db.Column('shared_file_id', db.Integer, db.ForeignKey('shared_files.id'), primary_key=True),
+)
+
+
 class Item(db.Model):
     __tablename__ = 'items'
     
@@ -367,6 +374,7 @@ class Item(db.Model):
     
     attachments = db.relationship('Attachment', backref='item', lazy=True, cascade='all, delete-orphan')
     batches = db.relationship('ItemBatch', backref='item', lazy=True, cascade='all, delete-orphan', order_by='ItemBatch.batch_number')
+    linked_share_files = db.relationship('SharedFile', secondary='item_share_files', lazy='subquery', backref=db.backref('linked_items', lazy=True))
     
     def __init__(self, **kwargs):
         super(Item, self).__init__(**kwargs)

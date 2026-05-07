@@ -29,6 +29,18 @@
     </div>
 </div>
 
+<!-- Search bar -->
+{% if files %}
+<div class="mb-3">
+    <div class="input-group input-group-sm" style="max-width:320px;">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="text" class="form-control" id="shareSearch" placeholder="Search files…"
+               oninput="filterShareFiles(this.value)">
+        <button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('shareSearch').value=''; filterShareFiles('');">×</button>
+    </div>
+</div>
+{% endif %}
+
 <!-- Category tabs + bulk action buttons -->
 <div class="d-flex justify-content-between align-items-end mb-3 flex-wrap gap-2">
     <ul class="nav nav-tabs mb-0 flex-grow-1">
@@ -86,7 +98,7 @@
 <!-- ===== CARD VIEW ===== -->
 <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3">
     {% for f in files %}
-    <div class="col">
+    <div class="col share-file-card" data-name="{{ f.name|lower }}">
         <div class="card h-100 shadow-sm" id="card_{{ f.id }}">
             <!-- Checkbox -->
             <div class="position-absolute top-0 start-0 p-1" style="z-index:1;">
@@ -96,10 +108,10 @@
             </div>
             <!-- Preview -->
             <div class="card-img-top d-flex align-items-center justify-content-center bg-light"
-                 style="height:120px; overflow:hidden;">
+                 style="width:100%; aspect-ratio:1/1; overflow:hidden;">
                 {% if f.is_image %}
                 <img src="{{ url_for('share.share_serve', category=f.category, filename=f.filename) }}"
-                     alt="{{ f.name }}" style="max-height:120px; max-width:100%; object-fit:contain;">
+                     alt="{{ f.name }}" style="width:100%; height:100%; object-fit:cover;">
                 {% else %}
                 {% set ext = f.ext %}
                 {% if ext == 'pdf' %}<i class="bi bi-file-earmark-pdf text-danger" style="font-size:3rem;"></i>
@@ -164,7 +176,7 @@
         </thead>
         <tbody>
             {% for f in files %}
-            <tr>
+            <tr class="share-file-row" data-name="{{ f.name|lower }}">
                 <td><input type="checkbox" class="file-checkbox form-check-input" value="{{ f.id }}"
                            style="width:16px;height:16px;" onchange="updateBulkActions()"></td>
                 <td class="text-center">
@@ -341,6 +353,13 @@ if (catSelect) {
 const fileNames = {
     {% for f in files %}{{ f.id }}: "{{ f.name|replace('"', '\\"') }}",{% endfor %}
 };
+
+function filterShareFiles(query) {
+    const q = query.toLowerCase();
+    document.querySelectorAll('.share-file-card, .share-file-row').forEach(el => {
+        el.style.display = el.dataset.name.includes(q) ? '' : 'none';
+    });
+}
 
 function getSelectedIds() {
     return Array.from(document.querySelectorAll('.file-checkbox:checked')).map(cb => parseInt(cb.value));
