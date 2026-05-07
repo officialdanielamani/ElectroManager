@@ -1134,6 +1134,8 @@ class ContactOrganization(db.Model):
     email = db.Column(db.String(200))
     tel = db.Column(db.String(50))
     url = db.Column(db.String(500))
+    address = db.Column(db.String(500))
+    zip_code = db.Column(db.String(20))
     info = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

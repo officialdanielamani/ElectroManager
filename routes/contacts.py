@@ -105,6 +105,8 @@ def contact_org_add():
         email=request.form.get('email', '').strip() or None,
         tel=request.form.get('tel', '').strip() or None,
         url=request.form.get('url', '').strip() or None,
+        address=request.form.get('address', '').strip() or None,
+        zip_code=request.form.get('zip_code', '').strip() or None,
         info=request.form.get('info', '').strip() or None
     )
     db.session.add(org)
@@ -125,6 +127,8 @@ def contact_org_edit(id):
     org.email = request.form.get('email', '').strip() or None
     org.tel = request.form.get('tel', '').strip() or None
     org.url = request.form.get('url', '').strip() or None
+    org.address = request.form.get('address', '').strip() or None
+    org.zip_code = request.form.get('zip_code', '').strip() or None
     org.info = request.form.get('info', '').strip() or None
     db.session.commit()
     log_audit(current_user.id, 'update', 'contact_org', org.id, f'Updated organization: {org.name}')

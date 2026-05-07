@@ -98,7 +98,8 @@ class DataExporter:
                 'color': r.color,
                 'rows': r.rows,
                 'cols': r.cols,
-                'unavailable_drawers': r.unavailable_drawers,
+                'unavailable_drawers': r.unavailable_drawers or '[]',
+                'merged_cells': r.merged_cells or '[]',
             }
             for r in Rack.query.all()
         ]}
@@ -156,7 +157,8 @@ class DataExporter:
     @staticmethod
     def export_contact_organizations():
         return {'contact_organizations': [
-            {'name': o.name, 'email': o.email or '', 'tel': o.tel or '', 'url': o.url or '', 'info': o.info or ''}
+            {'name': o.name, 'email': o.email or '', 'tel': o.tel or '', 'url': o.url or '',
+             'address': o.address or '', 'zip_code': o.zip_code or '', 'info': o.info or ''}
             for o in ContactOrganization.query.all()
         ]}
 
@@ -400,7 +402,8 @@ class DataImporter:
                     color=rd.get('color', '#6c757d'),
                     rows=rd.get('rows', 5),
                     cols=rd.get('cols', 5),
-                    unavailable_drawers=rd.get('unavailable_drawers', ''),
+                    unavailable_drawers=rd.get('unavailable_drawers', '[]'),
+                    merged_cells=rd.get('merged_cells', '[]'),
                 )
                 db.session.add(rack)
                 imported += 1
@@ -558,7 +561,8 @@ class DataImporter:
                 else:
                     db.session.add(ContactOrganization(
                         name=name, email=od.get('email', ''), tel=od.get('tel', ''),
-                        url=od.get('url', ''), info=od.get('info', ''),
+                        url=od.get('url', ''), address=od.get('address', '') or None,
+                        zip_code=od.get('zip_code', '') or None, info=od.get('info', ''),
                     ))
                     imported += 1
             except Exception as e:

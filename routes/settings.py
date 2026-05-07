@@ -562,7 +562,7 @@ def magic_parameters():
                           can_delete=can_delete)
 
 
-@settings_bp.route('/manage-types', endpoint='manage_types')
+@settings_bp.route('/settings/item-management', endpoint='manage_types')
 @login_required
 def manage_types():
     """Manage item types - Categories, Footprints, Tags"""

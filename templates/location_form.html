@@ -55,13 +55,11 @@
                         <div class="col-md-6 mb-3">
                             {{ form.color.label(class="form-label") }}
                             <div class="input-group">
-                                <input type="color" class="form-control form-control-color" id="color" name="color" 
-                                       value="{{ form.color.data or '#6c757d' }}" style="width: 100px; cursor: pointer;">
-                                <input type="text" class="form-control bg-light" id="color_text" readonly 
-                                       value="{{ form.color.data or '#6c757d' }}" 
-                                       style="flex: 1; user-select: none;">
+                                <input type="color" class="form-control form-control-color" id="cp_main" value="{{ form.color.data or '#6c757d' }}" style="width:50px; cursor:pointer; padding:2px;">
+                                <input type="text" class="form-control" id="ch_main" name="color" value="{{ form.color.data or '#6c757d' }}" placeholder="#6c757d" maxlength="7" style="max-width:110px; font-family:monospace;">
+                                <span class="input-group-text p-1"><span id="cs_main" style="display:inline-block; width:28px; height:28px; border-radius:4px; background:{{ form.color.data or '#6c757d' }};"></span></span>
                             </div>
-                            <small class="text-muted d-block mt-2">Click color picker to choose • Hex value shown on right</small>
+                            <small class="text-muted">Click swatch to pick or type hex code directly</small>
                         </div>
 
                         <div class="col-md-6 mb-3">
@@ -144,20 +142,23 @@ function showImageModal(imageSrc, locationName) {
     modal.show();
 }
 
-// Sync color input with text display
 document.addEventListener('DOMContentLoaded', function() {
-    const colorInput = document.getElementById('color');
-    const colorText = document.getElementById('color_text');
-    
-    if (colorInput && colorText) {
-        // Set initial value
-        colorText.value = colorInput.value;
-        
-        // Sync on change
-        colorInput.addEventListener('input', function() {
-            colorText.value = this.value;
-        });
+    function initColorPicker(pickerId, hexId, swatchId) {
+        const picker = document.getElementById(pickerId);
+        const hex = document.getElementById(hexId);
+        const swatch = document.getElementById(swatchId);
+        if (!picker || !hex) return;
+        function applyColor(val) {
+            if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+                picker.value = val;
+                hex.value = val;
+                if (swatch) swatch.style.background = val;
+            }
+        }
+        picker.addEventListener('input', () => applyColor(picker.value));
+        hex.addEventListener('input', () => applyColor(hex.value));
     }
+    initColorPicker('cp_main', 'ch_main', 'cs_main');
 });
 </script>
 

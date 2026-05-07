@@ -112,6 +112,7 @@
                                 {% if org.email %}<br><small><i class="bi bi-envelope"></i> {{ org.email }}</small>{% endif %}
                                 {% if org.tel %}<br><small><i class="bi bi-telephone"></i> {{ org.tel }}</small>{% endif %}
                                 {% if org.url %}<br><small><i class="bi bi-link-45deg"></i> <a href="{{ org.url }}" target="_blank" rel="noopener">{{ org.url }}</a></small>{% endif %}
+                                {% if org.address %}<br><small><i class="bi bi-geo-alt"></i> {{ org.address }}{% if org.zip_code %} {{ org.zip_code }}{% endif %}</small>{% elif org.zip_code %}<br><small><i class="bi bi-geo-alt"></i> {{ org.zip_code }}</small>{% endif %}
                                 {% if org.info %}<br><small class="text-muted">{{ org.info }}</small>{% endif %}
                                 {% if org.persons %}
                                 <div class="mt-1">
@@ -145,6 +146,8 @@
                             <tr><th>Email</th><td>{% if org.email %}<a href="mailto:{{ org.email }}">{{ org.email }}</a>{% else %}—{% endif %}</td></tr>
                             <tr><th>Tel</th><td>{{ org.tel or '—' }}</td></tr>
                             <tr><th>URL</th><td>{% if org.url %}<a href="{{ org.url }}" target="_blank" rel="noopener">{{ org.url }}</a>{% else %}—{% endif %}</td></tr>
+                            <tr><th>Address</th><td>{{ org.address or '—' }}</td></tr>
+                            <tr><th>Zip Code</th><td>{{ org.zip_code or '—' }}</td></tr>
                             <tr><th>Info</th><td>{{ org.info or '—' }}</td></tr>
                         </table>
                         {% if org.persons %}
@@ -176,6 +179,8 @@
                             <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email" value="{{ org.email or '' }}"></div>
                             <div class="mb-3"><label class="form-label">Tel</label><input type="text" class="form-control" name="tel" value="{{ org.tel or '' }}"></div>
                             <div class="mb-3"><label class="form-label">URL</label><input type="url" class="form-control" name="url" value="{{ org.url or '' }}"></div>
+                            <div class="mb-3"><label class="form-label">Address</label><input type="text" class="form-control" name="address" value="{{ org.address or '' }}"></div>
+                            <div class="mb-3"><label class="form-label">Zip Code</label><input type="text" class="form-control" name="zip_code" value="{{ org.zip_code or '' }}"></div>
                             <div class="mb-3"><label class="form-label">Info</label><textarea class="form-control" name="info" rows="3">{{ org.info or '' }}</textarea></div>
                         </div>
                         <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
@@ -395,6 +400,8 @@
             <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email"></div>
             <div class="mb-3"><label class="form-label">Tel</label><input type="text" class="form-control" name="tel"></div>
             <div class="mb-3"><label class="form-label">URL</label><input type="url" class="form-control" name="url" placeholder="https://"></div>
+            <div class="mb-3"><label class="form-label">Address</label><input type="text" class="form-control" name="address"></div>
+            <div class="mb-3"><label class="form-label">Zip Code</label><input type="text" class="form-control" name="zip_code"></div>
             <div class="mb-3"><label class="form-label">Info</label><textarea class="form-control" name="info" rows="3"></textarea></div>
         </div>
         <div class="modal-footer"><button type="submit" class="btn btn-success"><i class="bi bi-plus-circle"></i> Add Organization</button></div>
