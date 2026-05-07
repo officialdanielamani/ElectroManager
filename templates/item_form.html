@@ -4100,22 +4100,41 @@ function submitSnBulkLend(clearMode) {
 <!-- ===== Share File Picker Modal ===== -->
 {% if share_files_item is defined %}
 <div class="modal fade" id="shareFilePickerModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="bi bi-folder-fill text-warning"></i> Select Share Files</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="mb-3">
-                    <input type="text" class="form-control form-control-sm" id="sfPickerSearch"
-                           placeholder="Search files…" oninput="filterSharePicker(this.value)">
+                <!-- Toolbar: search + view toggle + selected count -->
+                <div class="d-flex gap-2 align-items-center mb-3 flex-wrap">
+                    <div class="input-group input-group-sm" style="max-width:280px;">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="sfPickerSearch"
+                               placeholder="Search files…" oninput="filterSharePicker(this.value)">
+                        <button class="btn btn-outline-secondary" type="button"
+                                onclick="document.getElementById('sfPickerSearch').value=''; filterSharePicker('');">×</button>
+                    </div>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary active" id="sfViewCard"
+                                onclick="setSfView('card')" title="Card view">
+                            <i class="bi bi-grid-3x3-gap"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="sfViewList"
+                                onclick="setSfView('list')" title="List view">
+                            <i class="bi bi-list-ul"></i>
+                        </button>
+                    </div>
+                    <span class="text-muted small ms-auto" id="sfSelectedCount">0 selected</span>
                 </div>
+
                 {% if share_files_item %}
-                <div class="row g-2" id="sfPickerGrid">
+                <!-- Card view -->
+                <div id="sfPickerCardView" class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3">
                     {% for sf in share_files_item %}
-                    <div class="col-4 col-sm-3 col-md-2 sf-picker-item" data-name="{{ sf.name|lower }}.{{ sf.ext }}">
-                        <div class="border rounded p-1 text-center h-100 sf-picker-card"
+                    <div class="col sf-picker-item" data-name="{{ sf.name|lower }}.{{ sf.ext }}">
+                        <div class="card h-100 shadow-sm position-relative sf-picker-card"
                              id="sfpcard_{{ sf.id }}"
                              data-sf-id="{{ sf.id }}"
                              data-sf-name="{{ sf.name }}"
@@ -4123,59 +4142,181 @@ function submitSnBulkLend(clearMode) {
                              data-sf-url="{{ url_for('share.share_serve', category='item', filename=sf.filename) }}"
                              style="cursor:pointer;"
                              onclick="toggleShareFilePick(this)">
-                            <div style="width:100%; aspect-ratio:1/1; overflow:hidden; border-radius:4px; background:#f8f9fa; display:flex; align-items:center; justify-content:center;">
+                            <!-- Checkbox indicator top-left -->
+                            <div class="position-absolute top-0 start-0 p-1" style="z-index:2; pointer-events:none;">
+                                <span class="sf-check-icon d-none">
+                                    <i class="bi bi-check-circle-fill text-success" style="font-size:1.1rem; filter:drop-shadow(0 0 2px #fff);"></i>
+                                </span>
+                            </div>
+                            <!-- Preview -->
+                            <div class="card-img-top d-flex align-items-center justify-content-center bg-light"
+                                 style="width:100%; aspect-ratio:1/1; overflow:hidden; pointer-events:none;">
                                 {% if sf.is_image %}
                                 <img src="{{ url_for('share.share_serve', category='item', filename=sf.filename) }}"
-                                     alt="{{ sf.name }}"
-                                     style="width:100%; height:100%; object-fit:cover;">
+                                     alt="{{ sf.name }}" style="width:100%; height:100%; object-fit:cover;">
                                 {% else %}
                                 {% set ext = sf.ext %}
-                                {% if ext == 'pdf' %}<i class="bi bi-file-earmark-pdf text-danger fs-3"></i>
-                                {% elif ext in ['doc','docx'] %}<i class="bi bi-file-earmark-word text-primary fs-3"></i>
-                                {% elif ext in ['txt','md'] %}<i class="bi bi-file-earmark-text text-secondary fs-3"></i>
-                                {% else %}<i class="bi bi-file-earmark text-muted fs-3"></i>
+                                {% if ext == 'pdf' %}<i class="bi bi-file-earmark-pdf text-danger" style="font-size:2.5rem;"></i>
+                                {% elif ext in ['doc','docx'] %}<i class="bi bi-file-earmark-word text-primary" style="font-size:2.5rem;"></i>
+                                {% elif ext in ['txt','md'] %}<i class="bi bi-file-earmark-text text-secondary" style="font-size:2.5rem;"></i>
+                                {% else %}<i class="bi bi-file-earmark text-muted" style="font-size:2.5rem;"></i>
                                 {% endif %}
                                 {% endif %}
                             </div>
-                            <div class="text-truncate mt-1" style="font-size:0.7rem;" title="{{ sf.name }}">{{ sf.name }}</div>
+                            <div class="card-body p-1" style="pointer-events:none;">
+                                <p class="card-text small fw-semibold text-truncate mb-0" title="{{ sf.name }}.{{ sf.ext }}">{{ sf.name }}</p>
+                                <small class="text-muted">{{ sf.ext|upper }} · {{ sf.size_display() }}</small>
+                            </div>
                         </div>
                     </div>
                     {% endfor %}
+                </div>
+
+                <!-- List view (hidden by default) -->
+                <div id="sfPickerListView" class="d-none">
+                    <table class="table table-hover align-middle table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="36"></th>
+                                <th width="44">Preview</th>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Size</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sf in share_files_item %}
+                            <tr class="sf-picker-item sf-picker-row"
+                                data-name="{{ sf.name|lower }}.{{ sf.ext }}"
+                                data-sf-id="{{ sf.id }}"
+                                data-sf-name="{{ sf.name }}"
+                                data-sf-image="{{ 'true' if sf.is_image else 'false' }}"
+                                data-sf-url="{{ url_for('share.share_serve', category='item', filename=sf.filename) }}"
+                                style="cursor:pointer;"
+                                onclick="toggleShareFilePickRow(this)">
+                                <td>
+                                    <span class="sf-check-icon d-none">
+                                        <i class="bi bi-check-circle-fill text-success"></i>
+                                    </span>
+                                    <span class="sf-uncheck-icon">
+                                        <i class="bi bi-circle text-muted"></i>
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if sf.is_image %}
+                                    <img src="{{ url_for('share.share_serve', category='item', filename=sf.filename) }}"
+                                         alt="{{ sf.name }}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;">
+                                    {% else %}
+                                    {% set ext = sf.ext %}
+                                    {% if ext == 'pdf' %}<i class="bi bi-file-earmark-pdf text-danger fs-4"></i>
+                                    {% elif ext in ['doc','docx'] %}<i class="bi bi-file-earmark-word text-primary fs-4"></i>
+                                    {% elif ext in ['txt','md'] %}<i class="bi bi-file-earmark-text text-secondary fs-4"></i>
+                                    {% else %}<i class="bi bi-file-earmark text-muted fs-4"></i>
+                                    {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td><span class="fw-semibold">{{ sf.name }}</span></td>
+                                <td><span class="badge bg-secondary">{{ sf.ext|upper }}</span></td>
+                                <td><small class="text-muted">{{ sf.size_display() }}</small></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
                 {% else %}
                 <p class="text-muted text-center py-4">No share files in the Item category yet.</p>
                 {% endif %}
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Done</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-const _linkedSfIds = new Set([{% for sf in item.linked_share_files if item and item.linked_share_files %}{{ sf.id }},{% endfor %}]);
-
 document.getElementById('shareFilePickerModal').addEventListener('show.bs.modal', function() {
-    const current = new Set();
-    document.querySelectorAll('input[name="share_file_ids[]"]').forEach(inp => current.add(parseInt(inp.value)));
-    document.querySelectorAll('.sf-picker-card').forEach(card => card.classList.remove('border-warning', 'bg-warning', 'bg-opacity-25'));
-    current.forEach(id => {
-        const card = document.getElementById('sfpcard_' + id);
-        if (card) card.classList.add('border-warning', 'bg-warning', 'bg-opacity-25');
-    });
+    syncPickerState();
 });
 
-function toggleShareFilePick(el) {
-    const id = parseInt(el.dataset.sfId);
-    const name = el.dataset.sfName;
-    const isImage = el.dataset.sfImage === 'true';
-    const imgUrl = el.dataset.sfUrl;
+function syncPickerState() {
+    const selected = new Set();
+    document.querySelectorAll('input[name="share_file_ids[]"]').forEach(inp => selected.add(parseInt(inp.value)));
+
+    document.querySelectorAll('.sf-picker-card').forEach(card => {
+        const id = parseInt(card.dataset.sfId);
+        setCardSelected(card, selected.has(id));
+    });
+    document.querySelectorAll('.sf-picker-row').forEach(row => {
+        const id = parseInt(row.dataset.sfId);
+        setRowSelected(row, selected.has(id));
+    });
+    updateSfCount();
+}
+
+function setCardSelected(card, sel) {
+    const icon = card.querySelector('.sf-check-icon');
+    if (sel) {
+        card.classList.add('border-success', 'border-2');
+        if (icon) icon.classList.remove('d-none');
+    } else {
+        card.classList.remove('border-success', 'border-2');
+        if (icon) icon.classList.add('d-none');
+    }
+}
+
+function setRowSelected(row, sel) {
+    const checkIcon = row.querySelector('.sf-check-icon');
+    const uncheckIcon = row.querySelector('.sf-uncheck-icon');
+    if (sel) {
+        row.classList.add('table-success');
+        if (checkIcon) checkIcon.classList.remove('d-none');
+        if (uncheckIcon) uncheckIcon.classList.add('d-none');
+    } else {
+        row.classList.remove('table-success');
+        if (checkIcon) checkIcon.classList.add('d-none');
+        if (uncheckIcon) uncheckIcon.classList.remove('d-none');
+    }
+}
+
+function updateSfCount() {
+    const n = document.querySelectorAll('input[name="share_file_ids[]"]').length;
+    const el = document.getElementById('sfSelectedCount');
+    if (el) el.textContent = n + ' selected';
+}
+
+function toggleShareFilePick(card) {
+    const id = parseInt(card.dataset.sfId);
+    const name = card.dataset.sfName;
+    const isImage = card.dataset.sfImage === 'true';
+    const imgUrl = card.dataset.sfUrl;
     if (document.getElementById('sfhid_' + id)) {
-        el.classList.remove('border-warning', 'bg-warning', 'bg-opacity-25');
+        setCardSelected(card, false);
+        const row = document.querySelector('.sf-picker-row[data-sf-id="' + id + '"]');
+        if (row) setRowSelected(row, false);
         removeShareFile(id);
     } else {
-        el.classList.add('border-warning', 'bg-warning', 'bg-opacity-25');
+        setCardSelected(card, true);
+        const row = document.querySelector('.sf-picker-row[data-sf-id="' + id + '"]');
+        if (row) setRowSelected(row, true);
+        addShareFileChip(id, name, isImage, imgUrl);
+    }
+}
+
+function toggleShareFilePickRow(row) {
+    const id = parseInt(row.dataset.sfId);
+    const name = row.dataset.sfName;
+    const isImage = row.dataset.sfImage === 'true';
+    const imgUrl = row.dataset.sfUrl;
+    if (document.getElementById('sfhid_' + id)) {
+        setRowSelected(row, false);
+        const card = document.getElementById('sfpcard_' + id);
+        if (card) setCardSelected(card, false);
+        removeShareFile(id);
+    } else {
+        setRowSelected(row, true);
+        const card = document.getElementById('sfpcard_' + id);
+        if (card) setCardSelected(card, true);
         addShareFileChip(id, name, isImage, imgUrl);
     }
 }
@@ -4194,13 +4335,17 @@ function addShareFileChip(id, name, isImage, imgUrl) {
         `<button type="button" class="position-absolute top-0 end-0 btn btn-danger btn-sm p-0" style="width:18px;height:18px;font-size:0.6rem;line-height:1;" onclick="removeShareFile(${id})">×</button>` +
         `<input type="hidden" name="share_file_ids[]" value="${id}" id="sfhid_${id}">`;
     container.appendChild(div);
+    updateSfCount();
 }
 
 function removeShareFile(id) {
     const chip = document.getElementById('sf_chip_' + id);
     if (chip) chip.remove();
     const card = document.getElementById('sfpcard_' + id);
-    if (card) card.classList.remove('border-warning', 'bg-warning', 'bg-opacity-25');
+    if (card) setCardSelected(card, false);
+    const row = document.querySelector('.sf-picker-row[data-sf-id="' + id + '"]');
+    if (row) setRowSelected(row, false);
+    updateSfCount();
 }
 
 function filterSharePicker(query) {
@@ -4208,6 +4353,24 @@ function filterSharePicker(query) {
     document.querySelectorAll('.sf-picker-item').forEach(el => {
         el.style.display = el.dataset.name.includes(q) ? '' : 'none';
     });
+}
+
+function setSfView(view) {
+    const cardView = document.getElementById('sfPickerCardView');
+    const listView = document.getElementById('sfPickerListView');
+    const btnCard = document.getElementById('sfViewCard');
+    const btnList = document.getElementById('sfViewList');
+    if (view === 'card') {
+        cardView.classList.remove('d-none');
+        listView.classList.add('d-none');
+        btnCard.classList.add('active');
+        btnList.classList.remove('active');
+    } else {
+        cardView.classList.add('d-none');
+        listView.classList.remove('d-none');
+        btnCard.classList.remove('active');
+        btnList.classList.add('active');
+    }
 }
 </script>
 {% endif %}
