@@ -84,7 +84,7 @@ class DataExporter:
     @staticmethod
     def export_locations():
         return {'locations': [
-            {'name': l.name, 'info': l.info, 'description': l.description, 'color': l.color}
+            {'name': l.name, 'info': l.info or '', 'description': l.description or '', 'color': l.color or '#6c757d'}
             for l in Location.query.all()
         ]}
 
@@ -93,7 +93,7 @@ class DataExporter:
         return {'racks': [
             {
                 'name': r.name,
-                'description': r.description,
+                'description': r.description or '',
                 'location_name': r.physical_location.name if r.physical_location else None,
                 'color': r.color,
                 'rows': r.rows,
@@ -107,21 +107,21 @@ class DataExporter:
     @staticmethod
     def export_categories():
         return {'categories': [
-            {'name': c.name, 'description': c.description}
+            {'name': c.name, 'description': c.description or '', 'color': c.color or '#6c757d'}
             for c in Category.query.all()
         ]}
 
     @staticmethod
     def export_footprints():
         return {'footprints': [
-            {'name': f.name, 'description': f.description}
+            {'name': f.name, 'description': f.description or '', 'color': f.color or '#6c757d'}
             for f in Footprint.query.all()
         ]}
 
     @staticmethod
     def export_tags():
         return {'tags': [
-            {'name': t.name, 'color': t.color}
+            {'name': t.name, 'description': t.description or '', 'color': t.color or '#6c757d'}
             for t in Tag.query.all()
         ]}
 
@@ -369,7 +369,7 @@ class DataImporter:
                 name = ld.get('name', '').strip()
                 if not name:
                     continue
-                loc = Location(name=name, info=ld.get('info', ''), description=ld.get('description', ''), color=ld.get('color', '#6c757d'))
+                loc = Location(name=name, info=ld.get('info') or '', description=ld.get('description') or '', color=ld.get('color') or '#6c757d')
                 db.session.add(loc)
                 imported += 1
             except Exception as e:
@@ -390,16 +390,16 @@ class DataImporter:
                 if not name:
                     continue
                 location_id = None
-                loc_name = rd.get('location_name', '').strip()
+                loc_name = (rd.get('location_name') or '').strip()
                 if loc_name:
                     loc = Location.query.filter_by(name=loc_name).first()
                     if loc:
                         location_id = loc.id
                 rack = Rack(
                     name=name,
-                    description=rd.get('description', ''),
+                    description=rd.get('description') or '',
                     location_id=location_id,
-                    color=rd.get('color', '#6c757d'),
+                    color=rd.get('color') or '#6c757d',
                     rows=rd.get('rows', 5),
                     cols=rd.get('cols', 5),
                     unavailable_drawers=rd.get('unavailable_drawers', '[]'),
@@ -427,7 +427,7 @@ class DataImporter:
                 if Category.query.filter_by(name=name).first():
                     skipped += 1
                 else:
-                    db.session.add(Category(name=name, description=cd.get('description', '')))
+                    db.session.add(Category(name=name, description=cd.get('description') or '', color=cd.get('color') or '#6c757d'))
                     imported += 1
             except Exception as e:
                 errors.append(f"Category '{cd.get('name', '?')}': {str(e)[:50]}")
@@ -449,7 +449,7 @@ class DataImporter:
                 if Footprint.query.filter_by(name=name).first():
                     skipped += 1
                 else:
-                    db.session.add(Footprint(name=name, description=fd.get('description', '')))
+                    db.session.add(Footprint(name=name, description=fd.get('description') or '', color=fd.get('color') or '#6c757d'))
                     imported += 1
             except Exception as e:
                 errors.append(f"Footprint '{fd.get('name', '?')}': {str(e)[:50]}")
@@ -471,7 +471,7 @@ class DataImporter:
                 if Tag.query.filter_by(name=name).first():
                     skipped += 1
                 else:
-                    db.session.add(Tag(name=name, color=td.get('color', '#6c757d')))
+                    db.session.add(Tag(name=name, description=td.get('description') or '', color=td.get('color') or '#6c757d'))
                     imported += 1
             except Exception as e:
                 errors.append(f"Tag '{td.get('name', '?')}': {str(e)[:50]}")
@@ -493,7 +493,7 @@ class DataImporter:
                 if ProjectCategory.query.filter_by(name=name).first():
                     skipped += 1
                 else:
-                    db.session.add(ProjectCategory(name=name, description=cd.get('description', ''), color=cd.get('color', '#6c757d')))
+                    db.session.add(ProjectCategory(name=name, description=cd.get('description') or '', color=cd.get('color') or '#6c757d'))
                     imported += 1
             except Exception as e:
                 errors.append(f"Project category '{cd.get('name', '?')}': {str(e)[:50]}")
@@ -515,7 +515,7 @@ class DataImporter:
                 if ProjectTag.query.filter_by(name=name).first():
                     skipped += 1
                 else:
-                    db.session.add(ProjectTag(name=name, description=td.get('description', ''), color=td.get('color', '#6c757d')))
+                    db.session.add(ProjectTag(name=name, description=td.get('description') or '', color=td.get('color') or '#6c757d'))
                     imported += 1
             except Exception as e:
                 errors.append(f"Project tag '{td.get('name', '?')}': {str(e)[:50]}")
@@ -537,7 +537,7 @@ class DataImporter:
                 if ProjectStatus.query.filter_by(name=name).first():
                     skipped += 1
                 else:
-                    db.session.add(ProjectStatus(name=name, description=sd.get('description', ''), color=sd.get('color', '#6c757d')))
+                    db.session.add(ProjectStatus(name=name, description=sd.get('description') or '', color=sd.get('color') or '#6c757d'))
                     imported += 1
             except Exception as e:
                 errors.append(f"Project status '{sd.get('name', '?')}': {str(e)[:50]}")
