@@ -583,7 +583,7 @@ class DataImporter:
                 if not name:
                     continue
                 organization_id = None
-                org_name = pd.get('organization_name', '').strip()
+                org_name = (pd.get('organization_name') or '').strip()
                 if org_name:
                     org = ContactOrganization.query.filter_by(name=org_name).first()
                     if org:

@@ -148,15 +148,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const hex = document.getElementById(hexId);
         const swatch = document.getElementById(swatchId);
         if (!picker || !hex) return;
-        function applyColor(val) {
-            if (/^#[0-9a-fA-F]{6}$/.test(val)) {
-                picker.value = val;
-                hex.value = val;
-                if (swatch) swatch.style.background = val;
-            }
-        }
-        picker.addEventListener('input', () => applyColor(picker.value));
-        hex.addEventListener('input', () => applyColor(hex.value));
+        picker.addEventListener('input', function() {
+            hex.value = this.value;
+            if (swatch) swatch.style.background = this.value;
+        });
+        hex.addEventListener('input', function() {
+            const val = this.value.startsWith('#') ? this.value : '#' + this.value;
+            if (swatch) swatch.style.background = val;
+            if (/^#[0-9a-fA-F]{6}$/.test(val)) picker.value = val;
+        });
+        hex.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); }
+        });
     }
     initColorPicker('cp_main', 'ch_main', 'cs_main');
 });
