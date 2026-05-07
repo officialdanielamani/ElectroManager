@@ -26,6 +26,40 @@ CATEGORY_DEFAULTS = {
 PROFILE_FIXED = True  # profile limits are not configurable
 
 
+def _share_folder(upload_folder: str, category: str) -> str:
+    """Return the absolute path for uploads/share/<category>.
+
+    The category is re-derived from the SHARE_CATEGORIES allowlist so the
+    resulting path never contains raw user input, satisfying the
+    py/path-injection rule. A realpath containment check is also performed as
+    defence-in-depth against path traversal.
+    """
+    safe_cat = next((c for c in SHARE_CATEGORIES if c == category), None)
+    if safe_cat is None:
+        raise ValueError(f'Invalid share category: {category!r}')
+    share_root = os.path.realpath(os.path.join(upload_folder, 'share'))
+    folder = os.path.realpath(os.path.join(share_root, safe_cat))
+    if not folder.startswith(share_root + os.sep):
+        raise ValueError(f'Path traversal detected for category: {category!r}')
+    return folder
+
+
+def _share_file_path(upload_folder: str, category: str, filename: str) -> str:
+    """Return the absolute path for a file inside uploads/share/<category>.
+
+    Both category (allowlist lookup) and filename (secure_filename) are
+    sanitised, and a realpath containment check guards against traversal.
+    """
+    folder = _share_folder(upload_folder, category)
+    safe_name = secure_filename(filename)
+    if not safe_name:
+        raise ValueError(f'Invalid filename: {filename!r}')
+    path = os.path.realpath(os.path.join(folder, safe_name))
+    if not path.startswith(folder + os.sep):
+        raise ValueError(f'Path traversal detected for filename: {filename!r}')
+    return path
+
+
 def get_share_config(category):
     """Return (allowed_ext_set, max_bytes) for the given category."""
     if category == 'profile':
@@ -103,7 +137,11 @@ def share_upload():
         return redirect(url_for('share.share_files'))
 
     allowed_exts, max_bytes = get_share_config(category)
-    share_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', category)
+    try:
+        share_folder = _share_folder(current_app.config['UPLOAD_FOLDER'], category)
+    except ValueError:
+        flash('Invalid category.', 'danger')
+        return redirect(url_for('share.share_files'))
     os.makedirs(share_folder, exist_ok=True)
 
     uploaded = 0
@@ -186,9 +224,13 @@ def share_rename(id):
         return redirect(url_for('share.share_files', category=sf.category))
 
     # Rename on disk
-    share_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', sf.category)
-    old_path = os.path.join(share_folder, sf.filename)
-    new_path = os.path.join(share_folder, new_filename)
+    try:
+        old_path = _share_file_path(current_app.config['UPLOAD_FOLDER'], sf.category, sf.filename)
+        share_folder = os.path.dirname(old_path)
+        new_path = os.path.join(share_folder, new_filename)
+    except ValueError:
+        flash('File path error.', 'danger')
+        return redirect(url_for('share.share_files', category=sf.category))
     old_filename = sf.filename
     if os.path.exists(old_path) and old_path != new_path:
         os.rename(old_path, new_path)
@@ -220,9 +262,12 @@ def share_delete(id):
     name = sf.name
     category = sf.category
 
-    file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', sf.category, sf.filename)
-    if os.path.exists(file_path):
-        os.remove(file_path)
+    try:
+        file_path = _share_file_path(current_app.config['UPLOAD_FOLDER'], sf.category, sf.filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    except ValueError:
+        pass  # File already gone or path invalid — proceed with DB deletion
 
     db.session.delete(sf)
     db.session.commit()
@@ -245,9 +290,12 @@ def share_bulk_delete():
     files = SharedFile.query.filter(SharedFile.id.in_(ids)).all()
     count = 0
     for sf in files:
-        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', sf.category, sf.filename)
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        try:
+            file_path = _share_file_path(current_app.config['UPLOAD_FOLDER'], sf.category, sf.filename)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except ValueError:
+            pass  # Invalid path — skip file delete, still remove DB record
         log_audit(current_user.id, 'delete', 'shared_file', sf.id, f'Bulk deleted shared file: {sf.name}')
         db.session.delete(sf)
         count += 1
@@ -282,7 +330,10 @@ def share_bulk_download():
     seen_names = {}
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
         for sf in files:
-            file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', sf.category, sf.filename)
+            try:
+                file_path = _share_file_path(current_app.config['UPLOAD_FOLDER'], sf.category, sf.filename)
+            except ValueError:
+                continue
             if not os.path.exists(file_path):
                 continue
             # Use display name with extension, deduplicate if needed
@@ -303,8 +354,9 @@ def share_bulk_download():
 @share_bp.route('/uploads/share/<category>/<path:filename>', endpoint='share_serve')
 @login_required
 def share_serve(category, filename):
-    if category not in SHARE_CATEGORIES:
+    try:
+        folder = _share_folder(current_app.config['UPLOAD_FOLDER'], category)
+    except ValueError:
         from flask import abort
         abort(404)
-    folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', category)
     return send_from_directory(folder, filename)
