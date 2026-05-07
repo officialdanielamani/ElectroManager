@@ -434,6 +434,8 @@ def item_edit(uuid):
         if perms['can_edit_advance']:
             item.description = form.description.data
             item.datasheet_urls = form.datasheet_urls.data
+            # Thumbnail
+            item.thumbnail = request.form.get('thumbnail', '').strip() or None
             # Linked share files
             sf_ids = [int(i) for i in request.form.getlist('share_file_ids[]') if i]
             item.linked_share_files = SharedFile.query.filter(SharedFile.id.in_(sf_ids)).all() if sf_ids else []

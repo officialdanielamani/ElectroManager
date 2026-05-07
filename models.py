@@ -362,6 +362,7 @@ class Item(db.Model):
     
     datasheet_urls = db.Column(db.Text)
     no_stock_warning = db.Column(db.Boolean, default=True)
+    thumbnail = db.Column(db.String(300))
 
     sn_tracking_enabled = db.Column(db.Boolean, default=False)
     

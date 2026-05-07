@@ -55,6 +55,38 @@
                         </div>
                     </div>
 
+                    <!-- Thumbnail -->
+                    {% if item %}
+                    <div class="mb-2 d-flex align-items-center gap-3">
+                        <div>
+                            <label class="form-label form-label-sm mb-1">Thumbnail</label>
+                            <div class="d-flex gap-2 align-items-center">
+                                <div id="thumbPreview" style="width:64px;height:64px;border:1px solid #dee2e6;border-radius:6px;overflow:hidden;background:#f8f9fa;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    {% if item.thumbnail %}
+                                        {% if item.thumbnail.startswith('share:') %}
+                                        <img src="{{ url_for('share.share_serve', category='item', filename=item.thumbnail[6:]) }}" style="width:100%;height:100%;object-fit:cover;">
+                                        {% else %}
+                                        <img src="{{ url_for('uploaded_file', filename=item.thumbnail) }}" style="width:100%;height:100%;object-fit:cover;">
+                                        {% endif %}
+                                    {% else %}
+                                    <i class="bi bi-image text-muted" style="font-size:1.5rem;"></i>
+                                    {% endif %}
+                                </div>
+                                <div class="d-flex flex-column gap-1">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                                            data-bs-toggle="modal" data-bs-target="#thumbnailPickerModal">
+                                        <i class="bi bi-image"></i> Change
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearThumbnail()">
+                                        <i class="bi bi-x"></i> Auto
+                                    </button>
+                                </div>
+                            </div>
+                            <input type="hidden" name="thumbnail" id="thumbnailValue" value="{{ item.thumbnail or '' }}">
+                        </div>
+                    </div>
+                    {% endif %}
+
                     <div class="row mb-2">
                         <div class="col-md-6">
                             <label class="form-label form-label-sm">Type / Model</label>
@@ -567,7 +599,7 @@
                     {% if item and share_files_item is defined %}
                     <div class="mb-3 border-top pt-3">
                         <label class="form-label form-label-sm">
-                            <i class="bi bi-folder-fill text-warning"></i> Share Files
+                            <i class="bi bi-folder-fill"></i> Share Files
                         </label>
 
                         <!-- Currently linked share files -->
@@ -4096,6 +4128,126 @@ function submitSnBulkLend(clearMode) {
         </div>
     </div>
 </div>
+
+<!-- ===== Thumbnail Picker Modal ===== -->
+{% if item %}
+<div class="modal fade" id="thumbnailPickerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-image"></i> Choose Thumbnail</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Tabs -->
+                <ul class="nav nav-tabs mb-3" id="thumbTabs">
+                    <li class="nav-item">
+                        <button class="nav-link active" onclick="showThumbTab('item', this)">
+                            <i class="bi bi-paperclip"></i> Item Images
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" onclick="showThumbTab('share', this)">
+                            <i class="bi bi-folder-fill"></i> Share Images
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Item Images tab -->
+                <div id="thumbTabItem">
+                    {% set item_images = item.attachments | selectattr('file_type', 'in', ['png','jpg','jpeg','gif','webp']) | list %}
+                    {% if item_images %}
+                    <div class="row row-cols-3 row-cols-sm-4 row-cols-md-5 g-2">
+                        {% for att in item_images %}
+                        <div class="col">
+                            <div class="thumb-option border rounded overflow-hidden"
+                                 data-value="{{ att.file_path }}"
+                                 data-url="{{ url_for('uploaded_file', filename=att.file_path) }}"
+                                 style="cursor:pointer; aspect-ratio:1/1;"
+                                 onclick="selectThumbnail(this)">
+                                <img src="{{ url_for('uploaded_file', filename=att.file_path) }}"
+                                     alt="{{ att.original_filename }}"
+                                     style="width:100%;height:100%;object-fit:cover;">
+                            </div>
+                            <div class="text-truncate mt-1" style="font-size:0.7rem;">{{ att.original_filename }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-3">No images uploaded for this item yet.</p>
+                    {% endif %}
+                </div>
+
+                <!-- Share Images tab -->
+                <div id="thumbTabShare" class="d-none">
+                    {% if share_files_item is defined %}
+                    {% set share_images = share_files_item | selectattr('is_image') | list %}
+                    {% if share_images %}
+                    <div class="row row-cols-3 row-cols-sm-4 row-cols-md-5 g-2">
+                        {% for sf in share_images %}
+                        <div class="col">
+                            <div class="thumb-option border rounded overflow-hidden"
+                                 data-value="share:{{ sf.filename }}"
+                                 data-url="{{ url_for('share.share_serve', category='item', filename=sf.filename) }}"
+                                 style="cursor:pointer; aspect-ratio:1/1;"
+                                 onclick="selectThumbnail(this)">
+                                <img src="{{ url_for('share.share_serve', category='item', filename=sf.filename) }}"
+                                     alt="{{ sf.name }}"
+                                     style="width:100%;height:100%;object-fit:cover;">
+                            </div>
+                            <div class="text-truncate mt-1" style="font-size:0.7rem;">{{ sf.name }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-3">No images in Share / Item category yet.</p>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="modal-footer justify-content-between">
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearThumbnail(); bootstrap.Modal.getInstance(document.getElementById('thumbnailPickerModal')).hide();">
+                    <i class="bi bi-x-circle"></i> Use Auto (first image)
+                </button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('thumbnailPickerModal').addEventListener('show.bs.modal', function() {
+    const current = document.getElementById('thumbnailValue').value;
+    document.querySelectorAll('.thumb-option').forEach(el => {
+        el.classList.toggle('border-success', el.dataset.value === current);
+        el.classList.toggle('border-3', el.dataset.value === current);
+    });
+});
+
+function showThumbTab(tab, btn) {
+    document.getElementById('thumbTabItem').classList.toggle('d-none', tab !== 'item');
+    document.getElementById('thumbTabShare').classList.toggle('d-none', tab !== 'share');
+    document.querySelectorAll('#thumbTabs .nav-link').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+}
+
+function selectThumbnail(el) {
+    document.getElementById('thumbnailValue').value = el.dataset.value;
+    const preview = document.getElementById('thumbPreview');
+    preview.innerHTML = `<img src="${el.dataset.url}" style="width:100%;height:100%;object-fit:cover;">`;
+    document.querySelectorAll('.thumb-option').forEach(o => {
+        o.classList.remove('border-success', 'border-3');
+    });
+    el.classList.add('border-success', 'border-3');
+}
+
+function clearThumbnail() {
+    document.getElementById('thumbnailValue').value = '';
+    document.getElementById('thumbPreview').innerHTML = '<i class="bi bi-image text-muted" style="font-size:1.5rem;"></i>';
+    document.querySelectorAll('.thumb-option').forEach(o => o.classList.remove('border-success', 'border-3'));
+}
+</script>
+{% endif %}
 
 <!-- ===== Share File Picker Modal ===== -->
 {% if share_files_item is defined %}
