@@ -166,9 +166,10 @@ def share_upload():
         safe_base = secure_filename(file.filename)
         stored_name = f"{uuid.uuid4().hex}_{safe_base}"
         file.save(os.path.join(share_folder, stored_name))
+        name_base = safe_base.rsplit('.', 1)[0] if '.' in safe_base else safe_base
 
         sf = SharedFile(
-            name=safe_base,
+            name=name_base,
             filename=stored_name,
             category=category,
             file_size=file_size,
@@ -236,7 +237,7 @@ def share_rename(id):
         os.rename(old_path, new_path)
 
     sf.filename = new_filename
-    sf.name = new_name_with_ext
+    sf.name = new_filename.rsplit('.', 1)[0] if '.' in new_filename else new_filename
 
     # Update any profile_photo references that pointed to the old filename
     old_ref = f'share/{old_filename}'

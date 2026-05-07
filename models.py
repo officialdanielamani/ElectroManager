@@ -374,7 +374,7 @@ class Item(db.Model):
     
     attachments = db.relationship('Attachment', backref='item', lazy=True, cascade='all, delete-orphan')
     batches = db.relationship('ItemBatch', backref='item', lazy=True, cascade='all, delete-orphan', order_by='ItemBatch.batch_number')
-    linked_share_files = db.relationship('SharedFile', secondary='item_share_files', lazy='subquery', backref=db.backref('linked_items', lazy=True))
+    linked_share_files = db.relationship('SharedFile', secondary=item_share_files, lazy='subquery', backref=db.backref('linked_items', lazy=True))
     
     def __init__(self, **kwargs):
         super(Item, self).__init__(**kwargs)

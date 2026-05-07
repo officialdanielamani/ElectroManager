@@ -4114,11 +4114,15 @@ function submitSnBulkLend(clearMode) {
                 {% if share_files_item %}
                 <div class="row g-2" id="sfPickerGrid">
                     {% for sf in share_files_item %}
-                    <div class="col-4 col-sm-3 col-md-2 sf-picker-item" data-name="{{ sf.name|lower }}">
+                    <div class="col-4 col-sm-3 col-md-2 sf-picker-item" data-name="{{ sf.name|lower }}.{{ sf.ext }}">
                         <div class="border rounded p-1 text-center h-100 sf-picker-card"
                              id="sfpcard_{{ sf.id }}"
+                             data-sf-id="{{ sf.id }}"
+                             data-sf-name="{{ sf.name }}"
+                             data-sf-image="{{ 'true' if sf.is_image else 'false' }}"
+                             data-sf-url="{{ url_for('share.share_serve', category='item', filename=sf.filename) }}"
                              style="cursor:pointer;"
-                             onclick="toggleShareFilePick({{ sf.id }}, {{ sf.name|tojson }}, {{ 'true' if sf.is_image else 'false' }}, '{{ url_for('share.share_serve', category='item', filename=sf.filename) }}')">
+                             onclick="toggleShareFilePick(this)">
                             <div style="width:100%; aspect-ratio:1/1; overflow:hidden; border-radius:4px; background:#f8f9fa; display:flex; align-items:center; justify-content:center;">
                                 {% if sf.is_image %}
                                 <img src="{{ url_for('share.share_serve', category='item', filename=sf.filename) }}"
@@ -4155,20 +4159,23 @@ const _linkedSfIds = new Set([{% for sf in item.linked_share_files if item and i
 document.getElementById('shareFilePickerModal').addEventListener('show.bs.modal', function() {
     const current = new Set();
     document.querySelectorAll('input[name="share_file_ids[]"]').forEach(inp => current.add(parseInt(inp.value)));
-    document.querySelectorAll('.sf-picker-card').forEach(card => card.classList.remove('border-warning', 'bg-warning-subtle'));
+    document.querySelectorAll('.sf-picker-card').forEach(card => card.classList.remove('border-warning', 'bg-warning', 'bg-opacity-25'));
     current.forEach(id => {
         const card = document.getElementById('sfpcard_' + id);
-        if (card) card.classList.add('border-warning', 'bg-warning-subtle');
+        if (card) card.classList.add('border-warning', 'bg-warning', 'bg-opacity-25');
     });
 });
 
-function toggleShareFilePick(id, name, isImage, imgUrl) {
-    const card = document.getElementById('sfpcard_' + id);
+function toggleShareFilePick(el) {
+    const id = parseInt(el.dataset.sfId);
+    const name = el.dataset.sfName;
+    const isImage = el.dataset.sfImage === 'true';
+    const imgUrl = el.dataset.sfUrl;
     if (document.getElementById('sfhid_' + id)) {
-        card.classList.remove('border-warning', 'bg-warning-subtle');
+        el.classList.remove('border-warning', 'bg-warning', 'bg-opacity-25');
         removeShareFile(id);
     } else {
-        card.classList.add('border-warning', 'bg-warning-subtle');
+        el.classList.add('border-warning', 'bg-warning', 'bg-opacity-25');
         addShareFileChip(id, name, isImage, imgUrl);
     }
 }
@@ -4193,7 +4200,7 @@ function removeShareFile(id) {
     const chip = document.getElementById('sf_chip_' + id);
     if (chip) chip.remove();
     const card = document.getElementById('sfpcard_' + id);
-    if (card) card.classList.remove('border-warning', 'bg-warning-subtle');
+    if (card) card.classList.remove('border-warning', 'bg-warning', 'bg-opacity-25');
 }
 
 function filterSharePicker(query) {
