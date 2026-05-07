@@ -7,7 +7,7 @@ from models import (db, User, Item, ItemBatch, BatchSerialNumber, Setting,
                     Project, ProjectCategory, ProjectTag, ProjectStatus,
                     ProjectPerson, ProjectGroup, ProjectGroupMember,
                     ContactPerson, ContactOrganization,
-                    ProjectBOMItem, ProjectAttachment, ProjectURL)
+                    ProjectBOMItem, ProjectAttachment, ProjectURL, SharedFile)
 from utils import log_audit, permission_required, allowed_file
 from werkzeug.utils import secure_filename
 from datetime import datetime, timezone
@@ -328,6 +328,9 @@ def project_edit(project_id):
         date_end = request.form.get('date_end')
         project.date_end = datetime.strptime(date_end, '%Y-%m-%d').date() if date_end else None
 
+        sf_ids = [int(i) for i in request.form.getlist('share_file_ids[]') if i]
+        project.linked_share_files = SharedFile.query.filter(SharedFile.id.in_(sf_ids)).all() if sf_ids else []
+
         db.session.commit()
         log_audit(current_user.id, 'update', 'project', project.id, f'Updated project: {project.name}')
         flash(f'Project "{project.name}" updated!', 'success')
@@ -338,6 +341,7 @@ def project_edit(project_id):
                            users=users, contact_persons=contact_persons, contact_orgs=contact_orgs,
                            bom_items=ProjectBOMItem.query.filter_by(project_id=project.id).all(),
                            attachments={atype: ProjectAttachment.query.filter_by(project_id=project.id, attachment_type=atype).all() for atype in ['picture', 'document', 'schematic', '2d_design', '3d_design', 'program']},
+                           share_files_project=SharedFile.query.filter_by(category='project').order_by(SharedFile.name).all(),
                            currency=Setting.get('currency', 'USD'),
                            currency_decimal=int(Setting.get('currency_decimal_places', '2')))
 

@@ -331,6 +331,12 @@ item_share_files = db.Table(
     db.Column('shared_file_id', db.Integer, db.ForeignKey('shared_files.id'), primary_key=True),
 )
 
+project_share_files = db.Table(
+    'project_share_files',
+    db.Column('project_id', db.Integer, db.ForeignKey('projects.id'), primary_key=True),
+    db.Column('shared_file_id', db.Integer, db.ForeignKey('shared_files.id'), primary_key=True),
+)
+
 
 class Item(db.Model):
     __tablename__ = 'items'
@@ -1215,6 +1221,7 @@ class Project(db.Model):
     bom_items = db.relationship('ProjectBOMItem', backref='project', lazy=True, cascade='all, delete-orphan')
     attachments = db.relationship('ProjectAttachment', backref='project', lazy=True, cascade='all, delete-orphan')
     urls = db.relationship('ProjectURL', backref='project', lazy=True, cascade='all, delete-orphan')
+    linked_share_files = db.relationship('SharedFile', secondary=project_share_files, lazy='subquery', backref=db.backref('linked_projects', lazy=True))
     def __init__(self, **kwargs):
         super(Project, self).__init__(**kwargs)
         if not self.project_id:

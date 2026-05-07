@@ -330,6 +330,41 @@
             </div>
         </div>
 
+        <!-- Share Files -->
+        {% if share_files_project is defined %}
+        <div class="card mt-3">
+            <div class="card-header"><h5 class="mb-0"><i class="bi bi-folder-fill text-warning"></i> Share Files</h5></div>
+            <div class="card-body">
+                <div id="linkedShareFiles" class="d-flex flex-wrap gap-2 mb-2">
+                    {% for sf in project.linked_share_files %}
+                    <div class="position-relative border rounded p-1 bg-light d-flex align-items-center justify-content-center"
+                         id="sf_chip_{{ sf.id }}"
+                         style="width:80px; height:80px; overflow:hidden; flex-shrink:0;">
+                        {% if sf.is_image %}
+                        <img src="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}"
+                             alt="{{ sf.name }}"
+                             style="width:100%; height:100%; object-fit:cover; border-radius:4px;">
+                        {% else %}
+                        <div class="text-center">
+                            <i class="bi bi-file-earmark text-muted" style="font-size:1.5rem;"></i>
+                            <div class="text-truncate" style="font-size:0.65rem; max-width:72px;">{{ sf.name }}</div>
+                        </div>
+                        {% endif %}
+                        <button type="button" class="position-absolute top-0 end-0 btn btn-danger btn-sm p-0"
+                                style="width:18px; height:18px; font-size:0.6rem; line-height:1;"
+                                onclick="removeShareFile({{ sf.id }})">×</button>
+                        <input type="hidden" name="share_file_ids[]" value="{{ sf.id }}" id="sfhid_{{ sf.id }}">
+                    </div>
+                    {% endfor %}
+                </div>
+                <button type="button" class="btn btn-warning btn-sm"
+                        data-bs-toggle="modal" data-bs-target="#shareFilePickerModal">
+                    <i class="bi bi-folder2-open"></i> Browse Share Files
+                </button>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- BOM -->
         <div class="card mt-3">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -689,4 +724,246 @@ document.addEventListener('click', function(e) {
 });
 </script>
 {% endif %}
+
+<!-- ===== Share File Picker Modal (Project) ===== -->
+{% if share_files_project is defined %}
+<div class="modal fade" id="shareFilePickerModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-folder-fill text-warning"></i> Select Share Files</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex gap-2 align-items-center mb-3 flex-wrap">
+                    <div class="input-group input-group-sm" style="max-width:280px;">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="sfPickerSearch"
+                               placeholder="Search files…" oninput="filterSharePicker(this.value)">
+                        <button class="btn btn-outline-secondary" type="button"
+                                onclick="document.getElementById('sfPickerSearch').value=''; filterSharePicker('');">×</button>
+                    </div>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary active" id="sfViewCard"
+                                onclick="setSfView('card')" title="Card view">
+                            <i class="bi bi-grid-3x3-gap"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="sfViewList"
+                                onclick="setSfView('list')" title="List view">
+                            <i class="bi bi-list-ul"></i>
+                        </button>
+                    </div>
+                    <span class="text-muted small ms-auto" id="sfSelectedCount">0 selected</span>
+                </div>
+
+                {% if share_files_project %}
+                <div id="sfPickerCardView" class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3">
+                    {% for sf in share_files_project %}
+                    <div class="col sf-picker-item" data-name="{{ sf.name|lower }}.{{ sf.ext }}">
+                        <div class="card h-100 shadow-sm position-relative sf-picker-card"
+                             id="sfpcard_{{ sf.id }}"
+                             data-sf-id="{{ sf.id }}"
+                             data-sf-name="{{ sf.name }}"
+                             data-sf-image="{{ 'true' if sf.is_image else 'false' }}"
+                             data-sf-url="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}"
+                             style="cursor:pointer;"
+                             onclick="toggleShareFilePick(this)">
+                            <div class="position-absolute top-0 start-0 p-1" style="z-index:2; pointer-events:none;">
+                                <span class="sf-check-icon d-none">
+                                    <i class="bi bi-check-circle-fill text-success" style="font-size:1.1rem; filter:drop-shadow(0 0 2px #fff);"></i>
+                                </span>
+                            </div>
+                            <div class="card-img-top d-flex align-items-center justify-content-center bg-light"
+                                 style="width:100%; aspect-ratio:1/1; overflow:hidden; pointer-events:none;">
+                                {% if sf.is_image %}
+                                <img src="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}"
+                                     alt="{{ sf.name }}" style="width:100%; height:100%; object-fit:cover;">
+                                {% else %}
+                                {% set ext = sf.ext %}
+                                {% if ext == 'pdf' %}<i class="bi bi-file-earmark-pdf text-danger" style="font-size:2.5rem;"></i>
+                                {% elif ext in ['doc','docx'] %}<i class="bi bi-file-earmark-word text-primary" style="font-size:2.5rem;"></i>
+                                {% elif ext in ['txt','md'] %}<i class="bi bi-file-earmark-text text-secondary" style="font-size:2.5rem;"></i>
+                                {% else %}<i class="bi bi-file-earmark text-muted" style="font-size:2.5rem;"></i>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                            <div class="card-body p-1" style="pointer-events:none;">
+                                <p class="card-text small fw-semibold text-truncate mb-0" title="{{ sf.name }}.{{ sf.ext }}">{{ sf.name }}</p>
+                                <small class="text-muted">{{ sf.ext|upper }} · {{ sf.size_display() }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div id="sfPickerListView" class="d-none">
+                    <table class="table table-hover align-middle table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="36"></th>
+                                <th width="44">Preview</th>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Size</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sf in share_files_project %}
+                            <tr class="sf-picker-item sf-picker-row"
+                                data-name="{{ sf.name|lower }}.{{ sf.ext }}"
+                                data-sf-id="{{ sf.id }}"
+                                data-sf-name="{{ sf.name }}"
+                                data-sf-image="{{ 'true' if sf.is_image else 'false' }}"
+                                data-sf-url="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}"
+                                style="cursor:pointer;"
+                                onclick="toggleShareFilePickRow(this)">
+                                <td>
+                                    <span class="sf-check-icon d-none"><i class="bi bi-check-circle-fill text-success"></i></span>
+                                    <span class="sf-uncheck-icon"><i class="bi bi-circle text-muted"></i></span>
+                                </td>
+                                <td>
+                                    {% if sf.is_image %}
+                                    <img src="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}"
+                                         alt="{{ sf.name }}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;">
+                                    {% else %}
+                                    {% set ext = sf.ext %}
+                                    {% if ext == 'pdf' %}<i class="bi bi-file-earmark-pdf text-danger fs-4"></i>
+                                    {% elif ext in ['doc','docx'] %}<i class="bi bi-file-earmark-word text-primary fs-4"></i>
+                                    {% elif ext in ['txt','md'] %}<i class="bi bi-file-earmark-text text-secondary fs-4"></i>
+                                    {% else %}<i class="bi bi-file-earmark text-muted fs-4"></i>
+                                    {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td><span class="fw-semibold">{{ sf.name }}</span></td>
+                                <td><span class="badge bg-secondary">{{ sf.ext|upper }}</span></td>
+                                <td><small class="text-muted">{{ sf.size_display() }}</small></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">No share files in the Project category yet.</p>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('shareFilePickerModal').addEventListener('show.bs.modal', function() {
+    syncPickerState();
+});
+
+function syncPickerState() {
+    const selected = new Set();
+    document.querySelectorAll('input[name="share_file_ids[]"]').forEach(inp => selected.add(parseInt(inp.value)));
+    document.querySelectorAll('.sf-picker-card').forEach(card => setCardSelected(card, selected.has(parseInt(card.dataset.sfId))));
+    document.querySelectorAll('.sf-picker-row').forEach(row => setRowSelected(row, selected.has(parseInt(row.dataset.sfId))));
+    updateSfCount();
+}
+
+function setCardSelected(card, sel) {
+    const icon = card.querySelector('.sf-check-icon');
+    card.classList.toggle('border-success', sel);
+    card.classList.toggle('border-2', sel);
+    if (icon) icon.classList.toggle('d-none', !sel);
+}
+
+function setRowSelected(row, sel) {
+    row.classList.toggle('table-success', sel);
+    const c = row.querySelector('.sf-check-icon');
+    const u = row.querySelector('.sf-uncheck-icon');
+    if (c) c.classList.toggle('d-none', !sel);
+    if (u) u.classList.toggle('d-none', sel);
+}
+
+function updateSfCount() {
+    const n = document.querySelectorAll('input[name="share_file_ids[]"]').length;
+    const el = document.getElementById('sfSelectedCount');
+    if (el) el.textContent = n + ' selected';
+}
+
+function toggleShareFilePick(card) {
+    const id = parseInt(card.dataset.sfId);
+    const name = card.dataset.sfName;
+    const isImage = card.dataset.sfImage === 'true';
+    const imgUrl = card.dataset.sfUrl;
+    if (document.getElementById('sfhid_' + id)) {
+        setCardSelected(card, false);
+        const row = document.querySelector('.sf-picker-row[data-sf-id="' + id + '"]');
+        if (row) setRowSelected(row, false);
+        removeShareFile(id);
+    } else {
+        setCardSelected(card, true);
+        const row = document.querySelector('.sf-picker-row[data-sf-id="' + id + '"]');
+        if (row) setRowSelected(row, true);
+        addShareFileChip(id, name, isImage, imgUrl);
+    }
+}
+
+function toggleShareFilePickRow(row) {
+    const id = parseInt(row.dataset.sfId);
+    const name = row.dataset.sfName;
+    const isImage = row.dataset.sfImage === 'true';
+    const imgUrl = row.dataset.sfUrl;
+    if (document.getElementById('sfhid_' + id)) {
+        setRowSelected(row, false);
+        const card = document.getElementById('sfpcard_' + id);
+        if (card) setCardSelected(card, false);
+        removeShareFile(id);
+    } else {
+        setRowSelected(row, true);
+        const card = document.getElementById('sfpcard_' + id);
+        if (card) setCardSelected(card, true);
+        addShareFileChip(id, name, isImage, imgUrl);
+    }
+}
+
+function addShareFileChip(id, name, isImage, imgUrl) {
+    if (document.getElementById('sf_chip_' + id)) return;
+    const container = document.getElementById('linkedShareFiles');
+    const div = document.createElement('div');
+    div.className = 'position-relative border rounded p-1 bg-light d-flex align-items-center justify-content-center';
+    div.id = 'sf_chip_' + id;
+    div.style.cssText = 'width:80px;height:80px;overflow:hidden;flex-shrink:0;';
+    const inner = isImage
+        ? `<img src="${imgUrl}" alt="${name}" style="width:100%;height:100%;object-fit:cover;border-radius:4px;">`
+        : `<div class="text-center"><i class="bi bi-file-earmark text-muted" style="font-size:1.5rem;"></i><div class="text-truncate" style="font-size:0.65rem;max-width:72px;">${name}</div></div>`;
+    div.innerHTML = inner +
+        `<button type="button" class="position-absolute top-0 end-0 btn btn-danger btn-sm p-0" style="width:18px;height:18px;font-size:0.6rem;line-height:1;" onclick="removeShareFile(${id})">×</button>` +
+        `<input type="hidden" name="share_file_ids[]" value="${id}" id="sfhid_${id}">`;
+    container.appendChild(div);
+    updateSfCount();
+}
+
+function removeShareFile(id) {
+    const chip = document.getElementById('sf_chip_' + id);
+    if (chip) chip.remove();
+    const card = document.getElementById('sfpcard_' + id);
+    if (card) setCardSelected(card, false);
+    const row = document.querySelector('.sf-picker-row[data-sf-id="' + id + '"]');
+    if (row) setRowSelected(row, false);
+    updateSfCount();
+}
+
+function filterSharePicker(query) {
+    const q = query.toLowerCase();
+    document.querySelectorAll('.sf-picker-item').forEach(el => {
+        el.style.display = el.dataset.name.includes(q) ? '' : 'none';
+    });
+}
+
+function setSfView(view) {
+    document.getElementById('sfPickerCardView').classList.toggle('d-none', view !== 'card');
+    document.getElementById('sfPickerListView').classList.toggle('d-none', view === 'card');
+    document.getElementById('sfViewCard').classList.toggle('active', view === 'card');
+    document.getElementById('sfViewList').classList.toggle('active', view !== 'card');
+}
+</script>
+{% endif %}
+
 {% endblock %}
