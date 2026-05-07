@@ -257,7 +257,7 @@
 </div></div></div>
 {% endif %}
 
-<!-- ===== Bulk Delete Confirm Modal ===== -->
+<!-- ===== Bulk Delete: File List Modal ===== -->
 {% if can_delete %}
 <div class="modal fade" id="bulkDeleteModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content border-danger">
     <div class="modal-header bg-danger text-white">
@@ -273,11 +273,46 @@
     </div>
     <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-danger" onclick="executeBulkDelete()">
+        <button type="button" class="btn btn-danger" onclick="promptBulkDeletePassword()">
             <i class="bi bi-trash"></i> Delete All Selected
         </button>
     </div>
 </div></div></div>
+
+<!-- ===== Bulk Delete: Password Confirmation Modal ===== -->
+<div class="modal fade" id="bulkDeletePasswordModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-shield-lock"></i> Confirm Your Password</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">
+                    <i class="bi bi-exclamation-triangle text-warning"></i>
+                    You are about to delete <strong id="bulkDeleteCountPw">0</strong> file(s). Please enter your password to confirm.
+                </p>
+                <div class="mb-3">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-control" id="shareDeletePassword" placeholder="Enter your password"
+                           oninput="this.classList.remove('is-invalid'); document.getElementById('sharePasswordError').style.display='none';">
+                    <div class="invalid-feedback" id="sharePasswordError" style="display:none;">
+                        Incorrect password. Please try again.
+                    </div>
+                </div>
+                <div class="alert alert-danger mb-0">
+                    <small><i class="bi bi-info-circle"></i> This action cannot be undone!</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="verifyPasswordAndDelete()">
+                    <i class="bi bi-trash"></i> Verify &amp; Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endif %}
 
 <script>
@@ -351,11 +386,56 @@ function showBulkDeleteConfirm() {
     new bootstrap.Modal(document.getElementById('bulkDeleteModal')).show();
 }
 
-function executeBulkDelete() {
+function promptBulkDeletePassword() {
     const ids = getSelectedIds();
     if (ids.length === 0) return;
-    const modal = bootstrap.Modal.getInstance(document.getElementById('bulkDeleteModal'));
-    modal.hide();
+    // Close file list modal, open password modal
+    const listModal = bootstrap.Modal.getInstance(document.getElementById('bulkDeleteModal'));
+    if (listModal) listModal.hide();
+    document.getElementById('shareDeletePassword').value = '';
+    document.getElementById('shareDeletePassword').classList.remove('is-invalid');
+    document.getElementById('sharePasswordError').style.display = 'none';
+    document.getElementById('bulkDeleteCountPw').textContent = ids.length;
+    setTimeout(() => new bootstrap.Modal(document.getElementById('bulkDeletePasswordModal')).show(), 300);
+}
+
+function verifyPasswordAndDelete() {
+    const password = document.getElementById('shareDeletePassword').value;
+    if (!password) { alert('Please enter your password.'); return; }
+    const btn = event.target;
+    const origText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Verifying...';
+    fetch('{{ url_for("auth.verify_password") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({password: password})
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+        if (data.success) {
+            const pwModal = bootstrap.Modal.getInstance(document.getElementById('bulkDeletePasswordModal'));
+            if (pwModal) pwModal.hide();
+            const ids = getSelectedIds();
+            if (confirm(`Are you sure you want to permanently delete ${ids.length} file(s)?`)) {
+                executeBulkDelete(ids);
+            }
+        } else {
+            const inp = document.getElementById('shareDeletePassword');
+            inp.classList.add('is-invalid');
+            const err = document.getElementById('sharePasswordError');
+            err.textContent = data.message || 'Incorrect password. Please try again.';
+            err.style.display = 'block';
+        }
+    })
+    .catch(() => { btn.disabled = false; btn.innerHTML = origText; alert('Network error. Please try again.'); });
+}
+
+function executeBulkDelete(ids) {
+    ids = ids || getSelectedIds();
+    if (ids.length === 0) return;
     fetch('{{ url_for("share.share_bulk_delete") }}', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},

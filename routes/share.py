@@ -8,7 +8,7 @@ import zipfile
 from flask import Blueprint, render_template, redirect, url_for, flash, request, send_from_directory, current_app, jsonify, send_file
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
-from models import db, SharedFile, Setting
+from models import db, SharedFile, Setting, User
 from utils import log_audit
 
 share_bp = Blueprint('share', __name__)
@@ -162,12 +162,50 @@ def share_rename(id):
     new_name = request.form.get('name', '').strip()
     if not new_name:
         flash('Name cannot be empty.', 'danger')
-        return redirect(url_for('share.share_files'))
+        return redirect(url_for('share.share_files', category=sf.category))
 
-    sf.name = new_name
+    # Ensure extension is preserved
+    orig_ext = sf.ext
+    if '.' not in new_name:
+        new_name_with_ext = f'{new_name}.{orig_ext}'
+    else:
+        new_name_with_ext = new_name
+    new_filename = secure_filename(new_name_with_ext)
+    if not new_filename:
+        flash('Invalid file name.', 'danger')
+        return redirect(url_for('share.share_files', category=sf.category))
+
+    # Duplicate check (same category, different record)
+    dup = SharedFile.query.filter(
+        SharedFile.category == sf.category,
+        SharedFile.filename == new_filename,
+        SharedFile.id != sf.id
+    ).first()
+    if dup:
+        flash(f'A file named "{new_filename}" already exists in {sf.category}. Choose a different name.', 'danger')
+        return redirect(url_for('share.share_files', category=sf.category))
+
+    # Rename on disk
+    share_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', sf.category)
+    old_path = os.path.join(share_folder, sf.filename)
+    new_path = os.path.join(share_folder, new_filename)
+    old_filename = sf.filename
+    if os.path.exists(old_path) and old_path != new_path:
+        os.rename(old_path, new_path)
+
+    sf.filename = new_filename
+    sf.name = new_name_with_ext
+
+    # Update any profile_photo references that pointed to the old filename
+    old_ref = f'share/{old_filename}'
+    new_ref = f'share/{new_filename}'
+    if old_ref != new_ref:
+        for u in User.query.filter_by(profile_photo=old_ref).all():
+            u.profile_photo = new_ref
+
     db.session.commit()
-    log_audit(current_user.id, 'update', 'shared_file', id, f'Renamed shared file to: {new_name}')
-    flash('File renamed.', 'success')
+    log_audit(current_user.id, 'update', 'shared_file', id, f'Renamed shared file to: {new_filename}')
+    flash(f'File renamed to "{new_filename}".', 'success')
     return redirect(url_for('share.share_files', category=sf.category))
 
 
