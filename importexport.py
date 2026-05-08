@@ -13,6 +13,7 @@ from models import (
     Location, Rack, Category, Footprint, Tag, Item,
     ProjectCategory, ProjectTag, ProjectStatus,
     ContactOrganization, ContactPerson, ContactGroup, ContactGroupMember,
+    Setting,
 )
 
 
@@ -163,6 +164,13 @@ class DataExporter:
         ]}
 
     @staticmethod
+    def export_system_settings():
+        return {'system_settings': [
+            {'key': s.key, 'value': s.value, 'description': s.description or ''}
+            for s in Setting.query.all()
+        ]}
+
+    @staticmethod
     def export_contact_groups():
         groups = []
         for g in ContactGroup.query.all():
@@ -227,6 +235,8 @@ class DataExporter:
             export_data.update(DataExporter.export_contact_organizations())
         if selections.get('contact_groups'):
             export_data.update(DataExporter.export_contact_groups())
+        if selections.get('system_settings'):
+            export_data.update(DataExporter.export_system_settings())
 
         return export_data
 
@@ -639,6 +649,25 @@ class DataImporter:
         self.results['skipped'] += skipped
         self.results['errors'].extend(errors)
 
+    def import_system_settings(self, data):
+        imported = 0
+        skipped = 0
+        errors = []
+        for sd in data.get('system_settings', []):
+            try:
+                key = sd.get('key', '').strip()
+                if not key:
+                    continue
+                Setting.set(key, sd.get('value', ''), sd.get('description', ''))
+                imported += 1
+            except Exception as e:
+                errors.append(f"Setting '{sd.get('key', '?')}': {str(e)[:50]}")
+        db.session.commit()
+        self.results['details']['system_settings'] = {'imported': imported, 'skipped': skipped}
+        self.results['imported'] += imported
+        self.results['skipped'] += skipped
+        self.results['errors'].extend(errors)
+
     def import_selective(self, data, selections):
         """
         Import selected data types.
@@ -695,5 +724,7 @@ class DataImporter:
             self.import_contact_persons(data)
         if selections.get('contact_groups'):
             self.import_contact_groups(data)
+        if selections.get('system_settings'):
+            self.import_system_settings(data)
 
         return self.results

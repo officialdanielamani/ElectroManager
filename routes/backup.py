@@ -122,6 +122,7 @@ def export_selective():
             'contact_persons': request.form.get('contact_persons') == 'on',
             'contact_organizations': request.form.get('contact_orgs') == 'on',
             'contact_groups': request.form.get('contact_groups') == 'on',
+            'system_settings': request.form.get('system_settings') == 'on',
         }
 
         if not any(v for v in selections.values()):
@@ -194,6 +195,7 @@ def import_selective():
             'contact_persons': request.form.get('contact_persons') == 'on',
             'contact_organizations': request.form.get('contact_orgs') == 'on',
             'contact_groups': request.form.get('contact_groups') == 'on',
+            'system_settings': request.form.get('system_settings') == 'on',
         }
 
         if not any(v for v in selections.values()):

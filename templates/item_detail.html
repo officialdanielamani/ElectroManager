@@ -64,6 +64,9 @@
                     <button onclick="printItemDetail()" class="btn btn-info btn-sm">
                         <i class="bi bi-printer"></i> Print
                     </button>
+                    <a href="{{ url_for('item.item_qr_sticker', uuid=item.uuid) }}" class="btn btn-success btn-sm">
+                        <i class="bi bi-qr-code"></i> Print QR
+                    </a>
                     {% if current_user.has_permission('items', 'delete') %}
                     <form method="POST" action="{{ url_for('item.item_delete', uuid=item.uuid) }}" style="display:inline">
                         <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Delete this item?')">
@@ -71,9 +74,6 @@
                         </button>
                     </form>
                     {% endif %}
-                    <a href="{{ url_for('item.item_qr_sticker', uuid=item.uuid) }}" class="btn btn-success btn-sm">
-                        <i class="bi bi-qr-code"></i> Print QR
-                    </a>
                     <a href="{{ url_for('item.items') }}" class="btn btn-secondary btn-sm">
                         <i class="bi bi-arrow-left"></i> Back
                     </a>
