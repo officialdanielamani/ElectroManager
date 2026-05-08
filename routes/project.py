@@ -1,7 +1,7 @@
 """
 Project Routes Blueprint
 """
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, current_app, abort
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, current_app, abort, send_file
 from flask_login import login_required, current_user
 from models import (db, User, Item, ItemBatch, BatchSerialNumber, Setting,
                     Project, ProjectCategory, ProjectTag, ProjectStatus,
@@ -275,7 +275,9 @@ def project_detail(project_id):
                            currency=currency,
                            currency_decimal=currency_decimal,
                            can_edit=can_edit,
-                           can_delete=can_delete)
+                           can_delete=can_delete,
+                           download_all_project_attachments=Setting.get('download_all_project_attachments', True),
+                           download_all_project_share_files=Setting.get('download_all_project_share_files', True))
 
 
 # ==================== EDIT PROJECT ====================
@@ -827,6 +829,53 @@ def project_attachment_delete(att_id):
     db.session.commit()
     flash('Attachment deleted.', 'success')
     return redirect(url_for('project.project_detail', project_id=project.project_id))
+
+
+@project_bp.route('/project/<project_id>/download-attachments', endpoint='project_download_attachments')
+@login_required
+def project_download_attachments(project_id):
+    if not current_user.has_permission('projects', 'view'):
+        abort(403)
+    if not Setting.get('download_all_project_attachments', True):
+        abort(403)
+    import zipfile, io
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    all_atts = ProjectAttachment.query.filter_by(project_id=project.id).all()
+    if not all_atts:
+        flash('No attachments to download.', 'warning')
+        return redirect(url_for('project.project_detail', project_id=project_id))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for att in all_atts:
+            full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], att.file_path)
+            if os.path.exists(full_path):
+                zf.write(full_path, f"{att.attachment_type}/{att.original_filename}")
+    buf.seek(0)
+    log_audit(current_user.id, 'download', 'project', project.id, f'Downloaded all attachments for project: {project.name}')
+    return send_file(buf, download_name=f"{project.project_id}_attachments.zip", as_attachment=True, mimetype='application/zip')
+
+
+@project_bp.route('/project/<project_id>/download-share-files', endpoint='project_download_share_files')
+@login_required
+def project_download_share_files(project_id):
+    if not current_user.has_permission('projects', 'view'):
+        abort(403)
+    if not Setting.get('download_all_project_share_files', True):
+        abort(403)
+    import zipfile, io
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    if not project.linked_share_files:
+        flash('No share files to download.', 'warning')
+        return redirect(url_for('project.project_detail', project_id=project_id))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for sf in project.linked_share_files:
+            full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', sf.category, sf.filename)
+            if os.path.exists(full_path):
+                zf.write(full_path, f"{sf.name}.{sf.ext}")
+    buf.seek(0)
+    log_audit(current_user.id, 'download', 'project', project.id, f'Downloaded all share files for project: {project.name}')
+    return send_file(buf, download_name=f"{project.project_id}_share_files.zip", as_attachment=True, mimetype='application/zip')
 
 
 # ==================== PROJECT URLS ====================

@@ -101,7 +101,14 @@
                 {% set has_attachments = attachments.values() | map('length') | sum > 0 %}
                 {% if has_attachments %}
                 <hr>
-                <strong><i class="bi bi-paperclip"></i> Attachments</strong>
+                <div class="d-flex justify-content-between align-items-center">
+                    <strong><i class="bi bi-paperclip"></i> Attachments</strong>
+                    {% if download_all_project_attachments %}
+                    <a href="{{ url_for('project.project_download_attachments', project_id=project.project_id) }}" class="btn btn-sm btn-outline-secondary" title="Download all attachments as ZIP">
+                        <i class="bi bi-download"></i> Download All
+                    </a>
+                    {% endif %}
+                </div>
                 <div class="mt-2">
                     {% for att_type, att_label, att_icon in att_types %}
                     {% if attachments[att_type] %}
@@ -127,7 +134,14 @@
                 <!-- Share Files -->
                 {% if project.linked_share_files %}
                 <hr>
-                <strong><i class="bi bi-folder-fill text-warning"></i> Share Files</strong>
+                <div class="d-flex justify-content-between align-items-center">
+                    <strong><i class="bi bi-folder-fill text-warning"></i> Share Files</strong>
+                    {% if download_all_project_share_files %}
+                    <a href="{{ url_for('project.project_download_share_files', project_id=project.project_id) }}" class="btn btn-sm btn-outline-secondary" title="Download all share files as ZIP">
+                        <i class="bi bi-download"></i> Download All
+                    </a>
+                    {% endif %}
+                </div>
                 <div class="mt-2">
                     {% set sf_images = project.linked_share_files | selectattr('is_image') | list %}
                     {% set sf_others = project.linked_share_files | rejectattr('is_image') | list %}

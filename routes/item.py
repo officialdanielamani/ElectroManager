@@ -349,8 +349,10 @@ def item_detail(uuid):
     from models import StickerTemplate
     qr_templates = StickerTemplate.query.filter_by(template_type='Items').all()
     
-    return render_template('item_detail.html', item=item, attachment_form=attachment_form, 
-                         currency_symbol=currency_symbol, currency_decimal_places=currency_decimal_places, qr_templates=qr_templates)
+    return render_template('item_detail.html', item=item, attachment_form=attachment_form,
+                         currency_symbol=currency_symbol, currency_decimal_places=currency_decimal_places, qr_templates=qr_templates,
+                         download_all_item_attachments=Setting.get('download_all_item_attachments', True),
+                         download_all_item_share_files=Setting.get('download_all_item_share_files', True))
 
 
 @item_bp.route('/item/<string:uuid>/qr', endpoint='item_qr_svg')
@@ -681,6 +683,53 @@ def delete_attachment(id):
     log_audit(current_user.id, 'delete', 'attachment', id, f'Deleted attachment: {attachment.original_filename}')
     flash('Attachment deleted successfully!', 'success')
     return redirect(url_for('item.item_edit', uuid=item.uuid))
+
+
+@item_bp.route('/item/<string:uuid>/download-attachments', endpoint='item_download_attachments')
+@login_required
+@item_permission_required
+def item_download_attachments(uuid):
+    if not Setting.get('download_all_item_attachments', True):
+        abort(403)
+    import zipfile, io
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    if not item.attachments:
+        flash('No attachments to download.', 'warning')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for att in item.attachments:
+            full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], att.filename)
+            if os.path.exists(full_path):
+                zf.write(full_path, att.original_filename)
+    buf.seek(0)
+    from flask import send_file as _send_file
+    log_audit(current_user.id, 'download', 'item', item.id, f'Downloaded all attachments for item: {item.name}')
+    return _send_file(buf, download_name=f"{item.uuid}_attachments.zip", as_attachment=True, mimetype='application/zip')
+
+
+@item_bp.route('/item/<string:uuid>/download-share-files', endpoint='item_download_share_files')
+@login_required
+@item_permission_required
+def item_download_share_files(uuid):
+    if not Setting.get('download_all_item_share_files', True):
+        abort(403)
+    import zipfile, io
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    if not item.linked_share_files:
+        flash('No share files to download.', 'warning')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for sf in item.linked_share_files:
+            full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', sf.category, sf.filename)
+            if os.path.exists(full_path):
+                zf.write(full_path, f"{sf.name}.{sf.ext}")
+    buf.seek(0)
+    from flask import send_file as _send_file
+    log_audit(current_user.id, 'download', 'item', item.id, f'Downloaded all share files for item: {item.name}')
+    return _send_file(buf, download_name=f"{item.uuid}_share_files.zip", as_attachment=True, mimetype='application/zip')
+
 
 
 

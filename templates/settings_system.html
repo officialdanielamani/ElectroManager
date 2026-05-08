@@ -37,6 +37,38 @@
                     <div class="alert alert-info mb-0">
                         <i class="bi bi-lightbulb"></i> <strong>Note:</strong> This affects info/alert banners displayed throughout the system.
                     </div>
+
+                    <hr>
+
+                    <!-- Download All Toggles -->
+                    <label class="form-label fw-semibold"><i class="bi bi-download"></i> Download All (ZIP)</label>
+                    <div class="form-text mb-2">Enable or disable the Download All button. When disabled the button is hidden and the backend endpoint returns 403.</div>
+
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" name="download_all_item_attachments" id="dl_item_att"
+                               {% if download_all_item_attachments %}checked{% endif %}>
+                        <label class="form-check-label" for="dl_item_att">Item — Attachments</label>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" name="download_all_item_share_files" id="dl_item_sf"
+                               {% if download_all_item_share_files %}checked{% endif %}>
+                        <label class="form-check-label" for="dl_item_sf">Item — Share Files</label>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" name="download_all_project_attachments" id="dl_proj_att"
+                               {% if download_all_project_attachments %}checked{% endif %}>
+                        <label class="form-check-label" for="dl_proj_att">Project — Attachments</label>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" name="download_all_project_share_files" id="dl_proj_sf"
+                               {% if download_all_project_share_files %}checked{% endif %}>
+                        <label class="form-check-label" for="dl_proj_sf">Project — Share Files</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="download_all_share_files_page" id="dl_sf_page"
+                               {% if download_all_share_files_page %}checked{% endif %}>
+                        <label class="form-check-label" for="dl_sf_page">Share Files page (<code>/settings/share-files</code>)</label>
+                    </div>
                 </div>
             </div>
 

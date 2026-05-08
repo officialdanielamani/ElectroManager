@@ -495,6 +495,11 @@ def settings_system():
             Setting.set('max_drawer_rows', max_drawer_rows, 'Maximum drawer rows (1-32)')
             Setting.set('max_drawer_cols', max_drawer_cols, 'Maximum drawer columns (1-32)')
             Setting.set('banner_timeout', banner_timeout, 'Banner auto-dismiss timeout in seconds (0=permanent)')
+            Setting.set('download_all_item_attachments',   'download_all_item_attachments'   in request.form, 'Enable Download All ZIP for item attachments')
+            Setting.set('download_all_item_share_files',   'download_all_item_share_files'   in request.form, 'Enable Download All ZIP for item share files')
+            Setting.set('download_all_project_attachments','download_all_project_attachments' in request.form, 'Enable Download All ZIP for project attachments')
+            Setting.set('download_all_project_share_files','download_all_project_share_files' in request.form, 'Enable Download All ZIP for project share files')
+            Setting.set('download_all_share_files_page',   'download_all_share_files_page'   in request.form, 'Enable Download All ZIP on share files page')
             
 
             # Location upload settings
@@ -535,6 +540,11 @@ def settings_system():
     max_drawer_rows = Setting.get('max_drawer_rows', '10')
     max_drawer_cols = Setting.get('max_drawer_cols', '10')
     banner_timeout = Setting.get('banner_timeout', '5')
+    download_all_item_attachments  = Setting.get('download_all_item_attachments',  True)
+    download_all_item_share_files  = Setting.get('download_all_item_share_files',  True)
+    download_all_project_attachments = Setting.get('download_all_project_attachments', True)
+    download_all_project_share_files = Setting.get('download_all_project_share_files', True)
+    download_all_share_files_page  = Setting.get('download_all_share_files_page',  True)
     
     # Read system information from verinfo file
     verinfo_content = ""
@@ -558,6 +568,11 @@ def settings_system():
                           max_drawer_rows=max_drawer_rows,
                           max_drawer_cols=max_drawer_cols,
                           banner_timeout=banner_timeout,
+                          download_all_item_attachments=download_all_item_attachments,
+                          download_all_item_share_files=download_all_item_share_files,
+                          download_all_project_attachments=download_all_project_attachments,
+                          download_all_project_share_files=download_all_project_share_files,
+                          download_all_share_files_page=download_all_share_files_page,
                           verinfo_content=verinfo_content,
                           demo_mode=current_app.config.get('DEMO_MODE', False),
                           location_upload_extensions=Setting.get('location_upload_extensions', 'webp,png,svg,jpeg,jpg'),
