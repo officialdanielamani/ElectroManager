@@ -1182,7 +1182,7 @@ class ProjectStatus(db.Model):
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 class ProjectPerson(db.Model):
-    __tablename__ = 'project_persons'
+    __tablename__ = 'persons'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     email = db.Column(db.String(200))
@@ -1192,7 +1192,7 @@ class ProjectPerson(db.Model):
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 class ProjectGroup(db.Model):
-    __tablename__ = 'project_groups'
+    __tablename__ = 'groups'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), unique=True, nullable=False)
     description = db.Column(db.Text)
@@ -1206,11 +1206,11 @@ class ProjectGroup(db.Model):
         return [m for m in self.members if m.person_id is not None]
 
 class ProjectGroupMember(db.Model):
-    __tablename__ = 'project_group_members'
+    __tablename__ = 'group_members'
     id = db.Column(db.Integer, primary_key=True)
-    group_id = db.Column(db.Integer, db.ForeignKey('project_groups.id'), nullable=False)
+    group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    person_id = db.Column(db.Integer, db.ForeignKey('project_persons.id'), nullable=True)
+    person_id = db.Column(db.Integer, db.ForeignKey('persons.id'), nullable=True)
     user = db.relationship('User', backref='project_group_memberships')
     person = db.relationship('ProjectPerson', backref='group_memberships')
 

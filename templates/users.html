@@ -7,33 +7,6 @@
     </div>
 </div>
 
-<!-- Signup Form Setting -->
-<div class="row mb-3">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0 text-white"><i class="bi bi-gear"></i> Signup Form Settings</h5>
-            </div>
-            <div class="card-body">
-                <form method="POST" action="{{ url_for('user_role.toggle_signup') }}">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="signupToggle" 
-                               name="signup_enabled" {% if signup_enabled %}checked{% endif %}
-                               onchange="this.form.submit()">
-                        <label class="form-check-label" for="signupToggle">
-                            <strong>Enable User Signup Form</strong>
-                        </label>
-                    </div>
-                    <small class="text-muted">
-                        When enabled, users can register at <code>/register</code>. 
-                        When disabled, only admins can create users.
-                    </small>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Role Management -->
 <div class="row mb-3">
     <div class="col-md-12">

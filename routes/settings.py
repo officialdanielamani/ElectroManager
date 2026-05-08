@@ -583,6 +583,8 @@ def settings_system():
             Setting.set('max_drawer_rows', max_drawer_rows, 'Maximum drawer rows (1-32)')
             Setting.set('max_drawer_cols', max_drawer_cols, 'Maximum drawer columns (1-32)')
             Setting.set('banner_timeout', banner_timeout, 'Banner auto-dismiss timeout in seconds (0=permanent)')
+            signup_enabled = 'signup_enabled' in request.form
+            Setting.set('signup_enabled', signup_enabled, 'Enable/disable user signup form')
             Setting.set('download_all_item_attachments',   'download_all_item_attachments'   in request.form, 'Enable Download All ZIP for item attachments')
             Setting.set('download_all_item_share_files',   'download_all_item_share_files'   in request.form, 'Enable Download All ZIP for item share files')
             Setting.set('download_all_project_attachments','download_all_project_attachments' in request.form, 'Enable Download All ZIP for project attachments')
@@ -617,6 +619,7 @@ def settings_system():
         return redirect(url_for('settings.settings_system'))
     
     # GET request - load current settings
+    signup_enabled = Setting.get('signup_enabled', True)
     currency = Setting.get('currency', '$')
     currency_decimal_places = Setting.get('currency_decimal_places', '2')
     max_file_size = Setting.get('max_file_size_mb', '10')
@@ -691,6 +694,7 @@ def settings_system():
                           company_zip=company_zip,
                           company_state=company_state,
                           company_country=company_country,
+                          signup_enabled=signup_enabled,
                           verinfo_content=verinfo_content,
                           demo_mode=current_app.config.get('DEMO_MODE', False),
                           project_upload_settings={

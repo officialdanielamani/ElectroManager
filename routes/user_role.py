@@ -31,43 +31,26 @@ def users():
         flash('You do not have permission to view users.', 'danger')
         return redirect(url_for('settings.settings'))
     
-    from models import Setting, Role
+    from models import Role
     users = User.query.order_by(User.username).all()
     roles = Role.query.order_by(Role.name).all()
-    signup_enabled = Setting.get('signup_enabled', True)
-    
+
     can_create_user = current_user.has_permission('settings_sections.users_roles', 'users_create')
     can_edit_user = current_user.has_permission('settings_sections.users_roles', 'users_edit')
     can_delete_user = current_user.has_permission('settings_sections.users_roles', 'users_delete')
     can_create_role = current_user.has_permission('settings_sections.users_roles', 'roles_create')
     can_edit_role = current_user.has_permission('settings_sections.users_roles', 'roles_edit')
     can_delete_role = current_user.has_permission('settings_sections.users_roles', 'roles_delete')
-    
-    return render_template('users.html', 
-                          users=users, 
-                          roles=roles, 
-                          signup_enabled=signup_enabled,
+
+    return render_template('users.html',
+                          users=users,
+                          roles=roles,
                           can_create_user=can_create_user,
                           can_edit_user=can_edit_user,
                           can_delete_user=can_delete_user,
                           can_create_role=can_create_role,
                           can_edit_role=can_edit_role,
                           can_delete_role=can_delete_role)
-
-
-
-@user_role_bp.route('/toggle-signup', endpoint='toggle_signup', methods=['POST'])
-@login_required
-@permission_required("settings_sections.users_roles", "users_edit")
-def toggle_signup():
-    from models import Setting
-    signup_enabled = request.form.get('signup_enabled') == 'on'
-    Setting.set('signup_enabled', signup_enabled, 'Enable/disable user signup form')
-    
-    status = 'enabled' if signup_enabled else 'disabled'
-    flash(f'User signup form has been {status}.', 'success')
-    log_audit(current_user.id, 'update', 'setting', 0, f'Signup form {status}')
-    return redirect(url_for('user_role.users'))
 
 
 @user_role_bp.route('/change-password', endpoint='change_password', methods=['POST'])

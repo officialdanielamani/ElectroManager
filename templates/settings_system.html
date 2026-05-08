@@ -36,11 +36,9 @@
                         {% if system_logo_url %}
                         <div class="mb-2 d-flex align-items-center gap-3">
                             <img src="{{ system_logo_url }}" alt="System Logo" style="max-height:80px; max-width:200px; border-radius:6px; border:1px solid #dee2e6;">
-                            <form method="POST" action="{{ url_for('settings.delete_system_logo') }}" style="display:inline;">
-                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete system logo?')">
-                                    <i class="bi bi-trash"></i> Delete
-                                </button>
-                            </form>
+                            <button type="submit" form="delete-system-logo-form" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete system logo?')">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
                         </div>
                         {% endif %}
                         <input type="file" class="form-control" name="system_logo" accept=".jpg,.jpeg,.png">
@@ -55,6 +53,15 @@
                         <input type="number" class="form-control" id="banner_timeout" name="banner_timeout"
                                value="{{ banner_timeout }}" min="0" max="60" required>
                         <div class="form-text"><i class="bi bi-info-circle"></i> 0 = permanent (closes only with ✕), 1–60 = auto-dismiss.</div>
+                    </div>
+
+                    <!-- User Signup -->
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="signup_enabled" name="signup_enabled" {% if signup_enabled %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="signup_enabled">Enable User Signup Form</label>
+                        </div>
+                        <div class="form-text"><i class="bi bi-info-circle"></i> When enabled, users can self-register at <code>/register</code>. When disabled, only admins can create accounts.</div>
                     </div>
 
                     <hr>
@@ -159,11 +166,9 @@
                         {% if company_logo_url %}
                         <div class="mb-2 d-flex align-items-center gap-3">
                             <img src="{{ company_logo_url }}" alt="Company Logo" style="max-height:80px; max-width:200px; border-radius:6px; border:1px solid #dee2e6;">
-                            <form method="POST" action="{{ url_for('settings.delete_company_logo') }}" style="display:inline;">
-                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete company logo?')">
-                                    <i class="bi bi-trash"></i> Delete
-                                </button>
-                            </form>
+                            <button type="submit" form="delete-company-logo-form" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete company logo?')">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
                         </div>
                         {% endif %}
                         <input type="file" class="form-control" name="company_logo" accept=".jpg,.jpeg,.png">
@@ -376,6 +381,10 @@
                 </div>
             </div>
         </form>
+
+        <!-- Standalone delete forms — must be outside the main form to avoid HTML nesting issues -->
+        <form id="delete-system-logo-form" method="POST" action="{{ url_for('settings.delete_system_logo') }}"></form>
+        <form id="delete-company-logo-form" method="POST" action="{{ url_for('settings.delete_company_logo') }}"></form>
 
         <!-- System Information Card -->
         {% if verinfo_content %}
