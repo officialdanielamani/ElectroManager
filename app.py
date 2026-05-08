@@ -255,6 +255,7 @@ from qr_utils import validate_bootstrap_icons
 with app.app_context():
     validate_bootstrap_icons()
 
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()

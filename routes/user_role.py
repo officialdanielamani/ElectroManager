@@ -120,6 +120,8 @@ def user_new():
         if _pps not in ('upload', 'share', 'both'):
             _pps = 'share'
         user = User(
+            name=(form.name.data or '').strip()[:64] or None,
+            short_info=(form.short_info.data or '').strip()[:128] or None,
             username=form.username.data,
             email=form.email.data,
             role_id=form.role_id.data,
@@ -227,6 +229,8 @@ def user_edit(id):
             return redirect(url_for('user_role.user_edit', id=user.id))
         
         # Regular form submission (full user edit)
+        user.name = (form.name.data or '').strip()[:64] or None
+        user.short_info = (form.short_info.data or '').strip()[:128] or None
         user.username = form.username.data
         user.email = form.email.data
         user.role_id = form.role_id.data
@@ -262,6 +266,8 @@ def user_edit(id):
         return redirect(url_for('user_role.users'))
     else:
         # Pre-populate form fields on GET request (for display)
+        form.name.data = user.name
+        form.short_info.data = user.short_info
         form.username.data = user.username
         form.email.data = user.email
         form.role_id.data = user.role_id

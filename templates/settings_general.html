@@ -161,6 +161,27 @@
                 <h5><i class="bi bi-shield-check"></i> Account Management</h5>
             </div>
             <div class="card-body">
+                <!-- Profile Info Section -->
+                <div class="mb-4">
+                    <h6 class="text-muted border-bottom pb-2 mb-3">
+                        <i class="bi bi-person-badge"></i> Profile Info
+                    </h6>
+                    <form method="POST" action="{{ url_for('settings.save_account_info') }}">
+                        <div class="mb-3">
+                            <label for="accountName" class="form-label">Name <small class="text-muted">(optional, not unique)</small></label>
+                            <input type="text" class="form-control" id="accountName" name="name" maxlength="64"
+                                   value="{{ current_user.name or '' }}" placeholder="e.g. Jane Doe">
+                        </div>
+                        <div class="mb-3">
+                            <label for="accountShortInfo" class="form-label">Short Info <small class="text-muted">(optional)</small></label>
+                            <input type="text" class="form-control" id="accountShortInfo" name="short_info" maxlength="128"
+                                   value="{{ current_user.short_info or '' }}" placeholder="e.g. Lab Technician">
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Save Profile Info
+                        </button>
+                    </form>
+                </div>
                 <!-- Profile Picture Section -->
                 {% if current_user.allow_profile_picture_change %}
                 {% set pps = current_user.profile_picture_source or 'share' %}

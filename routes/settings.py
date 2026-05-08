@@ -223,6 +223,18 @@ def save_ui_preference():
 
 
 
+@settings_bp.route('/save-account-info', endpoint='save_account_info', methods=['POST'])
+@login_required
+def save_account_info():
+    """Save display name and short info for own account"""
+    current_user.name = (request.form.get('name', '').strip()[:64]) or None
+    current_user.short_info = (request.form.get('short_info', '').strip()[:128]) or None
+    from models import db
+    db.session.commit()
+    flash('Profile info updated.', 'success')
+    return redirect(url_for('settings.settings_general'))
+
+
 @settings_bp.route('/change-password', methods=['POST'])
 @login_required
 def change_password():

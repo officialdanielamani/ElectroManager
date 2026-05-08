@@ -107,6 +107,26 @@
                         {% endif %}
                         
                         <div class="mb-3">
+                            {{ form.name.label(class="form-label") }}
+                            <small class="text-muted ms-1">(optional, not unique, max 64 chars)</small>
+                            {% if user and user.is_demo_user and config.DEMO_MODE %}
+                                <input type="text" class="form-control" value="{{ user.name or '' }}" disabled>
+                            {% else %}
+                                {{ form.name(class="form-control", placeholder="e.g. Jane Doe") }}
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.short_info.label(class="form-label") }}
+                            <small class="text-muted ms-1">(optional, max 128 chars)</small>
+                            {% if user and user.is_demo_user and config.DEMO_MODE %}
+                                <input type="text" class="form-control" value="{{ user.short_info or '' }}" disabled>
+                            {% else %}
+                                {{ form.short_info(class="form-control", placeholder="e.g. Lab Technician") }}
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
                             {{ form.username.label(class="form-label") }}
                             {% if user and user.is_demo_user and config.DEMO_MODE %}
                                 <input type="text" class="form-control" value="{{ user.username }}" disabled>

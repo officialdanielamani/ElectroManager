@@ -2328,45 +2328,42 @@
 </div>
 
 <script>
-    // Load templates when modal opens
+    var _templateDataMap = {};
     document.getElementById('useTemplateModal').addEventListener('show.bs.modal', function () {
         fetch('/api/parameter-templates')
             .then(response => response.json())
             .then(data => {
+                _templateDataMap = {};
                 const select = document.getElementById('template_select');
                 select.innerHTML = '<option value="">-- Select Template --</option>';
                 data.forEach(template => {
-                    const option = new Option(template.name, template.id);
-                    option.dataset.description = template.description || 'No description';
-                    option.dataset.parameters = JSON.stringify(template.parameters);
-                    select.add(option);
+                    _templateDataMap[template.id] = template;
+                    select.add(new Option(template.name, template.id));
                 });
             });
     });
 
     function showTemplateDetails() {
         const select = document.getElementById('template_select');
-        const selectedOption = select.options[select.selectedIndex];
-
-        if (selectedOption.value) {
-            document.getElementById('template_details').style.display = 'block';
-            document.getElementById('template_description').textContent = selectedOption.dataset.description;
-
-            const parameters = JSON.parse(selectedOption.dataset.parameters || '[]');
-            const paramList = document.getElementById('template_parameters');
-            paramList.innerHTML = '';
-
-            if (parameters.length > 0) {
-                parameters.forEach(param => {
-                    const li = document.createElement('li');
-                    li.innerHTML = '<small class="text-muted">• ' + param.display_text + '</small>';
-                    paramList.appendChild(li);
-                });
-            } else {
-                paramList.innerHTML = '<li class="text-muted">No parameters in this template</li>';
-            }
-        } else {
+        const templateId = select.value;
+        if (!templateId) {
             document.getElementById('template_details').style.display = 'none';
+            return;
+        }
+        const template = _templateDataMap[templateId];
+        if (!template) return;
+        document.getElementById('template_details').style.display = 'block';
+        document.getElementById('template_description').textContent = template.description || 'No description';
+        const paramList = document.getElementById('template_parameters');
+        paramList.innerHTML = '';
+        if (template.parameters && template.parameters.length > 0) {
+            template.parameters.forEach(param => {
+                const li = document.createElement('li');
+                li.innerHTML = '<small class="text-muted">• ' + (param.display_text || param.operation || '') + '</small>';
+                paramList.appendChild(li);
+            });
+        } else {
+            paramList.innerHTML = '<li class="text-muted">No parameters in this template</li>';
         }
     }
 </script>
@@ -4199,11 +4196,11 @@ function submitSnBulkLend(clearMode) {
                         {% for att in item_images %}
                         <div class="col">
                             <div class="thumb-option border rounded overflow-hidden"
-                                 data-value="{{ att.file_path }}"
-                                 data-url="{{ url_for('uploaded_file', filename=att.file_path) }}"
+                                 data-value="{{ att.filename }}"
+                                 data-url="{{ url_for('uploaded_file', filename=att.filename) }}"
                                  style="cursor:pointer; aspect-ratio:1/1;"
                                  onclick="selectThumbnail(this)">
-                                <img src="{{ url_for('uploaded_file', filename=att.file_path) }}"
+                                <img src="{{ url_for('uploaded_file', filename=att.filename) }}"
                                      alt="{{ att.original_filename }}"
                                      style="width:100%;height:100%;object-fit:cover;">
                             </div>

@@ -1067,31 +1067,32 @@ document.getElementById('pp_custom_value_input') && document.getElementById('pp_
     </div>
 </div>
 <script>
+var _ptTemplateDataMap = {};
 document.getElementById('useProjectTemplateModal').addEventListener('show.bs.modal', function () {
     fetch('/api/parameter-templates')
         .then(r => r.json())
         .then(data => {
+            _ptTemplateDataMap = {};
             const select = document.getElementById('pt_template_select');
             select.innerHTML = '<option value="">-- Select Template --</option>';
             data.forEach(t => {
-                const opt = new Option(t.name, t.id);
-                opt.dataset.description = t.description || 'No description';
-                opt.dataset.parameters = JSON.stringify(t.parameters);
-                select.add(opt);
+                _ptTemplateDataMap[t.id] = t;
+                select.add(new Option(t.name, t.id));
             });
         });
 });
 function ptShowTemplateDetails() {
     const select = document.getElementById('pt_template_select');
-    const selected = select.options[select.selectedIndex];
-    if (!selected.value) { document.getElementById('pt_template_details').style.display = 'none'; return; }
+    const templateId = select.value;
+    if (!templateId) { document.getElementById('pt_template_details').style.display = 'none'; return; }
+    const t = _ptTemplateDataMap[templateId];
+    if (!t) return;
     document.getElementById('pt_template_details').style.display = 'block';
-    document.getElementById('pt_template_description').textContent = selected.dataset.description;
-    const params = JSON.parse(selected.dataset.parameters || '[]');
+    document.getElementById('pt_template_description').textContent = t.description || 'No description';
     const list = document.getElementById('pt_template_parameters');
     list.innerHTML = '';
-    if (params.length) {
-        params.forEach(p => { const li = document.createElement('li'); li.innerHTML = '<small class="text-muted">• ' + p.display_text + '</small>'; list.appendChild(li); });
+    if (t.parameters && t.parameters.length) {
+        t.parameters.forEach(p => { const li = document.createElement('li'); li.innerHTML = '<small class="text-muted">• ' + (p.display_text || p.operation || '') + '</small>'; list.appendChild(li); });
     } else {
         list.innerHTML = '<li class="text-muted">No parameters in this template</li>';
     }

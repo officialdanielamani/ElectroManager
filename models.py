@@ -116,6 +116,8 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
+    name = db.Column(db.String(64))
+    short_info = db.Column(db.String(128))
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'), nullable=False)
     theme = db.Column(db.String(20), default='light')
     user_font = db.Column(db.String(50), default='system')

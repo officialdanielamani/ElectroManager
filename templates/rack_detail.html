@@ -43,6 +43,7 @@
                 </div>
                 <p><strong>UUID:</strong><br><code class="font-monospace small">{{ rack.uuid }}</code></p>
                 <p><strong>Name:</strong> {{ rack.name }}</p>
+                <p><strong>Short Info:</strong> {{ rack.short_info or 'N/A' }}</p>
                 <p><strong>Description:</strong> {{ rack.description or 'N/A' }}</p>
                 <p><strong>Color:</strong>
                     <span style="display:inline-block;width:18px;height:18px;background-color:{{ rack.color }};border:1px solid #dee2e6;border-radius:3px;vertical-align:middle;"></span>
