@@ -370,9 +370,14 @@
         <div class="card mt-3">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="bi bi-magic"></i> Magic Parameters</h5>
-                <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addProjectParameterModal">
-                    <i class="bi bi-plus-circle"></i> Add Parameter
-                </button>
+                <div>
+                    <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addProjectParameterModal">
+                        <i class="bi bi-plus-circle"></i> Add Parameter
+                    </button>
+                    <button type="button" class="btn btn-sm btn-success ms-1" data-bs-toggle="modal" data-bs-target="#useProjectTemplateModal">
+                        <i class="bi bi-collection"></i> Use Template
+                    </button>
+                </div>
             </div>
             <div class="card-body">
                 {% if project.magic_parameters %}
@@ -1022,6 +1027,75 @@ document.getElementById('pp_custom_value_input') && document.getElementById('pp_
     document.getElementById('pp_string_custom_value').value = this.value;
     ppValidateSelectionCount();
 });
+</script>
+<!-- ===== Use Template Modal (Project) ===== -->
+<div class="modal fade" id="useProjectTemplateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('project.project_populate_template', project_id=project.project_id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-collection"></i> Use Parameter Template</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Select Template</label>
+                        <select name="template_id" id="pt_template_select" class="form-select"
+                                onchange="ptShowTemplateDetails()" required>
+                            <option value="">-- Select Template --</option>
+                        </select>
+                    </div>
+                    <div id="pt_template_details" style="display:none;">
+                        <div class="alert alert-info">
+                            <h6 class="mb-2">Template Description:</h6>
+                            <p id="pt_template_description" class="mb-0"></p>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">Parameters in this template:</div>
+                            <div class="card-body">
+                                <ul id="pt_template_parameters" class="list-unstyled mb-0"></ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Populate</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('useProjectTemplateModal').addEventListener('show.bs.modal', function () {
+    fetch('/api/parameter-templates')
+        .then(r => r.json())
+        .then(data => {
+            const select = document.getElementById('pt_template_select');
+            select.innerHTML = '<option value="">-- Select Template --</option>';
+            data.forEach(t => {
+                const opt = new Option(t.name, t.id);
+                opt.dataset.description = t.description || 'No description';
+                opt.dataset.parameters = JSON.stringify(t.parameters);
+                select.add(opt);
+            });
+        });
+});
+function ptShowTemplateDetails() {
+    const select = document.getElementById('pt_template_select');
+    const selected = select.options[select.selectedIndex];
+    if (!selected.value) { document.getElementById('pt_template_details').style.display = 'none'; return; }
+    document.getElementById('pt_template_details').style.display = 'block';
+    document.getElementById('pt_template_description').textContent = selected.dataset.description;
+    const params = JSON.parse(selected.dataset.parameters || '[]');
+    const list = document.getElementById('pt_template_parameters');
+    list.innerHTML = '';
+    if (params.length) {
+        params.forEach(p => { const li = document.createElement('li'); li.innerHTML = '<small class="text-muted">• ' + p.display_text + '</small>'; list.appendChild(li); });
+    } else {
+        list.innerHTML = '<li class="text-muted">No parameters in this template</li>';
+    }
+}
 </script>
 {% endif %}
 

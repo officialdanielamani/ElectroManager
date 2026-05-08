@@ -349,6 +349,41 @@ def project_edit(project_id):
 
 # ==================== PROJECT MAGIC PARAMETERS ====================
 
+@project_bp.route('/project/<project_id>/populate-template', endpoint='project_populate_template', methods=['POST'])
+@login_required
+def project_populate_template(project_id):
+    if not current_user.has_permission('projects', 'edit'):
+        flash('You do not have permission to edit projects.', 'danger')
+        return redirect(url_for('project.projects'))
+
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    from models import ParameterTemplate
+    template_id = int(request.form.get('template_id', 0))
+    template = ParameterTemplate.query.get(template_id)
+    if not template:
+        flash('Invalid template selected.', 'danger')
+        return redirect(url_for('project.project_edit', project_id=project_id))
+
+    added_count = 0
+    for tp in template.template_parameters:
+        proj_param = ProjectParameter(
+            project_id=project.id,
+            parameter_id=tp.parameter_id,
+            operation=tp.operation,
+            value=tp.value,
+            value2=tp.value2,
+            unit=tp.unit,
+            description=tp.description
+        )
+        db.session.add(proj_param)
+        added_count += 1
+
+    db.session.commit()
+    log_audit(current_user.id, 'update', 'project', project.id, f'Applied template "{template.name}" to project: {project.name}')
+    flash(f'Added {added_count} parameters from template "{template.name}"!', 'success')
+    return redirect(url_for('project.project_edit', project_id=project_id))
+
+
 @project_bp.route('/project/<project_id>/add-parameter', endpoint='project_add_parameter', methods=['POST'])
 @login_required
 def project_add_parameter(project_id):
