@@ -803,6 +803,7 @@ class MagicParameter(db.Model):
     units = db.relationship('ParameterUnit', backref='parameter', lazy=True, cascade='all, delete-orphan')
     string_options = db.relationship('ParameterStringOption', backref='parameter', lazy=True, cascade='all, delete-orphan')
     item_parameters = db.relationship('ItemParameter', backref='parameter', lazy=True, cascade='all, delete-orphan')
+    project_parameters = db.relationship('ProjectParameter', lazy=True, cascade='all, delete-orphan')
     
     def get_units_list(self):
         if self.param_type == 'number':
@@ -990,6 +991,77 @@ class ItemParameter(db.Model):
     
     def __repr__(self):
         return f'<ItemParameter {self.id} for Item {self.item_id}>'
+
+
+class ProjectParameterStringValue(db.Model):
+    """Stores selected/custom string values for a ProjectParameter (supports multi-select)."""
+    __tablename__ = 'project_parameter_string_values'
+    id = db.Column(db.Integer, primary_key=True)
+    project_parameter_id = db.Column(db.Integer, db.ForeignKey('project_parameters.id'), nullable=False)
+    value = db.Column(db.String(128), nullable=False)
+    is_custom = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    def __repr__(self):
+        return f'<ProjectParameterStringValue {self.value} custom={self.is_custom}>'
+
+
+class ProjectParameter(db.Model):
+    __tablename__ = 'project_parameters'
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    parameter_id = db.Column(db.Integer, db.ForeignKey('magic_parameters.id'), nullable=False)
+    operation = db.Column(db.String(50))
+    value = db.Column(db.String(200))
+    value2 = db.Column(db.String(200))
+    unit = db.Column(db.String(50))
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    project = db.relationship('Project', backref=db.backref('magic_parameters', cascade='all, delete-orphan', lazy=True))
+    parameter = db.relationship('MagicParameter')
+    string_values = db.relationship('ProjectParameterStringValue', backref='project_parameter', lazy=True, cascade='all, delete-orphan')
+
+    def get_selected_string_values(self):
+        predefined = [sv.value for sv in self.string_values if not sv.is_custom]
+        custom = [sv.value for sv in self.string_values if sv.is_custom]
+        return predefined, custom
+
+    def get_display_text(self):
+        param = self.parameter
+        if not param:
+            return "Unknown Parameter"
+        if param.param_type == 'number':
+            if self.operation == 'min':
+                return f"MIN: {param.name} {self.value} {self.unit or ''} {self.description or ''}".strip()
+            elif self.operation == 'max':
+                return f"MAX: {param.name} {self.value} {self.unit or ''} {self.description or ''}".strip()
+            elif self.operation == 'range':
+                return f"RANGE: {param.name} {self.value} {self.unit or ''} - {self.value2} {self.unit or ''} {self.description or ''}".strip()
+            else:
+                return f"VALUE: {param.name} {self.value} {self.unit or ''} {self.description or ''}".strip()
+        elif param.param_type == 'date':
+            if self.operation == 'start':
+                return f"START: {param.name} on {self.value} {self.description or ''}".strip()
+            elif self.operation == 'end':
+                return f"END: {param.name} on {self.value} {self.description or ''}".strip()
+            elif self.operation == 'duration':
+                return f"DURATION: {param.name} {self.value} to {self.value2} {self.description or ''}".strip()
+            else:
+                return f"{param.name} on {self.value} {self.description or ''}".strip()
+        elif param.param_type == 'string':
+            predefined, custom = self.get_selected_string_values()
+            parts = []
+            if predefined:
+                parts.append(', '.join(predefined))
+            if custom:
+                parts.append(f"Custom: {', '.join(custom)}")
+            if parts:
+                return f"{param.name}: {' | '.join(parts)} {self.description or ''}".strip()
+            return f"{param.name}: (none selected) {self.description or ''}".strip()
+        return "Invalid Parameter"
+
+    def __repr__(self):
+        return f'<ProjectParameter {self.id} for Project {self.project_id}>'
 
 
 class ParameterTemplate(db.Model):

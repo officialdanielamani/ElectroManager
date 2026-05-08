@@ -7,7 +7,8 @@ from models import (db, User, Item, ItemBatch, BatchSerialNumber, Setting,
                     Project, ProjectCategory, ProjectTag, ProjectStatus,
                     ProjectPerson, ProjectGroup, ProjectGroupMember,
                     ContactPerson, ContactOrganization,
-                    ProjectBOMItem, ProjectAttachment, ProjectURL, SharedFile)
+                    ProjectBOMItem, ProjectAttachment, ProjectURL, SharedFile,
+                    MagicParameter, ProjectParameter, ProjectParameterStringValue)
 from utils import log_audit, permission_required, allowed_file
 from werkzeug.utils import secure_filename
 from datetime import datetime, timezone
@@ -344,6 +345,194 @@ def project_edit(project_id):
                            share_files_project=SharedFile.query.filter_by(category='project').order_by(SharedFile.name).all(),
                            currency=Setting.get('currency', 'USD'),
                            currency_decimal=int(Setting.get('currency_decimal_places', '2')))
+
+
+# ==================== PROJECT MAGIC PARAMETERS ====================
+
+@project_bp.route('/project/<project_id>/add-parameter', endpoint='project_add_parameter', methods=['POST'])
+@login_required
+def project_add_parameter(project_id):
+    if not current_user.has_permission('projects', 'edit'):
+        flash('You do not have permission to edit projects.', 'danger')
+        return redirect(url_for('project.projects'))
+
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+
+    param_type = request.form.get('param_type')
+    parameter_id = int(request.form.get('parameter_id', 0))
+    operation = request.form.get('operation')
+    value = request.form.get('value', '').strip()
+    value2 = request.form.get('value2', '').strip()
+    unit = request.form.get('unit', '').strip()
+    description = request.form.get('description', '').strip()
+
+    parameter = MagicParameter.query.get(parameter_id)
+    if not parameter:
+        flash('Invalid parameter selected.', 'danger')
+        return redirect(url_for('project.project_edit', project_id=project_id))
+
+    errors = []
+
+    if param_type == 'string':
+        selected_options = request.form.getlist('string_options')
+        custom_value = request.form.get('string_custom_value', '').strip()
+        custom_values = [custom_value] if custom_value else []
+        for opt in selected_options:
+            if len(opt) > 128:
+                errors.append(f"Option value too long (max 128 characters): {opt[:30]}...")
+        for cv in custom_values:
+            if len(cv) > 128:
+                errors.append("Custom value too long (max 128 characters)")
+        if not errors:
+            ok, err = parameter.validate_string_selections(selected_options, custom_values)
+            if not ok:
+                errors.append(err)
+    elif param_type == 'number':
+        if parameter.number_required and not value:
+            errors.append('This number parameter is required')
+        if value:
+            is_valid, error_msg = parameter.validate_number_value(value, False)
+            if not is_valid:
+                errors.append(f"Value: {error_msg}")
+        if value2 and operation == 'range':
+            is_valid, error_msg = parameter.validate_number_value(value2, True)
+            if not is_valid:
+                errors.append(f"Value2: {error_msg}")
+        if operation == 'range' and value and value2:
+            try:
+                if float(value) >= float(value2):
+                    errors.append('Range start must be less than range end')
+            except ValueError:
+                pass
+
+    if errors:
+        for error in errors:
+            flash(error, 'danger')
+        return redirect(url_for('project.project_edit', project_id=project_id))
+
+    proj_param = ProjectParameter(
+        project_id=project.id,
+        parameter_id=parameter_id,
+        operation=operation if param_type in ['number', 'date'] else None,
+        value=value if param_type in ['number', 'date'] else None,
+        value2=value2 if operation in ['range', 'duration'] else None,
+        unit=unit if param_type == 'number' else None,
+        description=description
+    )
+    db.session.add(proj_param)
+    db.session.flush()
+
+    if param_type == 'string':
+        for opt in selected_options:
+            db.session.add(ProjectParameterStringValue(project_parameter_id=proj_param.id, value=opt, is_custom=False))
+        for cv in custom_values:
+            db.session.add(ProjectParameterStringValue(project_parameter_id=proj_param.id, value=cv, is_custom=True))
+
+    db.session.commit()
+    log_audit(current_user.id, 'update', 'project', project.id, f'Added parameter to project: {project.name}')
+    flash('Parameter added successfully!', 'success')
+    return redirect(url_for('project.project_edit', project_id=project_id))
+
+
+@project_bp.route('/project/<project_id>/delete-parameter/<int:param_id>', endpoint='project_delete_parameter', methods=['POST'])
+@login_required
+def project_delete_parameter(project_id, param_id):
+    if not current_user.has_permission('projects', 'edit'):
+        flash('You do not have permission to edit projects.', 'danger')
+        return redirect(url_for('project.projects'))
+
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    proj_param = ProjectParameter.query.get_or_404(param_id)
+
+    if proj_param.project_id != project.id:
+        flash('Invalid parameter.', 'danger')
+        return redirect(url_for('project.project_edit', project_id=project_id))
+
+    db.session.delete(proj_param)
+    db.session.commit()
+    log_audit(current_user.id, 'update', 'project', project.id, f'Removed parameter from project: {project.name}')
+    flash('Parameter removed successfully!', 'success')
+    return redirect(url_for('project.project_edit', project_id=project_id))
+
+
+@project_bp.route('/project/<project_id>/edit-parameter/<int:param_id>', endpoint='project_edit_parameter', methods=['GET', 'POST'])
+@login_required
+def project_edit_parameter(project_id, param_id):
+    if not current_user.has_permission('projects', 'edit'):
+        flash('You do not have permission to edit projects.', 'danger')
+        return redirect(url_for('project.projects'))
+
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    proj_param = ProjectParameter.query.get_or_404(param_id)
+
+    if proj_param.project_id != project.id:
+        flash('Invalid parameter.', 'danger')
+        return redirect(url_for('project.project_edit', project_id=project_id))
+
+    if request.method == 'POST':
+        param = proj_param.parameter
+        operation = request.form.get('operation')
+        value = request.form.get('value', '').strip()
+        value2 = request.form.get('value2', '').strip() if operation in ['range', 'duration'] else None
+
+        errors = []
+
+        if param.param_type == 'string':
+            selected_options = request.form.getlist('string_options')
+            custom_value = request.form.get('string_custom_value', '').strip()
+            custom_values = [custom_value] if custom_value else []
+            for opt in selected_options:
+                if len(opt) > 128:
+                    errors.append(f"Option value too long (max 128 characters): {opt[:30]}...")
+            for cv in custom_values:
+                if len(cv) > 128:
+                    errors.append("Custom value too long (max 128 characters)")
+            if not errors:
+                ok, err = param.validate_string_selections(selected_options, custom_values)
+                if not ok:
+                    errors.append(err)
+        elif param.param_type == 'number':
+            if param.number_required and not value:
+                errors.append('This number parameter is required')
+            if value:
+                is_valid, error_msg = param.validate_number_value(value, False)
+                if not is_valid:
+                    errors.append(f"Value: {error_msg}")
+            if value2 and operation in ['range', 'duration']:
+                is_valid, error_msg = param.validate_number_value(value2, True)
+                if not is_valid:
+                    errors.append(f"Value2: {error_msg}")
+            if operation == 'range' and value and value2:
+                try:
+                    if float(value) >= float(value2):
+                        errors.append('Range start must be less than range end')
+                except ValueError:
+                    pass
+
+        if errors:
+            for error in errors:
+                flash(error, 'danger')
+            return redirect(url_for('project.project_edit_parameter', project_id=project_id, param_id=param_id))
+
+        proj_param.operation = operation
+        proj_param.value = value
+        proj_param.value2 = value2
+        proj_param.unit = request.form.get('unit', '').strip()
+        proj_param.description = request.form.get('description', '').strip()
+
+        if param.param_type == 'string':
+            ProjectParameterStringValue.query.filter_by(project_parameter_id=proj_param.id).delete()
+            for opt in selected_options:
+                db.session.add(ProjectParameterStringValue(project_parameter_id=proj_param.id, value=opt, is_custom=False))
+            for cv in custom_values:
+                db.session.add(ProjectParameterStringValue(project_parameter_id=proj_param.id, value=cv, is_custom=True))
+
+        db.session.commit()
+        log_audit(current_user.id, 'update', 'project', project.id, f'Updated parameter for project: {project.name}')
+        flash('Parameter updated successfully!', 'success')
+        return redirect(url_for('project.project_edit', project_id=project_id))
+
+    return render_template('project_parameter_edit.html', project=project, proj_param=proj_param)
 
 
 # ==================== DELETE PROJECT ====================
