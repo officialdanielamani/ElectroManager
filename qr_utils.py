@@ -44,7 +44,7 @@ def validate_bootstrap_icons():
 def get_item_data(item):
     """Extract printable data from Item"""
     return {
-        'ItemUUID': f"item/{item.uuid}",
+        'ItemUUID': item.uuid,
         'ItemName': item.name,
         'SKU': item.sku or '',
         'Price': f"${item.get_average_price():.2f}" if item.get_average_price() else '',
@@ -52,7 +52,7 @@ def get_item_data(item):
         'Category': item.category.name if item.category else '',
         'LocationName': item.general_location.name if item.general_location else '',
         'RackName': item.rack.name if item.rack else '',
-        'Drawer': f"drawer/{item.drawer}" if item.drawer else ''
+        'Drawer': item.drawer or ''
     }
 
 def get_location_data(location):
@@ -60,7 +60,7 @@ def get_location_data(location):
     from models import Item
     item_count = Item.query.filter_by(location_id=location.id).count()
     return {
-        'LocationUUID': f"location/{location.uuid}",
+        'LocationUUID': location.uuid,
         'LocationName': location.name,
         'LocationInfo': location.info or '',
         'ItemCount': str(item_count)
@@ -71,7 +71,7 @@ def get_rack_data(rack):
     from models import Item
     item_count = Item.query.filter_by(rack_id=rack.id).count()
     return {
-        'RackUUID': f"rack/{rack.uuid}",
+        'RackUUID': rack.uuid,
         'RackName': rack.name,
         'Capacity': str(rack.rows * rack.cols),
         'ItemCount': str(item_count)

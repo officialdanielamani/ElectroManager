@@ -1112,7 +1112,7 @@ function updatePropertiesPanel(index) {
     // Define placeholders based on template type context
     const placeholders = {
         item: [
-            { label: '{ItemUUID} - item/UUID format', value: '{ItemUUID}' },
+            { label: '{ItemUUID} - Item UUID', value: '{ItemUUID}' },
             { label: '{ItemName} - Product name', value: '{ItemName}' },
             { label: '{SKU} - Stock code', value: '{SKU}' },
             { label: '{Price} - Price', value: '{Price}' },
@@ -1120,19 +1120,19 @@ function updatePropertiesPanel(index) {
             { label: '{Category} - Category name', value: '{Category}' },
             { label: '{LocationName} - Location', value: '{LocationName}' },
             { label: '{RackName} - Rack name', value: '{RackName}' },
-            { label: '{Drawer} - drawer/UUID format', value: '{Drawer}' },
+            { label: '{Drawer} - Drawer cell (e.g. R1-C2)', value: '{Drawer}' },
             { label: '{Description} - Description', value: '{Description}' },
             { label: '{MinQuantity} - Min stock', value: '{MinQuantity}' }
         ],
         location: [
-            { label: '{LocationUUID} - location/UUID format', value: '{LocationUUID}' },
+            { label: '{LocationUUID} - Location UUID', value: '{LocationUUID}' },
             { label: '{LocationName} - Name', value: '{LocationName}' },
             { label: '{LocationInfo} - Info field', value: '{LocationInfo}' },
             { label: '{Description} - Description', value: '{Description}' },
             { label: '{ItemCount} - # of items', value: '{ItemCount}' }
         ],
         rack: [
-            { label: '{RackUUID} - Rack ID', value: '{RackUUID}' },
+            { label: '{RackUUID} - Rack UUID', value: '{RackUUID}' },
             { label: '{RackName} - Name', value: '{RackName}' },
             { label: '{Description} - Description', value: '{Description}' },
             { label: '{Capacity} - Total slots', value: '{Capacity}' },

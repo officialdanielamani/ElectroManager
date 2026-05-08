@@ -498,6 +498,7 @@ class ItemBatch(db.Model):
     item_id = db.Column(db.Integer, db.ForeignKey('items.id'), nullable=False)
     batch_number = db.Column(db.Integer, nullable=False)
     batch_label = db.Column(db.String(32))
+    manufacturer = db.Column(db.String(128))
     quantity = db.Column(db.Integer, default=0)
     price_per_unit = db.Column(db.Float, default=0.0)
     purchase_date = db.Column(db.Date)

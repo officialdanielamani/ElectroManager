@@ -262,6 +262,7 @@ def item_new():
                 if qty > max_qty:
                     qty = max_qty
                 label = str(pb.get('label', '')).strip()[:32] or None
+                manufacturer = str(pb.get('manufacturer', '')).strip()[:128] or None
                 price = float(pb.get('price', 0) or 0) if perms.get('can_edit_price') else 0.0
                 if price < 0:
                     price = 0.0
@@ -298,6 +299,7 @@ def item_new():
                     item_id=item.id,
                     batch_number=item.get_next_batch_number(),
                     batch_label=label,
+                    manufacturer=manufacturer,
                     quantity=qty,
                     price_per_unit=price,
                     purchase_date=purchase_date,

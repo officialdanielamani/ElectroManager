@@ -69,6 +69,7 @@ def add_batch(uuid):
     can_edit_lending = current_user.has_permission('items', 'edit_lending')
 
     batch_label = request.form.get('batch_label', '').strip()[:32]
+    manufacturer = request.form.get('manufacturer', '').strip()[:128]
     quantity = int(request.form.get('quantity', 0)) if can_edit_qty else 0
     price_per_unit = float(request.form.get('price_per_unit', 0)) if can_edit_price else 0.0
     purchase_date_str = request.form.get('purchase_date', '')
@@ -125,6 +126,7 @@ def add_batch(uuid):
         item_id=item.id,
         batch_number=batch_number,
         batch_label=batch_label or None,
+        manufacturer=manufacturer or None,
         quantity=quantity,
         price_per_unit=price_per_unit,
         purchase_date=purchase_date,
@@ -184,6 +186,7 @@ def edit_batch(uuid, batch_id):
     # General batch fields (label, date, note, location)
     if can_edit_batch:
         batch.batch_label = (request.form.get('batch_label', '').strip()[:32]) or None
+        batch.manufacturer = (request.form.get('manufacturer', '').strip()[:128]) or None
         batch.note = (request.form.get('note', '').strip()[:128]) or None
 
         purchase_date_str = request.form.get('purchase_date', '')
