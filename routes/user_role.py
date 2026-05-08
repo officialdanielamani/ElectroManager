@@ -3,7 +3,7 @@ User Role Routes Blueprint
 """
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file, abort, current_app
 from flask_login import login_required, current_user, login_user, logout_user
-from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate
+from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate, SharedFile
 from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEditForm, AttachmentForm, 
                    SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm)
 from helpers import is_safe_url, format_currency, is_safe_file_path
@@ -290,6 +290,28 @@ def user_edit(id):
     
     return render_template('user_form.html', form=form, user=user, title='Edit User', config=current_app.config)
 
+
+@user_role_bp.route('/user/<int:user_id>/choose-profile-photo', endpoint='admin_choose_profile_photo')
+@login_required
+@permission_required("settings_sections.users_roles", "users_edit")
+def admin_choose_profile_photo(user_id):
+    user = User.query.get_or_404(user_id)
+    files = SharedFile.query.filter_by(category='profile').order_by(SharedFile.created_at.desc()).all()
+    back_url = url_for('user_role.user_edit', id=user_id)
+    return render_template('choose_profile_photo.html', files=files, back_url=back_url, for_user_id=user_id)
+
+
+@user_role_bp.route('/user/<int:user_id>/choose-profile-photo/select/<int:file_id>', endpoint='admin_select_share_profile_photo', methods=['POST'])
+@login_required
+@permission_required("settings_sections.users_roles", "users_edit")
+def admin_select_share_profile_photo(user_id, file_id):
+    user = User.query.get_or_404(user_id)
+    sf = SharedFile.query.filter_by(id=file_id, category='profile').first_or_404()
+    user.profile_photo = f'share/{sf.filename}'
+    db.session.commit()
+    log_audit(current_user.id, 'update', 'user', user.id, f'Set profile photo from share for user {user.username}: {sf.name}')
+    flash('Profile picture updated.', 'success')
+    return redirect(url_for('user_role.user_edit', id=user_id))
 
 
 @user_role_bp.route('/user/<int:id>/delete', endpoint='user_delete', methods=['POST'])

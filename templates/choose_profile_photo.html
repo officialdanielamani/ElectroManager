@@ -4,7 +4,7 @@
 {% block content %}
 <div class="container-fluid">
     <div class="d-flex align-items-center mb-3 gap-2">
-        <a href="{{ url_for('settings.settings_general') }}" class="btn btn-outline-secondary btn-sm">
+        <a href="{{ back_url if back_url else url_for('settings.settings_general') }}" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-arrow-left"></i> Back
         </a>
         <h4 class="mb-0"><i class="bi bi-folder2-open"></i> Choose Profile Picture</h4>
@@ -30,7 +30,11 @@
                          class="img-fluid rounded mb-2"
                          style="max-height: 120px; object-fit: cover; width: 100%;">
                     <div class="small text-truncate text-muted mb-2" title="{{ sf.name }}">{{ sf.name }}</div>
+                    {% if for_user_id %}
+                    <form method="POST" action="{{ url_for('user_role.admin_select_share_profile_photo', user_id=for_user_id, file_id=sf.id) }}">
+                    {% else %}
                     <form method="POST" action="{{ url_for('settings.select_share_profile_photo', file_id=sf.id) }}">
+                    {% endif %}
                         <button type="submit" class="btn btn-primary btn-sm w-100">
                             <i class="bi bi-check2"></i> Select
                         </button>

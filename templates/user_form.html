@@ -93,6 +93,16 @@
                                     {% endif %}
                                 </div>
                             </div>
+
+                            <!-- Choose from Share Files -->
+                            {% if not (user and user.is_demo_user and config.DEMO_MODE) %}
+                            <div class="mt-2">
+                                <label class="form-label small text-muted fw-semibold">Choose from Share Files</label>
+                                <a href="{{ url_for('user_role.admin_choose_profile_photo', user_id=user.id) }}" class="btn btn-outline-primary d-block">
+                                    <i class="bi bi-folder2-open"></i> Browse Share Files
+                                </a>
+                            </div>
+                            {% endif %}
                         </div>
                         {% endif %}
                         
