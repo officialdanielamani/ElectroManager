@@ -509,8 +509,17 @@ def settings_system():
                             except OSError: pass
                         fname = f'system.{ext}'
                         os.makedirs(current_app.instance_path, exist_ok=True)
-                        sfile.save(os.path.join(current_app.instance_path, fname))
+                        logo_path = os.path.join(current_app.instance_path, fname)
+                        sfile.save(logo_path)
                         Setting.set('system_logo', fname, 'System logo filename in instance folder')
+                        # Auto-generate favicon.ico alongside the logo
+                        try:
+                            from PIL import Image
+                            img = Image.open(logo_path).convert('RGBA')
+                            img.save(os.path.join(current_app.instance_path, 'favicon.ico'),
+                                     format='ICO', sizes=[(16, 16), (32, 32), (48, 48)])
+                        except Exception as _e:
+                            logger.warning(f'favicon generation failed: {_e}')
                     else:
                         flash('System logo must be smaller than 1MB.', 'warning')
                 else:
@@ -583,10 +592,6 @@ def settings_system():
 
             # Location upload settings
             if not current_app.config.get('DEMO_MODE', False):
-                loc_ext = request.form.get('location_upload_extensions', 'webp,png,svg,jpeg,jpg').strip()
-                loc_size = request.form.get('location_upload_max_size', '10')
-                Setting.set('location_upload_extensions', loc_ext, 'Location upload allowed extensions')
-                Setting.set('location_upload_max_size', loc_size, 'Location upload max size MB')
                 for ptype in ['picture', 'document', 'schematic', '2d_design', '3d_design', 'program']:
                     pext = request.form.get(f'project_upload_{ptype}_extensions', '').strip()
                     psize = request.form.get(f'project_upload_{ptype}_max_size', '10')
@@ -688,8 +693,6 @@ def settings_system():
                           company_country=company_country,
                           verinfo_content=verinfo_content,
                           demo_mode=current_app.config.get('DEMO_MODE', False),
-                          location_upload_extensions=Setting.get('location_upload_extensions', 'webp,png,svg,jpeg,jpg'),
-                          location_upload_max_size=Setting.get('location_upload_max_size', '10'),
                           project_upload_settings={
                               'picture': {'extensions': Setting.get('project_upload_picture_extensions', 'webp,png,svg,jpeg,jpg'), 'max_size': Setting.get('project_upload_picture_max_size', '10')},
                               'document': {'extensions': Setting.get('project_upload_document_extensions', 'txt,doc,docx,pdf'), 'max_size': Setting.get('project_upload_document_max_size', '10')},
@@ -710,13 +713,14 @@ def settings_system():
 @login_required
 @admin_required
 def delete_system_logo():
-    """Delete the system logo from the instance folder."""
+    """Delete the system logo and favicon from the instance folder."""
     fname = Setting.get('system_logo', '')
     if fname:
-        try:
-            os.remove(os.path.join(current_app.instance_path, fname))
-        except OSError:
-            pass
+        for f in (fname, 'favicon.ico'):
+            try:
+                os.remove(os.path.join(current_app.instance_path, f))
+            except OSError:
+                pass
         Setting.set('system_logo', '', 'System logo filename in instance folder')
         flash('System logo deleted.', 'success')
     return redirect(url_for('settings.settings_system'))

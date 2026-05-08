@@ -95,7 +95,7 @@ def location_new():
             file = form.picture.data
             
             # Check file size against system settings
-            max_size_mb = int(Setting.get('max_file_size_mb', '10'))
+            max_size_mb = 10  # fixed for location/rack pictures
             max_size_bytes = max_size_mb * 1024 * 1024
             
             file.seek(0, 2)
@@ -103,7 +103,7 @@ def location_new():
             file.seek(0)
             
             if file_size > max_size_bytes:
-                flash(f'File size exceeds maximum allowed size of {max_size_mb}MB', 'danger')
+                flash('Location/rack pictures must be smaller than 10MB.', 'danger')
                 db.session.delete(location)
                 db.session.commit()
                 return render_template('location_form.html', form=form, location=None)
@@ -111,8 +111,8 @@ def location_new():
             # Only allow PNG and JPEG
             if file.filename and allowed_file(file.filename):
                 ext = file.filename.rsplit('.', 1)[1].lower()
-                if ext not in ['png', 'jpg', 'jpeg']:
-                    flash('Only PNG and JPEG images are allowed for locations!', 'danger')
+                if ext not in ['png', 'jpg', 'jpeg', 'webp']:
+                    flash('Only PNG, JPEG, and WebP images are allowed.', 'danger')
                     db.session.delete(location)
                     db.session.commit()
                     return render_template('location_form.html', form=form, location=None)
@@ -175,7 +175,7 @@ def location_edit(uuid):
             file = form.picture.data
             if hasattr(file, 'filename') and file.filename and allowed_file(file.filename):
                 # Check file size against system settings
-                max_size_mb = int(Setting.get('max_file_size_mb', '10'))
+                max_size_mb = 10  # fixed for location/rack pictures
                 max_size_bytes = max_size_mb * 1024 * 1024
                 
                 file.seek(0, 2)
@@ -183,13 +183,13 @@ def location_edit(uuid):
                 file.seek(0)
                 
                 if file_size > max_size_bytes:
-                    flash(f'File size exceeds maximum allowed size of {max_size_mb}MB', 'danger')
+                    flash('Location/rack pictures must be smaller than 10MB.', 'danger')
                     return render_template('location_form.html', form=form, location=location)
                 
                 # Only allow PNG and JPEG
                 ext = file.filename.rsplit('.', 1)[1].lower()
-                if ext not in ['png', 'jpg', 'jpeg']:
-                    flash('Only PNG and JPEG images are allowed for locations!', 'danger')
+                if ext not in ['png', 'jpg', 'jpeg', 'webp']:
+                    flash('Only PNG, JPEG, and WebP images are allowed.', 'danger')
                     return render_template('location_form.html', form=form, location=location)
                 
                 # Delete old picture if exists
@@ -347,7 +347,7 @@ def rack_new():
             file = request.files['picture']
             
             # Check file size against system settings
-            max_size_mb = int(Setting.get('max_file_size_mb', '10'))
+            max_size_mb = 10  # fixed for location/rack pictures
             max_size_bytes = max_size_mb * 1024 * 1024
             
             file.seek(0, 2)
@@ -355,14 +355,14 @@ def rack_new():
             file.seek(0)
             
             if file_size > max_size_bytes:
-                flash(f'File size exceeds maximum allowed size of {max_size_mb}MB', 'danger')
+                flash('Location/rack pictures must be smaller than 10MB.', 'danger')
                 return redirect(url_for('location_rack.rack_new'))
             
             # Only allow PNG and JPEG
             if file.filename and allowed_file(file.filename):
                 ext = file.filename.rsplit('.', 1)[1].lower()
-                if ext not in ['png', 'jpg', 'jpeg']:
-                    flash('Only PNG and JPEG images are allowed for racks!', 'danger')
+                if ext not in ['png', 'jpg', 'jpeg', 'webp']:
+                    flash('Only PNG, JPEG, and WebP images are allowed.', 'danger')
                     return redirect(url_for('location_rack.rack_new'))
                 
                 # Use UUID-based directory structure: /uploads/racks/{rack_uuid}/
@@ -489,7 +489,7 @@ def rack_edit(uuid):
             file = request.files['picture']
             if hasattr(file, 'filename') and file.filename and allowed_file(file.filename):
                 # Check file size against system settings
-                max_size_mb = int(Setting.get('max_file_size_mb', '10'))
+                max_size_mb = 10  # fixed for location/rack pictures
                 max_size_bytes = max_size_mb * 1024 * 1024
                 
                 file.seek(0, 2)
@@ -497,13 +497,13 @@ def rack_edit(uuid):
                 file.seek(0)
                 
                 if file_size > max_size_bytes:
-                    flash(f'File size exceeds maximum allowed size of {max_size_mb}MB', 'danger')
+                    flash('Location/rack pictures must be smaller than 10MB.', 'danger')
                     return redirect(url_for('location_rack.rack_edit', uuid=uuid))
                 
                 # Only allow PNG and JPEG
                 ext = file.filename.rsplit('.', 1)[1].lower()
-                if ext not in ['png', 'jpg', 'jpeg']:
-                    flash('Only PNG and JPEG images are allowed for racks!', 'danger')
+                if ext not in ['png', 'jpg', 'jpeg', 'webp']:
+                    flash('Only PNG, JPEG, and WebP images are allowed.', 'danger')
                     return redirect(url_for('location_rack.rack_edit', uuid=uuid))
                 
                 # Delete old picture if exists

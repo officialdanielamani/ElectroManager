@@ -206,6 +206,18 @@ def user_picture(filename):
     return send_from_directory(user_pic_folder, filename)
 
 
+@app.route('/favicon.ico')
+def favicon():
+    """Serve favicon.ico from instance folder if available, else fall back to static."""
+    favicon_path = os.path.join(app.instance_path, 'favicon.ico')
+    if os.path.exists(favicon_path):
+        return send_from_directory(app.instance_path, 'favicon.ico', mimetype='image/x-icon')
+    static_favicon = os.path.join(app.root_path, 'static', 'favicon.ico')
+    if os.path.exists(static_favicon):
+        return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico', mimetype='image/x-icon')
+    abort(404)
+
+
 @app.route('/instance-file/<filename>')
 def instance_file(filename):
     """Serve logo files stored in the instance folder (system/company logos)."""

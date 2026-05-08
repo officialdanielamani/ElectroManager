@@ -294,23 +294,6 @@
                         </div>
                     </div>
 
-                    <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-geo-alt"></i> Location / Rack Uploads</h6>
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                            <label class="form-label">Allowed File Types {% if not demo_mode %}<span class="text-danger">*</span>{% endif %}</label>
-                            <input type="text" class="form-control" name="location_upload_extensions"
-                                   value="{% if demo_mode %}jpg,jpeg,png{% else %}{{ location_upload_extensions }}{% endif %}"
-                                   {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}
-                                   placeholder="webp,png,svg,jpeg,jpg">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Max File Size (MB) {% if not demo_mode %}<span class="text-danger">*</span>{% endif %}</label>
-                            <input type="number" class="form-control" name="location_upload_max_size"
-                                   value="{% if demo_mode %}1{% else %}{{ location_upload_max_size }}{% endif %}"
-                                   min="1" max="100" {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}>
-                        </div>
-                    </div>
-
                     <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-kanban"></i> Project Uploads</h6>
                     {% if demo_mode %}
                     {% set proj_types_demo = [('picture', 'Pictures', 'jpg,jpeg,png', '1'), ('document', 'Documents', 'txt', '1'), ('schematic', 'Schematics', 'jpg,jpeg,png,txt', '1'), ('2d_design', '2D Design', 'jpg,jpeg,png', '1'), ('3d_design', '3D Design', 'jpg,jpeg,png', '1'), ('program', 'Programs', 'txt', '1')] %}
