@@ -1,7 +1,7 @@
 """
 Inventory Manager Application - Main Entry Point
 """
-from flask import Flask, render_template, request, send_from_directory, jsonify
+from flask import Flask, render_template, request, send_from_directory, jsonify, url_for, abort
 from flask_login import LoginManager, current_user, AnonymousUserMixin, login_required
 from config import Config
 from models import db, User, Category, Item, Setting
@@ -52,7 +52,8 @@ login_manager.login_view = 'auth.login'
 login_manager.login_message = 'Please log in to access this page.'
 login_manager.anonymous_user = AnonymousUser  # Use custom anonymous user
 
-# Create upload folders
+# Create upload and instance folders
+os.makedirs(app.instance_path, exist_ok=True)
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture'), exist_ok=True)
 for _share_cat in ('item', 'icon', 'profile', 'project', 'sticker'):
@@ -101,56 +102,60 @@ def load_dependencies():
 @app.context_processor
 def inject_theme():
     """Inject validated theme settings into all templates with fallback"""
+    import os
+
+    def get_available_themes():
+        themes_dir = os.path.join(app.root_path, 'static', 'custom', 'theme')
+        theme_ids = []
+        if os.path.exists(themes_dir):
+            for file in os.listdir(themes_dir):
+                if file.endswith('.css'):
+                    theme_ids.append(file[:-4])
+        return theme_ids if theme_ids else ['light']
+
+    def validate_theme(theme):
+        available = get_available_themes()
+        return theme if theme in available else 'light'
+
+    default_theme = validate_theme(Setting.get('default_theme', 'light'))
+
     if current_user.is_authenticated:
-        # Import validation functions
-        import os
-        import re
-        
-        def get_available_themes():
-            themes_dir = os.path.join(app.root_path, 'static', 'custom', 'theme')
-            theme_ids = []
-            if os.path.exists(themes_dir):
-                for file in os.listdir(themes_dir):
-                    if file.endswith('.css'):
-                        theme_ids.append(file[:-4])
-            return theme_ids if theme_ids else ['light']
-        
-        def validate_theme(theme):
-            available = get_available_themes()
-            return theme if theme in available else 'light'
-        
-        # Validate user's theme - fallback if file doesn't exist
-        validated_theme = validate_theme(current_user.theme or 'light')
-        return {'current_theme': validated_theme}
-    return {'current_theme': 'light'}
+        validated_theme = validate_theme(current_user.theme or default_theme)
+        return {'current_theme': validated_theme, 'default_theme': default_theme}
+    return {'current_theme': default_theme, 'default_theme': default_theme}
 
 
 @app.context_processor
 def inject_settings():
     """Inject global settings into all templates"""
     settings_dict = {}
-    
+
     # Core settings
     settings_to_inject = [
-        'app_name', 'currency', 'currency_decimal_places', 
+        'app_name', 'currency', 'currency_decimal_places',
         'company_name', 'company_address', 'company_logo'
     ]
-    
+
     for key in settings_to_inject:
         settings_dict[key] = Setting.get(key, '')
-    
+
+    # System name and logo
+    system_name = Setting.get('system_name', '')
+    system_logo_file = Setting.get('system_logo', '')
+    system_logo_url = url_for('instance_file', filename=system_logo_file) if system_logo_file else ''
+
     # Categories for dropdowns
     categories = Category.query.order_by(Category.name).all()
-    
+
     # Notification count (default to 0 if no notifications)
     notification_count = 0
-    
+
     # Banner timeout
     banner_timeout = Setting.get('banner_timeout', '5')
-    
+
     # Load JS dependencies dynamically
     css_files, js_files, libs = load_dependencies()
-    
+
     return {
         'app_settings': settings_dict,
         'all_categories': categories,
@@ -158,7 +163,9 @@ def inject_settings():
         'banner_timeout': banner_timeout,
         'css_files': css_files,
         'js_files': js_files,
-        'dependencies': libs
+        'dependencies': libs,
+        'system_name': system_name,
+        'system_logo_url': system_logo_url,
     }
 
 
@@ -197,6 +204,20 @@ def user_picture(filename):
         abort(404)
     
     return send_from_directory(user_pic_folder, filename)
+
+
+@app.route('/instance-file/<filename>')
+def instance_file(filename):
+    """Serve logo files stored in the instance folder (system/company logos)."""
+    from werkzeug.utils import secure_filename
+    safe_name = secure_filename(filename)
+    if not safe_name:
+        abort(404)
+    instance_dir = app.instance_path
+    full_path = os.path.join(instance_dir, safe_name)
+    if not os.path.exists(full_path):
+        abort(404)
+    return send_from_directory(instance_dir, safe_name)
 
 
 # Error handlers

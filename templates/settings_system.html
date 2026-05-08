@@ -12,30 +12,64 @@
 
 <div class="row">
     <div class="col-md-8">
-        <form method="POST" action="{{ url_for('settings.settings_system') }}">
-            
+        <form method="POST" action="{{ url_for('settings.settings_system') }}" enctype="multipart/form-data">
+
             <!-- System Customization Card -->
             <div class="card mb-4">
                 <div class="card-header">
                     <h5 class="mb-0"><i class="bi bi-palette"></i> System Customization</h5>
                 </div>
                 <div class="card-body">
+
+                    <!-- System Name -->
                     <div class="mb-3">
-                        <label for="banner_timeout" class="form-label">Banner Timeout (seconds) <span class="text-danger">*</span></label>
-                        <input type="number" 
-                               class="form-control" 
-                               id="banner_timeout" 
-                               name="banner_timeout" 
-                               value="{{ banner_timeout }}" 
-                               min="0" 
-                               max="60" 
-                               required>
-                        <div class="form-text">
-                            <i class="bi bi-info-circle"></i> Set to 0 for permanent banner (closes only with X button), or 1-60 seconds for auto-dismiss
-                        </div>
+                        <label for="system_name" class="form-label fw-semibold">System Name</label>
+                        <input type="text" class="form-control" id="system_name" name="system_name"
+                               value="{{ system_name }}" maxlength="64"
+                               placeholder="e.g. My Inventory System">
+                        <div class="form-text">Displayed on the login page (max 64 characters).</div>
                     </div>
-                    <div class="alert alert-info mb-0">
-                        <i class="bi bi-lightbulb"></i> <strong>Note:</strong> This affects info/alert banners displayed throughout the system.
+
+                    <!-- System Logo -->
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">System Logo</label>
+                        {% if system_logo_url %}
+                        <div class="mb-2 d-flex align-items-center gap-3">
+                            <img src="{{ system_logo_url }}" alt="System Logo" style="max-height:80px; max-width:200px; border-radius:6px; border:1px solid #dee2e6;">
+                            <form method="POST" action="{{ url_for('settings.delete_system_logo') }}" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete system logo?')">
+                                    <i class="bi bi-trash"></i> Delete
+                                </button>
+                            </form>
+                        </div>
+                        {% endif %}
+                        <input type="file" class="form-control" name="system_logo" accept=".jpg,.jpeg,.png">
+                        <div class="form-text">JPG or PNG, max 1 MB. Shown on the login page. Replaces existing logo on upload.</div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Banner Timeout -->
+                    <div class="mb-3">
+                        <label for="banner_timeout" class="form-label fw-semibold">Banner Timeout (seconds) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="banner_timeout" name="banner_timeout"
+                               value="{{ banner_timeout }}" min="0" max="60" required>
+                        <div class="form-text"><i class="bi bi-info-circle"></i> 0 = permanent (closes only with ✕), 1–60 = auto-dismiss.</div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Default Theme -->
+                    <div class="mb-3">
+                        <label for="default_theme" class="form-label fw-semibold">Default Theme</label>
+                        <select class="form-select" id="default_theme" name="default_theme">
+                            {% for theme in available_themes %}
+                            <option value="{{ theme.id }}" {% if default_theme == theme.id %}selected{% endif %}>
+                                {{ theme.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Applied for anonymous users and as the fallback when a user's chosen theme is unavailable. Each user can override this in their own settings.</div>
                     </div>
 
                     <hr>
@@ -68,6 +102,72 @@
                         <input class="form-check-input" type="checkbox" name="download_all_share_files_page" id="dl_sf_page"
                                {% if download_all_share_files_page %}checked{% endif %}>
                         <label class="form-check-label" for="dl_sf_page">Share Files page (<code>/settings/share-files</code>)</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Company Detail Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-building"></i> Company Detail</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Company Name</label>
+                            <input type="text" class="form-control" name="company_name" value="{{ company_name }}" maxlength="128" placeholder="Acme Corp">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Telephone</label>
+                            <input type="text" class="form-control" name="company_tel" value="{{ company_tel }}" maxlength="20" placeholder="+1234567890">
+                            <div class="form-text">Digits and + only.</div>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Email</label>
+                            <input type="text" class="form-control" name="company_email" value="{{ company_email }}" maxlength="128" placeholder="info@company.com">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Website URL</label>
+                            <input type="text" class="form-control" name="company_url" value="{{ company_url }}" maxlength="256" placeholder="https://company.com">
+                            <div class="form-text">Must start with http:// or https://</div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Address</label>
+                        <textarea class="form-control" name="company_address" rows="3" placeholder="123 Main St...">{{ company_address }}</textarea>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Zip / Postal Code</label>
+                            <input type="text" class="form-control" name="company_zip" value="{{ company_zip }}" maxlength="12" placeholder="12345">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">State / Region</label>
+                            <input type="text" class="form-control" name="company_state" value="{{ company_state }}" maxlength="64" placeholder="California">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Country</label>
+                            <input type="text" class="form-control" name="company_country" value="{{ company_country }}" maxlength="64" placeholder="United States">
+                        </div>
+                    </div>
+
+                    <!-- Company Logo -->
+                    <div class="mb-2">
+                        <label class="form-label fw-semibold">Company Logo</label>
+                        {% if company_logo_url %}
+                        <div class="mb-2 d-flex align-items-center gap-3">
+                            <img src="{{ company_logo_url }}" alt="Company Logo" style="max-height:80px; max-width:200px; border-radius:6px; border:1px solid #dee2e6;">
+                            <form method="POST" action="{{ url_for('settings.delete_company_logo') }}" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete company logo?')">
+                                    <i class="bi bi-trash"></i> Delete
+                                </button>
+                            </form>
+                        </div>
+                        {% endif %}
+                        <input type="file" class="form-control" name="company_logo" accept=".jpg,.jpeg,.png">
+                        <div class="form-text">JPG or PNG, max 1 MB. Replaces existing logo on upload.</div>
                     </div>
                 </div>
             </div>

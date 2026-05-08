@@ -6,8 +6,16 @@
 <div class="row justify-content-center mt-5">
     <div class="col-md-4">
         <div class="card">
-            <div class="card-header text-center">
+            <div class="card-header text-center py-4">
                 <h3><i class="bi bi-box-seam"></i> Inventory Manager</h3>
+                {% if system_logo_url %}
+                <div class="mt-3 mb-2">
+                    <img src="{{ system_logo_url }}" alt="System Logo" style="max-height:80px; max-width:220px; object-fit:contain;">
+                </div>
+                {% endif %}
+                {% if system_name %}
+                <div class="fw-semibold fs-5 {% if not system_logo_url %}mt-2{% endif %}">{{ system_name }}</div>
+                {% endif %}
             </div>
             <div class="card-body">
                 {% if demo_mode %}

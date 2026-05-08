@@ -491,6 +491,81 @@ def settings_system():
                 flash('Invalid banner timeout value!', 'danger')
                 return redirect(url_for('settings.settings_system'))
             
+            # System name
+            system_name = request.form.get('system_name', '').strip()[:64]
+            Setting.set('system_name', system_name, 'System display name (shown on login page)')
+
+            # System logo upload
+            if 'system_logo' in request.files and request.files['system_logo'].filename:
+                sfile = request.files['system_logo']
+                ext = sfile.filename.rsplit('.', 1)[-1].lower() if '.' in sfile.filename else ''
+                if ext in ('jpg', 'jpeg', 'png'):
+                    sfile.seek(0, os.SEEK_END)
+                    if sfile.tell() <= 1024 * 1024:
+                        sfile.seek(0)
+                        old_logo = Setting.get('system_logo', '')
+                        if old_logo:
+                            try: os.remove(os.path.join(current_app.instance_path, old_logo))
+                            except OSError: pass
+                        fname = f'system.{ext}'
+                        os.makedirs(current_app.instance_path, exist_ok=True)
+                        sfile.save(os.path.join(current_app.instance_path, fname))
+                        Setting.set('system_logo', fname, 'System logo filename in instance folder')
+                    else:
+                        flash('System logo must be smaller than 1MB.', 'warning')
+                else:
+                    flash('System logo must be JPG or PNG.', 'warning')
+
+            # Default theme
+            from routes.settings import get_available_themes as _get_themes
+            available_theme_ids = [t['id'] for t in _get_themes()]
+            default_theme = request.form.get('default_theme', 'light')
+            if default_theme not in available_theme_ids:
+                default_theme = 'light'
+            Setting.set('default_theme', default_theme, 'Default theme for all users')
+
+            # Company details
+            company_name = request.form.get('company_name', '').strip()[:128]
+            company_tel = ''.join(c for c in request.form.get('company_tel', '') if c.isdigit() or c == '+')[:20]
+            company_email = request.form.get('company_email', '').strip()[:128]
+            company_url = request.form.get('company_url', '').strip()
+            if company_url and not (company_url.startswith('http://') or company_url.startswith('https://')):
+                company_url = ''
+                flash('Company URL must start with http:// or https://', 'warning')
+            company_address = request.form.get('company_address', '').strip()
+            company_zip = request.form.get('company_zip', '').strip()[:12]
+            company_state = request.form.get('company_state', '').strip()[:64]
+            company_country = request.form.get('company_country', '').strip()[:64]
+            Setting.set('company_name', company_name, 'Company name')
+            Setting.set('company_tel', company_tel, 'Company telephone')
+            Setting.set('company_email', company_email, 'Company email')
+            Setting.set('company_url', company_url, 'Company website URL')
+            Setting.set('company_address', company_address, 'Company address')
+            Setting.set('company_zip', company_zip, 'Company zip/postal code')
+            Setting.set('company_state', company_state, 'Company state/region')
+            Setting.set('company_country', company_country, 'Company country')
+
+            # Company logo upload
+            if 'company_logo' in request.files and request.files['company_logo'].filename:
+                cfile = request.files['company_logo']
+                ext = cfile.filename.rsplit('.', 1)[-1].lower() if '.' in cfile.filename else ''
+                if ext in ('jpg', 'jpeg', 'png'):
+                    cfile.seek(0, os.SEEK_END)
+                    if cfile.tell() <= 1024 * 1024:
+                        cfile.seek(0)
+                        old_logo = Setting.get('company_logo', '')
+                        if old_logo:
+                            try: os.remove(os.path.join(current_app.instance_path, old_logo))
+                            except OSError: pass
+                        fname = f'company.{ext}'
+                        os.makedirs(current_app.instance_path, exist_ok=True)
+                        cfile.save(os.path.join(current_app.instance_path, fname))
+                        Setting.set('company_logo', fname, 'Company logo filename in instance folder')
+                    else:
+                        flash('Company logo must be smaller than 1MB.', 'warning')
+                else:
+                    flash('Company logo must be JPG or PNG.', 'warning')
+
             # Save settings
             Setting.set('currency', currency, 'Currency symbol for prices')
             Setting.set('currency_decimal_places', currency_decimal_places, 'Currency decimal places (0-5)')
@@ -549,7 +624,26 @@ def settings_system():
     download_all_project_attachments = Setting.get('download_all_project_attachments', True)
     download_all_project_share_files = Setting.get('download_all_project_share_files', True)
     download_all_share_files_page  = Setting.get('download_all_share_files_page',  True)
-    
+
+    # System customization
+    system_name = Setting.get('system_name', '')
+    system_logo_file = Setting.get('system_logo', '')
+    system_logo_url = url_for('instance_file', filename=system_logo_file) if system_logo_file else ''
+    default_theme = Setting.get('default_theme', 'light')
+    available_themes = get_available_themes()
+
+    # Company details
+    company_name    = Setting.get('company_name', '')
+    company_logo_file = Setting.get('company_logo', '')
+    company_logo_url = url_for('instance_file', filename=company_logo_file) if company_logo_file else ''
+    company_tel     = Setting.get('company_tel', '')
+    company_email   = Setting.get('company_email', '')
+    company_url     = Setting.get('company_url', '')
+    company_address = Setting.get('company_address', '')
+    company_zip     = Setting.get('company_zip', '')
+    company_state   = Setting.get('company_state', '')
+    company_country = Setting.get('company_country', '')
+
     # Read system information from verinfo file
     verinfo_content = ""
     verinfo_path = None
@@ -564,7 +658,7 @@ def settings_system():
                 verinfo_content = f"Error reading {filename}"
             break
     
-    return render_template('settings_system.html', 
+    return render_template('settings_system.html',
                           currency=currency,
                           currency_decimal_places=currency_decimal_places,
                           max_file_size=max_file_size,
@@ -577,6 +671,21 @@ def settings_system():
                           download_all_project_attachments=download_all_project_attachments,
                           download_all_project_share_files=download_all_project_share_files,
                           download_all_share_files_page=download_all_share_files_page,
+                          system_name=system_name,
+                          system_logo_url=system_logo_url,
+                          system_logo_file=system_logo_file,
+                          default_theme=default_theme,
+                          available_themes=available_themes,
+                          company_name=company_name,
+                          company_logo_url=company_logo_url,
+                          company_logo_file=company_logo_file,
+                          company_tel=company_tel,
+                          company_email=company_email,
+                          company_url=company_url,
+                          company_address=company_address,
+                          company_zip=company_zip,
+                          company_state=company_state,
+                          company_country=company_country,
                           verinfo_content=verinfo_content,
                           demo_mode=current_app.config.get('DEMO_MODE', False),
                           location_upload_extensions=Setting.get('location_upload_extensions', 'webp,png,svg,jpeg,jpg'),
@@ -595,6 +704,38 @@ def settings_system():
                               'sticker': {'extensions': Setting.get('share_sticker_extensions', 'png,jpg,jpeg'),                      'max_size': Setting.get('share_sticker_max_size', '1')},
                               'icon':    {'extensions': Setting.get('share_icon_extensions',    'png,jpg,jpeg'),                      'max_size': Setting.get('share_icon_max_size',    '5')},
                           })
+
+
+@settings_bp.route('/settings/system/delete-system-logo', endpoint='delete_system_logo', methods=['POST'])
+@login_required
+@admin_required
+def delete_system_logo():
+    """Delete the system logo from the instance folder."""
+    fname = Setting.get('system_logo', '')
+    if fname:
+        try:
+            os.remove(os.path.join(current_app.instance_path, fname))
+        except OSError:
+            pass
+        Setting.set('system_logo', '', 'System logo filename in instance folder')
+        flash('System logo deleted.', 'success')
+    return redirect(url_for('settings.settings_system'))
+
+
+@settings_bp.route('/settings/system/delete-company-logo', endpoint='delete_company_logo', methods=['POST'])
+@login_required
+@admin_required
+def delete_company_logo():
+    """Delete the company logo from the instance folder."""
+    fname = Setting.get('company_logo', '')
+    if fname:
+        try:
+            os.remove(os.path.join(current_app.instance_path, fname))
+        except OSError:
+            pass
+        Setting.set('company_logo', '', 'Company logo filename in instance folder')
+        flash('Company logo deleted.', 'success')
+    return redirect(url_for('settings.settings_system'))
 
 
 # ============= FOOTPRINTS =============
