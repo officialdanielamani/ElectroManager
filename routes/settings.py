@@ -155,11 +155,12 @@ def settings_general():
     available_themes = get_available_themes()
     available_fonts = get_available_fonts()
     
-    return render_template('settings_general.html', 
-                         current_theme=current_theme, 
+    return render_template('settings_general.html',
+                         current_theme=current_theme,
                          current_font=current_font,
                          available_themes=available_themes,
-                         available_fonts=available_fonts)
+                         available_fonts=available_fonts,
+                         demo_mode=current_app.config.get('DEMO_MODE', False))
 
 
 
@@ -270,6 +271,9 @@ def change_password():
 @login_required
 def upload_profile_photo():
     """Upload user profile photo"""
+    if current_app.config.get('DEMO_MODE', False):
+        flash('Direct upload is disabled in Demo Mode. Please select a photo from Share Files.', 'warning')
+        return redirect(url_for('settings.settings_general'))
     if 'profile_photo' not in request.files:
         flash('No file selected.', 'danger')
         return redirect(url_for('settings.settings_general'))
@@ -513,7 +517,7 @@ def settings_system():
                     psize = request.form.get(f'project_upload_{ptype}_max_size', '10')
                     if pext: Setting.set(f'project_upload_{ptype}_extensions', pext)
                     if psize: Setting.set(f'project_upload_{ptype}_max_size', psize)
-                for stype in ['item', 'project', 'sticker']:
+                for stype in ['item', 'project', 'sticker', 'icon']:
                     sext = request.form.get(f'share_{stype}_extensions', '').strip()
                     ssize = request.form.get(f'share_{stype}_max_size', '10')
                     if sext: Setting.set(f'share_{stype}_extensions', sext, f'Share {stype} allowed extensions')
@@ -589,6 +593,7 @@ def settings_system():
                               'item':    {'extensions': Setting.get('share_item_extensions',    'pdf,png,jpg,jpeg,gif,txt,doc,docx'), 'max_size': Setting.get('share_item_max_size',    '10')},
                               'project': {'extensions': Setting.get('share_project_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx'), 'max_size': Setting.get('share_project_max_size', '10')},
                               'sticker': {'extensions': Setting.get('share_sticker_extensions', 'png,jpg,jpeg'),                      'max_size': Setting.get('share_sticker_max_size', '1')},
+                              'icon':    {'extensions': Setting.get('share_icon_extensions',    'png,jpg,jpeg'),                      'max_size': Setting.get('share_icon_max_size',    '5')},
                           })
 
 

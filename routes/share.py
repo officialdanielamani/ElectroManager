@@ -15,15 +15,23 @@ from utils import log_audit
 
 share_bp = Blueprint('share', __name__)
 
-SHARE_CATEGORIES = ['item', 'icon', 'profile', 'project', 'sticker']
+SHARE_CATEGORIES = ['item', 'project', 'profile', 'sticker', 'icon']
 IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'}
 
 CATEGORY_DEFAULTS = {
     'item':    {'extensions': 'pdf,png,jpg,jpeg,gif,txt,doc,docx', 'max_size': '10'},
-    'icon':    {'extensions': 'svg,png,jpeg,jpg',                  'max_size': '5'},
+    'icon':    {'extensions': 'png,jpg,jpeg',                      'max_size': '5'},
     'profile': {'extensions': 'jpg,jpeg,png',                      'max_size': '1'},
     'project': {'extensions': 'pdf,png,jpg,jpeg,gif,txt,doc,docx', 'max_size': '10'},
     'sticker': {'extensions': 'png,jpg,jpeg',                      'max_size': '1'},
+}
+
+DEMO_LIMITS = {
+    'item':    {'extensions': 'jpg,jpeg,png,txt', 'max_size': '1'},
+    'icon':    {'extensions': 'jpg,jpeg,png',     'max_size': '1'},
+    'profile': {'extensions': 'jpg,jpeg,png',     'max_size': '1'},
+    'project': {'extensions': 'jpg,jpeg,png,txt', 'max_size': '1'},
+    'sticker': {'extensions': 'jpg,jpeg,png',     'max_size': '1'},
 }
 
 PROFILE_FIXED = True  # profile limits are not configurable
@@ -86,6 +94,10 @@ def get_share_config(category):
     """Return (allowed_ext_set, max_bytes) for the given category."""
     if category == 'profile':
         return {'jpg', 'jpeg', 'png'}, 1 * 1024 * 1024
+    if current_app.config.get('DEMO_MODE', False):
+        d = DEMO_LIMITS.get(category, DEMO_LIMITS['item'])
+        exts = {e.strip().lower() for e in d['extensions'].split(',') if e.strip()}
+        return exts, int(d['max_size']) * 1024 * 1024
     d = CATEGORY_DEFAULTS.get(category, CATEGORY_DEFAULTS['item'])
     ext_str = Setting.get(f'share_{category}_extensions', d['extensions'])
     size_mb_str = Setting.get(f'share_{category}_max_size', d['max_size'])
