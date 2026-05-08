@@ -35,6 +35,7 @@ def init_db():
             print(f"\nCreating default admin user: {admin_username}...")
             admin = User(
                 username=admin_username,
+                name=admin_username,
                 email=admin_email,
                 role_id=admin_role.id,
                 is_active=True,

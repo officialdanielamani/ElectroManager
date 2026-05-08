@@ -144,6 +144,50 @@
                 <hr>
                 {% endif %}
 
+                <!-- Magic Parameters -->
+                {% if item.magic_parameters %}
+                <div class="mb-3 px-1">
+                    <strong><i class="bi bi-magic"></i> Magic Parameters:</strong>
+                    <div class="list-group mt-2">
+                        {% for param in item.magic_parameters %}
+                        <div class="list-group-item p-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <small class="text-muted">
+                                        {% if param.parameter.param_type == 'number' %}
+                                            {% if param.operation == 'min' %}MIN{% elif param.operation == 'max' %}MAX{% elif param.operation == 'range' %}RANGE{% elif param.operation == 'value' %}VALUE{% endif %}:
+                                        {% elif param.parameter.param_type == 'date' %}
+                                            {% if param.operation == 'start' %}START{% elif param.operation == 'end' %}END{% elif param.operation == 'duration' %}DURATION{% endif %}{% if param.operation == 'value' %}{% endif %}
+                                        {% endif %}
+                                        <strong>{{ param.parameter.name }}</strong>
+                                        {% if param.parameter.param_type == 'number' %}
+                                            {{ param.value }} {% if param.operation == 'range' %}- {{ param.value2 }}{% endif %} {{ param.unit }}
+                                        {% elif param.parameter.param_type == 'date' %}
+                                            {% if param.operation != 'value' %}on {% endif %}{{ param.value }} {% if param.operation == 'duration' %}to {{ param.value2 }}{% endif %}
+                                        {% elif param.parameter.param_type == 'string' %}
+                                            {% set _sv = param.get_selected_string_values() %}
+                                            {% set _pre = _sv[0] %}
+                                            {% set _cust = _sv[1] %}
+                                            {% if _pre or _cust %}
+                                                {% if _pre %}{{ _pre | join(', ') }}{% endif %}
+                                                {% if _cust %} | Custom: {{ _cust | join(', ') }}{% endif %}
+                                            {% elif param.string_option %}{{ param.string_option }}
+                                            {% else %}(none){% endif %}
+                                        {% endif %}
+                                        {% if param.description %}{{ param.description }}{% endif %}
+                                        {% if param.parameter.param_type == 'date' and param.parameter.notify_enabled %}
+                                        <i class="bi bi-bell-fill text-warning" title="Notifications enabled"></i>
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <hr>
+                {% endif %}
+
                 <!-- Overall Summary -->
                 <div class="row mb-3">
                     <div class="col-md-2">
@@ -296,7 +340,6 @@
                                     <strong><i class="bi bi-upc-scan"></i> Serial Numbers</strong>
                                 </div>
                                 <!-- SN edit actions moved to Item Edit page -->
-                                </div>
                                 <div class="table-responsive">
                                     <table class="table table-sm table-bordered sn-table" id="snTable{{ batch.id }}">
                                         <thead class="table-light">
@@ -370,52 +413,6 @@
                     <!-- Batch edit/add moved to Edit Item page -->
                     {% endfor %}
                 </div>
-
-                <hr>
-
-                <!-- Magic Parameters -->
-                {% if item.magic_parameters %}
-                <div class="mb-3 px-1">
-                    <strong><i class="bi bi-magic"></i> Magic Parameters:</strong>
-                    <div class="list-group mt-2">
-                        {% for param in item.magic_parameters %}
-                        <div class="list-group-item p-2">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <small class="text-muted">
-                                        {% if param.parameter.param_type == 'number' %}
-                                            {% if param.operation == 'min' %}MIN{% elif param.operation == 'max' %}MAX{% elif param.operation == 'range' %}RANGE{% elif param.operation == 'value' %}VALUE{% endif %}:
-                                        {% elif param.parameter.param_type == 'date' %}
-                                            {% if param.operation == 'start' %}START{% elif param.operation == 'end' %}END{% elif param.operation == 'duration' %}DURATION{% endif %}{% if param.operation == 'value' %}{% endif %}
-                                        {% endif %}
-                                        <strong>{{ param.parameter.name }}</strong>
-                                        {% if param.parameter.param_type == 'number' %}
-                                            {{ param.value }} {% if param.operation == 'range' %}- {{ param.value2 }}{% endif %} {{ param.unit }}
-                                        {% elif param.parameter.param_type == 'date' %}
-                                            {% if param.operation != 'value' %}on {% endif %}{{ param.value }} {% if param.operation == 'duration' %}to {{ param.value2 }}{% endif %}
-                                        {% elif param.parameter.param_type == 'string' %}
-                                            {% set _sv = param.get_selected_string_values() %}
-                                            {% set _pre = _sv[0] %}
-                                            {% set _cust = _sv[1] %}
-                                            {% if _pre or _cust %}
-                                                {% if _pre %}{{ _pre | join(', ') }}{% endif %}
-                                                {% if _cust %} | Custom: {{ _cust | join(', ') }}{% endif %}
-                                            {% elif param.string_option %}{{ param.string_option }}
-                                            {% else %}(none){% endif %}
-                                        {% endif %}
-                                        {% if param.description %}{{ param.description }}{% endif %}
-                                        {% if param.parameter.param_type == 'date' and param.parameter.notify_enabled %}
-                                        <i class="bi bi-bell-fill text-warning" title="Notifications enabled"></i>
-                                        {% endif %}
-                                    </small>
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                <hr>
-                {% endif %}
 
                 <!-- Images -->
                 {% set images = item.attachments | selectattr('file_type', 'in', ['png', 'jpg', 'jpeg', 'gif', 'webp']) | list %}
@@ -544,7 +541,6 @@ document.addEventListener('DOMContentLoaded', function() { renderDatasheets(); }
 </script>
 
                 <!-- Info -->
-                <hr>
                 <div class="mb-3 px-1">
                     <strong><i class="bi bi-clock-history"></i> Created &amp; Updated:</strong>
                     <div class="mt-2">

@@ -41,7 +41,7 @@ class RegistrationForm(FlaskForm):
 
 class UserForm(FlaskForm):
     # --- Basic Section ---
-    name = StringField('Name', validators=[Optional(), Length(max=64)])
+    name = StringField('Name', validators=[DataRequired(), Length(max=64)])
     short_info = StringField('Short Info', validators=[Optional(), Length(max=128)])
     username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])
     email = StringField('Email', validators=[DataRequired(), Email()])

@@ -108,7 +108,7 @@
                         
                         <div class="mb-3">
                             {{ form.name.label(class="form-label") }}
-                            <small class="text-muted ms-1">(optional, not unique, max 64 chars)</small>
+                            <small class="text-muted ms-1">(required, not unique, max 64 chars)</small>
                             {% if user and user.is_demo_user and config.DEMO_MODE %}
                                 <input type="text" class="form-control" value="{{ user.name or '' }}" disabled>
                             {% else %}

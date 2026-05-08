@@ -48,6 +48,46 @@
 
                 <hr>
 
+                <!-- Magic Parameters -->
+                {% if project.magic_parameters %}
+                <div class="mb-3 px-1">
+                    <strong><i class="bi bi-magic"></i> Magic Parameters:</strong>
+                    <div class="list-group mt-2">
+                        {% for param in project.magic_parameters %}
+                        <div class="list-group-item p-2">
+                            <small class="text-muted">
+                                {% if param.parameter.param_type == 'number' %}
+                                    {% if param.operation == 'min' %}MIN{% elif param.operation == 'max' %}MAX{% elif param.operation == 'range' %}RANGE{% elif param.operation == 'value' %}VALUE{% endif %}:
+                                {% elif param.parameter.param_type == 'date' %}
+                                    {% if param.operation == 'start' %}START{% elif param.operation == 'end' %}END{% elif param.operation == 'duration' %}DURATION{% endif %}
+                                {% endif %}
+                                <strong>{{ param.parameter.name }}</strong>
+                                {% if param.parameter.param_type == 'number' %}
+                                    {{ param.value }} {% if param.operation == 'range' %}- {{ param.value2 }}{% endif %} {{ param.unit }}
+                                {% elif param.parameter.param_type == 'date' %}
+                                    {% if param.operation != 'value' %}on {% endif %}{{ param.value }} {% if param.operation == 'duration' %}to {{ param.value2 }}{% endif %}
+                                {% elif param.parameter.param_type == 'string' %}
+                                    {% set _sv = param.get_selected_string_values() %}
+                                    {% set _pre = _sv[0] %}
+                                    {% set _cust = _sv[1] %}
+                                    {% if _pre or _cust %}
+                                        {% if _pre %}{{ _pre | join(', ') }}{% endif %}
+                                        {% if _cust %} | Custom: {{ _cust | join(', ') }}{% endif %}
+                                    {% elif param.string_option %}{{ param.string_option }}
+                                    {% else %}(none){% endif %}
+                                {% endif %}
+                                {% if param.description %}{{ param.description }}{% endif %}
+                                {% if param.parameter.param_type == 'date' and param.parameter.notify_enabled %}
+                                <i class="bi bi-bell-fill text-warning" title="Notifications enabled"></i>
+                                {% endif %}
+                            </small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <hr>
+                {% endif %}
+
                 <div class="row mb-2">
                     <div class="col-md-12"><strong>Users:</strong> {% for u in project.get_users_list() %}<span class="badge bg-secondary me-1">{{ u.username }}</span>{% endfor %}{% if not project.get_users_list() %}<span class="text-muted">None</span>{% endif %}</div>
                 </div>
@@ -135,7 +175,7 @@
                 {% if project.linked_share_files %}
                 <hr>
                 <div class="d-flex justify-content-between align-items-center">
-                    <strong><i class="bi bi-folder-fill text-warning"></i> Share Files</strong>
+                    <strong><i class="bi bi-folder-fill"></i> Share Files</strong>
                     {% if download_all_project_share_files %}
                     <a href="{{ url_for('project.project_download_share_files', project_id=project.project_id) }}" class="btn btn-sm btn-outline-secondary" title="Download all share files as ZIP">
                         <i class="bi bi-download"></i> Download All
@@ -239,6 +279,16 @@
                 {% else %}
                 <p class="text-muted mt-2">No BOM items added yet.{% if can_edit %} Use <strong>Edit</strong> to manage BOM.{% endif %}</p>
                 {% endif %}
+
+                <hr>
+                <div class="mb-1 px-1">
+                    <small class="text-muted">
+                        <i class="bi bi-clock-history"></i>
+                        Created: {{ project.created_at.strftime('%Y-%m-%d %H:%M') if project.created_at else 'N/A' }}
+                        &nbsp;|&nbsp;
+                        Updated: {{ project.updated_at.strftime('%Y-%m-%d %H:%M') if project.updated_at else 'N/A' }}
+                    </small>
+                </div>
             </div>
         </div>
     </div>
