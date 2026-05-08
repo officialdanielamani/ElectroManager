@@ -55,6 +55,13 @@
                         </div>
                     </div>
 
+                    <div class="row mb-2">
+                        <div class="col-12">
+                            <label class="form-label form-label-sm">Short Info</label>
+                            {{ form.short_info(class="form-control form-control-sm", maxlength="128", placeholder="Brief summary shown on cards (max 128 chars)", disabled=(item_perms and not item_perms.can_edit_info)) }}
+                        </div>
+                    </div>
+
                     <!-- Thumbnail -->
                     {% if item %}
                     <div class="mb-2 d-flex align-items-center gap-3">

@@ -33,6 +33,11 @@
                     </div>
 
                     <div class="mb-3">
+                        <label for="short_info" class="form-label">Short Info</label>
+                        <input type="text" class="form-control" id="short_info" name="short_info" value="{{ rack.short_info if rack and rack.short_info else '' }}" maxlength="128" placeholder="Brief note shown on location cards (max 128 chars)">
+                    </div>
+
+                    <div class="mb-3">
                         <label for="description" class="form-label">Description</label>
                         <textarea class="form-control" id="description" name="description" rows="3">{{ rack.description if rack else '' }}</textarea>
                     </div>

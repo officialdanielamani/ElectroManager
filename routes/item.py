@@ -220,6 +220,7 @@ def item_new():
         item = Item(
             name=form.name.data,
             sku=form.sku.data if form.sku.data else None,
+            short_info=form.short_info.data if form.short_info.data else None,
             info=form.info.data,
             description=form.description.data if perms['can_edit_advance'] else None,
             quantity=0,
@@ -408,6 +409,7 @@ def item_edit(uuid):
         if perms['can_edit_info']:
             item.name = form.name.data
             item.sku = form.sku.data if form.sku.data else None
+            item.short_info = form.short_info.data if form.short_info.data else None
             item.info = form.info.data
             item.min_quantity = form.min_quantity.data or 0
             item.no_stock_warning = form.no_stock_warning.data

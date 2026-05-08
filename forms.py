@@ -7,7 +7,7 @@ from models import User, Category
 
 class LocationForm(FlaskForm):
     name = StringField('Location Name', validators=[DataRequired(), Length(max=100)])
-    info = StringField('Info (Short)', validators=[Optional(), Length(max=500)])
+    info = StringField('Short Info', validators=[Optional(), Length(max=128)])
     description = TextAreaField('Description', validators=[Optional()])
     color = StringField('Color', validators=[Optional(), Length(max=7)], default='#6c757d')
     picture = FileField('Picture', validators=[Optional(), FileAllowed(['png', 'jpg', 'jpeg'], 'PNG and JPEG only!')])
@@ -86,6 +86,7 @@ class ItemAddForm(FlaskForm):
     """Form for adding new items"""
     name = StringField('Item Name', validators=[DataRequired(), Length(max=200)], render_kw={"class": "form-control form-control-sm"})
     sku = StringField('SKU', validators=[Optional(), Length(max=100)], render_kw={"class": "form-control form-control-sm"})
+    short_info = StringField('Short Info', validators=[Optional(), Length(max=128)], render_kw={"class": "form-control form-control-sm"})
     info = StringField('Type / Model', validators=[Optional(), Length(max=500)], render_kw={"class": "form-control form-control-sm"})
     description = TextAreaField('Description', validators=[Optional()], render_kw={"class": "form-control form-control-sm", "rows": "4"})
     quantity = IntegerField('Quantity', validators=[NumberRange(min=0)], default=0, render_kw={"class": "form-control form-control-sm"})
@@ -129,6 +130,7 @@ class ItemAddForm(FlaskForm):
             # Item Info
             'name': 'can_edit_info',
             'sku': 'can_edit_info',
+            'short_info': 'can_edit_info',
             'info': 'can_edit_info',
             'location_id': 'can_edit_info',
             'rack_id': 'can_edit_info',
@@ -160,6 +162,7 @@ class ItemEditForm(FlaskForm):
     """Form for editing existing items"""
     name = StringField('Item Name', validators=[DataRequired(), Length(max=200)], render_kw={"class": "form-control form-control-sm"})
     sku = StringField('SKU', validators=[Optional(), Length(max=100)], render_kw={"class": "form-control form-control-sm"})
+    short_info = StringField('Short Info', validators=[Optional(), Length(max=128)], render_kw={"class": "form-control form-control-sm"})
     info = StringField('Type / Model', validators=[Optional(), Length(max=500)], render_kw={"class": "form-control form-control-sm"})
     description = TextAreaField('Description', validators=[Optional()], render_kw={"class": "form-control form-control-sm", "rows": "4"})
     quantity = IntegerField('Quantity', validators=[NumberRange(min=0)], default=0, render_kw={"class": "form-control form-control-sm"})
@@ -195,6 +198,7 @@ class ItemEditForm(FlaskForm):
         field_perms = {
             'name': 'can_edit_info',
             'sku': 'can_edit_info',
+            'short_info': 'can_edit_info',
             'info': 'can_edit_info',
             'location_id': 'can_edit_info',
             'rack_id': 'can_edit_info',

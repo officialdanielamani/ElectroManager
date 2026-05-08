@@ -228,6 +228,7 @@ class Rack(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     uuid = db.Column(db.String(12), unique=True, nullable=False)
     name = db.Column(db.String(100), nullable=False)
+    short_info = db.Column(db.String(128))
     description = db.Column(db.Text)
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
     picture = db.Column(db.String(200))
@@ -345,6 +346,7 @@ class Item(db.Model):
     uuid = db.Column(db.String(16), unique=True, nullable=False)
     name = db.Column(db.String(200), nullable=False)
     sku = db.Column(db.String(100))
+    short_info = db.Column(db.String(128))
     info = db.Column(db.String(500))
     description = db.Column(db.Text)
 

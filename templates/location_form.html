@@ -41,8 +41,8 @@
 
                     <div class="mb-3">
                         {{ form.info.label(class="form-label") }}
-                        {{ form.info(class="form-control", placeholder="Short description or note") }}
-                        <small class="text-muted">Optional short info (max 500 characters)</small>
+                        {{ form.info(class="form-control", maxlength="128", placeholder="Brief note shown on location cards (max 128 chars)") }}
+                        <small class="text-muted">Optional short info (max 128 characters)</small>
                     </div>
 
                     <div class="mb-3">

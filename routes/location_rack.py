@@ -311,26 +311,28 @@ def rack_new():
         name = request.form.get('name')
         
         # Allow duplicate names - UUID ensures uniqueness
+        short_info = request.form.get('short_info', '')[:128] or None
         description = request.form.get('description')
         location_id = request.form.get('location_id')
         color = request.form.get('color', '#6c757d')
         rows = int(request.form.get('rows', 5))
         cols = int(request.form.get('cols', 5))
-        
+
         # Validate against global max settings
         max_rows = int(Setting.get('max_drawer_rows', '10'))
         max_cols = int(Setting.get('max_drawer_cols', '10'))
-        
+
         if rows < 1 or rows > max_rows:
             flash(f'Rows must be between 1 and {max_rows}!', 'danger')
             return redirect(url_for('location_rack.rack_new'))
-        
+
         if cols < 1 or cols > max_cols:
             flash(f'Columns must be between 1 and {max_cols}!', 'danger')
             return redirect(url_for('location_rack.rack_new'))
-        
+
         rack = Rack(
             name=name,
+            short_info=short_info,
             description=description,
             location_id=int(location_id) if location_id and location_id != '0' else None,
             color=color,
@@ -407,6 +409,7 @@ def rack_edit(uuid):
         
         # Allow duplicate names - UUID ensures uniqueness
         rack.name = new_name
+        rack.short_info = request.form.get('short_info', '')[:128] or None
         rack.description = request.form.get('description')
         rack.color = request.form.get('color', '#6c757d')
         location_id = request.form.get('location_id')
@@ -648,13 +651,15 @@ def api_add_location():
 def add_rack():
     """Add a new rack"""
     name = request.form.get('name')
+    short_info = request.form.get('short_info', '')[:128] or None
     description = request.form.get('description')
     location = request.form.get('location')
     rows = int(request.form.get('rows', 5))
     cols = int(request.form.get('cols', 5))
-    
+
     rack = Rack(
         name=name,
+        short_info=short_info,
         description=description,
         location_id=location if location else None,
         rows=rows,
@@ -681,6 +686,7 @@ def edit_rack():
         return redirect(url_for('location_rack.rack_management'))
     
     rack.name = request.form.get('name', rack.name)
+    rack.short_info = request.form.get('short_info', '')[:128] or None
     rack.description = request.form.get('description', rack.description)
     rack.location_id = request.form.get('location') or None
     
