@@ -71,11 +71,9 @@
                         </button>
                     </form>
                     {% endif %}
-                    {% if qr_templates %}
                     <a href="{{ url_for('item.item_qr_sticker', uuid=item.uuid) }}" class="btn btn-success btn-sm">
                         <i class="bi bi-qr-code"></i> Print QR
                     </a>
-                    {% endif %}
                     <a href="{{ url_for('item.items') }}" class="btn btn-secondary btn-sm">
                         <i class="bi bi-arrow-left"></i> Back
                     </a>

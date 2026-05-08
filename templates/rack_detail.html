@@ -35,6 +35,12 @@
                 <h5 class="mb-0">Rack Information</h5>
             </div>
             <div class="card-body">
+                <div class="mb-3 d-flex align-items-flex-start gap-3">
+                    <div style="flex-shrink:0; background:white; padding:6px; border-radius:4px; display:inline-block;">
+                        <img src="{{ url_for('location_rack.rack_qr_svg', uuid=rack.uuid) }}" alt="QR Code" width="120" height="120" style="border:2px solid #ddd; padding:4px; border-radius:4px; display:block;">
+                        <div class="text-center mt-1" style="font-size:0.7em; color:#777;">{{ rack.uuid }}</div>
+                    </div>
+                </div>
                 <p><strong>UUID:</strong><br><code class="font-monospace small">{{ rack.uuid }}</code></p>
                 <p><strong>Name:</strong> {{ rack.name }}</p>
                 <p><strong>Description:</strong> {{ rack.description or 'N/A' }}</p>

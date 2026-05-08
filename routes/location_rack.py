@@ -716,6 +716,28 @@ def delete_rack():
     return redirect(url_for('location_rack.rack_management'))
 
 
+@location_rack_bp.route('/location/<string:uuid>/qr', endpoint='location_qr_svg')
+@login_required
+def location_qr_svg(uuid):
+    """Generate inline QR code SVG for a location (pure UUID)"""
+    from models import Location
+    from qr_utils import generate_qr_svg
+    location = Location.query.filter_by(uuid=uuid).first_or_404()
+    qr_svg = generate_qr_svg(location.uuid, 160, 160, error_correction='M')
+    return qr_svg, 200, {'Content-Type': 'image/svg+xml'}
+
+
+@location_rack_bp.route('/rack/<string:uuid>/qr', endpoint='rack_qr_svg')
+@login_required
+def rack_qr_svg(uuid):
+    """Generate inline QR code SVG for a rack (pure UUID)"""
+    from models import Rack
+    from qr_utils import generate_qr_svg
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
+    qr_svg = generate_qr_svg(rack.uuid, 160, 160, error_correction='M')
+    return qr_svg, 200, {'Content-Type': 'image/svg+xml'}
+
+
 @location_rack_bp.route('/location/<string:uuid>/qr-sticker', endpoint='location_qr_sticker')
 @login_required
 def location_qr_sticker(uuid):

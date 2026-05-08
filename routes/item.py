@@ -369,8 +369,8 @@ def item_qr_svg(uuid):
         abort(403)
     
     from qr_utils import generate_qr_svg
-    
-    qr_data = f'/item/{item.uuid}'
+
+    qr_data = item.uuid
     qr_svg = generate_qr_svg(qr_data, 160, 160, error_correction='M')
     
     return qr_svg, 200, {'Content-Type': 'image/svg+xml'}
