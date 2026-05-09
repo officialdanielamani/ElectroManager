@@ -297,11 +297,13 @@ def item_new():
                     batch_rack_id = None
                     batch_drawer = None
 
+                note = str(pb.get('note', '')).strip()[:128] or None
                 batch = ItemBatch(
                     item_id=item.id,
                     batch_number=item.get_next_batch_number(),
                     batch_label=label,
                     manufacturer=manufacturer,
+                    note=note,
                     quantity=qty,
                     price_per_unit=price,
                     purchase_date=purchase_date,

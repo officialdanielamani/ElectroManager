@@ -387,7 +387,7 @@
                                         {% if batch.lend_records %}
                                         <table class="table table-sm table-bordered mt-1 mb-0" style="font-size:0.8rem;">
                                             <thead class="table-light">
-                                                <tr><th>Lend To</th><th style="width:80px">Qty</th><th style="width:90px">Start</th><th style="width:90px">Due Date</th><th style="width:30px"><i class="bi bi-bell" title="Notify"></i></th></tr>
+                                                <tr><th>Lend To</th><th style="width:80px">Qty</th><th style="width:90px">Start</th><th style="width:90px">Due Date</th><th>Notes</th><th style="width:30px"><i class="bi bi-bell" title="Notify"></i></th></tr>
                                             </thead>
                                             <tbody>
                                                 {% for r in batch.lend_records %}
@@ -396,6 +396,7 @@
                                                     <td>{{ r.quantity }}</td>
                                                     <td>{% if r.lend_start %}{{ r.lend_start.strftime('%d/%m/%Y') }}{% if r.lend_start.hour or r.lend_start.minute %} {{ r.lend_start.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
                                                     <td>{% if r.lend_end %}{{ r.lend_end.strftime('%d/%m/%Y') }}{% if r.lend_end.hour or r.lend_end.minute %} {{ r.lend_end.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
+                                                    <td><small class="text-muted">{{ r.lend_note or '—' }}</small></td>
                                                     <td class="text-center">{% if r.lend_notify_enabled %}<i class="bi bi-bell-fill text-warning"></i>{% else %}—{% endif %}</td>
                                                 </tr>
                                                 {% endfor %}
@@ -3358,12 +3359,14 @@ function renderLendRecordsTable() {
     }
     var rows = _lmLendRecords.map(function(r, i) {
         var label = (r.label || '—').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        var note = r.lend_note ? ('<span class="text-muted" title="' + r.lend_note.replace(/"/g,'&quot;') + '"><i class="bi bi-sticky"></i> ' + r.lend_note.replace(/</g,'&lt;').replace(/>/g,'&gt;').slice(0, 30) + (r.lend_note.length > 30 ? '…' : '') + '</span>') : '—';
         var notify = r.notify ? '<i class="bi bi-bell-fill text-warning" title="Remind ' + (r.days||3) + ' days before"></i>' : '—';
         return '<tr>' +
             '<td class="small">' + label + '</td>' +
             '<td class="small text-center">' + (r.qty||1) + '</td>' +
             '<td class="small">' + formatLendDateTime(r.start) + '</td>' +
             '<td class="small">' + formatLendDateTime(r.end) + '</td>' +
+            '<td class="small">' + note + '</td>' +
             '<td class="text-center">' + notify + '</td>' +
             '<td class="text-end text-nowrap">' +
             '<button type="button" class="btn btn-link btn-sm p-0 me-1 text-primary" onclick="editLendRecord(' + i + ')"><i class="bi bi-pencil"></i></button>' +
@@ -3371,7 +3374,7 @@ function renderLendRecordsTable() {
             '</td></tr>';
     }).join('');
     el.innerHTML = '<table class="table table-sm table-bordered mb-0 small">' +
-        '<thead class="table-light"><tr><th>Lend To</th><th class="text-center">Qty</th><th>Start</th><th>End</th><th class="text-center"><i class="bi bi-bell" title="Notify"></i></th><th></th></tr></thead>' +
+        '<thead class="table-light"><tr><th>Lend To</th><th class="text-center">Qty</th><th>Start</th><th>End</th><th>Notes</th><th class="text-center"><i class="bi bi-bell" title="Notify"></i></th><th></th></tr></thead>' +
         '<tbody>' + rows + '</tbody></table>';
 }
 
@@ -3387,6 +3390,7 @@ function showLrForm(mode) {
         document.getElementById('lr_qty').value = 1;
         document.getElementById('lr_start').value = '';
         document.getElementById('lr_end').value = '';
+        document.getElementById('lr_note').value = '';
         document.getElementById('lr_notify').checked = false;
         document.getElementById('lr_notify_days').value = 3;
         document.getElementById('lr_notify_days_section').style.display = 'none';
@@ -3412,6 +3416,7 @@ function editLendRecord(idx) {
     document.getElementById('lr_qty').value = r.qty || 1;
     document.getElementById('lr_start').value = r.start || '';
     document.getElementById('lr_end').value = r.end || '';
+    document.getElementById('lr_note').value = r.lend_note || '';
     document.getElementById('lr_notify').checked = !!r.notify;
     document.getElementById('lr_notify_days').value = r.days || 3;
     document.getElementById('lr_notify_days_section').style.display = r.notify ? '' : 'none';
@@ -3435,14 +3440,22 @@ function cancelLrForm() {
 
 function saveLrForm() {
     var lbl = document.getElementById('lr_to_label');
+    var contactId = document.getElementById('lr_to_id').value ? parseInt(document.getElementById('lr_to_id').value) : null;
+    if (!contactId) {
+        document.getElementById('lr_to_label').style.outline = '2px solid red';
+        setTimeout(function() { document.getElementById('lr_to_label').style.outline = ''; }, 1800);
+        alert('Lend to contact is required. Please search and select a contact.');
+        return;
+    }
     var label = (lbl.className.indexOf('text-muted') !== -1) ? '' : lbl.textContent;
     var record = {
         type: document.getElementById('lr_to_type').value,
-        contact_id: document.getElementById('lr_to_id').value ? parseInt(document.getElementById('lr_to_id').value) : null,
+        contact_id: contactId,
         label: label,
         qty: parseInt(document.getElementById('lr_qty').value) || 1,
         start: document.getElementById('lr_start').value,
         end: document.getElementById('lr_end').value,
+        lend_note: document.getElementById('lr_note').value.trim().slice(0, 128),
         notify: document.getElementById('lr_notify').checked,
         days: parseInt(document.getElementById('lr_notify_days').value) || 3
     };
@@ -3524,7 +3537,7 @@ function _snlMoveForm(slotId) {
     slot.appendChild(form);
     form.style.display = '';
 }
-function _snlResetForm(lendType, lendId, lendLabel, lendStart, lendEnd, lendNotify, lendDays) {
+function _snlResetForm(lendType, lendId, lendLabel, lendStart, lendEnd, lendNotify, lendDays, lendNote) {
     document.getElementById('snl_to_type').value = lendType || '';
     document.getElementById('snl_to_id').value = lendId || '';
     var lbl = document.getElementById('snl_to_label');
@@ -3537,6 +3550,7 @@ function _snlResetForm(lendType, lendId, lendLabel, lendStart, lendEnd, lendNoti
     }
     document.getElementById('snl_start').value = lendStart || '';
     document.getElementById('snl_end').value = lendEnd || '';
+    document.getElementById('snl_note').value = lendNote || '';
     document.getElementById('snl_notify').checked = !!lendNotify;
     document.getElementById('snl_notify_days').value = lendDays || 3;
     document.getElementById('snl_notify_days_section').style.display = lendNotify ? '' : 'none';
@@ -3599,25 +3613,33 @@ function toggleSnlNotify() {
 }
 
 /* ── Per-SN Lend Modal ── */
-function openSnLendModal(snId, lendType, lendId, lendLabel, lendStart, lendEnd, lendNotify, lendDays) {
+function openSnLendModal(snId, lendType, lendId, lendLabel, lendStart, lendEnd, lendNotify, lendDays, lendNote) {
     document.getElementById('snLend_sn_id').value = snId;
     document.getElementById('snLend_sn_ref').textContent = 'SN #' + snId;
     _snlMoveForm('snlend_form_slot');
-    _snlResetForm(lendType, lendId, lendLabel, lendStart, lendEnd, lendNotify, lendDays);
+    _snlResetForm(lendType, lendId, lendLabel, lendStart, lendEnd, lendNotify, lendDays, lendNote || '');
     new bootstrap.Modal(document.getElementById('snLendModal')).show();
 }
 function clearSnlModal() {
-    _snlResetForm('', '', '', '', '', false, 3);
+    _snlResetForm('', '', '', '', '', false, 3, '');
 }
 function submitSnLend() {
     var snId = parseInt(document.getElementById('snLend_sn_id').value);
     var lendIdRaw = document.getElementById('snl_to_id').value;
+    var lendId = lendIdRaw ? parseInt(lendIdRaw) : null;
+    if (!lendId) {
+        document.getElementById('snl_to_label').style.outline = '2px solid red';
+        setTimeout(function() { document.getElementById('snl_to_label').style.outline = ''; }, 1800);
+        alert('Lend to contact is required. Please search and select a contact.');
+        return;
+    }
     var payload = {
         sn_id: snId, field: 'lend',
         lend_to_type: document.getElementById('snl_to_type').value,
-        lend_to_id: lendIdRaw ? parseInt(lendIdRaw) : null,
+        lend_to_id: lendId,
         lend_start: document.getElementById('snl_start').value,
         lend_end: document.getElementById('snl_end').value,
+        lend_note: document.getElementById('snl_note').value.trim().slice(0, 128),
         lend_notify_enabled: document.getElementById('snl_notify').checked,
         lend_notify_before_days: parseInt(document.getElementById('snl_notify_days').value) || 3
     };
@@ -3641,7 +3663,7 @@ function openSnBulkLendModal(batchId) {
     if (!checked.length) { alert('Select at least one serial number first.'); return; }
     document.getElementById('snBulkLend_info').textContent = checked.length + ' SN(s) selected';
     _snlMoveForm('snbulk_form_slot');
-    _snlResetForm('', '', '', '', '', false, 3);
+    _snlResetForm('', '', '', '', '', false, 3, '');
     new bootstrap.Modal(document.getElementById('snBulkLendModal')).show();
 }
 function submitSnBulkLend(clearMode) {
@@ -3653,11 +3675,19 @@ function submitSnBulkLend(clearMode) {
         lendData = null;
     } else {
         var lendIdRaw = document.getElementById('snl_to_id').value;
+        var lendId = lendIdRaw ? parseInt(lendIdRaw) : null;
+        if (!lendId) {
+            document.getElementById('snl_to_label').style.outline = '2px solid red';
+            setTimeout(function() { document.getElementById('snl_to_label').style.outline = ''; }, 1800);
+            alert('Lend to contact is required. Please search and select a contact.');
+            return;
+        }
         lendData = {
             type: document.getElementById('snl_to_type').value,
-            id: lendIdRaw ? parseInt(lendIdRaw) : null,
+            id: lendId,
             start: document.getElementById('snl_start').value || '',
             end: document.getElementById('snl_end').value || '',
+            lend_note: document.getElementById('snl_note').value.trim().slice(0, 128),
             notify: document.getElementById('snl_notify').checked,
             days: parseInt(document.getElementById('snl_notify_days').value) || 3
         };
@@ -3827,6 +3857,10 @@ function submitSnBulkLend(clearMode) {
                     <label class="form-label form-label-sm">Date</label>
                     <input type="date" class="form-control form-control-sm" id="pbDate">
                 </div>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Note <small class="text-muted">(max 128)</small></label>
+                    <input type="text" class="form-control form-control-sm" id="pbNote" maxlength="128" placeholder="Optional note for this batch">
+                </div>
                 <div class="border rounded p-2 mb-2">
                     <div class="form-check mb-2">
                         <input class="form-check-input" type="checkbox" id="pbFollowMain" checked onchange="pbToggleLocation()">
@@ -3915,7 +3949,7 @@ function submitSnBulkLend(clearMode) {
         }
 
         var html = '<table class="table table-sm table-bordered mb-0" style="font-size:0.83rem;">';
-        html += '<thead class="table-light"><tr><th>#</th><th>Label</th><th>Type</th><th>Qty</th><th>Price/Unit</th><th>Total Price</th><th>Date</th><th></th></tr></thead><tbody>';
+        html += '<thead class="table-light"><tr><th>#</th><th>Label</th><th>Type</th><th>Qty</th><th>Price/Unit</th><th>Total Price</th><th>Date</th><th>Note</th><th></th></tr></thead><tbody>';
         pendingBatches.forEach(function(b, i) {
             html += '<tr>';
             html += '<td>' + (i + 1) + '</td>';
@@ -3925,6 +3959,7 @@ function submitSnBulkLend(clearMode) {
             html += '<td>' + (b.price > 0 ? b.price.toFixed(4) : '<span class="text-muted">—</span>') + '</td>';
             html += '<td>' + (b.total > 0 ? b.total.toFixed(2) : '<span class="text-muted">—</span>') + '</td>';
             html += '<td>' + (b.date ? escHtml(b.date) : '<span class="text-muted">—</span>') + '</td>';
+            html += '<td>' + (b.note ? escHtml(b.note) : '<span class="text-muted">—</span>') + '</td>';
             html += '<td class="text-nowrap">';
             html += '<button type="button" class="btn btn-sm btn-outline-warning py-0 px-1 me-1" onclick="pendingBatchEdit(' + i + ')"><i class="bi bi-pencil"></i></button>';
             html += '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="pendingBatchDelete(' + i + ')"><i class="bi bi-trash"></i></button>';
@@ -3966,6 +4001,7 @@ function submitSnBulkLend(clearMode) {
         document.getElementById('pendingBatchEditIndex').value = '';
         document.getElementById('pbLabel').value = '';
         document.getElementById('pbManufacturer').value = '';
+        document.getElementById('pbNote').value = '';
         document.getElementById('pbTrackingCheck').checked = false;
         togglePbTracking();
         document.getElementById('pbQty').value = '0';
@@ -3995,6 +4031,7 @@ function submitSnBulkLend(clearMode) {
         document.getElementById('pendingBatchEditIndex').value = idx;
         document.getElementById('pbLabel').value = b.label || '';
         document.getElementById('pbManufacturer').value = b.manufacturer || '';
+        document.getElementById('pbNote').value = b.note || '';
         document.getElementById('pbTrackingCheck').checked = !!b.sn_tracking;
         togglePbTracking();
         document.getElementById('pbQty').value = b.quantity;
@@ -4039,6 +4076,7 @@ function submitSnBulkLend(clearMode) {
     window.pendingBatchSave = function() {
         var label = document.getElementById('pbLabel').value.trim().slice(0, 32);
         var manufacturer = document.getElementById('pbManufacturer').value.trim().slice(0, 128);
+        var note = document.getElementById('pbNote').value.trim().slice(0, 128);
         var tracking = document.getElementById('pbTrackingCheck').checked;
         var qty = parseInt(document.getElementById('pbQty').value, 10) || 0;
         var maxQty = tracking ? 100 : 99999;
@@ -4056,7 +4094,7 @@ function submitSnBulkLend(clearMode) {
         var drawer = document.getElementById('pbDrawer').value.trim().slice(0, 50);
 
         var batch = {
-            label: label, manufacturer: manufacturer, sn_tracking: tracking, quantity: qty, price: price, total: total, date: date,
+            label: label, manufacturer: manufacturer, note: note, sn_tracking: tracking, quantity: qty, price: price, total: total, date: date,
             follow_main_location: followMain,
             location_id: (followMain || isDrawer) ? null : (locationId ? parseInt(locationId, 10) : null),
             rack_id: (followMain || !isDrawer) ? null : (rackId ? parseInt(rackId, 10) : null),
@@ -4157,6 +4195,10 @@ function submitSnBulkLend(clearMode) {
             <input type="datetime-local" class="form-control form-control-sm" id="lr_end">
         </div>
     </div>
+    <div class="mb-2">
+        <label class="form-label form-label-sm mb-1">Lending Notes <small class="text-muted">(max 128, optional)</small></label>
+        <input type="text" class="form-control form-control-sm" id="lr_note" maxlength="128" placeholder="Optional note about this lending">
+    </div>
     <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
         <div class="form-check form-switch mb-0">
             <input class="form-check-input" type="checkbox" id="lr_notify" onchange="toggleLrNotify()">
@@ -4180,7 +4222,7 @@ function submitSnBulkLend(clearMode) {
 <!-- Shared SN Lend Form (moved dynamically into active SN modal slot) -->
 <div id="snl_shared_form" style="display:none;">
     <div class="mb-2">
-        <label class="form-label form-label-sm mb-1">Contact</label>
+        <label class="form-label form-label-sm mb-1">Contact <span class="text-danger">*</span></label>
         <input type="hidden" id="snl_to_type">
         <input type="hidden" id="snl_to_id">
         <div class="border rounded px-2 py-1 d-flex align-items-center justify-content-between"
@@ -4196,6 +4238,10 @@ function submitSnBulkLend(clearMode) {
             <div id="snl_search_results" class="border rounded"
                  style="max-height:200px; overflow-y:auto; background:var(--bs-body-bg);"></div>
         </div>
+    </div>
+    <div class="mb-2">
+        <label class="form-label form-label-sm mb-1">Lending Notes <small class="text-muted">(max 128, optional)</small></label>
+        <input type="text" class="form-control form-control-sm" id="snl_note" maxlength="128" placeholder="Optional note about this lending">
     </div>
     <div class="row g-2 mb-2">
         <div class="col-6">

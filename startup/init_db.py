@@ -11,10 +11,26 @@ import json
 
 
 
+def _add_missing_columns():
+    """Add new columns to existing tables without a migration script."""
+    with db.engine.connect() as conn:
+        additions = [
+            ("batch_lend_records",   "lend_note", "VARCHAR(128)"),
+            ("batch_serial_numbers", "lend_note", "VARCHAR(128)"),
+        ]
+        for table, col, col_type in additions:
+            try:
+                conn.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+                conn.commit()
+                print(f"[OK] Added column {table}.{col}")
+            except Exception:
+                pass  # column already exists
+
 def init_db():
     with app.app_context():
         print("Creating database tables...")
         db.create_all()
+        _add_missing_columns()
         print("Database tables created!")
 
         create_default_roles()

@@ -608,6 +608,7 @@ class ItemBatch(db.Model):
                 'end': r.lend_end.strftime('%Y-%m-%dT%H:%M') if r.lend_end else '',
                 'notify': r.lend_notify_enabled or False,
                 'days': r.lend_notify_before_days or 3,
+                'lend_note': r.lend_note or '',
             })
         return result
 
@@ -668,6 +669,7 @@ class ItemBatch(db.Model):
                 'lend_end': sn.lend_end,
                 'lend_notify_enabled': sn.lend_notify_enabled or False,
                 'lend_notify_before_days': sn.lend_notify_before_days or 3,
+                'lend_note': sn.lend_note or '',
             }
         BatchSerialNumber.query.filter_by(batch_id=self.id).delete()
         qty = min(self.quantity, 100)
@@ -688,6 +690,7 @@ class ItemBatch(db.Model):
                 lend_end=old.get('lend_end'),
                 lend_notify_enabled=old.get('lend_notify_enabled', False),
                 lend_notify_before_days=old.get('lend_notify_before_days', 3),
+                lend_note=old.get('lend_note', '') or None,
             )
             db.session.add(sn)
     
@@ -715,6 +718,7 @@ class BatchSerialNumber(db.Model):
     lend_end = db.Column(db.DateTime, nullable=True)
     lend_notify_enabled = db.Column(db.Boolean, default=False)
     lend_notify_before_days = db.Column(db.Integer, default=3)
+    lend_note = db.Column(db.String(128), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def get_lend_to_display(self):
@@ -754,6 +758,7 @@ class BatchLendRecord(db.Model):
     lend_end = db.Column(db.DateTime, nullable=True)
     lend_notify_enabled = db.Column(db.Boolean, default=False)
     lend_notify_before_days = db.Column(db.Integer, default=3)
+    lend_note = db.Column(db.String(128), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def get_lend_to_display(self):

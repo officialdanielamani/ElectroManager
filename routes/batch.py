@@ -45,6 +45,8 @@ def _save_lend_records(batch, records_data, max_qty):
             contact_id = int(contact_id_raw) if contact_id_raw else None
         except (ValueError, TypeError):
             contact_id = None
+        if not contact_id:
+            continue  # lend_to is required — skip records without a contact
         try:
             qty = max(1, min(int(r.get('qty', 1)), max_qty))
         except (ValueError, TypeError):
@@ -53,6 +55,7 @@ def _save_lend_records(batch, records_data, max_qty):
             days = int(r.get('days', 3))
         except (ValueError, TypeError):
             days = 3
+        note = (r.get('lend_note', '') or '').strip()[:128] or None
         rec = BatchLendRecord(
             batch_id=batch.id,
             lend_to_type=r.get('type', '').strip(),
@@ -62,6 +65,7 @@ def _save_lend_records(batch, records_data, max_qty):
             lend_end=_parse_datetime(r.get('end', '')),
             lend_notify_enabled=bool(r.get('notify', False)),
             lend_notify_before_days=days,
+            lend_note=note,
         )
         db.session.add(rec)
 
@@ -596,12 +600,15 @@ def inline_update_sn(uuid):
     elif field == 'lend':
         if not current_user.has_permission('items', 'edit_lending'):
             return jsonify({'success': False, 'message': 'Permission denied'}), 403
-        sn.lend_to_type = data.get('lend_to_type', '').strip()
         lend_to_id_raw = data.get('lend_to_id')
         try:
-            sn.lend_to_id = int(lend_to_id_raw) if lend_to_id_raw else None
+            lend_to_id = int(lend_to_id_raw) if lend_to_id_raw else None
         except (ValueError, TypeError):
-            sn.lend_to_id = None
+            lend_to_id = None
+        if not lend_to_id:
+            return jsonify({'success': False, 'message': 'Lend to contact is required.'}), 400
+        sn.lend_to_type = data.get('lend_to_type', '').strip()
+        sn.lend_to_id = lend_to_id
         sn.lend_start = _parse_datetime(data.get('lend_start', ''))
         sn.lend_end = _parse_datetime(data.get('lend_end', ''))
         sn.lend_notify_enabled = bool(data.get('lend_notify_enabled', False))
@@ -609,6 +616,7 @@ def inline_update_sn(uuid):
             sn.lend_notify_before_days = int(data.get('lend_notify_before_days', 3))
         except (ValueError, TypeError):
             sn.lend_notify_before_days = 3
+        sn.lend_note = (data.get('lend_note', '') or '').strip()[:128] or None
     else:
         return jsonify({'success': False, 'message': 'Invalid field'}), 400
 
@@ -660,13 +668,18 @@ def bulk_update_sn(uuid):
                 sn.lend_end = None
                 sn.lend_notify_enabled = False
                 sn.lend_notify_before_days = 3
+                sn.lend_note = None
             elif isinstance(lend_data, dict):
-                sn.lend_to_type = lend_data.get('type', '').strip()
                 lend_id_raw = lend_data.get('id')
                 try:
-                    sn.lend_to_id = int(lend_id_raw) if lend_id_raw else None
+                    lend_id = int(lend_id_raw) if lend_id_raw else None
                 except (ValueError, TypeError):
-                    sn.lend_to_id = None
+                    lend_id = None
+                if not lend_id:
+                    count += 1
+                    continue  # contact required for non-clear lend
+                sn.lend_to_type = lend_data.get('type', '').strip()
+                sn.lend_to_id = lend_id
                 sn.lend_start = _parse_datetime(lend_data.get('start', ''))
                 sn.lend_end = _parse_datetime(lend_data.get('end', ''))
                 sn.lend_notify_enabled = bool(lend_data.get('notify', False))
@@ -674,6 +687,7 @@ def bulk_update_sn(uuid):
                     sn.lend_notify_before_days = int(lend_data.get('days', 3))
                 except (ValueError, TypeError):
                     sn.lend_notify_before_days = 3
+                sn.lend_note = (lend_data.get('lend_note', '') or '').strip()[:128] or None
             count += 1
 
     db.session.commit()
