@@ -340,6 +340,41 @@ a:hover {
     background-color: #3d2a5c !important;
 }
 
+/* Markdown editor toolbar for keqing theme */
+.md-editor-wrapper {
+    border-color: rgba(212, 175, 55, 0.3) !important;
+}
+
+.md-editor-toolbar {
+    border-bottom-color: rgba(212, 175, 55, 0.3) !important;
+}
+
+.md-editor-toolbar .btn-outline-secondary {
+    color: #c0c0c0 !important;
+    border-color: rgba(212, 175, 55, 0.3) !important;
+    background-color: transparent !important;
+}
+
+.md-editor-toolbar .btn-outline-secondary:hover,
+.md-editor-toolbar .btn-outline-secondary:focus {
+    background-color: #4a3370 !important;
+    color: #d4af37 !important;
+    border-color: rgba(212, 175, 55, 0.5) !important;
+}
+
+.md-editor-toolbar .btn-outline-primary {
+    color: #d4af37 !important;
+    border-color: #d4af37 !important;
+    background-color: transparent !important;
+}
+
+.md-editor-toolbar .btn-outline-primary:hover,
+.md-editor-toolbar .btn-primary {
+    background-color: #d4af37 !important;
+    color: #2d1b4e !important;
+    border-color: #d4af37 !important;
+}
+
 /* Sortable table headers for keqing theme */
 table thead th a {
     color: #d4af37 !important;
