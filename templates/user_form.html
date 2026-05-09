@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-6">
+    <div class="col-md-7">
         <div class="card">
             <div class="card-header">
                 <h4><i class="bi bi-person"></i> {{ title }}</h4>
@@ -18,128 +18,77 @@
                 {% if user and user.is_demo_user and config.DEMO_MODE %}
                 <div class="alert alert-warning" role="alert">
                     <strong>Demo Mode Active</strong><br>
-                    This admin user cannot be modified in demo mode. Changes are restricted to maintain demo integrity.
+                    This admin user cannot be modified in demo mode.
                 </div>
                 {% endif %}
                 <form method="POST" enctype="multipart/form-data">
                     {{ form.hidden_tag() }}
-                    
+
                     <!-- BASIC SECTION -->
                     <div class="mb-4">
                         <h5 class="text-muted border-bottom pb-2 mb-3">
                             <i class="bi bi-sliders"></i> Basic
                         </h5>
-                        
-                        <!-- PROFILE PHOTO (if editing existing user) -->
-                        {% if user %}
+
+                        <!-- PROFILE PICTURE -->
                         <div class="mb-3">
-                            <!-- Picture Preview -->
+                            <label class="form-label">Profile Picture</label>
+                            <!-- Current picture preview -->
                             {% if user and user.profile_photo %}
                             <div class="mb-2 text-center">
-                                <img id="profilePhotoPreview" src="{{ url_for('user_role.serve_user_picture', filename=user.profile_photo) }}" alt="{{ user.username }}" style="max-width: 180px; max-height: 180px; border-radius: 10px; border: 2px solid #dee2e6; cursor: pointer;" data-bs-toggle="modal" data-bs-target="#photoModal" title="Click to view full size">
+                                {% if user.profile_photo.startswith('share/') %}
+                                <img id="profilePhotoPreview" src="{{ url_for('share.share_serve', category='profile', filename=user.profile_photo[6:]) }}" alt="{{ user.username }}" style="max-width:160px;max-height:160px;border-radius:10px;border:2px solid #dee2e6;">
+                                {% else %}
+                                <img id="profilePhotoPreview" src="{{ url_for('user_role.serve_user_picture', filename=user.profile_photo) }}" alt="{{ user.username }}" style="max-width:160px;max-height:160px;border-radius:10px;border:2px solid #dee2e6;">
+                                {% endif %}
                             </div>
-
-                            <!-- Full Size Photo Modal -->
-                            <div class="modal fade" id="photoModal" tabindex="-1">
-                                <div class="modal-dialog modal-dialog-centered modal-lg">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title">Profile Photo</h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                        </div>
-                                        <div class="modal-body text-center">
-                                            <img id="fullSizePhoto" src="{{ url_for('user_role.serve_user_picture', filename=user.profile_photo) }}" alt="{{ user.username }}" style="max-width: 100%; height: auto; border-radius: 10px;">
-                                        </div>
-                                    </div>
-                                </div>
+                            {% else %}
+                            <div class="mb-2 text-center" id="previewWrapper" style="display:none;">
+                                <img id="profilePhotoPreview" src="" alt="Preview" style="max-width:160px;max-height:160px;border-radius:10px;border:2px solid #dee2e6;">
                             </div>
                             {% endif %}
 
-                            <!-- File input, Upload and Delete in one row -->
-                            <div class="row g-2" style="align-items: flex-start;">
-                                <div class="col-6">
-                                    <div class="input-group">
-                                        <span class="input-group-text"><i class="bi bi-image"></i></span>
-                                        {% if user and user.is_demo_user and config.DEMO_MODE %}
-                                            <input type="file" class="form-control" disabled>
-                                        {% else %}
-                                            {{ form.profile_photo(class="form-control") }}
-                                        {% endif %}
-                                    </div>
-                                    <small class="text-muted d-block mt-1">Max 1MB, JPEG/PNG</small>
-                                </div>
-                                <div class="col-3">
-                                    {% if user and user.is_demo_user and config.DEMO_MODE %}
-                                        <button type="button" class="btn btn-primary w-100" style="height: 38px;" disabled>
-                                            <i class="bi bi-upload"></i> Upload
-                                        </button>
-                                    {% else %}
-                                        <button type="submit" class="btn btn-primary w-100" style="height: 38px;" name="action" value="upload_photo">
-                                            <i class="bi bi-upload"></i> Upload
-                                        </button>
-                                    {% endif %}
-                                </div>
-                                <div class="col-3">
-                                    {% if user and user.profile_photo %}
-                                    {% if user and user.is_demo_user and config.DEMO_MODE %}
-                                        <button type="button" class="btn btn-danger w-100" style="height: 38px;" disabled>
-                                            <i class="bi bi-trash"></i> Delete
-                                        </button>
-                                    {% else %}
-                                        <button type="submit" class="btn btn-danger w-100" style="height: 38px;" name="action" value="delete_photo" onclick="return confirm('Delete profile photo?')">
-                                            <i class="bi bi-trash"></i> Delete
-                                        </button>
-                                    {% endif %}
-                                    {% endif %}
-                                </div>
+                            <!-- Share file indicator -->
+                            <div id="shareFileIndicator" class="mb-2 text-center" style="display:none;">
+                                <span class="badge bg-info"><i class="bi bi-folder-fill"></i> Share file selected: <span id="shareFileName"></span></span>
                             </div>
 
-                            <!-- Choose from Share Files -->
+                            <!-- Hidden input for selected share file -->
+                            <input type="hidden" name="share_profile_file" id="shareProfileFile" value="">
+
+                            <!-- Controls row -->
                             {% if not (user and user.is_demo_user and config.DEMO_MODE) %}
-                            <div class="mt-2">
-                                <label class="form-label small text-muted fw-semibold">Choose from Share Files</label>
-                                <a href="{{ url_for('user_role.admin_choose_profile_photo', user_id=user.id) }}" class="btn btn-outline-primary d-block">
-                                    <i class="bi bi-folder2-open"></i> Browse Share Files
-                                </a>
+                            <div class="d-flex gap-2 flex-wrap align-items-center">
+                                <div class="input-group" style="max-width:320px;">
+                                    <span class="input-group-text"><i class="bi bi-image"></i></span>
+                                    {{ form.profile_photo(class="form-control", id="profilePhotoInput", accept=".jpg,.jpeg,.png") }}
+                                </div>
+                                {% if user and user.profile_photo %}
+                                <button type="submit" name="action" value="delete_photo" class="btn btn-outline-danger" onclick="return confirm('Delete profile photo?')" title="Delete photo">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                                {% endif %}
+                                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#shareFilesModal">
+                                    <i class="bi bi-folder2-open"></i> Share Files
+                                </button>
                             </div>
-                            {% endif %}
-                        </div>
-                        {% endif %}
-                        
-                        <div class="mb-3">
-                            {{ form.name.label(class="form-label") }}
-                            <small class="text-muted ms-1">(required, not unique, max 64 chars)</small>
-                            {% if user and user.is_demo_user and config.DEMO_MODE %}
-                                <input type="text" class="form-control" value="{{ user.name or '' }}" disabled>
-                            {% else %}
-                                {{ form.name(class="form-control", placeholder="e.g. Jane Doe") }}
+                            <small class="text-muted d-block mt-1">Max 1MB, JPEG/PNG. Or pick from Share Files.</small>
                             {% endif %}
                         </div>
 
-                        <div class="mb-3">
-                            {{ form.short_info.label(class="form-label") }}
-                            <small class="text-muted ms-1">(optional, max 128 chars)</small>
-                            {% if user and user.is_demo_user and config.DEMO_MODE %}
-                                <input type="text" class="form-control" value="{{ user.short_info or '' }}" disabled>
-                            {% else %}
-                                {{ form.short_info(class="form-control", placeholder="e.g. Lab Technician") }}
-                            {% endif %}
-                        </div>
-
+                        <!-- USERNAME -->
                         <div class="mb-3">
                             {{ form.username.label(class="form-label") }}
+                            <small class="text-muted ms-1">(required, unique, max 80 chars)</small>
                             {% if user and user.is_demo_user and config.DEMO_MODE %}
                                 <input type="text" class="form-control" value="{{ user.username }}" disabled>
                             {% else %}
                                 {{ form.username(class="form-control" + (" is-invalid" if form.username.errors else "")) }}
                             {% endif %}
-                            {% if form.username.errors %}
-                                <div class="invalid-feedback">
-                                    {% for error in form.username.errors %}{{ error }}{% endfor %}
-                                </div>
-                            {% endif %}
+                            {% if form.username.errors %}<div class="invalid-feedback">{% for e in form.username.errors %}{{ e }}{% endfor %}</div>{% endif %}
                         </div>
 
+                        <!-- EMAIL -->
                         <div class="mb-3">
                             {{ form.email.label(class="form-label") }}
                             {% if user and user.is_demo_user and config.DEMO_MODE %}
@@ -147,13 +96,10 @@
                             {% else %}
                                 {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else "")) }}
                             {% endif %}
-                            {% if form.email.errors %}
-                                <div class="invalid-feedback">
-                                    {% for error in form.email.errors %}{{ error }}{% endfor %}
-                                </div>
-                            {% endif %}
+                            {% if form.email.errors %}<div class="invalid-feedback">{% for e in form.email.errors %}{{ e }}{% endfor %}</div>{% endif %}
                         </div>
 
+                        <!-- PASSWORD -->
                         <div class="mb-3">
                             {{ form.password.label(class="form-label") }}
                             {% if user and user.is_demo_user and config.DEMO_MODE %}
@@ -161,37 +107,30 @@
                             {% else %}
                                 {{ form.password(class="form-control" + (" is-invalid" if form.password.errors else "")) }}
                             {% endif %}
-                            {% if form.password.errors %}
-                                <div class="invalid-feedback">
-                                    {% for error in form.password.errors %}{{ error }}{% endfor %}
-                                </div>
-                            {% endif %}
-                            <small class="text-muted">Leave blank to keep current password</small>
+                            {% if form.password.errors %}<div class="invalid-feedback">{% for e in form.password.errors %}{{ e }}{% endfor %}</div>{% endif %}
+                            <small class="text-muted">{% if user %}Leave blank to keep current password. {% endif %}Min 8 chars with letters and numbers.</small>
                         </div>
 
+                        <!-- NAME -->
                         <div class="mb-3">
-                            {{ form.role_id.label(class="form-label") }}
+                            {{ form.name.label(class="form-label") }}
+                            <small class="text-muted ms-1">(required, not unique, max 64 chars)</small>
                             {% if user and user.is_demo_user and config.DEMO_MODE %}
-                                <select class="form-select" disabled>
-                                    <option selected>{{ user.user_role.name }}</option>
-                                </select>
+                                <input type="text" class="form-control" value="{{ user.name or '' }}" disabled>
                             {% else %}
-                                {{ form.role_id(class="form-select" + (" is-invalid" if form.role_id.errors else "")) }}
+                                {{ form.name(class="form-control" + (" is-invalid" if form.name.errors else ""), placeholder="e.g. Jane Doe") }}
                             {% endif %}
-                            {% if form.role_id.errors %}
-                                <div class="invalid-feedback">
-                                    {% for error in form.role_id.errors %}{{ error }}{% endfor %}
-                                </div>
-                            {% endif %}
+                            {% if form.name.errors %}<div class="invalid-feedback">{% for e in form.name.errors %}{{ e }}{% endfor %}</div>{% endif %}
                         </div>
 
-                        <div class="mb-3 form-check">
+                        <!-- SHORT INFO -->
+                        <div class="mb-3">
+                            {{ form.short_info.label(class="form-label") }}
+                            <small class="text-muted ms-1">(optional, max 128 chars)</small>
                             {% if user and user.is_demo_user and config.DEMO_MODE %}
-                                <input type="checkbox" class="form-check-input" disabled checked>
-                                {{ form.is_active.label(class="form-check-label") }}
+                                <input type="text" class="form-control" value="{{ user.short_info or '' }}" disabled>
                             {% else %}
-                                {{ form.is_active(class="form-check-input") }}
-                                {{ form.is_active.label(class="form-check-label") }}
+                                {{ form.short_info(class="form-control", placeholder="e.g. Lab Technician") }}
                             {% endif %}
                         </div>
                     </div>
@@ -202,6 +141,31 @@
                             <i class="bi bi-shield-lock"></i> Security
                         </h5>
 
+                        <!-- ROLES -->
+                        <div class="mb-3">
+                            {{ form.role_id.label(class="form-label") }}
+                            {% if user and user.is_demo_user and config.DEMO_MODE %}
+                                <select class="form-select" disabled>
+                                    <option selected>{{ user.user_role.name }}</option>
+                                </select>
+                            {% else %}
+                                {{ form.role_id(class="form-select" + (" is-invalid" if form.role_id.errors else "")) }}
+                            {% endif %}
+                            {% if form.role_id.errors %}<div class="invalid-feedback">{% for e in form.role_id.errors %}{{ e }}{% endfor %}</div>{% endif %}
+                        </div>
+
+                        <!-- ACTIVE -->
+                        <div class="mb-3 form-check">
+                            {% if user and user.is_demo_user and config.DEMO_MODE %}
+                                <input type="checkbox" class="form-check-input" disabled checked>
+                                {{ form.is_active.label(class="form-check-label") }}
+                            {% else %}
+                                {{ form.is_active(class="form-check-input") }}
+                                {{ form.is_active.label(class="form-check-label") }}
+                            {% endif %}
+                        </div>
+
+                        <!-- ALLOW RESET PASSWORD -->
                         <div class="mb-3 form-check">
                             {% if user and user.is_demo_user and config.DEMO_MODE %}
                                 <input type="checkbox" class="form-check-input" disabled checked>
@@ -212,6 +176,7 @@
                             {% endif %}
                         </div>
 
+                        <!-- ALLOW CHANGE PROFILE PICTURE -->
                         <div class="mb-3 form-check">
                             {% if user and user.is_demo_user and config.DEMO_MODE %}
                                 <input type="checkbox" class="form-check-input" disabled checked>
@@ -222,17 +187,18 @@
                             {% endif %}
                         </div>
 
+                        <!-- PROFILE PICTURE SOURCE (sub-option) -->
                         <div id="profilePictureSourceSection" class="mb-3 ms-4" style="display:none;">
-                            <label class="form-label fw-semibold">Profile Picture Source</label>
+                            <label class="form-label fw-semibold small">Allowed Source</label>
                             <div class="form-check">
                                 <input class="form-check-input" type="radio" name="profile_picture_source" id="ppsUpload" value="upload"
                                     {% if user and user.profile_picture_source == 'upload' %}checked{% endif %}>
-                                <label class="form-check-label" for="ppsUpload">Custom Upload</label>
+                                <label class="form-check-label" for="ppsUpload">Custom Upload only</label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="radio" name="profile_picture_source" id="ppsShare" value="share"
                                     {% if not user or user.profile_picture_source in ('share', None, '') %}checked{% endif %}>
-                                <label class="form-check-label" for="ppsShare">Share Files Profile</label>
+                                <label class="form-check-label" for="ppsShare">Share Files only</label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="radio" name="profile_picture_source" id="ppsBoth" value="both"
@@ -241,6 +207,18 @@
                             </div>
                         </div>
 
+                        <!-- ALLOW CHANGE SHORT INFO -->
+                        <div class="mb-3 form-check">
+                            {% if user and user.is_demo_user and config.DEMO_MODE %}
+                                <input type="checkbox" class="form-check-input" disabled checked>
+                                {{ form.allow_change_short_info.label(class="form-check-label") }}
+                            {% else %}
+                                {{ form.allow_change_short_info(class="form-check-input") }}
+                                {{ form.allow_change_short_info.label(class="form-check-label") }}
+                            {% endif %}
+                        </div>
+
+                        <!-- MAX LOGIN ATTEMPTS -->
                         <div class="mb-3">
                             {{ form.max_login_attempts.label(class="form-label") }}
                             {% if user and user.is_demo_user and config.DEMO_MODE %}
@@ -248,14 +226,11 @@
                             {% else %}
                                 {{ form.max_login_attempts(class="form-control" + (" is-invalid" if form.max_login_attempts.errors else "")) }}
                             {% endif %}
-                            {% if form.max_login_attempts.errors %}
-                                <div class="invalid-feedback">
-                                    {% for error in form.max_login_attempts.errors %}{{ error }}{% endfor %}
-                                </div>
-                            {% endif %}
+                            {% if form.max_login_attempts.errors %}<div class="invalid-feedback">{% for e in form.max_login_attempts.errors %}{{ e }}{% endfor %}</div>{% endif %}
                             <small class="text-muted">Set to 0 for unlimited login attempts</small>
                         </div>
 
+                        <!-- UNLOCK AFTER TIME (enabled toggle) -->
                         <div class="mb-3 form-check">
                             {% if user and user.is_demo_user and config.DEMO_MODE %}
                                 <input type="checkbox" class="form-check-input" disabled checked>
@@ -267,6 +242,7 @@
                             <small class="text-muted d-block mt-1">Auto-unlock account after failed login attempts</small>
                         </div>
 
+                        <!-- UNLOCK AFTER (duration) -->
                         <div class="mb-3">
                             {{ form.auto_unlock_minutes.label(class="form-label") }}
                             {% if user and user.is_demo_user and config.DEMO_MODE %}
@@ -276,9 +252,10 @@
                             {% else %}
                                 {{ form.auto_unlock_minutes(class="form-select" + (" is-invalid" if form.auto_unlock_minutes.errors else "")) }}
                             {% endif %}
-                            <small class="text-muted">Only applicable if "Unlock After Time" is enabled</small>
+                            <small class="text-muted">Only applicable if "Unlock after Time" is enabled</small>
                         </div>
 
+                        <!-- UNLOCK IMMEDIATELY -->
                         {% if user and user.account_locked_until %}
                         <div class="mb-3 form-check">
                             <input type="checkbox" class="form-check-input" id="unlockAccount" name="unlock_account" value="true">
@@ -307,17 +284,101 @@
         </div>
     </div>
 </div>
+
+<!-- Share Files Modal -->
+<div class="modal fade" id="shareFilesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-folder2-open"></i> Choose Profile Picture from Share Files</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                {% if profile_share_files %}
+                <div class="row g-3">
+                    {% for sf in profile_share_files %}
+                    <div class="col-4 col-md-3">
+                        <div class="card share-file-card h-100" style="cursor:pointer;" onclick="selectShareFile('{{ sf.filename }}', '{{ sf.name }}', '{{ url_for('share.share_serve', category='profile', filename=sf.filename) }}')">
+                            <img src="{{ url_for('share.share_serve', category='profile', filename=sf.filename) }}" class="card-img-top" style="height:100px;object-fit:cover;" alt="{{ sf.name }}">
+                            <div class="card-body p-1 text-center">
+                                <small class="text-muted">{{ sf.name }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">No profile pictures in Share Files yet.<br>Upload images to the "Profile" category in Share Files management.</p>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                {% if user %}
+                <a href="{{ url_for('user_role.admin_choose_profile_photo', user_id=user.id) }}" class="btn btn-outline-primary">
+                    <i class="bi bi-arrow-up-right-circle"></i> Manage Share Files
+                </a>
+                {% endif %}
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 (function() {
+    // Profile picture source toggle
     const cb = document.getElementById('allowProfilePictureChange');
     const section = document.getElementById('profilePictureSourceSection');
-    if (!cb || !section) return;
-    function toggle() { section.style.display = cb.checked ? '' : 'none'; }
-    cb.addEventListener('change', toggle);
-    toggle();
+    if (cb && section) {
+        function toggle() { section.style.display = cb.checked ? '' : 'none'; }
+        cb.addEventListener('change', toggle);
+        toggle();
+    }
+
+    // File input preview
+    const fileInput = document.getElementById('profilePhotoInput');
+    if (fileInput) {
+        fileInput.addEventListener('change', function() {
+            const file = this.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.getElementById('profilePhotoPreview');
+                const wrapper = document.getElementById('previewWrapper');
+                if (preview) {
+                    preview.src = e.target.result;
+                    if (wrapper) wrapper.style.display = '';
+                }
+                // Clear any share file selection
+                document.getElementById('shareProfileFile').value = '';
+                document.getElementById('shareFileIndicator').style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        });
+    }
 })();
+
+function selectShareFile(filename, name, url) {
+    document.getElementById('shareProfileFile').value = filename;
+    document.getElementById('shareFileName').textContent = name;
+    document.getElementById('shareFileIndicator').style.display = '';
+
+    // Show preview
+    const preview = document.getElementById('profilePhotoPreview');
+    const wrapper = document.getElementById('previewWrapper');
+    if (preview) {
+        preview.src = url;
+        if (wrapper) wrapper.style.display = '';
+    }
+
+    // Clear file input
+    const fileInput = document.getElementById('profilePhotoInput');
+    if (fileInput) fileInput.value = '';
+
+    // Close modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('shareFilesModal'));
+    if (modal) modal.hide();
+}
 </script>
 {% endblock %}

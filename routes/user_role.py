@@ -110,11 +110,11 @@ def user_new():
         
         if existing_username:
             flash(f'Username "{form.username.data}" already exists!', 'danger')
-            return render_template('user_form.html', form=form, title='New User')
-        
+            return render_template('user_form.html', form=form, title='New User', profile_share_files=SharedFile.query.filter_by(category='profile').order_by(SharedFile.created_at.desc()).all())
+
         if existing_email:
             flash(f'Email "{form.email.data}" already registered!', 'danger')
-            return render_template('user_form.html', form=form, title='New User')
+            return render_template('user_form.html', form=form, title='New User', profile_share_files=SharedFile.query.filter_by(category='profile').order_by(SharedFile.created_at.desc()).all())
         
         _pps = request.form.get('profile_picture_source', 'share')
         if _pps not in ('upload', 'share', 'both'):
@@ -129,32 +129,38 @@ def user_new():
             max_login_attempts=form.max_login_attempts.data or 0,
             allow_password_reset=form.allow_password_reset.data,
             allow_profile_picture_change=form.allow_profile_picture_change.data,
+            allow_change_short_info=form.allow_change_short_info.data,
             profile_picture_source=_pps if form.allow_profile_picture_change.data else 'upload',
             auto_unlock_enabled=form.auto_unlock_enabled.data,
             auto_unlock_minutes=form.auto_unlock_minutes.data
         )
         user.set_password(form.password.data)
-        
+
+        # Handle share file profile photo
+        share_file = request.form.get('share_profile_file', '').strip()
+        if share_file and not form.profile_photo.data:
+            user.profile_photo = f'share/{share_file}'
+
         # Handle profile photo upload
-        if form.profile_photo.data:
+        if not share_file and form.profile_photo.data:
             file = form.profile_photo.data
             if file and allowed_file(file.filename, {'png', 'jpg', 'jpeg'}):
                 # Check file size (max 1MB)
                 file.seek(0, os.SEEK_END)
                 file_size = file.tell()
                 file.seek(0)
-                
+
                 if file_size > 1024 * 1024:  # 1MB
                     flash('Profile photo must be smaller than 1MB', 'danger')
-                    return render_template('user_form.html', form=form, title='New User')
-                
+                    return render_template('user_form.html', form=form, title='New User', profile_share_files=SharedFile.query.filter_by(category='profile').order_by(SharedFile.created_at.desc()).all())
+
                 # Save with username as filename - sanitize extension
                 ext = secure_filename(file.filename.rsplit('.', 1)[1].lower())
                 filename = f"{secure_filename(form.username.data)}.{ext}"
                 filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', filename)
                 file.save(filepath)
                 user.profile_photo = filename
-        
+
         db.session.add(user)
         db.session.commit()
         
@@ -162,7 +168,7 @@ def user_new():
         flash(f'User "{user.username}" created successfully!', 'success')
         return redirect(url_for('user_role.users'))
     
-    return render_template('user_form.html', form=form, title='New User')
+    return render_template('user_form.html', form=form, title='New User', profile_share_files=SharedFile.query.filter_by(category='profile').order_by(SharedFile.created_at.desc()).all())
 
 
 

@@ -39,19 +39,29 @@ class RegistrationForm(FlaskForm):
             raise ValidationError('Email already registered.')
 
 
+def _alphanumeric_password(form, field):
+    if field.data:
+        has_letter = any(c.isalpha() for c in field.data)
+        has_digit = any(c.isdigit() for c in field.data)
+        if not (has_letter and has_digit):
+            from wtforms.validators import ValidationError
+            raise ValidationError('Password must contain both letters and numbers.')
+
+
 class UserForm(FlaskForm):
     # --- Basic Section ---
     name = StringField('Name', validators=[DataRequired(), Length(max=64)])
     short_info = StringField('Short Info', validators=[Optional(), Length(max=128)])
     username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])
     email = StringField('Email', validators=[DataRequired(), Email()])
-    password = PasswordField('Password', validators=[Optional(), Length(min=6)])
+    password = PasswordField('Password', validators=[Optional(), Length(min=8), _alphanumeric_password])
     role_id = SelectField('Roles', coerce=int, validators=[DataRequired()])
     is_active = BooleanField('Active')
     
     # --- Security Section ---
     allow_password_reset = BooleanField('Allow User to Reset Password', default=True)
     allow_profile_picture_change = BooleanField('Allow User to change Profile Picture', default=True)
+    allow_change_short_info = BooleanField('Allow User to change Short Info', default=True)
     max_login_attempts = IntegerField('Max Login Attempt', validators=[Optional(), NumberRange(min=0)], default=0)
     auto_unlock_enabled = BooleanField('Unlock after Time', default=True)
     auto_unlock_minutes = SelectField('Unlock After', coerce=int, choices=[
