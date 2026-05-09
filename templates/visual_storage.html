@@ -118,7 +118,7 @@
                             <span class="badge bg-primary">{{ rack.item_count }} items</span>
                         </h5>
                         {% if rack.short_info %}
-                        <small>{{ rack.short_info }}</small>
+                        <small class="rack-header-short-info d-block text-truncate" style="max-width:100%;opacity:0.85;" title="{{ rack.short_info }}">{{ rack.short_info }}</small>
                         {% endif %}
                         {% if rack.physical_location %}
                         <div><small>
@@ -544,7 +544,7 @@
 }
 
 .drawer-label {
-    font-size: 0.72rem;
+    font-size: 0.65rem;
     font-weight: bold;
     color: var(--dc-normal-color);
     margin-bottom: 2px;
@@ -553,11 +553,12 @@
 .drawer-cell.unavailable .drawer-label { color: var(--dc-unavail-color); }
 
 .drawer-short-info {
-    font-size: 0.62rem;
+    font-size: 0.75rem;
     font-style: italic;
-    opacity: 0.85;
+    opacity: 0.9;
     color: inherit;
-    max-width: 100%;
+    width: 100%;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -643,8 +644,8 @@
         min-height: 85px;
         padding: 4px 3px;
     }
-    .drawer-label { font-size: 0.65rem; }
-    .drawer-short-info { font-size: 0.58rem; }
+    .drawer-label { font-size: 0.6rem; }
+    .drawer-short-info { font-size: 0.68rem; }
     /* Stack filter controls vertically */
     #filterCard .row.g-2 { flex-direction: column; }
     #filterCard .col-auto { width: 100%; }
@@ -1016,7 +1017,7 @@ function saveDrawerShortInfo() {
         if (data.success) {
             input.value = data.short_info || '';
             input.classList.add('border-success');
-            setTimeout(() => input.classList.remove('border-success'), 1500);
+            setTimeout(() => location.reload(), 800);
         } else {
             alert('Error: ' + (data.error || 'Failed to save short info'));
         }
