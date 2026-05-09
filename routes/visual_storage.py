@@ -117,6 +117,7 @@ def visual_storage():
             'uuid': rack.uuid,
             'name': rack.name,
             'description': rack.description,
+            'short_info': rack.short_info or '',
             'physical_location': rack.physical_location,
             'rows': rack.rows,
             'cols': rack.cols,

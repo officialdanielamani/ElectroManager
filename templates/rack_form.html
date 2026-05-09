@@ -198,6 +198,7 @@
 
                 <!-- Rack grid preview -->
                 {% set unavailable_drawers = rack.get_unavailable_drawers() %}
+                {% set drawer_info_map = rack.get_drawer_info() %}
                 <div id="layoutGrid" class="layout-grid"
                      style="display:grid; grid-template-columns: repeat({{ rack.cols }}, minmax(0, 1fr)); gap:6px; max-width: {{ rack.cols * 86 }}px;">
                     {% set skip_cells, cell_spans, group_cells = rack.compute_merge_layout() %}
@@ -208,10 +209,14 @@
                     {% set span = cell_spans.get(drawer_id) %}
                     {% set grp = group_cells.get(drawer_id) %}
                     {% set is_unavail = drawer_id in unavailable_drawers %}
+                    {% set is_slave = grp and grp.role == 'slave' %}
+                    {% set effective_id = grp.master if is_slave else drawer_id %}
+                    {% set d_short_info = drawer_info_map.get(effective_id, '') %}
                     <div class="layout-cell {% if span %}merged{% elif grp %}group-{{ grp.role }}{% endif %}{% if is_unavail %} unavailable{% endif %}"
                          data-drawer="{{ drawer_id }}"
                          data-is-merged="{{ 'true' if (span or (grp and grp.role == 'master')) else 'false' }}"
                          data-unavailable="{{ 'true' if is_unavail else 'false' }}"
+                         data-short-info="{{ d_short_info | e }}"
                          {% if grp %}data-group-master="{{ grp.master }}"{% endif %}
                          {% if span %}
                          style="grid-row: span {{ span.rowspan }}; grid-column: span {{ span.colspan }};"
@@ -220,6 +225,9 @@
                          {% endif %}
                          onclick="layoutCellClick(this)">
                         <div class="layout-cell-label">{{ drawer_id }}</div>
+                        {% if d_short_info and not is_slave %}
+                        <div class="layout-cell-short-info" title="{{ d_short_info }}">{{ d_short_info }}</div>
+                        {% endif %}
                         <div class="layout-cell-badge">
                             {% if span %}
                             <span class="badge bg-primary" style="font-size:0.6rem;">{{ span.rowspan }}×{{ span.colspan }}</span>
@@ -240,7 +248,9 @@
                     {% endfor %}
                 </div>
 
-                <div class="mt-3">
+                <div id="layoutShortInfoHint" class="text-info mt-2" style="font-size:0.8rem;min-height:1.2em;"></div>
+
+                <div class="mt-2">
                     <small class="text-muted">
                         <span class="badge bg-light border text-dark me-1">&nbsp;&nbsp;&nbsp;</span> Normal &nbsp;
                         <span class="badge bg-primary me-1">&nbsp;&nbsp;&nbsp;</span> Merged (rect) &nbsp;
@@ -336,6 +346,16 @@
     font-size: 0.72rem;
     font-weight: 700;
 }
+.layout-cell-short-info {
+    font-size: 0.6rem;
+    font-style: italic;
+    opacity: 0.85;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 2px;
+}
 .layout-cell-badge {
     margin-top: 2px;
 }
@@ -399,8 +419,10 @@ function cellsConnected(cells) {
 function layoutCellClick(cell) {
     const drawerId = cell.dataset.drawer;
     const isMerged = cell.dataset.isMerged === 'true';
-    // Slave cells of a non-rectangular group redirect to master for split
     const groupMaster = cell.dataset.groupMaster || null;
+    const shortInfo = cell.dataset.shortInfo || '';
+    const hintEl = document.getElementById('layoutShortInfoHint');
+    if (hintEl) hintEl.textContent = shortInfo ? `📝 ${shortInfo}` : '';
 
     // If clicking a merged master cell or a group-slave: enter split mode
     if (isMerged || groupMaster) {

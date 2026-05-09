@@ -95,12 +95,14 @@ class DataExporter:
             {
                 'name': r.name,
                 'description': r.description or '',
+                'short_info': r.short_info or '',
                 'location_name': r.physical_location.name if r.physical_location else None,
                 'color': r.color,
                 'rows': r.rows,
                 'cols': r.cols,
                 'unavailable_drawers': r.unavailable_drawers or '[]',
                 'merged_cells': r.merged_cells or '[]',
+                'drawer_info': r.drawer_info or '{}',
             }
             for r in Rack.query.all()
         ]}
@@ -408,12 +410,14 @@ class DataImporter:
                 rack = Rack(
                     name=name,
                     description=rd.get('description') or '',
+                    short_info=rd.get('short_info') or None,
                     location_id=location_id,
                     color=rd.get('color') or '#6c757d',
                     rows=rd.get('rows', 5),
                     cols=rd.get('cols', 5),
                     unavailable_drawers=rd.get('unavailable_drawers', '[]'),
                     merged_cells=rd.get('merged_cells', '[]'),
+                    drawer_info=rd.get('drawer_info') or None,
                 )
                 db.session.add(rack)
                 imported += 1
