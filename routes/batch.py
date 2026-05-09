@@ -321,12 +321,13 @@ def manage_lend(uuid, batch_id):
     return jsonify({'success': True, 'lend_qty': batch.get_lend_quantity()})
 
 
+@batch_bp.route('/item/<string:uuid>/batch/<int:batch_id>/delete', methods=['POST'])
 @login_required
 def delete_batch(uuid, batch_id):
-    """Delete a batch"""
+    """Delete a batch, logging SN records first for SN-tracked batches."""
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     batch = ItemBatch.query.get_or_404(batch_id)
-    
+
     if batch.item_id != item.id:
         flash('Batch does not belong to this item.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
@@ -336,13 +337,18 @@ def delete_batch(uuid, batch_id):
         return redirect(url_for('item.item_detail', uuid=uuid))
 
     batch_label = batch.get_display_label()
+
+    if batch.sn_tracking_enabled and batch.serial_numbers:
+        isn_list = ', '.join(sn.internal_serial_number for sn in batch.serial_numbers)
+        log_audit(current_user.id, 'batch_sn_purge', 'batch', batch_id,
+                  f'Deleted SN-tracked batch "{batch_label}" (B{batch.batch_number:02d}) '
+                  f'from item: {item.name} | {len(batch.serial_numbers)} SN records purged: {isn_list}')
+
     db.session.delete(batch)
-    
     item.recalculate_from_batches()
     item.updated_by = current_user.id
-    
     db.session.commit()
-    
+
     log_audit(current_user.id, 'delete', 'batch', batch_id,
               f'Deleted batch "{batch_label}" from item: {item.name}')
     flash(f'Batch "{batch_label}" deleted successfully!', 'success')
@@ -368,13 +374,18 @@ def bulk_delete_batches(uuid):
     for bid in batch_ids:
         batch = ItemBatch.query.get(int(bid))
         if batch and batch.item_id == item.id:
+            if batch.sn_tracking_enabled and batch.serial_numbers:
+                isn_list = ', '.join(sn.internal_serial_number for sn in batch.serial_numbers)
+                log_audit(current_user.id, 'batch_sn_purge', 'batch', batch.id,
+                          f'Bulk-deleted SN-tracked batch "{batch.get_display_label()}" (B{batch.batch_number:02d}) '
+                          f'from item: {item.name} | {len(batch.serial_numbers)} SN records purged: {isn_list}')
             db.session.delete(batch)
             deleted += 1
-    
+
     item.recalculate_from_batches()
     item.updated_by = current_user.id
     db.session.commit()
-    
+
     log_audit(current_user.id, 'bulk_delete', 'batch', None,
               f'Bulk deleted {deleted} batches from item: {item.name}')
     

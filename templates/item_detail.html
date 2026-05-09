@@ -342,11 +342,8 @@
                                 <!-- Serial Numbers Table (if enabled) -->
                                 {% if batch.sn_tracking_enabled and batch.serial_numbers|length > 0 %}
                                 <hr>
-                                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                <div class="mb-2">
                                     <strong><i class="bi bi-upc-scan"></i> Serial Numbers</strong>
-                                    {% if current_user.has_permission('items', 'edit_sn') and current_user.has_permission('items', 'edit_quantity') %}
-                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="openDeleteSnModal({{ batch.id }})"><i class="bi bi-trash"></i> Delete Selected</button>
-                                    {% endif %}
                                 </div>
                                 <div class="table-responsive">
                                     <table class="table table-sm table-bordered sn-table" id="snTable{{ batch.id }}">
@@ -391,32 +388,23 @@
                                                 <td class="small">{% if not sn.is_deleted and sn.lend_end %}{{ sn.lend_end.strftime('%d/%m/%Y') }}{% if sn.lend_end.hour or sn.lend_end.minute %} {{ sn.lend_end.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
                                                 <td>
                                                     {% if sn.is_deleted %}
-                                                    <span class="badge bg-danger" title="Removed by {{ sn.deleted_by.username if sn.deleted_by else 'unknown' }} on {{ sn.deleted_at.strftime('%Y-%m-%d %H:%M') if sn.deleted_at else '?' }}{% if sn.deleted_reason %} — {{ sn.deleted_reason }}{% endif %}"><i class="bi bi-x-circle"></i> Removed</span>
-                                                    {% if sn.deleted_reason %}<div class="text-muted" style="font-size:0.72rem;text-decoration:none">{{ sn.deleted_reason[:40] }}{% if sn.deleted_reason|length > 40 %}…{% endif %}</div>{% endif %}
-                                                    {% else %}<span class="badge bg-success">Active</span>{% endif %}
+                                                    <span class="badge bg-danger" title="Removed by {{ sn.deleted_by.username if sn.deleted_by else 'unknown' }} on {{ sn.deleted_at.strftime('%Y-%m-%d %H:%M') if sn.deleted_at else '?' }}{% if sn.deleted_reason %} — {{ sn.deleted_reason }}{% endif %}">Removed</span>
+                                                    {% if sn.deleted_reason %}<div class="text-muted" style="font-size:0.72rem">{{ sn.deleted_reason[:40] }}{% if sn.deleted_reason|length > 40 %}…{% endif %}</div>{% endif %}
+                                                    {% elif sn.lend_to_id %}
+                                                    <span class="badge bg-warning text-dark">Lending</span>
+                                                    {% else %}
+                                                    <span class="badge bg-success">Active</span>
+                                                    {% endif %}
                                                 </td>
                                             </tr>
                                             {% endfor %}
                                         </tbody>
                                     </table>
                                 </div>
-                                <small class="text-muted">Deleted entries are kept for audit record.</small>
+                                <small class="text-muted">Removed entries are kept for audit record.</small>
                                 {% endif %}
 
-                                <!-- Add SN when tracking enabled but batch empty -->
-                                {% if batch.sn_tracking_enabled and batch.serial_numbers|length == 0 and current_user.has_permission('items', 'edit_batch') %}
-                                <hr>
-                                <div class="d-flex align-items-center gap-2 mb-2">
-                                    <strong><i class="bi bi-upc-scan"></i> Serial Numbers</strong>
-                                    <div class="input-group input-group-sm" style="width:auto">
-                                        <span class="input-group-text">Add</span>
-                                        <input type="number" class="form-control" id="addSnQty{{ batch.id }}" min="1" max="100" value="1" style="width:60px">
-                                        <button class="btn btn-outline-success" type="button" onclick="addSnToBatch({{ batch.id }}, 0)"><i class="bi bi-plus"></i></button>
-                                    </div>
-                                </div>
-                                {% endif %}
-
-                                <!-- Batch Actions moved to Item Edit page -->
+                                <!-- Batch Actions on Item Edit page -->
                             </div>
                         </div>
                     </div>
@@ -567,34 +555,6 @@ document.addEventListener('DOMContentLoaded', function() { renderDatasheets(); }
 </div>
 
 <!-- Add/Edit Batch operations are on the Edit Item page -->
-
-<!-- Delete SN Modal -->
-{% if current_user.has_permission('items', 'edit_batch') %}
-<div class="modal fade" id="deleteSnModalDialog" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title"><i class="bi bi-trash"></i> Remove Serial Numbers</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p class="mb-2">Removing <strong><span id="deleteSnCount">0</span></strong> selected unit(s). Removed entries are kept for record.</p>
-                <div class="alert alert-warning p-2 small">
-                    <i class="bi bi-exclamation-triangle"></i> Batch quantity will be reduced. The ISN entries remain visible as "Removed" for audit purposes.
-                </div>
-                <div class="mb-2">
-                    <label class="form-label">Reason for removal <span class="text-muted">(optional, max 256 chars)</span></label>
-                    <textarea class="form-control" id="deleteSnReason" rows="3" maxlength="256" placeholder="e.g. Damaged in testing, Component failure, Lost during transit..."></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" onclick="doDeleteSn()"><i class="bi bi-trash"></i> Confirm Remove</button>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
 
 <!-- Transfer Modal (quantity based - for non-tracking batches) -->
 {% if current_user.has_permission('items', 'edit_batch') and item.batches|length >= 2 %}
@@ -820,46 +780,6 @@ function saveEditDetails() {
     .catch(e => alert('Error: ' + e));
 }
 
-/* ── Soft-Delete selected SNs modal ── */
-var _deleteSnBatchId = null;
-function openDeleteSnModal(batchId) {
-    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
-    if (checked.length === 0) { alert('Please select at least one serial number.'); return; }
-    _deleteSnBatchId = batchId;
-    document.getElementById('deleteSnCount').textContent = checked.length;
-    document.getElementById('deleteSnReason').value = '';
-    new bootstrap.Modal(document.getElementById('deleteSnModalDialog')).show();
-}
-function doDeleteSn() {
-    var checked = document.querySelectorAll('.sn-check-' + _deleteSnBatchId + ':checked');
-    var ids = [];
-    checked.forEach(function(cb) { ids.push(parseInt(cb.value)); });
-    var reason = document.getElementById('deleteSnReason').value.trim().slice(0, 256);
-    fetch('{{ url_for("batch.delete_selected_sn", uuid=item.uuid) }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sn_ids: ids, batch_id: _deleteSnBatchId, reason: reason })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) { if (data.success) location.reload(); else alert(data.message || 'Error'); })
-    .catch(function(e) { alert('Error: ' + e); });
-}
-
-/* ── Add SNs to batch ── */
-function addSnToBatch(batchId, currentQty) {
-    var input = document.getElementById('addSnQty' + batchId);
-    var qty = parseInt(input.value) || 0;
-    if (qty < 1) { alert('Enter at least 1.'); return; }
-    if (currentQty + qty > 100) { alert('Maximum 100 per batch. Can add up to ' + (100 - currentQty) + '.'); return; }
-    fetch('{{ url_for("batch.add_sn_to_batch", uuid=item.uuid) }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ batch_id: batchId, quantity: qty })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) { if (data.success) location.reload(); else alert(data.message || 'Error'); })
-    .catch(function(e) { alert('Error: ' + e); });
-}
 
 function confirmDisableSn() {
     const clearCheck = document.getElementById('clearSnsCheck');

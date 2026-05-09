@@ -477,12 +477,12 @@
                                                     </td>
                                                     <td>
                                                         {% if sn.is_deleted %}
-                                                        <span class="badge bg-danger" title="Deleted by {{ sn.deleted_by.username if sn.deleted_by else 'unknown' }} on {{ sn.deleted_at.strftime('%Y-%m-%d %H:%M') if sn.deleted_at else '?' }}{% if sn.deleted_reason %} — {{ sn.deleted_reason }}{% endif %}">
-                                                            <i class="bi bi-x-circle"></i> Removed
-                                                        </span>
+                                                        <span class="badge bg-danger" title="Removed by {{ sn.deleted_by.username if sn.deleted_by else 'unknown' }} on {{ sn.deleted_at.strftime('%Y-%m-%d %H:%M') if sn.deleted_at else '?' }}{% if sn.deleted_reason %} — {{ sn.deleted_reason }}{% endif %}">Removed</span>
                                                         {% if sn.deleted_reason %}
-                                                        <div class="text-muted" style="font-size:0.72rem;text-decoration:none">{{ sn.deleted_reason[:40] }}{% if sn.deleted_reason|length > 40 %}…{% endif %}</div>
+                                                        <div class="text-muted" style="font-size:0.72rem">{{ sn.deleted_reason[:40] }}{% if sn.deleted_reason|length > 40 %}…{% endif %}</div>
                                                         {% endif %}
+                                                        {% elif sn.lend_to_id %}
+                                                        <span class="badge bg-warning text-dark">Lending</span>
                                                         {% else %}
                                                         <span class="badge bg-success">Active</span>
                                                         {% endif %}
