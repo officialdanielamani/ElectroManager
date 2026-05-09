@@ -80,11 +80,17 @@ def change_password():
         flash('New passwords do not match.', 'danger')
         return redirect(url_for('settings.settings_general'))
     
-    # Check minimum length
-    if len(new_password) < 6:
-        flash('New password must be at least 6 characters.', 'danger')
+    # Check minimum length and alphanumeric requirement
+    if len(new_password) < 8:
+        flash('New password must be at least 8 characters.', 'danger')
         return redirect(url_for('settings.settings_general'))
-    
+
+    has_letter = any(c.isalpha() for c in new_password)
+    has_digit = any(c.isdigit() for c in new_password)
+    if not (has_letter and has_digit):
+        flash('New password must contain both letters and numbers.', 'danger')
+        return redirect(url_for('settings.settings_general'))
+
     # Set new password
     current_user.set_password(new_password)
     current_user.failed_login_attempts = 0  # Reset failed attempts

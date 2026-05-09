@@ -227,9 +227,13 @@ def save_ui_preference():
 @login_required
 def save_account_info():
     """Save display name and short info for own account"""
-    current_user.name = (request.form.get('name', '').strip()[:64]) or None
-    current_user.short_info = (request.form.get('short_info', '').strip()[:128]) or None
-    from models import db
+    name = (request.form.get('name', '').strip()[:64])
+    if not name:
+        flash('Name is required.', 'danger')
+        return redirect(url_for('settings.settings_general'))
+    current_user.name = name
+    if getattr(current_user, 'allow_change_short_info', True):
+        current_user.short_info = (request.form.get('short_info', '').strip()[:128]) or None
     db.session.commit()
     flash('Profile info updated.', 'success')
     return redirect(url_for('settings.settings_general'))
@@ -263,10 +267,16 @@ def change_password():
         return redirect(url_for('settings.settings_general'))
     
     # Check minimum length
-    if len(new_password) < 6:
-        flash('New password must be at least 6 characters.', 'danger')
+    if len(new_password) < 8:
+        flash('New password must be at least 8 characters.', 'danger')
         return redirect(url_for('settings.settings_general'))
-    
+
+    has_letter = any(c.isalpha() for c in new_password)
+    has_digit = any(c.isdigit() for c in new_password)
+    if not (has_letter and has_digit):
+        flash('New password must contain both letters and numbers.', 'danger')
+        return redirect(url_for('settings.settings_general'))
+
     # Set new password
     current_user.set_password(new_password)
     current_user.failed_login_attempts = 0  # Reset failed attempts
