@@ -247,7 +247,7 @@
                     <!-- Description (edit only) -->
                     <div class="mb-2">
                         <label class="form-label form-label-sm">Description <small class="text-muted">(Markdown)</small></label>
-                        <textarea class="form-control form-control-sm" name="description" rows="4">{{ project.description or '' }}</textarea>
+                        <textarea class="form-control form-control-sm" name="description" id="projectDescription" rows="6">{{ project.description or '' }}</textarea>
                     </div>
 
                     <!-- Dateline Notification (edit only) -->
@@ -1340,5 +1340,14 @@ function setSfView(view) {
 }
 </script>
 {% endif %}
+
+<script src="{{ url_for('static', filename='js/marked.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/md-editor.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var ta = document.getElementById('projectDescription');
+    if (ta) initMdEditor(ta);
+});
+</script>
 
 {% endblock %}
