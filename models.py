@@ -674,9 +674,9 @@ class ItemBatch(db.Model):
         BatchSerialNumber.query.filter_by(batch_id=self.id).delete()
         qty = min(self.quantity, 100)
         date_str = self.purchase_date.strftime('%Y%m%d') if self.purchase_date else '00000000'
-        label = self.batch_label or f"B{self.batch_number}"
+        batch_id_str = f"B{self.batch_number:02d}"
         for i in range(1, qty + 1):
-            isn = f"{item.uuid}-{date_str}-{label}-{i:03d}"
+            isn = f"{item.uuid}-{date_str}-{batch_id_str}-{i:03d}"
             old = existing_data.get(i, {})
             sn = BatchSerialNumber(
                 batch_id=self.id,
