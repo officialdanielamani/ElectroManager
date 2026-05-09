@@ -3781,10 +3781,59 @@ function snSaveChanges(batchId) {
     }).catch(function(e){ alert('Error: '+e); });
 }
 
+function _snFlushSilent(batchId) {
+    var s = _snState[batchId];
+    if (!s || !_snHasChanges(batchId)) return Promise.resolve();
+    var adds = s.rows.filter(function(r){ return r._add; }).length;
+    var deletes = s.rows.filter(function(r){ return r._del; }).map(function(r){ return {sn_id:r.id, reason:r._del_reason}; });
+    var edits = s.rows.filter(function(r){ return r._dirty && !r._add && !r._del; }).map(function(r){ return {sn_id:r.id, sn:r._editSn, info:r._editInfo}; });
+    var lend_changes = s.rows.filter(function(r){ return r._lend_dirty && !r._add && !r._del; }).map(function(r){
+        return {sn_id:r.id, lend_to_type:r.lend_to_type, lend_to_id:r.lend_to_id, lend_start:r.lend_start, lend_end:r.lend_end, lend_note:r.lend_note, lend_notify:r.lend_notify, lend_days:r.lend_days};
+    });
+    return fetch('/item/{{ item.uuid if item is defined else "" }}/batch/' + batchId + '/sn/save-pending', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({batch_id: batchId, adds: adds, deletes: deletes, edits: edits, lend_changes: lend_changes})
+    }).then(function(r){ return r.json(); }).then(function(d){
+        if (!d.success) throw new Error(d.message || 'Error saving SN changes for batch ' + batchId);
+    });
+}
+
+function _lendFlushSilent(batchId) {
+    if (!_lendDirtyBatches[batchId]) return Promise.resolve();
+    var fd = new FormData();
+    fd.append('lend_records', JSON.stringify(_batchLendData[batchId] || []));
+    return fetch('/item/{{ item.uuid if item is defined else "" }}/batch/' + batchId + '/manage_lend', {
+        method: 'POST', body: fd
+    }).then(function(r){ return r.json(); }).then(function(d){
+        if (!d.success) throw new Error(d.message || 'Error saving lending for batch ' + batchId);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     Object.keys(_snAllData).forEach(function(batchId) {
         _snInit(parseInt(batchId));
     });
+
+    var _flushing = false;
+    var form = document.getElementById('itemForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (_flushing) return;
+            var dirtySnBatches   = Object.keys(_snState).map(Number).filter(function(bid){ return _snHasChanges(bid); });
+            var dirtyLendBatches = Object.keys(_lendDirtyBatches).map(Number).filter(function(bid){ return _lendDirtyBatches[bid]; });
+            if (dirtySnBatches.length === 0 && dirtyLendBatches.length === 0) return;
+            e.preventDefault();
+            var promises = [];
+            dirtySnBatches.forEach(function(bid){ promises.push(_snFlushSilent(bid)); });
+            dirtyLendBatches.forEach(function(bid){ promises.push(_lendFlushSilent(bid)); });
+            Promise.all(promises).then(function() {
+                _flushing = true;
+                form.submit();
+            }).catch(function(err) {
+                alert('Failed to save batch changes: ' + err.message + '\nPlease use the Save buttons on each batch first.');
+            });
+        });
+    }
 });
 </script>
 
