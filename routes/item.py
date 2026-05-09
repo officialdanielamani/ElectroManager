@@ -180,6 +180,7 @@ def item_new():
     racks_data = [{'id': r.id, 'name': r.name, 'rows': r.rows, 'cols': r.cols,
                    'unavailable_drawers': r.get_unavailable_drawers(),
                    'merged_cells': r.get_merged_cells(),
+                   'drawer_info': r.get_drawer_info(),
                    'same_item_drawers': []} for r in racks]
     all_tags = [{'id': t.id, 'name': t.name, 'color': t.color} for t in Tag.query.order_by(Tag.name).all()]
     
@@ -414,6 +415,7 @@ def item_edit(uuid):
     racks_data = [{'id': r.id, 'name': r.name, 'rows': r.rows, 'cols': r.cols,
                    'unavailable_drawers': r.get_unavailable_drawers(),
                    'merged_cells': r.get_merged_cells(),
+                   'drawer_info': r.get_drawer_info(),
                    'same_item_drawers': _sid.get(r.id, [])} for r in racks]
     all_tags = [{'id': t.id, 'name': t.name, 'color': t.color} for t in Tag.query.order_by(Tag.name).all()]
     

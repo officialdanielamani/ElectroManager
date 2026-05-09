@@ -124,6 +124,7 @@ def visual_storage():
             'item_count': len(items_main) + len(batches_here),
             'unavailable_drawers': rack.get_unavailable_drawers(),
             'merged_cells': rack.get_merged_cells(),
+            'drawer_info': rack.get_drawer_info(),
             'skip_cells': list(skip_cells),
             'cell_spans': cell_spans,
             'group_cells': group_cells,

@@ -218,13 +218,16 @@
 
                                 <div id="drawer_picker" style="display: none;">
                                     <div class="p-2 border rounded drawer-grid-container">
-                                        <div class="d-flex align-items-center gap-3 mb-2 flex-wrap">
+                                        <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
                                             <small class="text-muted">Click to select:</small>
                                             {% if item %}
-                                            <small><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e6a817;"></span> <span class="text-muted">= another batch/location of this item</span></small>
+                                            <small><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e6a817;margin-right:3px;"></span><span class="text-muted">another batch/location of this item</span></small>
                                             {% endif %}
                                         </div>
-                                        <div id="drawer_grid" style="display: inline-grid; gap: 4px; background: transparent;"></div>
+                                        <div id="drawer_short_info_hint" class="text-muted small mb-1 fst-italic" style="min-height:1.2em;"></div>
+                                        <div style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
+                                            <div id="drawer_grid" style="display: inline-grid; gap: 4px; background: transparent;"></div>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -1391,6 +1394,9 @@
         const sameItemList = rackData ? (rackData.same_item_drawers || []) : [];
         const sameItemMap = {};
         sameItemList.forEach(d => { sameItemMap[d.drawer] = d.label; });
+        // Drawer short-info map: drawerId → info text
+        const drawerInfoMap = rackData ? (rackData.drawer_info || {}) : {};
+        const hintEl = document.getElementById('drawer_short_info_hint');
 
         // Build skip / span / group maps from merged cells
         const skipCells = new Set();
@@ -1421,10 +1427,12 @@
             grid.querySelectorAll('.drawer-cell-picker').forEach(d => d.classList.remove('selected'));
             if (drawerInput.value === targetId) {
                 drawerInput.value = '';
+                if (hintEl) hintEl.textContent = '';
             } else {
                 const targetEl = grid.querySelector(`[data-drawer="${targetId}"]`);
                 if (targetEl) targetEl.classList.add('selected');
                 drawerInput.value = targetId;
+                if (hintEl) hintEl.textContent = drawerInfoMap[targetId] ? `📝 ${drawerInfoMap[targetId]}` : '';
             }
         }
 
@@ -1486,6 +1494,17 @@
                 const isSelectable = canEditLocation && !(!groupInfo && !span && isUnavailable);
                 if (isSelectable) {
                     cell.addEventListener('click', () => pickDrawer(targetId));
+                }
+
+                // Show drawer short info on hover (restores selected-drawer info on leave)
+                if (drawerInfoMap[targetId]) {
+                    cell.addEventListener('mouseenter', () => {
+                        if (hintEl) hintEl.textContent = `📝 ${drawerInfoMap[targetId]}`;
+                    });
+                    cell.addEventListener('mouseleave', () => {
+                        if (hintEl) hintEl.textContent = drawerInput.value && drawerInfoMap[drawerInput.value]
+                            ? `📝 ${drawerInfoMap[drawerInput.value]}` : '';
+                    });
                 }
 
                 // Restore selected state (only show on the master/direct cell, not on slaves)
@@ -2424,9 +2443,9 @@
 <script>
 /* ── Batch drawer grid picker (shared across Add / Edit / Pending modals) ── */
 var BATCH_LOC_IDS = {
-    ab: { rack: 'ab_rack_id', drawer: 'ab_drawer', picker: 'ab_drawer_picker', grid: 'ab_drawer_grid', locFilter: 'ab_storage_location_select' },
-    eb: { rack: 'eb_rack_id', drawer: 'eb_drawer', picker: 'eb_drawer_picker', grid: 'eb_drawer_grid', locFilter: 'eb_storage_location_select' },
-    pb: { rack: 'pbRackId',   drawer: 'pbDrawer',   picker: 'pb_drawer_picker', grid: 'pb_drawer_grid', locFilter: 'pb_storage_location_select' }
+    ab: { rack: 'ab_rack_id', drawer: 'ab_drawer', picker: 'ab_drawer_picker', grid: 'ab_drawer_grid', locFilter: 'ab_storage_location_select', hint: 'ab_drawer_short_info_hint' },
+    eb: { rack: 'eb_rack_id', drawer: 'eb_drawer', picker: 'eb_drawer_picker', grid: 'eb_drawer_grid', locFilter: 'eb_storage_location_select', hint: 'eb_drawer_short_info_hint' },
+    pb: { rack: 'pbRackId',   drawer: 'pbDrawer',   picker: 'pb_drawer_picker', grid: 'pb_drawer_grid', locFilter: 'pb_storage_location_select', hint: 'pb_drawer_short_info_hint' }
 };
 function batchUpdateStorageRackSelect(prefix) {
     var ids = BATCH_LOC_IDS[prefix];
@@ -2475,6 +2494,8 @@ function batchUpdateDrawerGrid(prefix) {
     var sameItemList = rackData ? (rackData.same_item_drawers || []) : [];
     var sameItemMap = {};
     sameItemList.forEach(function(d) { sameItemMap[d.drawer] = d.label; });
+    var drawerInfoMap = rackData ? (rackData.drawer_info || {}) : {};
+    var hintEl = document.getElementById(ids.hint || null);
 
     var skipCells = {};
     var cellSpans = {};
@@ -2509,10 +2530,12 @@ function batchUpdateDrawerGrid(prefix) {
         grid.querySelectorAll('.drawer-cell-picker').forEach(function(d) { d.classList.remove('selected'); });
         if (drawerInput.value === targetId) {
             drawerInput.value = '';
+            if (hintEl) hintEl.textContent = '';
         } else {
             var targetEl = grid.querySelector('[data-drawer="' + targetId + '"]');
             if (targetEl) targetEl.classList.add('selected');
             drawerInput.value = targetId;
+            if (hintEl) hintEl.textContent = drawerInfoMap[targetId] ? '📝 ' + drawerInfoMap[targetId] : '';
         }
     }
 
@@ -2570,6 +2593,19 @@ function batchUpdateDrawerGrid(prefix) {
                 if (isSelectable) {
                     (function(tid) {
                         cell.addEventListener('click', function() { batchPickDrawer(tid); });
+                    })(targetId);
+                }
+
+                // Show drawer short info on hover
+                if (drawerInfoMap[targetId]) {
+                    (function(tid) {
+                        cell.addEventListener('mouseenter', function() {
+                            if (hintEl) hintEl.textContent = '📝 ' + drawerInfoMap[tid];
+                        });
+                        cell.addEventListener('mouseleave', function() {
+                            if (hintEl) hintEl.textContent = drawerInput.value && drawerInfoMap[drawerInput.value]
+                                ? '📝 ' + drawerInfoMap[drawerInput.value] : '';
+                        });
                     })(targetId);
                 }
 
@@ -2687,6 +2723,7 @@ function batchUpdateDrawerGrid(prefix) {
                             <div id="ab_drawer_picker" style="display:none;">
                                 <div class="p-2 border rounded drawer-grid-container">
                                     <small class="text-muted d-block mb-2">Click to select:</small>
+                                    <div id="ab_drawer_short_info_hint" class="text-info" style="font-size:0.75rem;min-height:1.1em;margin-bottom:4px;"></div>
                                     <div id="ab_drawer_grid" style="display:inline-grid; gap:4px; background: transparent;"></div>
                                 </div>
                             </div>
@@ -2810,6 +2847,7 @@ function batchUpdateDrawerGrid(prefix) {
                             <div id="eb_drawer_picker" style="display:none;">
                                 <div class="p-2 border rounded drawer-grid-container">
                                     <small class="text-muted d-block mb-2">Click to select:</small>
+                                    <div id="eb_drawer_short_info_hint" class="text-info" style="font-size:0.75rem;min-height:1.1em;margin-bottom:4px;"></div>
                                     <div id="eb_drawer_grid" style="display:inline-grid; gap:4px; background: transparent;"></div>
                                 </div>
                             </div>
@@ -3841,6 +3879,7 @@ function submitSnBulkLend(clearMode) {
                             <div id="pb_drawer_picker" style="display:none;">
                                 <div class="p-2 border rounded drawer-grid-container">
                                     <small class="text-muted d-block mb-2">Click to select:</small>
+                                    <div id="pb_drawer_short_info_hint" class="text-info" style="font-size:0.75rem;min-height:1.1em;margin-bottom:4px;"></div>
                                     <div id="pb_drawer_grid" style="display:inline-grid; gap:4px; background: transparent;"></div>
                                 </div>
                             </div>
