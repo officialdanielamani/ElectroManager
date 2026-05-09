@@ -797,3 +797,115 @@ def add_sn_to_batch(uuid):
     return jsonify({'success': True, 'added': qty})
 
 
+@batch_bp.route('/item/<string:uuid>/batch/<int:batch_id>/sn/save-pending', methods=['POST'])
+@login_required
+def save_sn_pending(uuid, batch_id):
+    """Apply all pending SN changes (adds, soft-deletes, field edits, lend changes) atomically."""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+
+    if not current_user.has_permission('items', 'edit_sn'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+
+    batch = ItemBatch.query.get(batch_id)
+    if not batch or batch.item_id != item.id or not batch.sn_tracking_enabled:
+        return jsonify({'success': False, 'message': 'Invalid batch'}), 400
+
+    data = request.get_json()
+    adds    = int(data.get('adds', 0))
+    deletes = data.get('deletes', [])   # [{sn_id, reason}]
+    edits   = data.get('edits', [])     # [{sn_id, sn, info}]  — only non-null fields applied
+    lend_changes = data.get('lend_changes', [])  # [{sn_id, lend_to_type, lend_to_id, lend_start, lend_end, lend_note, lend_notify, lend_days}]
+
+    can_qty  = current_user.has_permission('items', 'edit_quantity')
+    can_lend = current_user.has_permission('items', 'edit_lending')
+    now = datetime.utcnow()
+
+    # ── Adds ──
+    added = 0
+    if adds > 0 and can_qty:
+        active_count = sum(1 for sn in batch.serial_numbers if not sn.is_deleted)
+        if active_count + adds > 100:
+            return jsonify({'success': False, 'message': f'Would exceed max 100. Can add up to {100 - active_count}.'}), 400
+        max_seq = db.session.query(db.func.max(BatchSerialNumber.sequence_number)).filter_by(batch_id=batch.id).scalar() or 0
+        date_str = batch.purchase_date.strftime('%Y%m%d') if batch.purchase_date else '00000000'
+        batch_id_str = f"B{batch.batch_number:02d}"
+        for i in range(1, adds + 1):
+            seq = max_seq + i
+            isn = f"{item.uuid}-{date_str}-{batch_id_str}-{seq:03d}"
+            sn = BatchSerialNumber(batch_id=batch.id, sequence_number=seq,
+                                   internal_serial_number=isn, serial_number='', info='')
+            db.session.add(sn)
+        batch.quantity += adds
+        added = adds
+
+    # ── Soft-deletes ──
+    deleted = 0
+    if deletes and can_qty:
+        for d in deletes:
+            sn_id = d.get('sn_id')
+            reason = (d.get('reason', '') or '').strip()[:256] or None
+            sn = BatchSerialNumber.query.get(sn_id)
+            if sn and sn.batch_id == batch.id and not sn.is_deleted:
+                sn.is_deleted = True
+                sn.deleted_by_id = current_user.id
+                sn.deleted_at = now
+                sn.deleted_reason = reason
+                deleted += 1
+        batch.quantity = max(batch.quantity - deleted, 0)
+
+    # ── Field edits ──
+    edited = 0
+    for e in edits:
+        sn_id = e.get('sn_id')
+        sn = BatchSerialNumber.query.get(sn_id)
+        if not sn or sn.batch_id != batch.id or sn.is_deleted:
+            continue
+        if e.get('sn') is not None:
+            sn.serial_number = str(e['sn']).strip()[:200]
+        if e.get('info') is not None:
+            sn.info = str(e['info']).strip()[:32]
+        edited += 1
+
+    # ── Lending changes ──
+    lent = 0
+    if can_lend:
+        for lc in lend_changes:
+            sn_id = lc.get('sn_id')
+            sn = BatchSerialNumber.query.get(sn_id)
+            if not sn or sn.batch_id != batch.id or sn.is_deleted:
+                continue
+            lend_id_raw = lc.get('lend_to_id')
+            try:
+                lend_id = int(lend_id_raw) if lend_id_raw else None
+            except (ValueError, TypeError):
+                lend_id = None
+            if lend_id:
+                sn.lend_to_type = lc.get('lend_to_type', '')
+                sn.lend_to_id = lend_id
+                sn.lend_start = _parse_datetime(lc.get('lend_start', ''))
+                sn.lend_end = _parse_datetime(lc.get('lend_end', ''))
+                sn.lend_note = (lc.get('lend_note', '') or '').strip()[:128] or None
+                sn.lend_notify_enabled = bool(lc.get('lend_notify', False))
+                try:
+                    sn.lend_notify_before_days = int(lc.get('lend_days', 3))
+                except (ValueError, TypeError):
+                    sn.lend_notify_before_days = 3
+            else:
+                # Clear lend
+                sn.lend_to_type = ''
+                sn.lend_to_id = None
+                sn.lend_start = None
+                sn.lend_end = None
+                sn.lend_note = None
+                sn.lend_notify_enabled = False
+                sn.lend_notify_before_days = 3
+            lent += 1
+
+    item.recalculate_from_batches()
+    item.updated_by = current_user.id
+    db.session.commit()
+
+    log_audit(current_user.id, 'sn_batch_save', 'batch', batch.id,
+              f'Saved pending SN changes for batch #{batch.batch_number} of item: {item.name} '
+              f'(+{added} adds, -{deleted} removes, {edited} edits, {lent} lend changes)')
+    return jsonify({'success': True, 'added': added, 'deleted': deleted, 'edited': edited, 'lent': lent})

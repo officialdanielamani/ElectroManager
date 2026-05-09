@@ -270,7 +270,12 @@
                                 <small class="text-muted ms-2"><i class="bi bi-sticky"></i> {{ batch.note }}</small>
                                 {% endif %}
                             </div>
-                            <i class="bi bi-chevron-down"></i>
+                            <div class="d-flex align-items-center gap-2">
+                                <button class="btn btn-outline-secondary btn-sm" onclick="event.stopPropagation()" title="Print QR Batch">
+                                    <i class="bi bi-qr-code"></i> Print QR Batch
+                                </button>
+                                <i class="bi bi-chevron-down"></i>
+                            </div>
                         </div>
                         <div class="collapse" id="batchCollapse{{ batch.id }}">
                             <div class="card-body">
@@ -365,7 +370,7 @@
                                             {% for sn in batch.serial_numbers %}
                                             {% set sn_project_used = sn.id in batch.get_project_used_sn_ids() %}
                                             <tr data-sn-id="{{ sn.id }}" {% if sn.is_deleted %}class="table-secondary text-decoration-line-through" style="opacity:0.55"{% endif %}>
-                                                <td><input type="checkbox" class="form-check-input sn-check-{{ batch.id }}" value="{{ sn.id }}" {% if sn.is_deleted %}disabled{% endif %}></td>
+                                                <td><input type="checkbox" class="form-check-input sn-check-{{ batch.id }}" value="{{ sn.id }}"></td>
                                                 <td>{{ sn.sequence_number }}</td>
                                                 <td>{{ sn.serial_number or '-' }}</td>
                                                 <td><code style="font-size:0.8rem">{{ sn.internal_serial_number }}</code></td>
@@ -706,7 +711,7 @@ function saveInlineEdit(snId, field, batchId) {
 /* ── Select-all checkbox ── */
 function toggleAllSn(source, batchId) {
     document.querySelectorAll('.sn-check-' + batchId).forEach(function(cb) {
-        if (!cb.disabled) cb.checked = source.checked;
+        cb.checked = source.checked;
     });
 }
 

@@ -612,6 +612,31 @@ class ItemBatch(db.Model):
             })
         return result
 
+    def get_serial_numbers_data(self):
+        """Serialise all SN rows to a list of dicts for JS state manager."""
+        result = []
+        for sn in self.serial_numbers:
+            result.append({
+                'id': sn.id,
+                'seq': sn.sequence_number,
+                'isn': sn.internal_serial_number or '',
+                'sn': sn.serial_number or '',
+                'info': sn.info or '',
+                'lend_to_id': sn.lend_to_id,
+                'lend_to_type': sn.lend_to_type or '',
+                'lend_display': sn.get_lend_to_display() or '',
+                'lend_start': sn.lend_start.strftime('%Y-%m-%dT%H:%M') if sn.lend_start else '',
+                'lend_end': sn.lend_end.strftime('%Y-%m-%dT%H:%M') if sn.lend_end else '',
+                'lend_notify': bool(sn.lend_notify_enabled),
+                'lend_days': sn.lend_notify_before_days or 3,
+                'lend_note': sn.lend_note or '',
+                'is_deleted': bool(sn.is_deleted),
+                'deleted_reason': sn.deleted_reason or '',
+                'deleted_by': sn.deleted_by.username if sn.deleted_by else '',
+                'deleted_at': sn.deleted_at.strftime('%Y-%m-%d %H:%M') if sn.deleted_at else '',
+            })
+        return result
+
     def get_project_used_quantity(self):
         """Get total used_quantity across all projects for this batch"""
         from models import ProjectBOMItem
