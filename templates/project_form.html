@@ -11,6 +11,7 @@
             </div>
             <div class="card-body">
                 <form method="POST" id="projectForm">
+                    <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
 
                     {% if project and project.project_id %}
                     <div class="mb-2">
@@ -22,7 +23,7 @@
                     <!-- Row 1: Name -->
                     <div class="row mb-2">
                         <div class="col-8">
-                            <label class="form-label form-label-sm">Project Name <span class="text-danger">*</span></label>
+                            <label class="form-label form-label-sm required">Project Name</label>
                             <input type="text" class="form-control form-control-sm" name="name" value="{{ project.name if project else '' }}" required>
                         </div>
                         <div class="col-4">

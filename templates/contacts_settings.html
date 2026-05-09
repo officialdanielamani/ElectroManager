@@ -69,7 +69,8 @@
                     <form method="POST" action="{{ url_for('contacts.contact_person_edit', id=p.id) }}">
                         <div class="modal-header"><h5 class="modal-title">Edit Person</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                         <div class="modal-body">
-                            <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" value="{{ p.name }}" required></div>
+                            <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
+                            <div class="mb-3"><label class="form-label required">Name</label><input type="text" class="form-control" name="name" value="{{ p.name }}" required></div>
                             <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email" value="{{ p.email or '' }}"></div>
                             <div class="mb-3"><label class="form-label">Tel</label><input type="text" class="form-control" name="tel" value="{{ p.tel or '' }}"></div>
                             <div class="mb-3">
@@ -175,7 +176,8 @@
                     <form method="POST" action="{{ url_for('contacts.contact_org_edit', id=org.id) }}">
                         <div class="modal-header"><h5 class="modal-title">Edit Organization</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                         <div class="modal-body">
-                            <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" value="{{ org.name }}" required></div>
+                            <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
+                            <div class="mb-3"><label class="form-label required">Name</label><input type="text" class="form-control" name="name" value="{{ org.name }}" required></div>
                             <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email" value="{{ org.email or '' }}"></div>
                             <div class="mb-3"><label class="form-label">Tel</label><input type="text" class="form-control" name="tel" value="{{ org.tel or '' }}"></div>
                             <div class="mb-3"><label class="form-label">URL</label><input type="url" class="form-control" name="url" value="{{ org.url or '' }}"></div>
@@ -356,7 +358,8 @@
                     <form method="POST" action="{{ url_for('contacts.contact_group_edit', id=grp.id) }}">
                         <div class="modal-header"><h5 class="modal-title">Edit Group</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                         <div class="modal-body">
-                            <div class="mb-3"><label class="form-label">Group Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" value="{{ grp.name }}" required></div>
+                            <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
+                            <div class="mb-3"><label class="form-label required">Group Name</label><input type="text" class="form-control" name="name" value="{{ grp.name }}" required></div>
                             <div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" rows="2">{{ grp.description or '' }}</textarea></div>
                         </div>
                         <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
@@ -376,7 +379,8 @@
     <form method="POST" action="{{ url_for('contacts.contact_person_add') }}">
         <div class="modal-header"><h5 class="modal-title">Add Person</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
-            <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required></div>
+            <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
+            <div class="mb-3"><label class="form-label required">Name</label><input type="text" class="form-control" name="name" required></div>
             <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email"></div>
             <div class="mb-3"><label class="form-label">Tel</label><input type="text" class="form-control" name="tel"></div>
             <div class="mb-3">
@@ -396,7 +400,8 @@
     <form method="POST" action="{{ url_for('contacts.contact_org_add') }}">
         <div class="modal-header"><h5 class="modal-title">Add Organization</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
-            <div class="mb-3"><label class="form-label">Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required></div>
+            <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
+            <div class="mb-3"><label class="form-label required">Name</label><input type="text" class="form-control" name="name" required></div>
             <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email"></div>
             <div class="mb-3"><label class="form-label">Tel</label><input type="text" class="form-control" name="tel"></div>
             <div class="mb-3"><label class="form-label">URL</label><input type="url" class="form-control" name="url" placeholder="https://"></div>
@@ -412,7 +417,8 @@
     <form method="POST" action="{{ url_for('contacts.contact_group_add') }}">
         <div class="modal-header"><h5 class="modal-title">Create Group</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
-            <div class="mb-3"><label class="form-label">Group Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required></div>
+            <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
+            <div class="mb-3"><label class="form-label required">Group Name</label><input type="text" class="form-control" name="name" required></div>
             <div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" rows="2"></textarea></div>
         </div>
         <div class="modal-footer"><button type="submit" class="btn btn-success"><i class="bi bi-plus-circle"></i> Create Group</button></div>

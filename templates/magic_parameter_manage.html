@@ -14,8 +14,9 @@
             </div>
             <div class="card-body">
                 <form method="POST" action="{{ url_for('magic_parameter.magic_parameter_edit', id=parameter.id) }}">
+                    <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
                     <div class="mb-3">
-                        <label class="form-label">Name</label>
+                        <label class="form-label required">Name</label>
                         <input type="text" name="name" class="form-control" value="{{ parameter.name }}" required>
                     </div>
                     

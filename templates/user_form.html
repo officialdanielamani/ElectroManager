@@ -23,6 +23,7 @@
                 {% endif %}
                 <form method="POST" enctype="multipart/form-data">
                     {{ form.hidden_tag() }}
+                    <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
 
                     <!-- BASIC SECTION -->
                     <div class="mb-4">
@@ -78,7 +79,7 @@
 
                         <!-- USERNAME -->
                         <div class="mb-3">
-                            {{ form.username.label(class="form-label") }}
+                            {{ form.username.label(class="form-label required") }}
                             <small class="text-muted ms-1">(required, unique, max 80 chars)</small>
                             {% if user and user.is_demo_user and config.DEMO_MODE %}
                                 <input type="text" class="form-control" value="{{ user.username }}" disabled>
@@ -90,7 +91,7 @@
 
                         <!-- EMAIL -->
                         <div class="mb-3">
-                            {{ form.email.label(class="form-label") }}
+                            {{ form.email.label(class="form-label required") }}
                             {% if user and user.is_demo_user and config.DEMO_MODE %}
                                 <input type="email" class="form-control" value="{{ user.email }}" disabled>
                             {% else %}
@@ -102,6 +103,7 @@
                         <!-- PASSWORD -->
                         <div class="mb-3">
                             {{ form.password.label(class="form-label") }}
+                            <small class="text-muted">Required for new user. Leave blank to keep current.</small>
                             {% if user and user.is_demo_user and config.DEMO_MODE %}
                                 <input type="password" class="form-control" disabled placeholder="Password locked in demo mode">
                             {% else %}
@@ -113,7 +115,7 @@
 
                         <!-- NAME -->
                         <div class="mb-3">
-                            {{ form.name.label(class="form-label") }}
+                            {{ form.name.label(class="form-label required") }}
                             <small class="text-muted ms-1">(required, not unique, max 64 chars)</small>
                             {% if user and user.is_demo_user and config.DEMO_MODE %}
                                 <input type="text" class="form-control" value="{{ user.name or '' }}" disabled>
@@ -143,7 +145,7 @@
 
                         <!-- ROLES -->
                         <div class="mb-3">
-                            {{ form.role_id.label(class="form-label") }}
+                            {{ form.role_id.label(class="form-label required") }}
                             {% if user and user.is_demo_user and config.DEMO_MODE %}
                                 <select class="form-select" disabled>
                                     <option selected>{{ user.user_role.name }}</option>

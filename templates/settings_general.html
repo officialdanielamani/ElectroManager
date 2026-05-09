@@ -219,8 +219,9 @@
 
                     <!-- Name + Short Info form -->
                     <form method="POST" action="{{ url_for('settings.save_account_info') }}">
+                        <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
                         <div class="mb-3">
-                            <label for="accountName" class="form-label">Name <small class="text-muted">(required, not unique, max 64 chars)</small></label>
+                            <label for="accountName" class="form-label required">Name <small class="text-muted">(required, not unique, max 64 chars)</small></label>
                             <input type="text" class="form-control" id="accountName" name="name" maxlength="64" required
                                    value="{{ current_user.name or '' }}" placeholder="e.g. Jane Doe">
                         </div>

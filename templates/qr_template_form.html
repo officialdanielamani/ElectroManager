@@ -13,16 +13,17 @@
                 
                 <div class="card-body">
                     <form method="POST">
-                        
+                        <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
+
                         <div class="mb-3">
-                            <label for="name" class="form-label"><strong>Template Name</strong></label>
+                            <label for="name" class="form-label required"><strong>Template Name</strong></label>
                             <input type="text" class="form-control" id="name" name="name" 
                                    placeholder="e.g., 30x20mm Label" required>
                             <small class="form-text text-muted">Give your template a descriptive name</small>
                         </div>
                         
                         <div class="mb-3">
-                            <label for="template_type" class="form-label"><strong>Template Type</strong></label>
+                            <label for="template_type" class="form-label required"><strong>Template Type</strong></label>
                             <select class="form-select" id="template_type" name="template_type" required>
                                 <option value="">-- Select Type --</option>
                                 <option value="Items">Items (for product stickers)</option>
@@ -38,14 +39,14 @@
                         <div class="row">
                             <div class="col-6">
                                 <div class="mb-3">
-                                    <label for="width_mm" class="form-label"><strong>Width (mm)</strong></label>
+                                    <label for="width_mm" class="form-label required"><strong>Width (mm)</strong></label>
                                     <input type="number" class="form-control" id="width_mm" name="width_mm" 
                                            value="30" step="0.1" required>
                                 </div>
                             </div>
                             <div class="col-6">
                                 <div class="mb-3">
-                                    <label for="height_mm" class="form-label"><strong>Height (mm)</strong></label>
+                                    <label for="height_mm" class="form-label required"><strong>Height (mm)</strong></label>
                                     <input type="number" class="form-control" id="height_mm" name="height_mm" 
                                            value="20" step="0.1" required>
                                 </div>

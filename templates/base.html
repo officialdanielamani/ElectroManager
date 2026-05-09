@@ -95,6 +95,16 @@
         })();
     </script>
     
+    <!-- Required field indicator CSS -->
+    <style>
+        label.form-label.required::after,
+        label.form-check-label.required::after {
+            content: " *";
+            color: #dc3545;
+            font-weight: bold;
+        }
+    </style>
+
     <!-- Font CSS Rules -->
     <style id="user-font-rules">
         /* Font application - use !important to override Bootstrap and other styles */

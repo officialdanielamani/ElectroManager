@@ -26,6 +26,7 @@
     <div class="col-md-10">
         <form method="POST" id="itemForm">
             {{ form.hidden_tag() }}
+            <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
 
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0"><i class="bi bi-box"></i> {{ title }}</h5>
@@ -45,7 +46,7 @@
                 <div class="card-body">
                     <div class="row mb-2">
                         <div class="col-md-8">
-                            <label class="form-label form-label-sm">Component Name *</label>
+                            <label class="form-label form-label-sm required">Component Name</label>
                             {{ form.name(class="form-control form-control-sm" + (" is-invalid" if form.name.errors else
                             ""), disabled=(item_perms and not item_perms.can_edit_info)) }}
                         </div>
