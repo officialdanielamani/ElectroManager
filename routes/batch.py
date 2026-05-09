@@ -275,10 +275,6 @@ def edit_batch(uuid, batch_id):
         BatchLendRecord.query.filter_by(batch_id=batch.id).delete()
         _save_lend_records(batch, lend_records_data, batch.quantity)
 
-    # Regenerate serial numbers if quantity changed and tracking enabled on this batch
-    if batch.sn_tracking_enabled and batch.quantity != old_qty:
-        batch.generate_serial_numbers()
-
     item.recalculate_from_batches()
     item.updated_by = current_user.id
 
@@ -588,6 +584,8 @@ def inline_update_sn(uuid):
     sn = BatchSerialNumber.query.get(sn_id)
     if not sn or sn.batch.item_id != item.id:
         return jsonify({'success': False, 'message': 'Invalid serial number'}), 400
+    if sn.is_deleted:
+        return jsonify({'success': False, 'message': 'Cannot edit a removed serial number'}), 400
 
     if field == 'sn':
         if not current_user.has_permission('items', 'edit_sn'):
@@ -650,7 +648,7 @@ def bulk_update_sn(uuid):
     count = 0
     for sn_id in sn_ids:
         sn = BatchSerialNumber.query.get(sn_id)
-        if not sn or sn.batch.item_id != item.id:
+        if not sn or sn.batch.item_id != item.id or sn.is_deleted:
             continue
 
         if 'sn' in fields and can_edit_sn:
@@ -701,10 +699,9 @@ def bulk_update_sn(uuid):
 @batch_bp.route('/item/<string:uuid>/batch/sn/delete-selected', methods=['POST'])
 @login_required
 def delete_selected_sn(uuid):
-    """Delete selected serial numbers and reduce batch quantity"""
+    """Soft-delete selected serial numbers, recording who, why, and when."""
     item = Item.query.filter_by(uuid=uuid).first_or_404()
 
-    # Needs both SN edit (to remove SNs) and quantity edit (quantity is reduced).
     if not (current_user.has_permission('items', 'edit_sn') and
             current_user.has_permission('items', 'edit_quantity')):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
@@ -712,126 +709,31 @@ def delete_selected_sn(uuid):
     data = request.get_json()
     sn_ids = data.get('sn_ids', [])
     batch_id = data.get('batch_id')
+    reason = (data.get('reason', '') or '').strip()[:256] or None
 
     batch = ItemBatch.query.get(batch_id)
     if not batch or batch.item_id != item.id:
         return jsonify({'success': False, 'message': 'Invalid batch'}), 400
 
+    now = datetime.utcnow()
     deleted = 0
     for sn_id in sn_ids:
         sn = BatchSerialNumber.query.get(sn_id)
-        if sn and sn.batch_id == batch.id:
-            db.session.delete(sn)
+        if sn and sn.batch_id == batch.id and not sn.is_deleted:
+            sn.is_deleted = True
+            sn.deleted_by_id = current_user.id
+            sn.deleted_at = now
+            sn.deleted_reason = reason
             deleted += 1
 
-    # Update batch quantity
     batch.quantity = max(batch.quantity - deleted, 0)
-
-    # Re-sequence the remaining serial numbers
-    remaining = BatchSerialNumber.query.filter_by(batch_id=batch.id).order_by(BatchSerialNumber.sequence_number).all()
-    for idx, sn in enumerate(remaining, 1):
-        sn.sequence_number = idx
-
     item.recalculate_from_batches()
     item.updated_by = current_user.id
     db.session.commit()
 
     log_audit(current_user.id, 'delete', 'serial_numbers', batch.id,
-              f'Deleted {deleted} SNs from batch #{batch.batch_number} of item: {item.name}')
+              f'Soft-deleted {deleted} SNs from batch #{batch.batch_number} of item: {item.name}')
     return jsonify({'success': True, 'deleted': deleted})
-
-
-@batch_bp.route('/item/<string:uuid>/batch/sn/transfer-selected', methods=['POST'])
-@login_required
-def transfer_selected_sn(uuid):
-    """Transfer selected serial numbers to another batch (ISN kept as-is)"""
-    item = Item.query.filter_by(uuid=uuid).first_or_404()
-
-    if not current_user.has_permission('items', 'edit_quantity'):
-        return jsonify({'success': False, 'message': 'Permission denied'}), 403
-
-    data = request.get_json()
-    sn_ids = data.get('sn_ids', [])
-    from_batch_id = data.get('from_batch_id')
-    to_batch_id = data.get('to_batch_id')
-
-    from_batch = ItemBatch.query.get(from_batch_id)
-    to_batch = ItemBatch.query.get(to_batch_id)
-
-    if not from_batch or not to_batch or from_batch.item_id != item.id or to_batch.item_id != item.id:
-        return jsonify({'success': False, 'message': 'Invalid batch'}), 400
-
-    if from_batch_id == to_batch_id:
-        return jsonify({'success': False, 'message': 'Cannot transfer to same batch'}), 400
-
-    # Block transfer from Tracking ON to Non-tracking (would lose SN data)
-    if from_batch.sn_tracking_enabled and not to_batch.sn_tracking_enabled:
-        return jsonify({'success': False, 'message': 'Cannot transfer from a tracked batch to a non-tracked batch. Serial number data would be lost.'}), 400
-
-    # Check if target batch can accept all selected items
-    if to_batch.quantity >= 100:
-        return jsonify({'success': False, 'message': f'Target batch "{to_batch.get_display_label()}" is full (100/100).'}), 400
-
-    space_available = 100 - to_batch.quantity
-    if len(sn_ids) > space_available:
-        return jsonify({'success': False, 'message': f'Target batch can only accept {space_available} more item(s). You selected {len(sn_ids)}.'}), 400
-
-    # Collect existing ISNs in target batch to detect collisions
-    existing_isns = set(
-        s.internal_serial_number for s in BatchSerialNumber.query.filter_by(batch_id=to_batch.id).all()
-    )
-
-    # Find the max ISN suffix number in target batch for collision resolution
-    import re
-    max_suffix = 0
-    for s in BatchSerialNumber.query.filter_by(batch_id=to_batch.id).all():
-        match = re.search(r'-(\d+)$', s.internal_serial_number)
-        if match:
-            max_suffix = max(max_suffix, int(match.group(1)))
-
-    transferred = 0
-    for sn_id in sn_ids:
-        sn = BatchSerialNumber.query.get(sn_id)
-        if sn and sn.batch_id == from_batch.id:
-            sn.batch_id = to_batch.id
-            # Assign next sequence number in target batch
-            max_seq = db.session.query(db.func.max(BatchSerialNumber.sequence_number)).filter_by(batch_id=to_batch.id).scalar() or 0
-            sn.sequence_number = max_seq + 1
-
-            # Keep original ISN, but if collision, generate new ISN with max+1 suffix
-            if sn.internal_serial_number in existing_isns:
-                to_date_str = to_batch.purchase_date.strftime('%Y%m%d') if to_batch.purchase_date else '00000000'
-                to_label = to_batch.batch_label or f"B{to_batch.batch_number}"
-                max_suffix += 1
-                sn.internal_serial_number = f"{item.uuid}-{to_date_str}-{to_label}-{max_suffix:03d}"
-
-            existing_isns.add(sn.internal_serial_number)
-            # Enable tracking on target if not already
-            if not to_batch.sn_tracking_enabled:
-                to_batch.sn_tracking_enabled = True
-            transferred += 1
-
-    # Update quantities
-    from_batch.quantity = max(from_batch.quantity - transferred, 0)
-    to_batch.quantity = to_batch.quantity + transferred
-
-    # Re-sequence source batch (row numbers only, keep ISNs as-is)
-    remaining = BatchSerialNumber.query.filter_by(batch_id=from_batch.id).order_by(BatchSerialNumber.sequence_number).all()
-    for idx, sn in enumerate(remaining, 1):
-        sn.sequence_number = idx
-
-    # Re-sequence target batch (row numbers only, keep ISNs as-is)
-    target_sns = BatchSerialNumber.query.filter_by(batch_id=to_batch.id).order_by(BatchSerialNumber.sequence_number).all()
-    for idx, sn in enumerate(target_sns, 1):
-        sn.sequence_number = idx
-
-    item.recalculate_from_batches()
-    item.updated_by = current_user.id
-    db.session.commit()
-
-    log_audit(current_user.id, 'transfer', 'serial_numbers', None,
-              f'Transferred {transferred} SNs from batch #{from_batch.batch_number} to #{to_batch.batch_number} in item: {item.name}')
-    return jsonify({'success': True, 'transferred': transferred})
 
 
 @batch_bp.route('/item/<string:uuid>/batch/sn/add', methods=['POST'])
@@ -860,11 +762,11 @@ def add_sn_to_batch(uuid):
     max_seq = db.session.query(db.func.max(BatchSerialNumber.sequence_number)).filter_by(batch_id=batch.id).scalar() or 0
 
     date_str = batch.purchase_date.strftime('%Y%m%d') if batch.purchase_date else '00000000'
-    label = batch.batch_label or f"B{batch.batch_number}"
+    batch_id_str = f"B{batch.batch_number:02d}"
 
     for i in range(1, qty + 1):
         seq = max_seq + i
-        isn = f"{item.uuid}-{date_str}-{label}-{seq:03d}"
+        isn = f"{item.uuid}-{date_str}-{batch_id_str}-{seq:03d}"
         sn = BatchSerialNumber(
             batch_id=batch.id,
             sequence_number=seq,
@@ -884,32 +786,3 @@ def add_sn_to_batch(uuid):
     return jsonify({'success': True, 'added': qty})
 
 
-@batch_bp.route('/item/<string:uuid>/batch/sn/remap-isn', methods=['POST'])
-@login_required
-def remap_isn(uuid):
-    """Regenerate ISN sequence for a batch while keeping SN, info, lend_to"""
-    item = Item.query.filter_by(uuid=uuid).first_or_404()
-
-    if not current_user.has_permission('items', 'edit_sn'):
-        return jsonify({'success': False, 'message': 'Permission denied'}), 403
-
-    data = request.get_json()
-    batch_id = data.get('batch_id')
-
-    batch = ItemBatch.query.get(batch_id)
-    if not batch or batch.item_id != item.id:
-        return jsonify({'success': False, 'message': 'Invalid batch'}), 400
-
-    date_str = batch.purchase_date.strftime('%Y%m%d') if batch.purchase_date else '00000000'
-    label = batch.batch_label or f"B{batch.batch_number}"
-
-    sns = BatchSerialNumber.query.filter_by(batch_id=batch.id).order_by(BatchSerialNumber.sequence_number).all()
-    for idx, sn in enumerate(sns, 1):
-        sn.sequence_number = idx
-        sn.internal_serial_number = f"{item.uuid}-{date_str}-{label}-{idx:03d}"
-
-    db.session.commit()
-
-    log_audit(current_user.id, 'update', 'serial_numbers', batch.id,
-              f'Remapped ISN for batch #{batch.batch_number} of item: {item.name}')
-    return jsonify({'success': True, 'remapped': len(sns)})

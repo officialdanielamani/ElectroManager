@@ -591,7 +591,7 @@ class ItemBatch(db.Model):
     def get_lend_quantity(self):
         """Total lend quantity across all lend records (or per-SN count for tracked batches)."""
         if self.sn_tracking_enabled:
-            return sum(1 for sn in self.serial_numbers if sn.lend_to_id)
+            return sum(1 for sn in self.serial_numbers if sn.lend_to_id and not sn.is_deleted)
         return sum(r.quantity for r in self.lend_records)
 
     def get_lend_records_data(self):
@@ -719,7 +719,13 @@ class BatchSerialNumber(db.Model):
     lend_notify_enabled = db.Column(db.Boolean, default=False)
     lend_notify_before_days = db.Column(db.Integer, default=3)
     lend_note = db.Column(db.String(128), nullable=True)
+    is_deleted = db.Column(db.Boolean, default=False)
+    deleted_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    deleted_at = db.Column(db.DateTime, nullable=True)
+    deleted_reason = db.Column(db.String(256), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    deleted_by = db.relationship('User', foreign_keys=[deleted_by_id])
 
     def get_lend_to_display(self):
         if not self.lend_to_id or not self.lend_to_type:

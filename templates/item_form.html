@@ -413,14 +413,12 @@
                                     {% if item_perms and item_perms.can_edit_batch %}
                                     <div class="d-flex gap-1 mb-2 flex-wrap">
                                         <button type="button" class="btn btn-sm btn-outline-primary" onclick="openEditDetailsModal({{ batch.id }})"><i class="bi bi-pencil-square"></i> Edit Selected</button>
-                                        <button type="button" class="btn btn-sm btn-outline-info" onclick="openTransferSnModal({{ batch.id }})"><i class="bi bi-arrow-left-right"></i> Transfer Selected</button>
-                                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteSelectedSn({{ batch.id }})"><i class="bi bi-trash"></i> Delete Selected</button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="openDeleteSnModal({{ batch.id }})"><i class="bi bi-trash"></i> Delete Selected</button>
                                         <div class="input-group input-group-sm" style="width:auto;">
                                             <span class="input-group-text">Add</span>
                                             <input type="number" class="form-control" id="addSnQty{{ batch.id }}" min="1" max="100" value="1" style="width:55px">
                                             <button class="btn btn-outline-success" type="button" onclick="addSnToBatch({{ batch.id }}, {{ batch.quantity }})"><i class="bi bi-plus"></i></button>
                                         </div>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="remapIsn({{ batch.id }})"><i class="bi bi-arrow-repeat"></i> Remap ISN</button>
                                         {% if item_perms and item_perms.can_edit_lending %}
                                         <button type="button" class="btn btn-sm btn-outline-warning" onclick="openSnBulkLendModal({{ batch.id }})"><i class="bi bi-hand-index-thumb"></i> Manage Lending</button>
                                         {% endif %}
@@ -438,34 +436,55 @@
                                                     <th>Info</th>
                                                     <th>Project</th>
                                                     <th>Lend to</th>
+                                                    <th>Status</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {% for sn in batch.serial_numbers %}
                                                 {% set sn_project_used = sn.id in batch.get_project_used_sn_ids() %}
-                                                <tr>
-                                                    <td><input type="checkbox" class="form-check-input sn-check-{{ batch.id }}" value="{{ sn.id }}"></td>
+                                                <tr {% if sn.is_deleted %}class="table-secondary text-decoration-line-through" style="opacity:0.55"{% endif %}>
+                                                    <td><input type="checkbox" class="form-check-input sn-check-{{ batch.id }}" value="{{ sn.id }}" {% if sn.is_deleted %}disabled{% endif %}></td>
                                                     <td>{{ sn.sequence_number }}</td>
                                                     <td>
+                                                        {% if not sn.is_deleted %}
                                                         <span id="snVal{{ sn.id }}" ondblclick="inlineEdit(this, {{ sn.id }}, 'sn', '{{ sn.serial_number|e if sn.serial_number else '-' }}', {{ batch.id }})">{{ sn.serial_number or '-' }}</span>
+                                                        {% else %}{{ sn.serial_number or '-' }}{% endif %}
                                                     </td>
                                                     <td><code style="font-size:0.78rem">{{ sn.internal_serial_number }}</code></td>
                                                     <td>
+                                                        {% if not sn.is_deleted %}
                                                         <span id="infoVal{{ sn.id }}" ondblclick="inlineEdit(this, {{ sn.id }}, 'info', '{{ sn.info|e if sn.info else '-' }}', {{ batch.id }})">{{ sn.info or '-' }}</span>
+                                                        {% else %}{{ sn.info or '-' }}{% endif %}
                                                     </td>
                                                     <td>
-                                                        {% if sn_project_used %}
-                                                        {% for bom in batch.bom_uses if bom.used_quantity > 0 and bom.serial_numbers %}
-                                                            {% set sn_ids = bom.serial_numbers | from_json %}
-                                                            {% if sn.id in sn_ids %}<a href="{{ url_for('project.project_detail', project_id=bom.project.project_id) }}" target="_blank" class="badge bg-info text-decoration-none">{{ bom.project.name }}</a>{% endif %}
-                                                        {% endfor %}
+                                                        {% if not sn.is_deleted %}
+                                                            {% if sn_project_used %}
+                                                            {% for bom in batch.bom_uses if bom.used_quantity > 0 and bom.serial_numbers %}
+                                                                {% set sn_ids = bom.serial_numbers | from_json %}
+                                                                {% if sn.id in sn_ids %}<a href="{{ url_for('project.project_detail', project_id=bom.project.project_id) }}" target="_blank" class="badge bg-info text-decoration-none">{{ bom.project.name }}</a>{% endif %}
+                                                            {% endfor %}
+                                                            {% else %}-{% endif %}
                                                         {% else %}-{% endif %}
                                                     </td>
                                                     <td>
-                                                        {% if sn_project_used %}
-                                                        <span class="text-muted" style="opacity:0.5">{{ sn.get_lend_to_display() or '-' }}</span>
+                                                        {% if not sn.is_deleted %}
+                                                            {% if sn_project_used %}
+                                                            <span class="text-muted" style="opacity:0.5">{{ sn.get_lend_to_display() or '-' }}</span>
+                                                            {% else %}
+                                                            <span id="lendVal{{ sn.id }}" class="small">{{ sn.get_lend_to_display() or '-' }}</span>
+                                                            {% endif %}
+                                                        {% else %}-{% endif %}
+                                                    </td>
+                                                    <td>
+                                                        {% if sn.is_deleted %}
+                                                        <span class="badge bg-danger" title="Deleted by {{ sn.deleted_by.username if sn.deleted_by else 'unknown' }} on {{ sn.deleted_at.strftime('%Y-%m-%d %H:%M') if sn.deleted_at else '?' }}{% if sn.deleted_reason %} — {{ sn.deleted_reason }}{% endif %}">
+                                                            <i class="bi bi-x-circle"></i> Removed
+                                                        </span>
+                                                        {% if sn.deleted_reason %}
+                                                        <div class="text-muted" style="font-size:0.72rem;text-decoration:none">{{ sn.deleted_reason[:40] }}{% if sn.deleted_reason|length > 40 %}…{% endif %}</div>
+                                                        {% endif %}
                                                         {% else %}
-                                                        <span id="lendVal{{ sn.id }}" class="small">{{ sn.get_lend_to_display() or '-' }}</span>
+                                                        <span class="badge bg-success">Active</span>
                                                         {% endif %}
                                                     </td>
                                                 </tr>
@@ -473,7 +492,7 @@
                                             </tbody>
                                         </table>
                                     </div>
-                                    <small class="text-muted">Double-click SN or Info to edit inline. Use <strong>Manage Lending</strong> to set lending.</small>
+                                    <small class="text-muted">Double-click SN or Info to edit inline. Use <strong>Manage Lending</strong> to set lending. Deleted entries are kept for record.</small>
                                     {% elif batch.sn_tracking_enabled and batch.serial_numbers|length == 0 and item_perms and item_perms.can_edit_batch %}
                                     <hr class="my-2">
                                     <div class="d-flex align-items-center gap-2">
@@ -3153,7 +3172,9 @@ function submitTransferBatch() {
 
 /* ── SN: Select all checkbox ── */
 function toggleAllSn(source, batchId) {
-    document.querySelectorAll('.sn-check-' + batchId).forEach(function(cb) { cb.checked = source.checked; });
+    document.querySelectorAll('.sn-check-' + batchId).forEach(function(cb) {
+        if (!cb.disabled) cb.checked = source.checked;
+    });
 }
 
 /* ── SN: Inline edit (double-click) ── */
@@ -3180,15 +3201,24 @@ function saveInlineEdit(snId, field) {
 }
 
 /* ── SN: Delete selected ── */
-function deleteSelectedSn(batchId) {
+/* ── SN: Soft-Delete Selected Modal ── */
+var _deleteSnBatchId = null;
+function openDeleteSnModal(batchId) {
     var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
     if (checked.length === 0) { alert('Select at least one serial number.'); return; }
-    if (!confirm('Delete ' + checked.length + ' selected serial number(s)?')) return;
+    _deleteSnBatchId = batchId;
+    document.getElementById('deleteSnCount').textContent = checked.length;
+    document.getElementById('deleteSnReason').value = '';
+    new bootstrap.Modal(document.getElementById('deleteSnModalDialog')).show();
+}
+function doDeleteSn() {
+    var checked = document.querySelectorAll('.sn-check-' + _deleteSnBatchId + ':checked');
     var ids = [];
     checked.forEach(function(cb) { ids.push(parseInt(cb.value)); });
+    var reason = document.getElementById('deleteSnReason').value.trim().slice(0, 256);
     fetch('{{ url_for("batch.delete_selected_sn", uuid=item.uuid) }}', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sn_ids: ids, batch_id: batchId })
+        body: JSON.stringify({ sn_ids: ids, batch_id: _deleteSnBatchId, reason: reason })
     }).then(function(r) { return r.json(); }).then(function(d) {
         if (d.success) reloadKeepBatch(); else alert(d.message || 'Error');
     }).catch(function(e) { alert('Error: ' + e); });
@@ -3207,64 +3237,6 @@ function addSnToBatch(batchId, currentQty) {
         if (d.success) reloadKeepBatch(); else alert(d.message || 'Error');
     }).catch(function(e) { alert('Error: ' + e); });
 }
-
-/* ── SN: Remap ISN ── */
-function remapIsn(batchId) {
-    if (!confirm('Regenerate ISN sequence for this batch? Existing ISN values will be replaced. SN, Info, Lend to will be kept.')) return;
-    fetch('{{ url_for("batch.remap_isn", uuid=item.uuid) }}', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ batch_id: batchId })
-    }).then(function(r) { return r.json(); }).then(function(d) {
-        if (d.success) reloadKeepBatch(); else alert(d.message || 'Error');
-    }).catch(function(e) { alert('Error: ' + e); });
-}
-
-/* ── SN: Transfer Selected SNs Modal ── */
-var transferSnFromBatchId = null;
-var transferSnIds = [];
-function openTransferSnModal(batchId) {
-    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
-    if (checked.length === 0) { alert('Please select at least one serial number.'); return; }
-    transferSnFromBatchId = batchId;
-    transferSnIds = [];
-    checked.forEach(function(cb) { transferSnIds.push(parseInt(cb.value)); });
-    document.getElementById('transferSnCount').textContent = transferSnIds.length;
-
-    var sel = document.getElementById('transferSnTarget');
-    for (var i = 0; i < sel.options.length; i++) {
-        var opt = sel.options[i];
-        if (opt.value === "") continue;
-        var optId = parseInt(opt.value);
-        var isTracking = opt.dataset.tracking === '1';
-        // Hide self, AND hide non-tracking targets! Tracking Enable to Non Tracking blocked.
-        if (optId === batchId || !isTracking) {
-            opt.style.display = 'none';
-        } else {
-            opt.style.display = '';
-        }
-    }
-    sel.value = '';
-    new bootstrap.Modal(document.getElementById('transferSnModalDialog')).show();
-}
-
-function doTransferSn() {
-    var targetId = parseInt(document.getElementById('transferSnTarget').value);
-    if (!targetId) { alert('Select a destination batch.'); return; }
-    if (targetId === transferSnFromBatchId) { alert('Cannot transfer to same batch.'); return; }
-
-    fetch('{{ url_for("batch.transfer_selected_sn", uuid=item.uuid) }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sn_ids: transferSnIds, from_batch_id: transferSnFromBatchId, to_batch_id: targetId })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (data.success) reloadKeepBatch();
-        else alert(data.message || 'Error');
-    })
-    .catch(function(e) { alert('Error: ' + e); });
-}
-
 
 /* ── SN: Bulk Edit Details modal ── */
 var editDetailsSelectedIds = [];
@@ -3774,33 +3746,26 @@ function submitSnBulkLend(clearMode) {
     </div>
 </div>
 
-<div class="modal fade" id="transferSnModalDialog" tabindex="-1">
+<div class="modal fade" id="deleteSnModalDialog" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Transfer Selected Serial Numbers</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-trash"></i> Remove Serial Numbers</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p class="text-muted small mb-2">Moving <strong><span id="transferSnCount">0</span></strong> selected item(s). ISN kept as-is (renamed only if collision detected).</p>
-                <div class="alert alert-info p-2 small">
-                    <i class="bi bi-info-circle"></i> Serial numbers can only be transferred to batches with tracking enabled.
+                <p class="mb-2">Removing <strong><span id="deleteSnCount">0</span></strong> selected unit(s). This action is permanent — removed entries will be kept for record.</p>
+                <div class="alert alert-warning p-2 small">
+                    <i class="bi bi-exclamation-triangle"></i> Batch quantity will be reduced. The ISN entries will remain visible in the table as "Removed" for audit purposes.
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Transfer to Batch</label>
-                    <select class="form-select" id="transferSnTarget">
-                        <option value="">-- Select Destination Batch --</option>
-                        {% for b in item.batches %}
-                        <option value="{{ b.id }}" data-tracking="{{ '1' if b.sn_tracking_enabled else '0' }}">
-                            {{ b.get_display_label() }} (Qty: {{ b.quantity }}) {% if b.sn_tracking_enabled %}[Tracking]{% endif %}
-                        </option>
-                        {% endfor %}
-                    </select>
+                <div class="mb-2">
+                    <label class="form-label">Reason for removal <span class="text-muted">(optional, max 256 chars)</span></label>
+                    <textarea class="form-control" id="deleteSnReason" rows="3" maxlength="256" placeholder="e.g. Damaged in testing, Component failure, Lost during transit..."></textarea>
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-info" onclick="doTransferSn()"><i class="bi bi-arrow-left-right"></i> Transfer</button>
+                <button type="button" class="btn btn-danger" onclick="doDeleteSn()"><i class="bi bi-trash"></i> Confirm Remove</button>
             </div>
         </div>
     </div>
