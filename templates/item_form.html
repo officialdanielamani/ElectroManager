@@ -275,11 +275,12 @@
                     <div class="mb-2 border rounded p-2" id="batches-section">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <label class="form-label form-label-sm mb-0">
-                                <i class="bi bi-collection"></i> Batches ({{ item.batches|length }})
+                                <i class="bi bi-collection"></i> Batches
+                                <span class="badge {% if item.batches|length >= 32 %}bg-danger{% elif item.batches|length >= 28 %}bg-warning text-dark{% else %}bg-secondary{% endif %} ms-1">{{ item.batches|length }}/32</span>
                                 <small class="text-muted ms-2">Total Qty: {{ item.get_overall_quantity() }} | Price: {{ currency }}{{ "%.2f"|format(item.get_overall_total_price()) }} | Value: {{ currency }}{{ "%.2f"|format(item.get_overall_total_value()) }}</small>
                             </label>
                             {% if item_perms and item_perms.can_edit_batch %}
-                            <button type="button" class="btn btn-sm btn-success" onclick="openAddBatchModal()">
+                            <button type="button" class="btn btn-sm btn-success" onclick="openAddBatchModal()" {% if item.batches|length >= 32 %}disabled title="Maximum 32 batches reached"{% endif %}>
                                 <i class="bi bi-plus-circle"></i> Add Batch
                             </button>
                             {% endif %}
@@ -335,6 +336,12 @@
                                         <div class="col-md-3"><strong>Date of Purchase:</strong> {{ batch.purchase_date.strftime('%d/%m/%Y') if batch.purchase_date else 'N/A' }}</div>
                                         <div class="col-md-3"><strong>Note:</strong> {{ batch.note or 'N/A' }}</div>
                                     </div>
+                                    <div class="row mb-1 small">
+                                        <div class="col-12">
+                                            <strong>Batch UID:</strong>
+                                            <code class="user-select-all">{{ batch.get_batch_uid() }}</code>
+                                        </div>
+                                    </div>
                                     {% if batch.manufacturer %}
                                     <div class="row mb-1 small">
                                         <div class="col-12"><strong>Manufacturer:</strong> {{ batch.manufacturer }}</div>
@@ -379,8 +386,8 @@
                                                 <tr>
                                                     <td>{{ r.get_lend_to_display() or '(not set)' }}</td>
                                                     <td>{{ r.quantity }}</td>
-                                                    <td>{{ r.lend_start.strftime('%d/%m/%Y') if r.lend_start else '—' }}</td>
-                                                    <td>{{ r.lend_end.strftime('%d/%m/%Y') if r.lend_end else '—' }}</td>
+                                                    <td>{% if r.lend_start %}{{ r.lend_start.strftime('%d/%m/%Y') }}{% if r.lend_start.hour or r.lend_start.minute %} {{ r.lend_start.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
+                                                    <td>{% if r.lend_end %}{{ r.lend_end.strftime('%d/%m/%Y') }}{% if r.lend_end.hour or r.lend_end.minute %} {{ r.lend_end.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
                                                     <td class="text-center">{% if r.lend_notify_enabled %}<i class="bi bi-bell-fill text-warning"></i>{% else %}—{% endif %}</td>
                                                 </tr>
                                                 {% endfor %}
@@ -3240,6 +3247,18 @@ function submitLendManage() {
     }).catch(function(e) { alert('Error: ' + e); });
 }
 
+function formatLendDateTime(s) {
+    if (!s) return '—';
+    var d = new Date(s);
+    if (isNaN(d.getTime())) return s;
+    var dd = String(d.getDate()).padStart(2,'0');
+    var mm = String(d.getMonth()+1).padStart(2,'0');
+    var yyyy = d.getFullYear();
+    var hh = d.getHours(), min = d.getMinutes();
+    if (hh === 0 && min === 0) return dd+'/'+mm+'/'+yyyy;
+    return dd+'/'+mm+'/'+yyyy+' '+String(hh).padStart(2,'0')+':'+String(min).padStart(2,'0');
+}
+
 function renderLendRecordsTable() {
     var el = document.getElementById('lm_lend_records_table');
     if (!el) return;
@@ -3253,8 +3272,8 @@ function renderLendRecordsTable() {
         return '<tr>' +
             '<td class="small">' + label + '</td>' +
             '<td class="small text-center">' + (r.qty||1) + '</td>' +
-            '<td class="small">' + (r.start||'—') + '</td>' +
-            '<td class="small">' + (r.end||'—') + '</td>' +
+            '<td class="small">' + formatLendDateTime(r.start) + '</td>' +
+            '<td class="small">' + formatLendDateTime(r.end) + '</td>' +
             '<td class="text-center">' + notify + '</td>' +
             '<td class="text-end text-nowrap">' +
             '<button type="button" class="btn btn-link btn-sm p-0 me-1 text-primary" onclick="editLendRecord(' + i + ')"><i class="bi bi-pencil"></i></button>' +
@@ -4039,12 +4058,12 @@ function submitSnBulkLend(clearMode) {
             <input type="number" class="form-control form-control-sm" id="lr_qty" min="1" value="1">
         </div>
         <div class="col-4">
-            <label class="form-label form-label-sm mb-1">Start</label>
-            <input type="date" class="form-control form-control-sm" id="lr_start">
+            <label class="form-label form-label-sm mb-1">Start <small class="text-muted">(date+time optional)</small></label>
+            <input type="datetime-local" class="form-control form-control-sm" id="lr_start">
         </div>
         <div class="col-4">
-            <label class="form-label form-label-sm mb-1">End</label>
-            <input type="date" class="form-control form-control-sm" id="lr_end">
+            <label class="form-label form-label-sm mb-1">End <small class="text-muted">(date+time optional)</small></label>
+            <input type="datetime-local" class="form-control form-control-sm" id="lr_end">
         </div>
     </div>
     <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
@@ -4089,12 +4108,12 @@ function submitSnBulkLend(clearMode) {
     </div>
     <div class="row g-2 mb-2">
         <div class="col-6">
-            <label class="form-label form-label-sm mb-1">Start Date</label>
-            <input type="date" class="form-control form-control-sm" id="snl_start">
+            <label class="form-label form-label-sm mb-1">Start <small class="text-muted">(date+time optional)</small></label>
+            <input type="datetime-local" class="form-control form-control-sm" id="snl_start">
         </div>
         <div class="col-6">
-            <label class="form-label form-label-sm mb-1">End Date</label>
-            <input type="date" class="form-control form-control-sm" id="snl_end">
+            <label class="form-label form-label-sm mb-1">End <small class="text-muted">(date+time optional)</small></label>
+            <input type="datetime-local" class="form-control form-control-sm" id="snl_end">
         </div>
     </div>
     <div class="d-flex flex-wrap align-items-center gap-2">

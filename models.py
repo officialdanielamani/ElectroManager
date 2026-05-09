@@ -563,6 +563,10 @@ class ItemBatch(db.Model):
         if self.batch_label:
             return self.batch_label
         return f"Batch {self.batch_number}"
+
+    def get_batch_uid(self):
+        """Return a stable unique identifier: {item_uuid}-{batch_db_id}."""
+        return f"{self.item.uuid}-{self.id}"
     
     def get_lend_quantity(self):
         """Total lend quantity across all lend records (or per-SN count for tracked batches)."""
@@ -580,8 +584,8 @@ class ItemBatch(db.Model):
                 'contact_id': r.lend_to_id,
                 'label': r.get_lend_to_display(),
                 'qty': r.quantity,
-                'start': r.lend_start.strftime('%Y-%m-%d') if r.lend_start else '',
-                'end': r.lend_end.strftime('%Y-%m-%d') if r.lend_end else '',
+                'start': r.lend_start.strftime('%Y-%m-%dT%H:%M') if r.lend_start else '',
+                'end': r.lend_end.strftime('%Y-%m-%dT%H:%M') if r.lend_end else '',
                 'notify': r.lend_notify_enabled or False,
                 'days': r.lend_notify_before_days or 3,
             })
@@ -687,8 +691,8 @@ class BatchSerialNumber(db.Model):
     info = db.Column(db.String(32), default='')
     lend_to_type = db.Column(db.String(20), default='')
     lend_to_id = db.Column(db.Integer, nullable=True)
-    lend_start = db.Column(db.Date, nullable=True)
-    lend_end = db.Column(db.Date, nullable=True)
+    lend_start = db.Column(db.DateTime, nullable=True)
+    lend_end = db.Column(db.DateTime, nullable=True)
     lend_notify_enabled = db.Column(db.Boolean, default=False)
     lend_notify_before_days = db.Column(db.Integer, default=3)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -726,8 +730,8 @@ class BatchLendRecord(db.Model):
     lend_to_type = db.Column(db.String(20), default='')
     lend_to_id = db.Column(db.Integer, nullable=True)
     quantity = db.Column(db.Integer, default=1)
-    lend_start = db.Column(db.Date, nullable=True)
-    lend_end = db.Column(db.Date, nullable=True)
+    lend_start = db.Column(db.DateTime, nullable=True)
+    lend_end = db.Column(db.DateTime, nullable=True)
     lend_notify_enabled = db.Column(db.Boolean, default=False)
     lend_notify_before_days = db.Column(db.Integer, default=3)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))

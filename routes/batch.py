@@ -14,11 +14,25 @@ logger = logging.getLogger(__name__)
 batch_bp = Blueprint('batch', __name__)
 
 
-def _parse_date(s):
-    try:
-        return datetime.strptime(s, '%Y-%m-%d').date() if s else None
-    except ValueError:
+def _parse_datetime(s):
+    """Parse a date or datetime string into a datetime object (or None)."""
+    if not s:
         return None
+    for fmt in ('%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d'):
+        try:
+            return datetime.strptime(s, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _fmt_dt(dt):
+    """Format a datetime for display: date-only when time is midnight."""
+    if not dt:
+        return '—'
+    if dt.hour == 0 and dt.minute == 0:
+        return dt.strftime('%d/%m/%Y')
+    return dt.strftime('%d/%m/%Y %H:%M')
 
 
 def _save_lend_records(batch, records_data, max_qty):
@@ -44,8 +58,8 @@ def _save_lend_records(batch, records_data, max_qty):
             lend_to_type=r.get('type', '').strip(),
             lend_to_id=contact_id,
             quantity=qty,
-            lend_start=_parse_date(r.get('start', '')),
-            lend_end=_parse_date(r.get('end', '')),
+            lend_start=_parse_datetime(r.get('start', '')),
+            lend_end=_parse_datetime(r.get('end', '')),
             lend_notify_enabled=bool(r.get('notify', False)),
             lend_notify_before_days=days,
         )
@@ -103,6 +117,12 @@ def add_batch(uuid):
     else:
         batch_rack_id = None
         batch_drawer = None
+
+    # Hard cap: max 32 batches per item
+    current_batch_count = ItemBatch.query.filter_by(item_id=item.id).count()
+    if current_batch_count >= 32:
+        flash('This item has reached the maximum of 32 batches.', 'danger')
+        return redirect(url_for('item.item_edit', uuid=uuid) + '#batches-section')
 
     if quantity < 0:
         flash('Quantity cannot be negative.', 'danger')
@@ -290,11 +310,14 @@ def manage_lend(uuid, batch_id):
             'success': False,
             'message': f'Total lend quantity ({total_lend_qty}) exceeds batch quantity ({batch.quantity}).'
         })
+    old_count = BatchLendRecord.query.filter_by(batch_id=batch.id).count()
     BatchLendRecord.query.filter_by(batch_id=batch.id).delete()
     _save_lend_records(batch, lend_records_data, batch.quantity)
     db.session.commit()
-    log_audit(current_user.id, 'batch_lend_update', item.id,
-              f'Updated lend records for batch #{batch.batch_number} of item: {item.name}')
+    new_count = len(lend_records_data)
+    log_audit(current_user.id, 'lend_update', 'batch', batch.id,
+              f'Updated lending for batch #{batch.batch_number} "{batch.get_display_label()}" of item: {item.name} '
+              f'(was {old_count} record(s), now {new_count} record(s), total lent: {batch.get_lend_quantity()})')
     return jsonify({'success': True, 'lend_qty': batch.get_lend_quantity()})
 
 
@@ -518,6 +541,7 @@ def update_serial_lend(uuid, batch_id):
         flash('You do not have permission to manage lending.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
     
+    lent_count = 0
     for sn in batch.serial_numbers:
         lend_type = request.form.get(f'lend_type_{sn.id}', '').strip()
         lend_id_raw = request.form.get(f'lend_id_{sn.id}', '').strip()
@@ -528,24 +552,21 @@ def update_serial_lend(uuid, batch_id):
             sn.lend_to_id = int(lend_id_raw) if lend_id_raw else None
         except (ValueError, TypeError):
             sn.lend_to_id = None
-        try:
-            sn.lend_start = datetime.strptime(lend_start_str, '%Y-%m-%d').date() if lend_start_str else None
-        except ValueError:
-            sn.lend_start = None
-        try:
-            sn.lend_end = datetime.strptime(lend_end_str, '%Y-%m-%d').date() if lend_end_str else None
-        except ValueError:
-            sn.lend_end = None
+        sn.lend_start = _parse_datetime(lend_start_str)
+        sn.lend_end = _parse_datetime(lend_end_str)
         sn.lend_notify_enabled = request.form.get(f'lend_notify_{sn.id}', '0') == '1'
         try:
             sn.lend_notify_before_days = int(request.form.get(f'lend_notify_days_{sn.id}', 3))
         except (ValueError, TypeError):
             sn.lend_notify_before_days = 3
+        if sn.lend_to_id:
+            lent_count += 1
 
     db.session.commit()
 
-    log_audit(current_user.id, 'update', 'serial_lend', batch.id,
-              f'Updated lending info for batch #{batch.batch_number} of item: {item.name}')
+    log_audit(current_user.id, 'lend_update', 'batch', batch.id,
+              f'Updated SN lending for batch #{batch.batch_number} "{batch.get_display_label()}" of item: {item.name} '
+              f'({lent_count} unit(s) on lend)')
     flash(f'Lending info updated for "{batch.get_display_label()}".', 'success')
     return redirect(url_for('item.item_detail', uuid=uuid))
 
@@ -581,16 +602,8 @@ def inline_update_sn(uuid):
             sn.lend_to_id = int(lend_to_id_raw) if lend_to_id_raw else None
         except (ValueError, TypeError):
             sn.lend_to_id = None
-        lend_start_str = data.get('lend_start', '')
-        lend_end_str = data.get('lend_end', '')
-        try:
-            sn.lend_start = datetime.strptime(lend_start_str, '%Y-%m-%d').date() if lend_start_str else None
-        except ValueError:
-            sn.lend_start = None
-        try:
-            sn.lend_end = datetime.strptime(lend_end_str, '%Y-%m-%d').date() if lend_end_str else None
-        except ValueError:
-            sn.lend_end = None
+        sn.lend_start = _parse_datetime(data.get('lend_start', ''))
+        sn.lend_end = _parse_datetime(data.get('lend_end', ''))
         sn.lend_notify_enabled = bool(data.get('lend_notify_enabled', False))
         try:
             sn.lend_notify_before_days = int(data.get('lend_notify_before_days', 3))
@@ -600,8 +613,14 @@ def inline_update_sn(uuid):
         return jsonify({'success': False, 'message': 'Invalid field'}), 400
 
     db.session.commit()
-    log_audit(current_user.id, 'update', 'serial_number', sn.id,
-              f'Inline updated {field} for SN #{sn.sequence_number} in item: {item.name}')
+    if field == 'lend':
+        lend_display = sn.get_lend_to_display() or 'cleared'
+        log_audit(current_user.id, 'lend_update', 'serial_number', sn.id,
+                  f'Set lending on SN #{sn.sequence_number} (ISN: {sn.internal_serial_number}) '
+                  f'in item: {item.name} → {lend_display}')
+    else:
+        log_audit(current_user.id, 'update', 'serial_number', sn.id,
+                  f'Updated {field} for SN #{sn.sequence_number} in item: {item.name}')
     response = {'success': True}
     if field == 'lend':
         response['display'] = sn.get_lend_to_display() or '-'
@@ -648,8 +667,8 @@ def bulk_update_sn(uuid):
                     sn.lend_to_id = int(lend_id_raw) if lend_id_raw else None
                 except (ValueError, TypeError):
                     sn.lend_to_id = None
-                sn.lend_start = _parse_date(lend_data.get('start', ''))
-                sn.lend_end = _parse_date(lend_data.get('end', ''))
+                sn.lend_start = _parse_datetime(lend_data.get('start', ''))
+                sn.lend_end = _parse_datetime(lend_data.get('end', ''))
                 sn.lend_notify_enabled = bool(lend_data.get('notify', False))
                 try:
                     sn.lend_notify_before_days = int(lend_data.get('days', 3))
@@ -658,8 +677,10 @@ def bulk_update_sn(uuid):
             count += 1
 
     db.session.commit()
-    log_audit(current_user.id, 'bulk_update', 'serial_numbers', None,
-              f'Bulk updated {len(sn_ids)} SNs in item: {item.name}')
+    field_names = ', '.join(fields.keys())
+    log_audit(current_user.id, 'lend_update' if 'lend' in fields else 'bulk_update',
+              'serial_numbers', None,
+              f'Bulk updated field(s) [{field_names}] on {len(sn_ids)} SN(s) in item: {item.name}')
     return jsonify({'success': True, 'updated': count})
 
 

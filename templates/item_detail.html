@@ -289,6 +289,12 @@
                                     <div class="col-md-6"><strong>Note:</strong> {{ batch.note or 'N/A' }}</div>
                                 </div>
                                 <div class="row mb-2">
+                                    <div class="col-12 small">
+                                        <strong>Batch UID:</strong>
+                                        <code class="user-select-all">{{ batch.get_batch_uid() }}</code>
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
                                     <div class="col-md-12">
                                         <strong>Location:</strong>
                                         {% if batch.follow_main_location %}
@@ -323,8 +329,8 @@
                                         <tr>
                                             <td>{{ rec.get_lend_to_display() or '—' }}</td>
                                             <td class="text-center">{{ rec.quantity }}</td>
-                                            <td>{{ rec.lend_start.strftime('%d/%m/%Y') if rec.lend_start else '—' }}</td>
-                                            <td>{{ rec.lend_end.strftime('%d/%m/%Y') if rec.lend_end else '—' }}</td>
+                                            <td>{% if rec.lend_start %}{{ rec.lend_start.strftime('%d/%m/%Y') }}{% if rec.lend_start.hour or rec.lend_start.minute %} {{ rec.lend_start.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
+                                            <td>{% if rec.lend_end %}{{ rec.lend_end.strftime('%d/%m/%Y') }}{% if rec.lend_end.hour or rec.lend_end.minute %} {{ rec.lend_end.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
                                             <td class="text-center">{% if rec.lend_notify_enabled %}<i class="bi bi-bell-fill text-warning" title="Remind {{ rec.lend_notify_before_days }} days before"></i>{% else %}—{% endif %}</td>
                                         </tr>
                                         {% endfor %}
@@ -383,8 +389,8 @@
                                                     <span class="lend-val" id="lendVal{{ sn.id }}">{{ sn.get_lend_to_display() or '-' }}</span>
                                                     {% endif %}
                                                 </td>
-                                                <td class="small">{{ sn.lend_start.strftime('%d/%m/%Y') if sn.lend_start else '—' }}</td>
-                                                <td class="small">{{ sn.lend_end.strftime('%d/%m/%Y') if sn.lend_end else '—' }}</td>
+                                                <td class="small">{% if sn.lend_start %}{{ sn.lend_start.strftime('%d/%m/%Y') }}{% if sn.lend_start.hour or sn.lend_start.minute %} {{ sn.lend_start.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
+                                                <td class="small">{% if sn.lend_end %}{{ sn.lend_end.strftime('%d/%m/%Y') }}{% if sn.lend_end.hour or sn.lend_end.minute %} {{ sn.lend_end.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
                                             </tr>
                                             {% endfor %}
                                         </tbody>
