@@ -179,7 +179,8 @@ def item_new():
     racks = Rack.query.order_by(Rack.name).all()
     racks_data = [{'id': r.id, 'name': r.name, 'rows': r.rows, 'cols': r.cols,
                    'unavailable_drawers': r.get_unavailable_drawers(),
-                   'merged_cells': r.get_merged_cells()} for r in racks]
+                   'merged_cells': r.get_merged_cells(),
+                   'same_item_drawers': []} for r in racks]
     all_tags = [{'id': t.id, 'name': t.name, 'color': t.color} for t in Tag.query.order_by(Tag.name).all()]
     
     prefill_rack_uuid = request.args.get('rack_id', type=str)
@@ -401,9 +402,19 @@ def item_edit(uuid):
     form = ItemEditForm(obj=item, perms=perms)
     locations = Location.query.order_by(Location.name).all()
     racks = Rack.query.order_by(Rack.name).all()
+
+    # Build per-rack map of drawers used by this item (main + batch overrides)
+    _sid = {}  # rack_id → [{drawer, label}]
+    if item.rack_id and item.drawer:
+        _sid.setdefault(item.rack_id, []).append({'drawer': item.drawer, 'label': 'Main Location'})
+    for _b in item.batches:
+        if not _b.follow_main_location and _b.rack_id and _b.drawer:
+            _sid.setdefault(_b.rack_id, []).append({'drawer': _b.drawer, 'label': _b.get_display_label()})
+
     racks_data = [{'id': r.id, 'name': r.name, 'rows': r.rows, 'cols': r.cols,
                    'unavailable_drawers': r.get_unavailable_drawers(),
-                   'merged_cells': r.get_merged_cells()} for r in racks]
+                   'merged_cells': r.get_merged_cells(),
+                   'same_item_drawers': _sid.get(r.id, [])} for r in racks]
     all_tags = [{'id': t.id, 'name': t.name, 'color': t.color} for t in Tag.query.order_by(Tag.name).all()]
     
     if form.validate_on_submit():

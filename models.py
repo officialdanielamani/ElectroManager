@@ -240,6 +240,7 @@ class Rack(db.Model):
     cols = db.Column(db.Integer, default=5)
     unavailable_drawers = db.Column(db.Text)
     merged_cells = db.Column(db.Text, default='[]')
+    drawer_info = db.Column(db.Text)  # JSON dict: {drawer_id: short_info_text}
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     items = db.relationship('Item', backref='rack', lazy=True)
@@ -266,6 +267,25 @@ class Rack(db.Model):
             return json.loads(self.merged_cells or '[]')
         except (json.JSONDecodeError, TypeError):
             return []
+
+    def get_drawer_info(self):
+        if not self.drawer_info:
+            return {}
+        try:
+            return json.loads(self.drawer_info)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+
+    def get_drawer_short_info(self, drawer_id):
+        return self.get_drawer_info().get(drawer_id, '')
+
+    def set_drawer_short_info(self, drawer_id, text):
+        info = self.get_drawer_info()
+        if text:
+            info[drawer_id] = text[:128]
+        elif drawer_id in info:
+            del info[drawer_id]
+        self.drawer_info = json.dumps(info) if info else None
 
     def get_merge_group(self, cell_id):
         for group in self.get_merged_cells():
@@ -565,8 +585,8 @@ class ItemBatch(db.Model):
         return f"Batch {self.batch_number}"
 
     def get_batch_uid(self):
-        """Return a stable unique identifier: {item_uuid}-{batch_db_id}."""
-        return f"{self.item.uuid}-{self.id}"
+        """Return a stable unique identifier: {item_uuid}-B{batch_number:02d}."""
+        return f"{self.item.uuid}-B{self.batch_number:02d}"
     
     def get_lend_quantity(self):
         """Total lend quantity across all lend records (or per-SN count for tracked batches)."""

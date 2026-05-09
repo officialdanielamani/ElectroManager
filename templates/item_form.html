@@ -218,7 +218,12 @@
 
                                 <div id="drawer_picker" style="display: none;">
                                     <div class="p-2 border rounded drawer-grid-container">
-                                        <small class="text-muted d-block mb-2">Click to select:</small>
+                                        <div class="d-flex align-items-center gap-3 mb-2 flex-wrap">
+                                            <small class="text-muted">Click to select:</small>
+                                            {% if item %}
+                                            <small><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e6a817;"></span> <span class="text-muted">= another batch/location of this item</span></small>
+                                            {% endif %}
+                                        </div>
                                         <div id="drawer_grid" style="display: inline-grid; gap: 4px; background: transparent;"></div>
                                     </div>
                                 </div>
@@ -1303,6 +1308,32 @@
         border-style: solid !important;
         opacity: 1 !important;
     }
+
+    /* Same-item batch highlight: warm yellow */
+    .drawer-cell-picker.same-item-drawer {
+        background: rgba(255, 193, 7, 0.22) !important;
+        border-color: #e6a817 !important;
+        border-style: solid !important;
+    }
+    .drawer-cell-picker.same-item-drawer .drawer-label,
+    .drawer-cell-picker.same-item-drawer {
+        color: #7a5700 !important;
+    }
+    .drawer-cell-picker.same-item-drawer::after {
+        content: '';
+        display: block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #e6a817;
+        position: absolute;
+        top: 3px;
+        right: 3px;
+    }
+    .drawer-cell-picker.same-item-drawer.selected {
+        background: rgba(255, 193, 7, 0.55) !important;
+        border-color: #c97d00 !important;
+    }
 </style>
 
 <script>
@@ -1356,6 +1387,10 @@
         const rackData = racksData.find(r => r.id === rackId);
         const unavailableDrawers = rackData ? rackData.unavailable_drawers : [];
         const mergedGroups = rackData ? (rackData.merged_cells || []) : [];
+        // Same-item drawer map: drawerId → batch label
+        const sameItemList = rackData ? (rackData.same_item_drawers || []) : [];
+        const sameItemMap = {};
+        sameItemList.forEach(d => { sameItemMap[d.drawer] = d.label; });
 
         // Build skip / span / group maps from merged cells
         const skipCells = new Set();
@@ -1438,6 +1473,13 @@
                         cell.classList.add('no-permission');
                         cell.title = 'You do not have permission to edit location';
                     }
+                }
+
+                // Highlight drawers used by other batches/main location of this item
+                if (sameItemMap[drawerId]) {
+                    cell.classList.add('same-item-drawer');
+                    const prev = cell.title ? cell.title + ' | ' : '';
+                    cell.title = prev + 'This item: ' + sameItemMap[drawerId];
                 }
 
                 // Unified click handler: all selectable cell types use pickDrawer
@@ -2430,6 +2472,9 @@ function batchUpdateDrawerGrid(prefix) {
     var rackData = (typeof racksData !== 'undefined') ? racksData.find(function(r) { return r.id === rackId; }) : null;
     var unavailable = rackData ? rackData.unavailable_drawers : [];
     var mergedGroups = rackData ? (rackData.merged_cells || []) : [];
+    var sameItemList = rackData ? (rackData.same_item_drawers || []) : [];
+    var sameItemMap = {};
+    sameItemList.forEach(function(d) { sameItemMap[d.drawer] = d.label; });
 
     var skipCells = {};
     var cellSpans = {};
@@ -2511,6 +2556,13 @@ function batchUpdateDrawerGrid(prefix) {
                         cell.classList.add('unavailable');
                         cell.title = 'This drawer is unavailable';
                     }
+                }
+
+                // Highlight drawers used by other batches/main location of this item
+                if (sameItemMap[drawerId]) {
+                    cell.classList.add('same-item-drawer');
+                    var prevTitle = cell.title ? cell.title + ' | ' : '';
+                    cell.title = prevTitle + 'This item: ' + sameItemMap[drawerId];
                 }
 
                 // Unified click handler for all selectable cells

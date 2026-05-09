@@ -834,7 +834,21 @@ function openDrawer(rackName, drawerId, rackId) {
         .then(data => {
             let html = '';
 
-            
+            // Short Info section (always shown; editable only with location_management.edit)
+            {% if current_user.has_permission('settings_sections.location_management', 'edit') %}
+            html += '<div class="mb-2">';
+            html += '<label class="form-label form-label-sm mb-1 fw-bold"><i class="bi bi-info-circle"></i> Short Info <small class="text-muted fw-normal">(max 128 chars)</small></label>';
+            html += `<div class="d-flex gap-2">`;
+            html += `<input type="text" class="form-control form-control-sm" id="drawerShortInfo" maxlength="128" placeholder="Optional note for this drawer..." value="${(data.short_info || '').replace(/"/g, '&quot;')}">`;
+            html += `<button class="btn btn-sm btn-outline-primary text-nowrap" onclick="saveDrawerShortInfo()"><i class="bi bi-save"></i> Save</button>`;
+            html += `</div>`;
+            html += '</div>';
+            {% else %}
+            if (data.short_info) {
+                html += `<div class="mb-2 p-2 bg-light rounded small text-muted"><i class="bi bi-info-circle"></i> ${data.short_info.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+            }
+            {% endif %}
+
             {% if current_user.has_permission('settings_sections.location_management', 'edit') %}
             // Controls section
             html += '<div class="mb-3 p-2 bg-light rounded">';
@@ -938,6 +952,32 @@ function toggleDrawerAvailability() {
     .catch(error => {
         alert('Error: ' + error);
     });
+}
+
+function saveDrawerShortInfo() {
+    const input = document.getElementById('drawerShortInfo');
+    if (!input) return;
+    const shortInfo = input.value.trim().slice(0, 128);
+    fetch('/api/drawer/update-info', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            rack_id: currentRackId,
+            drawer_id: currentDrawerId,
+            short_info: shortInfo
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            input.value = data.short_info || '';
+            input.classList.add('border-success');
+            setTimeout(() => input.classList.remove('border-success'), 1500);
+        } else {
+            alert('Error: ' + (data.error || 'Failed to save short info'));
+        }
+    })
+    .catch(err => alert('Error: ' + err));
 }
 
 function toggleMoveLocationType(type) {
