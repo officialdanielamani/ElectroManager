@@ -244,6 +244,7 @@ def user_edit(id):
         user.max_login_attempts = form.max_login_attempts.data or 0
         user.allow_password_reset = form.allow_password_reset.data
         user.allow_profile_picture_change = form.allow_profile_picture_change.data
+        user.allow_change_short_info = form.allow_change_short_info.data
         user.auto_unlock_enabled = form.auto_unlock_enabled.data
         user.auto_unlock_minutes = form.auto_unlock_minutes.data
         if form.allow_profile_picture_change.data:
@@ -251,6 +252,34 @@ def user_edit(id):
             if src not in ('upload', 'share', 'both'):
                 src = 'share'
             user.profile_picture_source = src
+
+        # Handle share file profile photo
+        share_file = request.form.get('share_profile_file', '').strip()
+        if share_file:
+            if user.profile_photo and not user.profile_photo.startswith('share/'):
+                # delete old uploaded file
+                old_fp = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
+                if is_safe_file_path(old_fp) and os.path.exists(old_fp):
+                    os.remove(old_fp)
+            user.profile_photo = f'share/{share_file}'
+
+        # Handle profile photo upload in regular submit too
+        if not share_file and form.profile_photo.data and form.profile_photo.data.filename:
+            file = form.profile_photo.data
+            if file and allowed_file(file.filename, {'png', 'jpg', 'jpeg'}):
+                file.seek(0, os.SEEK_END)
+                file_size = file.tell()
+                file.seek(0)
+                if file_size <= 1024 * 1024:
+                    if user.profile_photo and not user.profile_photo.startswith('share/'):
+                        old_fp = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
+                        if is_safe_file_path(old_fp) and os.path.exists(old_fp):
+                            os.remove(old_fp)
+                    ext = secure_filename(file.filename.rsplit('.', 1)[1].lower())
+                    filename = f"{secure_filename(form.username.data)}.{ext}"
+                    filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', filename)
+                    file.save(filepath)
+                    user.profile_photo = filename
 
         # Check if admin is unlocking the account
         unlock_account = request.form.get('unlock_account')
@@ -261,12 +290,12 @@ def user_edit(id):
             timestamp = datetime.now(tz_module.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
             log_audit(current_user.id, 'update', 'user', user.id, f'{current_user.username} manually unlock: {user.username} on {timestamp}')
             flash(f'Account "{user.username}" has been unlocked.', 'success')
-        
+
         if form.password.data:
             user.set_password(form.password.data)
-        
+
         db.session.commit()
-        
+
         log_audit(current_user.id, 'update', 'user', user.id, f'Updated user: {user.username}')
         flash(f'User "{user.username}" updated successfully!', 'success')
         return redirect(url_for('user_role.users'))
@@ -280,10 +309,12 @@ def user_edit(id):
         form.is_active.data = user.is_active
         form.max_login_attempts.data = user.max_login_attempts
         form.allow_password_reset.data = user.allow_password_reset
+        form.allow_profile_picture_change.data = user.allow_profile_picture_change
+        form.allow_change_short_info.data = user.allow_change_short_info
         form.auto_unlock_enabled.data = user.auto_unlock_enabled
         form.auto_unlock_minutes.data = user.auto_unlock_minutes
-    
-    return render_template('user_form.html', form=form, user=user, title='Edit User', config=current_app.config)
+
+    return render_template('user_form.html', form=form, user=user, title='Edit User', config=current_app.config, profile_share_files=SharedFile.query.filter_by(category='profile').order_by(SharedFile.created_at.desc()).all())
 
 
 @user_role_bp.route('/user/<int:user_id>/choose-profile-photo', endpoint='admin_choose_profile_photo')
