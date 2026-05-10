@@ -533,7 +533,7 @@ def role_edit(id):
                 perms['items'][action] = checkbox_name in request.form
 
             # Lending & Return permissions
-            lr_actions = ['view_page', 'view_log', 'edit_batch', 'delete_batch', 'edit_lending', 'delete_lending']
+            lr_actions = ['view_page', 'only_self_lending', 'view_log', 'edit_batch', 'delete_batch', 'edit_lending', 'delete_lending']
             perms['lending_return'] = {}
             for action in lr_actions:
                 perms['lending_return'][action] = f'lr_{action}' in request.form

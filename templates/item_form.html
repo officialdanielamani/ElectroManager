@@ -422,6 +422,7 @@
                                         </div>
                                         {% if item_perms and item_perms.can_edit_lending %}
                                         <button type="button" class="btn btn-sm btn-outline-warning" onclick="openSnBulkLendModal({{ batch.id }})"><i class="bi bi-hand-index-thumb"></i> Manage Lending</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="openSnReturnModal({{ batch.id }})"><i class="bi bi-box-arrow-in-left"></i> Manage Return</button>
                                         {% endif %}
                                         <span id="snUnsavedBadge_{{ batch.id }}" class="d-none badge bg-warning text-dark align-self-center">Pending</span>
                                     </div>
@@ -3340,6 +3341,7 @@ function renderLendRecordsTable() {
         var note = r.lend_note ? ('<span class="text-muted" title="' + r.lend_note.replace(/"/g,'&quot;') + '"><i class="bi bi-sticky"></i> ' + r.lend_note.replace(/</g,'&lt;').replace(/>/g,'&gt;').slice(0, 30) + (r.lend_note.length > 30 ? '…' : '') + '</span>') : '—';
         var notify = r.notify ? '<i class="bi bi-bell-fill text-warning" title="Remind ' + (r.days||3) + ' days before"></i>' : '—';
         return '<tr>' +
+            '<td><input type="checkbox" class="form-check-input lend-return-check" value="' + i + '"></td>' +
             '<td class="small">' + label + '</td>' +
             '<td class="small text-center">' + (r.qty||1) + '</td>' +
             '<td class="small">' + formatLendDateTime(r.start) + '</td>' +
@@ -3352,7 +3354,7 @@ function renderLendRecordsTable() {
             '</td></tr>';
     }).join('');
     el.innerHTML = '<table class="table table-sm table-bordered mb-0 small">' +
-        '<thead class="table-light"><tr><th>Lend To</th><th class="text-center">Qty</th><th>Start</th><th>End</th><th>Notes</th><th class="text-center"><i class="bi bi-bell" title="Notify"></i></th><th></th></tr></thead>' +
+        '<thead class="table-light"><tr><th style="width:25px"></th><th>Lend To</th><th class="text-center">Qty</th><th>Start</th><th>End</th><th>Notes</th><th class="text-center"><i class="bi bi-bell" title="Notify"></i></th><th></th></tr></thead>' +
         '<tbody>' + rows + '</tbody></table>';
 }
 
@@ -3441,6 +3443,57 @@ function saveLrForm() {
     else _lmLendRecords.push(record);
     cancelLrForm();
     renderLendRecordsTable();
+}
+
+function showReturnForm() {
+    var checked = document.querySelectorAll('.lend-return-check:checked');
+    if (checked.length === 0) { alert('Select at least one lending record to return.'); return; }
+    document.getElementById('lmReturnForm').classList.remove('d-none');
+    // Set qty to sum of selected records
+    var total = 0;
+    checked.forEach(function(cb) {
+        var idx = parseInt(cb.value);
+        if (_lmLendRecords[idx]) total += (_lmLendRecords[idx].qty || 1);
+    });
+    document.getElementById('lmReturnQty').value = total;
+    document.getElementById('lmReturnQty').max = total;
+}
+
+function hideReturnForm() {
+    document.getElementById('lmReturnForm').classList.add('d-none');
+}
+
+function doReturnLending() {
+    var checked = document.querySelectorAll('.lend-return-check:checked');
+    if (checked.length === 0) { alert('Select at least one lending record to return.'); return; }
+    var returnDatetime = document.getElementById('lmReturnDatetime').value;
+    var returnQty = parseInt(document.getElementById('lmReturnQty').value) || 1;
+    var returnNotes = document.getElementById('lmReturnNotes').value.trim().slice(0, 128);
+
+    checked.forEach(function(cb) {
+        var idx = parseInt(cb.value);
+        if (!_lmLendRecords[idx]) return;
+        var rec = _lmLendRecords[idx];
+        var lendQty = rec.qty || 1;
+        if (returnQty >= lendQty) {
+            // Full return — mark record as returned (will be removed)
+            _lmLendRecords[idx]._returned = true;
+            _lmLendRecords[idx]._return_datetime = returnDatetime;
+            _lmLendRecords[idx]._return_notes = returnNotes;
+        } else {
+            // Partial return — reduce qty
+            _lmLendRecords[idx].qty = lendQty - returnQty;
+            _lmLendRecords[idx]._partial_return = true;
+            _lmLendRecords[idx]._return_datetime = returnDatetime;
+            _lmLendRecords[idx]._return_notes = returnNotes;
+        }
+    });
+
+    // Remove fully returned records from the display array
+    _lmLendRecords = _lmLendRecords.filter(function(r) { return !r._returned; });
+
+    renderLendRecordsTable();
+    hideReturnForm();
 }
 
 function toggleLrSearch() {
@@ -3649,6 +3702,53 @@ function openSnBulkLendModal(batchId) {
     _snlResetForm('', '', '', '', '', false, 3, '');
     new bootstrap.Modal(document.getElementById('snBulkLendModal')).show();
 }
+var _snReturnBatchId = null;
+function openSnReturnModal(batchId) {
+    var s = _snState[batchId];
+    if (!s) return;
+    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
+    var lentChecked = Array.from(checked).filter(function(cb) {
+        var id = parseInt(cb.value);
+        var row = s.rows.find(function(r) { return r.id === id; });
+        return row && row.lend_to_id && !row._del && !row._add;
+    });
+    if (lentChecked.length === 0) { alert('Select at least one currently lent serial number to return.'); return; }
+    _snReturnBatchId = batchId;
+    document.getElementById('snReturnCount').textContent = lentChecked.length;
+    document.getElementById('snReturnDatetime').value = '';
+    document.getElementById('snReturnNotes').value = '';
+    new bootstrap.Modal(document.getElementById('snReturnModalDialog')).show();
+}
+
+function doSnReturn() {
+    var batchId = _snReturnBatchId;
+    var s = _snState[batchId];
+    if (!s) return;
+    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
+    var returnDatetime = document.getElementById('snReturnDatetime').value;
+    var returnNotes = document.getElementById('snReturnNotes').value.trim().slice(0, 128);
+
+    Array.from(checked).forEach(function(cb) {
+        var id = parseInt(cb.value);
+        var row = s.rows.find(function(r) { return r.id === id; });
+        if (!row || !row.lend_to_id) return;
+        // Mark as returned: clear lending fields, mark lend_dirty
+        row.lend_to_id = null;
+        row.lend_to_type = '';
+        row.lend_display = '';
+        row.lend_start = '';
+        row.lend_end = '';
+        row.lend_note = returnNotes;
+        row._lend_dirty = true;
+        row._return_datetime = returnDatetime;
+        row._return_notes = returnNotes;
+    });
+
+    _snRender(batchId);
+    _snUpdateSaveBtn(batchId);
+    bootstrap.Modal.getInstance(document.getElementById('snReturnModalDialog')).hide();
+}
+
 function submitSnBulkLend(clearMode) {
     var checked = document.querySelectorAll('.sn-check-' + _snBulkBatchId + ':checked:not([disabled])');
     if (!checked.length) { alert('No SNs selected.'); return; }
@@ -3912,6 +4012,32 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-danger" onclick="doDeleteSn()"><i class="bi bi-trash"></i> Confirm Remove</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="snReturnModalDialog" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="bi bi-box-arrow-in-left"></i> Return Serial Numbers</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">Returning <strong><span id="snReturnCount">0</span></strong> selected lent unit(s).</p>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Return Date/Time <span class="text-muted">(optional)</span></label>
+                    <input type="datetime-local" class="form-control form-control-sm" id="snReturnDatetime">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Return Notes <small class="text-muted">(max 128 chars)</small></label>
+                    <input type="text" class="form-control form-control-sm" id="snReturnNotes" maxlength="128" placeholder="Optional notes about this return">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="doSnReturn()"><i class="bi bi-check-circle"></i> Confirm Return</button>
             </div>
         </div>
     </div>
@@ -4256,13 +4382,35 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header py-2">
-                <h5 class="modal-title"><i class="bi bi-hand-index-thumb text-warning"></i> Manage Lending</h5>
+                <h5 class="modal-title"><i class="bi bi-hand-index-thumb text-warning"></i> Manage Lending &amp; Return</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-3">
                 <div id="lm_lend_records_table" class="mb-2"></div>
+                <div id="lmReturnForm" class="d-none mt-3 border-top pt-3">
+                    <h6><i class="bi bi-box-arrow-in-left"></i> Return Selected Lending</h6>
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label form-label-sm">Return Date/Time <span class="text-muted">(optional)</span></label>
+                            <input type="datetime-local" class="form-control form-control-sm" id="lmReturnDatetime">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label form-label-sm">Qty to Return</label>
+                            <input type="number" class="form-control form-control-sm" id="lmReturnQty" min="1" value="1">
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm">Return Notes <small class="text-muted">(max 128 chars)</small></label>
+                        <input type="text" class="form-control form-control-sm" id="lmReturnNotes" maxlength="128" placeholder="Optional notes about this return">
+                    </div>
+                    <button type="button" class="btn btn-warning btn-sm" onclick="doReturnLending()"><i class="bi bi-check-circle"></i> Confirm Return</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="hideReturnForm()">Cancel</button>
+                </div>
                 <div id="lm_lr_form_slot"></div>
-                <button type="button" class="btn btn-outline-warning btn-sm mt-1" onclick="showLrForm('add')"><i class="bi bi-plus"></i> Add Lending Record</button>
+                <div class="d-flex gap-2 mt-1">
+                    <button type="button" class="btn btn-outline-warning btn-sm" onclick="showLrForm('add')"><i class="bi bi-plus"></i> Add Lending Record</button>
+                    <button type="button" class="btn btn-sm btn-outline-warning" id="lmReturnBtn" onclick="showReturnForm()"><i class="bi bi-box-arrow-in-left"></i> Return</button>
+                </div>
             </div>
             <div class="modal-footer py-2">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>

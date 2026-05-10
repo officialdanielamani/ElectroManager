@@ -382,6 +382,85 @@
             </div>
         </form>
 
+        {% if current_user.has_permission('settings_sections.system_settings', 'edit') %}
+        <div class="card mb-4" id="lending-return-settings">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="bi bi-arrow-left-right"></i> Lending &amp; Return Settings</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="">
+                    <input type="hidden" name="section" value="lending_return">
+
+                    <h6 class="text-primary">Lending Options</h6>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="lr_lend_start_date_required" name="lr_lend_start_date_required"
+                                       {% if Setting.get('lr_lend_start_date_required','false')=='true' %}checked{% endif %}
+                                       onchange="document.getElementById('lr_lend_start_time_required').disabled = !this.checked">
+                                <label class="form-check-label" for="lr_lend_start_date_required"><strong>Start Date required</strong></label>
+                            </div>
+                            <div class="form-check ms-3">
+                                <input class="form-check-input" type="checkbox" id="lr_lend_start_time_required" name="lr_lend_start_time_required"
+                                       {% if Setting.get('lr_lend_start_time_required','false')=='true' %}checked{% endif %}
+                                       {% if Setting.get('lr_lend_start_date_required','false')!='true' %}disabled{% endif %}>
+                                <label class="form-check-label" for="lr_lend_start_time_required">Start Time required <small class="text-muted">(only if Start Date required)</small></label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="lr_lend_end_date_required" name="lr_lend_end_date_required"
+                                       {% if Setting.get('lr_lend_end_date_required','false')=='true' %}checked{% endif %}
+                                       onchange="document.getElementById('lr_lend_end_time_required').disabled = !this.checked">
+                                <label class="form-check-label" for="lr_lend_end_date_required"><strong>End Date required</strong></label>
+                            </div>
+                            <div class="form-check ms-3">
+                                <input class="form-check-input" type="checkbox" id="lr_lend_end_time_required" name="lr_lend_end_time_required"
+                                       {% if Setting.get('lr_lend_end_time_required','false')=='true' %}checked{% endif %}
+                                       {% if Setting.get('lr_lend_end_date_required','false')!='true' %}disabled{% endif %}>
+                                <label class="form-check-label" for="lr_lend_end_time_required">End Time required <small class="text-muted">(only if End Date required)</small></label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="lr_lend_self_use_now" name="lr_lend_self_use_now"
+                                       {% if Setting.get('lr_lend_self_use_now','false')=='true' %}checked{% endif %}>
+                                <label class="form-check-label" for="lr_lend_self_use_now">Only Self Lending must use current date/time for Start <small class="text-muted">(cannot manually set start date)</small></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h6 class="text-primary mt-3">Return Options</h6>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="lr_return_date_required" name="lr_return_date_required"
+                                       {% if Setting.get('lr_return_date_required','false')=='true' %}checked{% endif %}
+                                       onchange="document.getElementById('lr_return_time_required').disabled = !this.checked">
+                                <label class="form-check-label" for="lr_return_date_required"><strong>Return Date required</strong></label>
+                            </div>
+                            <div class="form-check ms-3">
+                                <input class="form-check-input" type="checkbox" id="lr_return_time_required" name="lr_return_time_required"
+                                       {% if Setting.get('lr_return_time_required','false')=='true' %}checked{% endif %}
+                                       {% if Setting.get('lr_return_date_required','false')!='true' %}disabled{% endif %}>
+                                <label class="form-check-label" for="lr_return_time_required">Return Time required <small class="text-muted">(only if Return Date required)</small></label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="lr_return_self_use_now" name="lr_return_self_use_now"
+                                       {% if Setting.get('lr_return_self_use_now','false')=='true' %}checked{% endif %}>
+                                <label class="form-check-label" for="lr_return_self_use_now">Only Self Lending must use current date/time for Return <small class="text-muted">(cannot manually set return date)</small></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save"></i> Save Lending &amp; Return Settings</button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Standalone delete forms — must be outside the main form to avoid HTML nesting issues -->
         <form id="delete-system-logo-form" method="POST" action="{{ url_for('settings.delete_system_logo') }}"></form>
         <form id="delete-company-logo-form" method="POST" action="{{ url_for('settings.delete_company_logo') }}"></form>

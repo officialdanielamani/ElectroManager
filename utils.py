@@ -250,6 +250,7 @@ def get_item_edit_permissions(user):
         'can_edit_price': lr('edit_batch'),      # merged into edit_batch
         'can_edit_sn': lr('edit_batch'),         # merged into edit_batch
         'can_edit_lending': lr('edit_lending'),
+        'can_only_self_lending': not is_admin and user.has_permission('lending_return', 'only_self_lending') and not user.has_permission('lending_return', 'edit_batch'),
         'can_delete_batch': lr('delete_batch'),
         'can_delete_lending': lr('delete_lending'),
         'can_view_advance': is_admin or user.has_permission('items', 'view_advance'),

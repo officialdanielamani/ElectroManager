@@ -439,6 +439,24 @@ def settings_system():
         if not can_edit:
             flash('You do not have permission to edit system settings.', 'danger')
             return redirect(url_for('settings.settings_system'))
+
+        section = request.form.get('section', '')
+
+        if section == 'lending_return':
+            lr_keys = ['lr_lend_start_date_required', 'lr_lend_start_time_required',
+                       'lr_lend_end_date_required', 'lr_lend_end_time_required', 'lr_lend_self_use_now',
+                       'lr_return_date_required', 'lr_return_time_required', 'lr_return_self_use_now']
+            for key in lr_keys:
+                val = 'true' if key in request.form else 'false'
+                s = Setting.query.filter_by(key=key).first()
+                if s:
+                    s.value = val
+                else:
+                    db.session.add(Setting(key=key, value=val, description=key))
+            db.session.commit()
+            flash('Lending & Return settings saved.', 'success')
+            return redirect(url_for('settings.settings_system') + '#lending-return-settings')
+
         try:
             # Currency setting
             currency = request.form.get('currency', '$').strip()
@@ -689,6 +707,7 @@ def settings_system():
             break
     
     return render_template('settings_system.html',
+                          Setting=Setting,
                           currency=currency,
                           currency_decimal_places=currency_decimal_places,
                           max_file_size=max_file_size,

@@ -98,7 +98,7 @@ def create_default_roles():
                 "view_advance": True, "edit_advance": True, "delete_advance": True,
             },
             "lending_return": {
-                "view_page": True, "view_log": True,
+                "view_page": True, "only_self_lending": False, "view_log": True,
                 "edit_batch": True, "delete_batch": True,
                 "edit_lending": True, "delete_lending": True,
             },
@@ -146,7 +146,7 @@ def create_default_roles():
                 "view_advance": True, "edit_advance": True, "delete_advance": True,
             },
             "lending_return": {
-                "view_page": True, "view_log": True,
+                "view_page": True, "only_self_lending": False, "view_log": True,
                 "edit_batch": True, "delete_batch": False,
                 "edit_lending": True, "delete_lending": False,
             },
@@ -194,7 +194,7 @@ def create_default_roles():
                 "view_advance": True, "edit_advance": False, "delete_advance": False,
             },
             "lending_return": {
-                "view_page": True, "view_log": True,
+                "view_page": True, "only_self_lending": False, "view_log": True,
                 "edit_batch": False, "delete_batch": False,
                 "edit_lending": False, "delete_lending": False,
             },
@@ -259,9 +259,9 @@ def update_system_roles():
 
     # Migrate lending_return section if missing
     lr_updates = {
-        'Admin':   {"view_page": True,  "view_log": True,  "edit_batch": True,  "delete_batch": True,  "edit_lending": True,  "delete_lending": True},
-        'Manager': {"view_page": True,  "view_log": True,  "edit_batch": True,  "delete_batch": False, "edit_lending": True,  "delete_lending": False},
-        'Viewer':  {"view_page": True,  "view_log": True,  "edit_batch": False, "delete_batch": False, "edit_lending": False, "delete_lending": False},
+        'Admin':   {"view_page": True,  "only_self_lending": False, "view_log": True,  "edit_batch": True,  "delete_batch": True,  "edit_lending": True,  "delete_lending": True},
+        'Manager': {"view_page": True,  "only_self_lending": False, "view_log": True,  "edit_batch": True,  "delete_batch": False, "edit_lending": True,  "delete_lending": False},
+        'Viewer':  {"view_page": True,  "only_self_lending": False, "view_log": True,  "edit_batch": False, "delete_batch": False, "edit_lending": False, "delete_lending": False},
     }
     for role_name, lr_perms in lr_updates.items():
         role = Role.query.filter_by(name=role_name).first()
@@ -272,6 +272,10 @@ def update_system_roles():
             perms['lending_return'] = lr_perms
             role.set_permissions(perms)
             print(f"Added lending_return permissions for role: {role_name}")
+        elif 'only_self_lending' not in perms['lending_return']:
+            perms['lending_return']['only_self_lending'] = False
+            role.set_permissions(perms)
+            print(f"Added only_self_lending to lending_return for role: {role_name}")
 
     db.session.commit()
 
@@ -283,6 +287,14 @@ def create_default_settings():
         ('items_per_page', '20', 'Number of items to display per page'),
         ('low_stock_threshold', '5', 'Default low stock threshold'),
         ('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx', 'Allowed file extensions for uploads'),
+        ('lr_lend_start_date_required', 'false', 'Lending start date is required'),
+        ('lr_lend_start_time_required', 'false', 'Lending start time is required (only if date required)'),
+        ('lr_lend_end_date_required', 'false', 'Lending end date is required'),
+        ('lr_lend_end_time_required', 'false', 'Lending end time is required (only if date required)'),
+        ('lr_lend_self_use_now', 'false', 'Only Self Lending must use current datetime for start'),
+        ('lr_return_date_required', 'false', 'Return date is required'),
+        ('lr_return_time_required', 'false', 'Return time is required (only if date required)'),
+        ('lr_return_self_use_now', 'false', 'Only Self Lending must use current datetime for return'),
     ]
     
     for key, value, description in default_settings:
