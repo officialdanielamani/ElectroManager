@@ -184,6 +184,52 @@ def add_batch(uuid):
     return redirect(url_for('item.item_edit', uuid=uuid) + '#batches-section')
 
 
+@batch_bp.route('/item/<string:uuid>/batch/<int:batch_id>/edit-location', methods=['POST'])
+@login_required
+def edit_batch_location(uuid, batch_id):
+    """Update only the location fields of a batch — requires items.edit_info."""
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    batch = ItemBatch.query.get_or_404(batch_id)
+    if batch.item_id != item.id:
+        return jsonify({'success': False, 'message': 'Batch does not belong to this item'}), 400
+    if not (current_user.is_admin() or current_user.has_permission('items', 'edit_info')):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+
+    follow_main = request.form.get('follow_main_location', '') == 'on'
+    batch.follow_main_location = follow_main
+    if follow_main:
+        batch.location_id = None
+        batch.rack_id = None
+        batch.drawer = None
+    else:
+        batch_loc_id_raw = request.form.get('batch_location_id', '')
+        batch_rack_id_raw = request.form.get('batch_rack_id', '')
+        batch_drawer = request.form.get('batch_drawer', '').strip() or None
+        try:
+            batch_loc_id = int(batch_loc_id_raw) if batch_loc_id_raw else None
+        except (ValueError, TypeError):
+            batch_loc_id = None
+        try:
+            batch_rack_id = int(batch_rack_id_raw) if batch_rack_id_raw else None
+        except (ValueError, TypeError):
+            batch_rack_id = None
+        if batch_rack_id:
+            batch.location_id = None
+            batch.rack_id = batch_rack_id
+            batch.drawer = batch_drawer
+        else:
+            batch.location_id = batch_loc_id
+            batch.rack_id = None
+            batch.drawer = None
+
+    item.updated_by = current_user.id
+    item.updated_at = datetime.now(timezone.utc)
+    db.session.commit()
+    log_audit(current_user.id, 'update', 'batch', batch.id,
+              f'Updated location of batch "{batch.get_display_label()}" for {item.name}')
+    return jsonify({'success': True})
+
+
 @batch_bp.route('/item/<string:uuid>/batch/<int:batch_id>/edit', methods=['POST'])
 @login_required
 def edit_batch(uuid, batch_id):
