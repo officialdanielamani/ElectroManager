@@ -3183,7 +3183,6 @@ function openDeleteSnModal(batchId) {
     document.getElementById('deleteSnCount').textContent = checked.length;
     document.getElementById('deleteSnReasonType').value = '';
     document.getElementById('deleteSnReasonOther').value = '';
-    document.getElementById('deleteSnReasonOther').classList.add('d-none');
     new bootstrap.Modal(document.getElementById('deleteSnModalDialog')).show();
 }
 function doDeleteSn() {
@@ -3192,9 +3191,10 @@ function doDeleteSn() {
     var ids = Array.from(checked).map(function(cb) { return parseInt(cb.value); });
     var reasonType = document.getElementById('deleteSnReasonType').value;
     if (!reasonType) { alert('Please select a reason for removal.'); return; }
+    var notes = document.getElementById('deleteSnReasonOther').value.trim();
     var reason = reasonType === 'Other'
-        ? ('Other: ' + document.getElementById('deleteSnReasonOther').value.trim()).slice(0, 256)
-        : reasonType;
+        ? ('Other: ' + notes).slice(0, 256)
+        : (notes ? reasonType + ' — ' + notes : reasonType).slice(0, 256);
     var s = _snState[batchId];
     if (s) {
         s.rows = s.rows.map(function(row) {
