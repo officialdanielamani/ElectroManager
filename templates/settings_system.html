@@ -369,28 +369,13 @@
 
 
 
-            <!-- Action Buttons -->
-            <div class="card">
-                <div class="card-body">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-save"></i> Save All Settings
-                    </button>
-                    <a href="{{ url_for('settings.settings') }}" class="btn btn-secondary">
-                        <i class="bi bi-arrow-left"></i> Back to Settings
-                    </a>
+            <!-- Lending & Return Settings -->
+            {% if current_user.has_permission('settings_sections.system_settings', 'edit') %}
+            <div class="card mb-4" id="lending-return-settings">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-arrow-left-right"></i> Lending &amp; Return Settings</h6>
                 </div>
-            </div>
-        </form>
-
-        {% if current_user.has_permission('settings_sections.system_settings', 'edit') %}
-        <div class="card mb-4" id="lending-return-settings">
-            <div class="card-header bg-light">
-                <h6 class="mb-0"><i class="bi bi-arrow-left-right"></i> Lending &amp; Return Settings</h6>
-            </div>
-            <div class="card-body">
-                <form method="POST" action="">
-                    <input type="hidden" name="section" value="lending_return">
-
+                <div class="card-body">
                     <h6 class="text-primary">Lending Options</h6>
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
@@ -454,12 +439,22 @@
                             </div>
                         </div>
                     </div>
-
-                    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save"></i> Save Lending &amp; Return Settings</button>
-                </form>
+                </div>
             </div>
-        </div>
-        {% endif %}
+            {% endif %}
+
+            <!-- Action Buttons -->
+            <div class="card">
+                <div class="card-body">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Save All Settings
+                    </button>
+                    <a href="{{ url_for('settings.settings') }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Settings
+                    </a>
+                </div>
+            </div>
+        </form>
 
         <!-- Standalone delete forms — must be outside the main form to avoid HTML nesting issues -->
         <form id="delete-system-logo-form" method="POST" action="{{ url_for('settings.delete_system_logo') }}"></form>

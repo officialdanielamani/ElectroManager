@@ -25,7 +25,7 @@
         </div>
         {% endif %}
       </div>
-      <div class="card-body">
+      <div class="card-body" style="overflow-y:auto;max-height:90vh;padding-bottom:220px;">
         <!-- Image placeholder (scan area) -->
         <div class="text-center rounded mb-3 py-4" style="background:#f8f9fa;border:2px dashed #dee2e6;">
           <i class="bi bi-camera fs-2 text-muted"></i>
@@ -81,7 +81,7 @@
           <span class="ms-1 fw-semibold">{{ entry.username }}</span>
           <span class="text-muted ms-1">{{ entry.timestamp }}</span>
           <div class="text-muted mt-1" style="font-size:0.78rem;word-break:break-word;">
-            {{ log.details[:120] if log.details else '' }}{% if log.details and log.details|length > 120 %}…{% endif %}
+            {{ entry.display }}
           </div>
         </div>
         {% endif %}
@@ -106,6 +106,7 @@ var _canEditBatch = {{ can_edit_batch | tojson }};
 var _canDeleteBatch = {{ can_delete_batch | tojson }};
 var _canOnlySelf = {{ can_only_self | tojson }};
 var _currentUserId = {{ current_user_id }};
+var _ebCurrency = {{ currency | tojson }};
 
 function onModeChange() {
     _mode = document.getElementById('modeToggle').checked ? 'return' : 'lending';
@@ -173,7 +174,7 @@ function renderResults(data) {
 function renderItemCard(item, expanded) {
     var batchesHtml = '';
     item.batches.forEach(function(b) {
-        batchesHtml += '<div class="ps-3 py-1 border-bottom d-flex justify-content-between align-items-center batch-row" ' +
+        batchesHtml += '<div class="px-3 py-2 border-bottom d-flex justify-content-between align-items-center batch-row" ' +
             'style="cursor:pointer;" onclick="selectBatch(' + b.id + ', null)">' +
             '<span><i class="bi bi-box-seam me-1"></i>' + _esc(b.display_label) + '</span>' +
             '<span class="text-muted small">Qty:' + b.quantity + ' Avail:' + b.available_qty +
@@ -188,7 +189,7 @@ function renderItemCard(item, expanded) {
         '</span>' +
         '<code class="text-muted small">' + _esc(item.uuid) + '</code>' +
         '</div>' +
-        '<div class="card-body p-0' + (expanded ? '' : ' d-none') + '">' +
+        '<div class="' + (expanded ? '' : 'd-none') + '">' +
         batchesHtml + '</div></div>';
 }
 
@@ -207,6 +208,7 @@ function _esc(s) {
 }
 
 function selectBatch(batchId, preselectedSnId) {
+    _ebSnState = null;
     fetch('/in-out/batch/' + batchId + '/detail')
     .then(function(r) { return r.json(); })
     .then(function(d) {
@@ -219,6 +221,7 @@ function selectBatch(batchId, preselectedSnId) {
 function clearActionForm() {
     document.getElementById('actionForm').innerHTML = '';
     document.getElementById('formDivider').classList.add('d-none');
+    _ebSnState = null;
 }
 
 function showActionForm(batch) {
@@ -401,8 +404,9 @@ function buildReturnForm(b) {
         html += '<div class="mb-2"><label class="form-label fw-semibold">Select units to return</label>' +
             '<div style="max-height:200px;overflow-y:auto;border:1px solid #dee2e6;border-radius:4px;padding:4px;">';
         lent.forEach(function(sn) {
-            html += '<div class="form-check"><input class="form-check-input sn-return-chk" type="checkbox" value="' + sn.id + '">' +
-                '<label class="form-check-label small"><code>' + _esc(sn.isn) + '</code>' +
+            var chkId = 'sn-ret-' + sn.id;
+            html += '<div class="form-check"><input class="form-check-input sn-return-chk" type="checkbox" id="' + chkId + '" value="' + sn.id + '">' +
+                '<label class="form-check-label small" for="' + chkId + '"><code>' + _esc(sn.isn) + '</code>' +
                 (sn.lend_display ? ' → <em>' + _esc(sn.lend_display) + '</em>' : '') +
                 (sn.lend_end ? ' <span class="text-muted">(due ' + _esc(sn.lend_end.slice(0,10)) + ')</span>' : '') + '</label></div>';
         });
@@ -412,9 +416,10 @@ function buildReturnForm(b) {
         if (recs.length === 0) { return html + '<div class="alert alert-info">No lending records.</div>'; }
         html += '<div class="mb-2"><label class="form-label fw-semibold">Select lending record(s) to return</label>';
         recs.forEach(function(r, i) {
+            var chkId = 'lend-rec-' + r.id;
             html += '<div class="form-check border rounded p-2 mb-1">' +
-                '<input class="form-check-input lend-rec-chk" type="checkbox" value="' + r.id + '" data-qty="' + (r.qty||1) + '">' +
-                '<label class="form-check-label small">' + _esc(r.label||'—') +
+                '<input class="form-check-input lend-rec-chk" type="checkbox" id="' + chkId + '" value="' + r.id + '" data-qty="' + (r.qty||1) + '">' +
+                '<label class="form-check-label small" for="' + chkId + '">' + _esc(r.label||'—') +
                 ' | Qty: ' + (r.qty||1) +
                 (r.end ? ' | Due: ' + _esc(r.end.slice(0,10)) : '') + '</label></div>';
         });
@@ -458,29 +463,171 @@ function submitReturn(batchId, snTracking) {
 }
 
 /* ── Edit Batch Form ── */
+var _ebSnState = null;  // SN state for edit batch mode
+
+function _ebCalcTotal() {
+    var qty = parseFloat((document.getElementById('eb_qty')||{}).value) || 0;
+    var price = parseFloat((document.getElementById('eb_price')||{}).value) || 0;
+    var totalEl = document.getElementById('eb_total');
+    if (totalEl) totalEl.value = (qty * price).toFixed(2);
+}
+function _ebCalcTotalSn() {
+    var snBatch = _ebSnState;
+    var qty = snBatch ? snBatch.filter(function(r){ return !r.is_deleted && !r._del; }).length : 0;
+    var price = parseFloat((document.getElementById('eb_price')||{}).value) || 0;
+    var totalEl = document.getElementById('eb_total');
+    if (totalEl) totalEl.value = (qty * price).toFixed(2);
+}
+
 function buildEditBatchForm(b) {
     if (!_canEditBatch) return '<div class="alert alert-warning">No permission to edit batch.</div>';
+    var cur = _ebCurrency;
+    var isSn = b.sn_tracking;
+
+    // Row 1: Label | Manufacturer | Purchase Date
+    var row1 = '<div class="row g-2 mb-2">' +
+        '<div class="col-md-4"><label class="form-label form-label-sm">Label</label>' +
+        '<input type="text" class="form-control form-control-sm" id="eb_label" value="' + _esc(b.batch_label) + '" maxlength="50"></div>' +
+        '<div class="col-md-4"><label class="form-label form-label-sm">Manufacturer</label>' +
+        '<input type="text" class="form-control form-control-sm" id="eb_manuf" value="' + _esc(b.manufacturer) + '" maxlength="100"></div>' +
+        '<div class="col-md-4"><label class="form-label form-label-sm">Purchase Date</label>' +
+        '<input type="date" class="form-control form-control-sm" id="eb_date" value="' + _esc(b.purchase_date) + '"></div>' +
+        '</div>';
+
+    // Row 2: Normal → Qty | Price/Unit | Total Price; SN → Price/Unit | Total Price
+    var snCount = isSn ? (b.serial_numbers||[]).filter(function(s){ return !s.is_deleted; }).length : 0;
+    var totalVal = isSn ? (snCount * b.price_per_unit).toFixed(2) : (b.quantity * b.price_per_unit).toFixed(2);
+    var row2 = '<div class="row g-2 mb-2">';
+    if (!isSn) {
+        row2 += '<div class="col-md-4"><label class="form-label form-label-sm">Quantity</label>' +
+            '<input type="number" class="form-control form-control-sm" id="eb_qty" value="' + b.quantity + '" min="0" oninput="_ebCalcTotal()"></div>';
+    }
+    row2 += '<div class="col-md-4"><label class="form-label form-label-sm">Price/Unit</label>' +
+        '<div class="input-group input-group-sm"><span class="input-group-text">' + _esc(cur) + '</span>' +
+        '<input type="number" step="0.01" class="form-control" id="eb_price" value="' + b.price_per_unit + '" min="0" oninput="' + (isSn ? '_ebCalcTotalSn()' : '_ebCalcTotal()') + '"></div></div>' +
+        '<div class="col-md-4"><label class="form-label form-label-sm">Total Price</label>' +
+        '<div class="input-group input-group-sm"><span class="input-group-text">' + _esc(cur) + '</span>' +
+        '<input type="text" class="form-control" id="eb_total" value="' + totalVal + '" readonly></div></div>' +
+        '</div>';
+
+    // Row 3: Note (full width)
+    var row3 = '<div class="mb-2"><label class="form-label form-label-sm">Note</label>' +
+        '<input type="text" class="form-control form-control-sm" id="eb_note" value="' + _esc(b.note) + '" maxlength="256"></div>';
+
+    // SN table (only for SN batches)
+    var snTable = '';
+    if (isSn) {
+        // Only initialise state when first loading this batch; preserve edits on re-render
+        if (!_ebSnState || _ebSnState._batchId !== b.id) {
+            _ebSnState = JSON.parse(JSON.stringify(b.serial_numbers || []));
+            _ebSnState.forEach(function(r){ r._del = false; r._del_reason = ''; r._dirty = false; });
+            _ebSnState._batchId = b.id;
+        }
+        snTable = _ebRenderSnTable(b.id);
+    }
+
+    var buttons = '<div class="d-flex gap-2 mt-2">' +
+        '<button class="btn btn-primary btn-sm" onclick="submitEditBatch(' + b.id + ', ' + (isSn ? 'true' : 'false') + ')"><i class="bi bi-save"></i> Save Batch</button>' +
+        (_canDeleteBatch ? '<button class="btn btn-outline-danger btn-sm" onclick="submitDeleteBatch(' + b.id + ', \'' + _esc(b.display_label) + '\')"><i class="bi bi-trash"></i> Delete Batch</button>' : '') +
+        '</div>';
+
     return '<h6><i class="bi bi-pencil-square"></i> Edit Batch — ' + _esc(b.display_label) + ' (' + _esc(b.item_name) + ')</h6>' +
-    '<div class="row g-2 mb-2">' +
-    '<div class="col-md-4"><label class="form-label form-label-sm">Label</label>' +
-    '<input type="text" class="form-control form-control-sm" id="eb_label" value="' + _esc(b.batch_label) + '" maxlength="50"></div>' +
-    '<div class="col-md-4"><label class="form-label form-label-sm">Manufacturer</label>' +
-    '<input type="text" class="form-control form-control-sm" id="eb_manuf" value="' + _esc(b.manufacturer) + '" maxlength="100"></div>' +
-    (!b.sn_tracking ? '<div class="col-md-4"><label class="form-label form-label-sm">Quantity</label>' +
-    '<input type="number" class="form-control form-control-sm" id="eb_qty" value="' + b.quantity + '" min="0"></div>' : '') +
-    '</div>' +
-    '<div class="row g-2 mb-2">' +
-    '<div class="col-md-4"><label class="form-label form-label-sm">Price/Unit</label>' +
-    '<input type="number" step="0.01" class="form-control form-control-sm" id="eb_price" value="' + b.price_per_unit + '" min="0"></div>' +
-    '<div class="col-md-4"><label class="form-label form-label-sm">Purchase Date</label>' +
-    '<input type="date" class="form-control form-control-sm" id="eb_date" value="' + _esc(b.purchase_date) + '"></div>' +
-    '<div class="col-md-4"><label class="form-label form-label-sm">Note</label>' +
-    '<input type="text" class="form-control form-control-sm" id="eb_note" value="' + _esc(b.note) + '" maxlength="256"></div>' +
-    '</div>' +
-    '<div class="d-flex gap-2">' +
-    '<button class="btn btn-primary btn-sm" onclick="submitEditBatch(' + b.id + ', ' + (b.sn_tracking ? 'true' : 'false') + ')"><i class="bi bi-save"></i> Save Batch</button>' +
-    (_canDeleteBatch ? '<button class="btn btn-outline-danger btn-sm" onclick="submitDeleteBatch(' + b.id + ', \'' + _esc(b.display_label) + '\')"><i class="bi bi-trash"></i> Delete Batch</button>' : '') +
-    '</div>';
+        row1 + row2 + row3 + snTable + buttons;
+}
+
+function _ebRenderSnTable(batchId) {
+    if (!_ebSnState) return '';
+    var rows = _ebSnState;
+    var html = '<hr class="my-2">' +
+        '<div class="d-flex gap-1 mb-2 flex-wrap align-items-center">' +
+        '<button type="button" class="btn btn-sm btn-outline-primary" onclick="_ebEditSelected(' + batchId + ')"><i class="bi bi-pencil-square"></i> Edit Selected</button>' +
+        '<button type="button" class="btn btn-sm btn-outline-danger" onclick="_ebDeleteSelected(' + batchId + ')"><i class="bi bi-trash"></i> Delete Selected</button>' +
+        '<div class="input-group input-group-sm ms-2" style="width:auto;">' +
+        '<span class="input-group-text">Add</span>' +
+        '<input type="number" class="form-control" id="eb_add_qty" min="1" max="100" value="1" style="width:55px">' +
+        '<button class="btn btn-outline-success" type="button" onclick="_ebAddSn(' + batchId + ')"><i class="bi bi-plus"></i></button>' +
+        '</div></div>' +
+        '<div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:0.82rem;">' +
+        '<thead><tr><th style="width:30px"><input type="checkbox" id="eb_chk_all" onchange="_ebToggleAll(this)"></th>' +
+        '<th>No</th><th>SN</th><th>ISN</th><th>Info</th><th>Status</th></tr></thead><tbody>';
+
+    rows.forEach(function(r, idx) {
+        if (r._del) {
+            html += '<tr class="table-danger"><td></td><td>' + (idx+1) + '</td><td colspan="3" class="text-muted">' + _esc(r.internal_serial_number||r.isn||'') + '</td>' +
+                '<td><span class="badge bg-danger">Removed</span></td></tr>';
+        } else {
+            var chkId = 'eb_sn_chk_' + r.id;
+            html += '<tr>' +
+                '<td><input type="checkbox" class="eb-sn-chk" id="' + chkId + '" value="' + r.id + '"' + (r.is_deleted ? ' disabled' : '') + '></td>' +
+                '<td>' + (idx+1) + '</td>' +
+                '<td>' + (r.is_deleted ? '<span class="text-muted">' + _esc(r.serial_number||r.sn||'') + '</span>' : _esc(r.serial_number||r.sn||'')) + '</td>' +
+                '<td><code style="font-size:0.75rem;">' + _esc(r.internal_serial_number||r.isn||'') + '</code></td>' +
+                '<td>' + _esc(r.info||'') + '</td>' +
+                '<td>' + (r.is_deleted ? '<span class="badge bg-secondary">Deleted</span>' : '<span class="badge bg-success">OK</span>') + '</td>' +
+                '</tr>';
+        }
+    });
+
+    html += '</tbody></table></div>';
+    return html;
+}
+
+function _ebToggleAll(master) {
+    document.querySelectorAll('.eb-sn-chk:not([disabled])').forEach(function(c){ c.checked = master.checked; });
+}
+
+function _ebEditSelected(batchId) {
+    var checked = Array.from(document.querySelectorAll('.eb-sn-chk:checked:not([disabled])')).map(function(c){ return parseInt(c.value); });
+    if (!checked.length) { alert('Select at least one serial number.'); return; }
+    var sn = prompt('New SN value (leave blank to keep current):');
+    var info = prompt('New Info value (leave blank to keep current):');
+    if (sn === null && info === null) return;
+    _ebSnState.forEach(function(r) {
+        if (checked.indexOf(r.id) === -1 || r.is_deleted || r._del) return;
+        if (sn !== null && sn !== '') { r.serial_number = sn.trim().slice(0,200); r._dirty = true; }
+        if (info !== null && info !== '') { r.info = info.trim().slice(0,32); r._dirty = true; }
+    });
+    var container = document.getElementById('actionForm');
+    if (container) container.innerHTML = buildEditBatchForm(_selectedBatch);
+}
+
+var _ebDeleteSnIds = [];
+function _ebDeleteSelected(batchId) {
+    var checked = Array.from(document.querySelectorAll('.eb-sn-chk:checked:not([disabled])')).map(function(c){ return parseInt(c.value); });
+    if (!checked.length) { alert('Select at least one serial number.'); return; }
+    _ebDeleteSnIds = checked;
+    document.getElementById('eb_del_count').textContent = checked.length;
+    document.getElementById('eb_del_reason').value = '';
+    document.getElementById('eb_del_notes').value = '';
+    new bootstrap.Modal(document.getElementById('ebDeleteSnModal')).show();
+}
+function _ebConfirmDelete() {
+    var reasonType = document.getElementById('eb_del_reason').value;
+    if (!reasonType) { alert('Please select a reason for removal.'); return; }
+    var notes = document.getElementById('eb_del_notes').value.trim();
+    var reason = reasonType === 'Other'
+        ? ('Other: ' + notes).slice(0, 256)
+        : (notes ? reasonType + ' — ' + notes : reasonType).slice(0, 256);
+    _ebSnState.forEach(function(r) {
+        if (_ebDeleteSnIds.indexOf(r.id) !== -1 && !r.is_deleted && !r._del) {
+            r._del = true; r._del_reason = reason;
+        }
+    });
+    bootstrap.Modal.getInstance(document.getElementById('ebDeleteSnModal')).hide();
+    var container = document.getElementById('actionForm');
+    if (container) container.innerHTML = buildEditBatchForm(_selectedBatch);
+    _ebCalcTotalSn();
+}
+function _ebAddSn(batchId) {
+    var qty = parseInt((document.getElementById('eb_add_qty')||{}).value) || 1;
+    if (qty < 1) return;
+    /* For add, we pass 'adds' to save_sn_pending on submit */
+    if (!_ebSnState) _ebSnState = [];
+    for (var i = 0; i < qty; i++) {
+        _ebSnState.push({ id: -(Date.now() + i), serial_number: '', internal_serial_number: '(new)', isn: '(new)', info: '', is_deleted: false, _del: false, _del_reason: '', _add: true, _dirty: false });
+    }
+    var container = document.getElementById('actionForm');
+    if (container) container.innerHTML = buildEditBatchForm(_selectedBatch);
 }
 
 function submitEditBatch(batchId, snTracking) {
@@ -492,10 +639,28 @@ function submitEditBatch(batchId, snTracking) {
         note: (document.getElementById('eb_note')||{}).value || '',
     };
     if (!snTracking) payload.quantity = parseInt((document.getElementById('eb_qty')||{}).value) || 0;
-    fetch('/in-out/batch/' + batchId + '/edit', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
-    .then(function(r){ return r.json(); }).then(function(d){
-        if (d.success) { showToast('Batch updated.', 'success'); refreshLog(); }
-        else { alert(d.message || 'Error'); }
+
+    var batchSave = fetch('/in-out/batch/' + batchId + '/edit', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
+        .then(function(r){ return r.json(); });
+
+    var snSave = Promise.resolve({success: true});
+    if (snTracking && _ebSnState) {
+        var item = _selectedBatch;
+        var adds    = _ebSnState.filter(function(r){ return r._add; }).length;
+        var deletes = _ebSnState.filter(function(r){ return r._del && !r._add; }).map(function(r){ return {sn_id: r.id, reason: r._del_reason}; });
+        var edits   = _ebSnState.filter(function(r){ return r._dirty && !r._del && !r._add && r.id > 0; }).map(function(r){ return {sn_id: r.id, sn: r.serial_number, info: r.info}; });
+        if (adds > 0 || deletes.length > 0 || edits.length > 0) {
+            snSave = fetch('/batch/' + item.item_uuid + '/' + batchId + '/save_sn_pending', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({adds: adds, deletes: deletes, edits: edits, lend_changes: []})
+            }).then(function(r){ return r.json(); });
+        }
+    }
+
+    Promise.all([batchSave, snSave]).then(function(results) {
+        var d1 = results[0], d2 = results[1];
+        if (d1.success && d2.success) { showToast('Batch updated.', 'success'); refreshLog(); }
+        else { alert((d1.success ? '' : (d1.message || 'Batch save error')) + ' ' + (d2.success ? '' : (d2.message || 'SN save error'))); }
     });
 }
 
@@ -529,4 +694,37 @@ function refreshLog() {
     setTimeout(function(){ window.location.reload(); }, 1000);
 }
 </script>
+
+<!-- Delete SN modal for Edit Batch mode -->
+<div class="modal fade" id="ebDeleteSnModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-trash"></i> Remove Serial Numbers</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">Removing <strong><span id="eb_del_count">0</span></strong> selected unit(s). Removed entries kept for record.</p>
+                <div class="mb-2">
+                    <label class="form-label fw-semibold">Reason for removal <span class="text-danger">*</span></label>
+                    <select class="form-select mb-2" id="eb_del_reason" required>
+                        <option value="">— Select reason —</option>
+                        <option value="Damage">Damage</option>
+                        <option value="Missing By Lender">Missing By Lender</option>
+                        <option value="Missing on Own">Missing on Own</option>
+                        <option value="Sold">Sold</option>
+                        <option value="Incorrect Item">Incorrect Item</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <label class="form-label form-label-sm">Additional notes (optional)</label>
+                    <textarea class="form-control" id="eb_del_notes" rows="2" maxlength="200" placeholder="Optional notes..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="_ebConfirmDelete()"><i class="bi bi-trash"></i> Confirm Remove</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

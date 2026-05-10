@@ -20,6 +20,35 @@ def _parse_dt(s):
     return None
 
 
+def _format_log_details(action, details):
+    """Convert raw log details to a human-readable string for display."""
+    if not details:
+        return ''
+    if action in ('return',):
+        try:
+            d = json.loads(details)
+            parts = []
+            cnt = d.get('count') or d.get('qty')
+            if cnt is not None:
+                parts.append(f'{cnt} unit(s)')
+            on_time = d.get('on_time')
+            if on_time is True:
+                parts.append('on time')
+            elif on_time is False:
+                parts.append('LATE')
+            ret_dt = d.get('return_dt', '')
+            if ret_dt:
+                parts.append(f'@ {ret_dt}')
+            notes = d.get('notes', '')
+            if notes:
+                parts.append(f'— {notes}')
+            return ' | '.join(parts) if parts else details[:120]
+        except (ValueError, TypeError):
+            pass
+    # Truncate plain text
+    return details[:120] + ('…' if len(details) > 120 else '')
+
+
 @in_out_bp.route('/in-out')
 @login_required
 def in_out():
@@ -46,10 +75,12 @@ def in_out():
                .limit(100).all())
         for log in raw:
             user = User.query.get(log.user_id)
+            display = _format_log_details(log.action, log.details)
             logs.append({
                 'log': log,
                 'username': user.username if user else 'Unknown',
                 'timestamp': log.timestamp.strftime('%d/%m/%Y %H:%M') if log.timestamp else '?',
+                'display': display,
             })
 
     return render_template('in_out.html',

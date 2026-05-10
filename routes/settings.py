@@ -440,23 +440,6 @@ def settings_system():
             flash('You do not have permission to edit system settings.', 'danger')
             return redirect(url_for('settings.settings_system'))
 
-        section = request.form.get('section', '')
-
-        if section == 'lending_return':
-            lr_keys = ['lr_lend_start_date_required', 'lr_lend_start_time_required',
-                       'lr_lend_end_date_required', 'lr_lend_end_time_required', 'lr_lend_self_use_now',
-                       'lr_return_date_required', 'lr_return_time_required', 'lr_return_self_use_now']
-            for key in lr_keys:
-                val = 'true' if key in request.form else 'false'
-                s = Setting.query.filter_by(key=key).first()
-                if s:
-                    s.value = val
-                else:
-                    db.session.add(Setting(key=key, value=val, description=key))
-            db.session.commit()
-            flash('Lending & Return settings saved.', 'success')
-            return redirect(url_for('settings.settings_system') + '#lending-return-settings')
-
         try:
             # Currency setting
             currency = request.form.get('currency', '$').strip()
@@ -645,9 +628,17 @@ def settings_system():
                     if sext: Setting.set(f'share_{stype}_extensions', sext, f'Share {stype} allowed extensions')
                     if ssize: Setting.set(f'share_{stype}_max_size', ssize, f'Share {stype} max size MB')
 
+            # Lending & Return settings
+            lr_keys = ['lr_lend_start_date_required', 'lr_lend_start_time_required',
+                       'lr_lend_end_date_required', 'lr_lend_end_time_required', 'lr_lend_self_use_now',
+                       'lr_return_date_required', 'lr_return_time_required', 'lr_return_self_use_now']
+            for key in lr_keys:
+                val = 'true' if key in request.form else 'false'
+                Setting.set(key, val, key)
+
             # Update app config dynamically
             current_app.config['MAX_CONTENT_LENGTH'] = max_file_size * 1024 * 1024
-            
+
             flash('System settings updated successfully!', 'success')
             log_audit(current_user.id, 'update', 'settings', 0,
                      f'Updated system settings: currency={currency}, decimal_places={currency_decimal_places}, max_file_size={max_file_size}MB, drawer_size={max_drawer_rows}x{max_drawer_cols}, banner_timeout={banner_timeout}s')

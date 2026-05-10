@@ -317,7 +317,6 @@
                                 </div>
                                 <div class="d-flex gap-1 align-items-center">
                                     <i class="bi bi-chevron-down"></i>
-                                    <a href="{{ url_for('in_out.in_out') }}" class="btn btn-sm btn-outline-primary py-0 px-1" onclick="event.stopPropagation()" title="Manage lending, return and edit in In/Out page"><i class="bi bi-arrow-left-right"></i> In/Out</a>
                                 </div>
                             </div>
                             <div class="collapse" id="batchBody{{ batch.id }}">
@@ -406,7 +405,6 @@
                                     {% if item_perms and item_perms.can_edit_batch %}
                                     <div class="d-flex gap-1 mb-2 flex-wrap">
                                         <button type="button" class="btn btn-sm btn-outline-primary" onclick="openEditDetailsModal({{ batch.id }})"><i class="bi bi-pencil-square"></i> Edit Selected</button>
-                                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="openDeleteSnModal({{ batch.id }})"><i class="bi bi-trash"></i> Delete Selected</button>
                                         <div class="input-group input-group-sm" style="width:auto;">
                                             <span class="input-group-text">Add</span>
                                             <input type="number" class="form-control" id="addSnQty{{ batch.id }}" min="1" max="100" value="1" style="width:55px">
@@ -433,7 +431,7 @@
                                             <tbody id="snTableBody_{{ batch.id }}"></tbody>
                                         </table>
                                     </div>
-                                    <small class="text-muted">Double-click SN or Info to edit inline. Click Lend to set lending. Use <strong><a href="{{ url_for('in_out.in_out') }}">In/Out page</a></strong> for bulk lending &amp; return. Removed entries kept for record.</small>
+                                    <small class="text-muted">Double-click SN or Info to edit inline. Removed entries kept for record.</small>
                                     {% elif batch.sn_tracking_enabled and batch.serial_numbers|length == 0 and item_perms and item_perms.can_edit_batch %}
                                     <hr class="my-2">
                                     <div class="d-flex align-items-center gap-2">
@@ -2865,41 +2863,6 @@ function saveInlineEdit(batchId, snId, field) {
     _snRender(batchId);
 }
 
-/* ── SN: Delete selected ── */
-/* ── SN: Soft-Delete Selected Modal ── */
-var _deleteSnBatchId = null;
-function openDeleteSnModal(batchId) {
-    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked:not([disabled])');
-    if (checked.length === 0) { alert('Select at least one serial number.'); return; }
-    _deleteSnBatchId = batchId;
-    document.getElementById('deleteSnCount').textContent = checked.length;
-    document.getElementById('deleteSnReasonType').value = '';
-    document.getElementById('deleteSnReasonOther').value = '';
-    new bootstrap.Modal(document.getElementById('deleteSnModalDialog')).show();
-}
-function doDeleteSn() {
-    var batchId = _deleteSnBatchId;
-    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked:not([disabled])');
-    var ids = Array.from(checked).map(function(cb) { return parseInt(cb.value); });
-    var reasonType = document.getElementById('deleteSnReasonType').value;
-    if (!reasonType) { alert('Please select a reason for removal.'); return; }
-    var notes = document.getElementById('deleteSnReasonOther').value.trim();
-    var reason = reasonType === 'Other'
-        ? ('Other: ' + notes).slice(0, 256)
-        : (notes ? reasonType + ' — ' + notes : reasonType).slice(0, 256);
-    var s = _snState[batchId];
-    if (s) {
-        s.rows = s.rows.map(function(row) {
-            if (ids.indexOf(row.id) !== -1) {
-                if (row._add) { row._remove = true; }
-                else { row._del = true; row._del_reason = reason; }
-            }
-            return row;
-        }).filter(function(row) { return !row._remove; });
-    }
-    bootstrap.Modal.getInstance(document.getElementById('deleteSnModalDialog')).hide();
-    _snRender(batchId);
-}
 
 /* ── SN: Add to batch — local state ── */
 function addSnToBatch(batchId) {
@@ -3247,9 +3210,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         <button class="btn btn-outline-danger" type="button" onclick="clearBulkField('bulkInfoEdit')"><i class="bi bi-x-circle"></i> Clear</button>
                     </div>
                 </div>
-                <div class="alert alert-info py-1 px-2 small mb-0">
-                    <i class="bi bi-info-circle"></i> To set lending, use the <strong><a href="{{ url_for('in_out.in_out') }}" target="_blank">In/Out page</a></strong>.
-                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -3260,40 +3220,6 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 
-<div class="modal fade" id="deleteSnModalDialog" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title"><i class="bi bi-trash"></i> Remove Serial Numbers</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p class="mb-2">Removing <strong><span id="deleteSnCount">0</span></strong> selected unit(s). This action is permanent — removed entries will be kept for record.</p>
-                <div class="alert alert-warning p-2 small">
-                    <i class="bi bi-exclamation-triangle"></i> Batch quantity will be reduced. The ISN entries will remain visible in the table as "Removed" for audit purposes.
-                </div>
-                <div class="mb-2">
-                    <label class="form-label fw-semibold">Reason for removal <span class="text-danger">*</span></label>
-                    <select class="form-select mb-2" id="deleteSnReasonType" required>
-                        <option value="">— Select reason —</option>
-                        <option value="Damage">Damage</option>
-                        <option value="Missing By Lender">Missing By Lender</option>
-                        <option value="Missing on Own">Missing on Own</option>
-                        <option value="Sold">Sold</option>
-                        <option value="Incorrect Item">Incorrect Item</option>
-                        <option value="Other">Other</option>
-                    </select>
-                    <label class="form-label form-label-sm mt-2">Additional notes (optional)</label>
-                    <textarea class="form-control" id="deleteSnReasonOther" rows="2" maxlength="200" placeholder="Please specify..."></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" onclick="doDeleteSn()"><i class="bi bi-trash"></i> Confirm Remove</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 {% endif %}
 
