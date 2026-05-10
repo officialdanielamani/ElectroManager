@@ -612,7 +612,7 @@ function _ebRenderSnTable(batchId) {
         '<input type="number" class="form-control" id="eb_add_qty" min="1" max="100" value="1" style="width:55px">' +
         '<button class="btn btn-outline-success" type="button" onclick="_ebAddSn(' + batchId + ')"><i class="bi bi-plus"></i></button>' +
         '</div>' +
-        '<button type="button" class="btn btn-sm btn-outline-warning ms-2" onclick="_ebOpenPurgeModal(' + batchId + ')"><i class="bi bi-eraser"></i> Clear Deleted Serial Number</button>' +
+        (_canDeleteBatch ? '<button type="button" class="btn btn-sm btn-outline-warning ms-2" onclick="_ebOpenPurgeModal(' + batchId + ')"><i class="bi bi-eraser"></i> Clear Deleted Serial Number</button>' : '') +
         '</div>' +
         '<div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:0.82rem;">' +
         '<thead><tr>' +
@@ -714,7 +714,7 @@ function _ebConfirmPurge() {
             bootstrap.Modal.getInstance(document.getElementById('ebPurgeSnModal')).hide();
             btn.disabled = false;
             if (d.success) {
-                sessionStorage.setItem('inout_mode', _isReturn ? '1' : '0');
+                sessionStorage.setItem('inout_mode', _mode === 'return' ? '1' : '0');
                 sessionStorage.setItem('inout_edit_batch', '1');
                 window.location.reload();
             } else {
