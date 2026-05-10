@@ -58,3 +58,8 @@ Thumbs.db
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Node (used only to install frontend libs)
+node_modules/
+package.json
+package-lock.json
