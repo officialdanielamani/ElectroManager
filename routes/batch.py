@@ -77,14 +77,14 @@ def add_batch(uuid):
     item = Item.query.filter_by(uuid=uuid).first_or_404()
 
     # Adding a batch requires at least the general batch-edit permission.
-    if not current_user.has_permission('items', 'edit_batch'):
+    if not current_user.has_permission('lending_return', 'edit_batch'):
         flash('You do not have permission to manage batches.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
 
-    can_edit_qty = current_user.has_permission('items', 'edit_quantity')
-    can_edit_price = current_user.has_permission('items', 'edit_price')
-    can_edit_sn = current_user.has_permission('items', 'edit_sn')
-    can_edit_lending = current_user.has_permission('items', 'edit_lending')
+    can_edit_qty = current_user.has_permission('lending_return', 'edit_batch')
+    can_edit_price = current_user.has_permission('lending_return', 'edit_batch')
+    can_edit_sn = current_user.has_permission('lending_return', 'edit_batch')
+    can_edit_lending = current_user.has_permission('lending_return', 'edit_lending')
 
     batch_label = request.form.get('batch_label', '').strip()[:32]
     manufacturer = request.form.get('manufacturer', '').strip()[:128]
@@ -195,11 +195,11 @@ def edit_batch(uuid, batch_id):
         flash('Batch does not belong to this item.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
 
-    can_edit_batch = current_user.has_permission('items', 'edit_batch')
-    can_edit_qty = current_user.has_permission('items', 'edit_quantity')
-    can_edit_price = current_user.has_permission('items', 'edit_price')
-    can_edit_sn = current_user.has_permission('items', 'edit_sn')
-    can_edit_lending = current_user.has_permission('items', 'edit_lending')
+    can_edit_batch = current_user.has_permission('lending_return', 'edit_batch')
+    can_edit_qty = current_user.has_permission('lending_return', 'edit_batch')
+    can_edit_price = current_user.has_permission('lending_return', 'edit_batch')
+    can_edit_sn = current_user.has_permission('lending_return', 'edit_batch')
+    can_edit_lending = current_user.has_permission('lending_return', 'edit_lending')
 
     if not (can_edit_batch or can_edit_qty or can_edit_price or can_edit_lending or can_edit_sn):
         flash('You do not have permission to manage batches.', 'danger')
@@ -294,7 +294,7 @@ def manage_lend(uuid, batch_id):
     batch = ItemBatch.query.filter_by(id=batch_id, item_id=item.id).first_or_404()
     if batch.sn_tracking_enabled:
         return jsonify({'success': False, 'message': 'SN batches use per-SN lending.'})
-    can_edit_lending = current_user.has_permission('items', 'edit_lending')
+    can_edit_lending = current_user.has_permission('lending_return', 'edit_lending')
     if not can_edit_lending:
         return jsonify({'success': False, 'message': 'No permission.'})
     lend_records_json = request.form.get('lend_records', '[]')
@@ -332,7 +332,7 @@ def delete_batch(uuid, batch_id):
         flash('Batch does not belong to this item.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
 
-    if not current_user.has_permission('items', 'delete_batch'):
+    if not current_user.has_permission('lending_return', 'delete_batch'):
         flash('You do not have permission to delete batches.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
 
@@ -361,7 +361,7 @@ def bulk_delete_batches(uuid):
     """Bulk delete batches"""
     item = Item.query.filter_by(uuid=uuid).first_or_404()
 
-    if not current_user.has_permission('items', 'delete_batch'):
+    if not current_user.has_permission('lending_return', 'delete_batch'):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
 
     data = request.get_json()
@@ -398,8 +398,8 @@ def transfer_batch(uuid):
     """Transfer quantity between batches"""
     item = Item.query.filter_by(uuid=uuid).first_or_404()
 
-    # Transferring changes both quantities; require quantity edit permission.
-    if not current_user.has_permission('items', 'edit_quantity'):
+    # Transferring changes both quantities; require batch edit permission.
+    if not current_user.has_permission('lending_return', 'edit_batch'):
         flash('You do not have permission to transfer quantities.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
     
@@ -493,7 +493,7 @@ def update_serial_numbers(uuid, batch_id):
         flash('Batch does not belong to this item.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
     
-    if not current_user.has_permission('items', 'edit_sn'):
+    if not current_user.has_permission('lending_return', 'edit_batch'):
         flash('You do not have permission to manage serial numbers.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
     
@@ -521,7 +521,7 @@ def update_serial_info(uuid, batch_id):
         flash('Batch does not belong to this item.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
     
-    if not current_user.has_permission('items', 'edit_sn'):
+    if not current_user.has_permission('lending_return', 'edit_batch'):
         flash('You do not have permission to manage serial numbers.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
     
@@ -548,7 +548,7 @@ def update_serial_lend(uuid, batch_id):
         flash('Batch does not belong to this item.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
     
-    if not current_user.has_permission('items', 'edit_lending'):
+    if not current_user.has_permission('lending_return', 'edit_lending'):
         flash('You do not have permission to manage lending.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
     
@@ -599,15 +599,15 @@ def inline_update_sn(uuid):
         return jsonify({'success': False, 'message': 'Cannot edit a removed serial number'}), 400
 
     if field == 'sn':
-        if not current_user.has_permission('items', 'edit_sn'):
+        if not current_user.has_permission('lending_return', 'edit_batch'):
             return jsonify({'success': False, 'message': 'Permission denied'}), 403
         sn.serial_number = value
     elif field == 'info':
-        if not current_user.has_permission('items', 'edit_sn'):
+        if not current_user.has_permission('lending_return', 'edit_batch'):
             return jsonify({'success': False, 'message': 'Permission denied'}), 403
         sn.info = value[:32]
     elif field == 'lend':
-        if not current_user.has_permission('items', 'edit_lending'):
+        if not current_user.has_permission('lending_return', 'edit_lending'):
             return jsonify({'success': False, 'message': 'Permission denied'}), 403
         lend_to_id_raw = data.get('lend_to_id')
         try:
@@ -653,8 +653,8 @@ def bulk_update_sn(uuid):
     sn_ids = data.get('sn_ids', [])
     fields = data.get('fields', {})
 
-    can_edit_sn = current_user.has_permission('items', 'edit_sn')
-    can_edit_lending = current_user.has_permission('items', 'edit_lending')
+    can_edit_sn = current_user.has_permission('lending_return', 'edit_batch')
+    can_edit_lending = current_user.has_permission('lending_return', 'edit_lending')
 
     count = 0
     for sn_id in sn_ids:
@@ -713,8 +713,8 @@ def delete_selected_sn(uuid):
     """Soft-delete selected serial numbers, recording who, why, and when."""
     item = Item.query.filter_by(uuid=uuid).first_or_404()
 
-    if not (current_user.has_permission('items', 'edit_sn') and
-            current_user.has_permission('items', 'edit_quantity')):
+    if not (current_user.has_permission('lending_return', 'edit_batch') and
+            current_user.has_permission('lending_return', 'edit_batch')):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
 
     data = request.get_json()
@@ -754,8 +754,8 @@ def add_sn_to_batch(uuid):
     item = Item.query.filter_by(uuid=uuid).first_or_404()
 
     # Adding SNs increases quantity; require both SN edit and quantity edit.
-    if not (current_user.has_permission('items', 'edit_sn') and
-            current_user.has_permission('items', 'edit_quantity')):
+    if not (current_user.has_permission('lending_return', 'edit_batch') and
+            current_user.has_permission('lending_return', 'edit_batch')):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
 
     data = request.get_json()
@@ -803,7 +803,7 @@ def save_sn_pending(uuid, batch_id):
     """Apply all pending SN changes (adds, soft-deletes, field edits, lend changes) atomically."""
     item = Item.query.filter_by(uuid=uuid).first_or_404()
 
-    if not current_user.has_permission('items', 'edit_sn'):
+    if not current_user.has_permission('lending_return', 'edit_batch'):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
 
     batch = ItemBatch.query.get(batch_id)
@@ -816,8 +816,8 @@ def save_sn_pending(uuid, batch_id):
     edits   = data.get('edits', [])     # [{sn_id, sn, info}]  — only non-null fields applied
     lend_changes = data.get('lend_changes', [])  # [{sn_id, lend_to_type, lend_to_id, lend_start, lend_end, lend_note, lend_notify, lend_days}]
 
-    can_qty  = current_user.has_permission('items', 'edit_quantity')
-    can_lend = current_user.has_permission('items', 'edit_lending')
+    can_qty  = current_user.has_permission('lending_return', 'edit_batch')
+    can_lend = current_user.has_permission('lending_return', 'edit_lending')
     now = datetime.utcnow()
 
     # ── Adds ──

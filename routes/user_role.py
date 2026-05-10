@@ -429,18 +429,21 @@ def role_new():
                 # Item Info
                 "view_info": False,
                 "edit_info": False,
-                # Batch
-                "view_batch": False,
-                "edit_batch": False,
-                "edit_quantity": False,
-                "edit_price": False,
-                "edit_sn": False,
-                "edit_lending": False,
-                "delete_batch": False,
+                # Batch creation
+                "create_batch": False,
                 # Advance Info
                 "view_advance": False,
                 "edit_advance": False,
                 "delete_advance": False,
+            },
+            # Lending & Return permissions
+            "lending_return": {
+                "view_page": False,
+                "view_log": False,
+                "edit_batch": False,
+                "delete_batch": False,
+                "edit_lending": False,
+                "delete_lending": False,
             },
             # Page Permissions
             "pages": {
@@ -513,22 +516,27 @@ def role_edit(id):
                 "pages": {},
                 "settings_sections": {}
             }
-            
+
             # Items permissions (simplified schema)
             item_actions = [
                 # Component
                 'view', 'create', 'delete',
                 # Item Info
                 'view_info', 'edit_info',
-                # Batch
-                'view_batch', 'edit_batch', 'edit_quantity', 'edit_price',
-                'edit_sn', 'edit_lending', 'delete_batch',
+                # Batch creation
+                'create_batch',
                 # Advance Info
                 'view_advance', 'edit_advance', 'delete_advance',
             ]
             for action in item_actions:
                 checkbox_name = f'items_{action}'
                 perms['items'][action] = checkbox_name in request.form
+
+            # Lending & Return permissions
+            lr_actions = ['view_page', 'view_log', 'edit_batch', 'delete_batch', 'edit_lending', 'delete_lending']
+            perms['lending_return'] = {}
+            for action in lr_actions:
+                perms['lending_return'][action] = f'lr_{action}' in request.form
             
             # Page permissions (Settings page removed - accessible to all users)
             # Visual Storage and Notifications edit controlled by settings_sections

@@ -411,7 +411,7 @@
                                     {% endif %}
                                     
                                     <!-- Edit button (if has any edit permission) -->
-                                    {% if current_user.has_permission('items', 'edit_info') or current_user.has_permission('items', 'edit_batch') or current_user.has_permission('items', 'edit_quantity') or current_user.has_permission('items', 'edit_price') or current_user.has_permission('items', 'edit_sn') or current_user.has_permission('items', 'edit_lending') or current_user.has_permission('items', 'edit_advance') %}
+                                    {% if current_user.has_permission('items', 'edit_info') or current_user.has_permission('lending_return', 'edit_batch') or current_user.has_permission('lending_return', 'edit_lending') or current_user.has_permission('items', 'edit_advance') %}
                                     <a href="{{ url_for('item.item_edit', uuid=item.uuid) }}" class="btn btn-sm btn-warning" title="Edit">
                                         <i class="bi bi-pencil"></i>
                                     </a>
@@ -427,7 +427,7 @@
                                     {% endif %}
                                     
                                     <!-- Show dash if no permissions -->
-                                    {% if not (current_user.has_permission('items', 'view') or current_user.has_permission('items', 'edit_info') or current_user.has_permission('items', 'edit_batch') or current_user.has_permission('items', 'edit_quantity') or current_user.has_permission('items', 'edit_price') or current_user.has_permission('items', 'edit_sn') or current_user.has_permission('items', 'edit_lending') or current_user.has_permission('items', 'edit_advance') or current_user.has_permission('items', 'delete')) %}
+                                    {% if not (current_user.has_permission('items', 'view') or current_user.has_permission('items', 'edit_info') or current_user.has_permission('lending_return', 'edit_batch') or current_user.has_permission('lending_return', 'edit_lending') or current_user.has_permission('items', 'edit_advance') or current_user.has_permission('items', 'delete')) %}
                                     <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
@@ -535,7 +535,7 @@
                                         <i class="bi bi-eye"></i>
                                     </a>
                                     {% endif %}
-                                    {% if current_user.has_permission('items', 'edit_info') or current_user.has_permission('items', 'edit_batch') or current_user.has_permission('items', 'edit_quantity') or current_user.has_permission('items', 'edit_price') or current_user.has_permission('items', 'edit_sn') or current_user.has_permission('items', 'edit_lending') or current_user.has_permission('items', 'edit_advance') %}
+                                    {% if current_user.has_permission('items', 'edit_info') or current_user.has_permission('lending_return', 'edit_batch') or current_user.has_permission('lending_return', 'edit_lending') or current_user.has_permission('items', 'edit_advance') %}
                                     <a href="{{ url_for('item.item_edit', uuid=item.uuid) }}" class="btn btn-sm btn-warning" title="Edit">
                                         <i class="bi bi-pencil"></i>
                                     </a>

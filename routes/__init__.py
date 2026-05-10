@@ -34,6 +34,7 @@ def register_blueprints(app: Flask):
     from routes.project import project_bp
     from routes.contacts import contacts_bp
     from routes.share import share_bp
+    from routes.in_out import in_out_bp
 
     # Register blueprints
     app.register_blueprint(auth_bp)
@@ -55,5 +56,6 @@ def register_blueprints(app: Flask):
     app.register_blueprint(project_bp)
     app.register_blueprint(contacts_bp)
     app.register_blueprint(share_bp)
+    app.register_blueprint(in_out_bp)
 
     logger.info("✓ All blueprints registered successfully")

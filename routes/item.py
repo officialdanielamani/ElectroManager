@@ -259,7 +259,7 @@ def item_new():
                 qty = int(pb.get('quantity', 0)) if perms.get('can_edit_quantity') else 0
                 if qty < 0:
                     qty = 0
-                sn_tracking = bool(pb.get('sn_tracking', False)) if perms.get('can_edit_sn') else False
+                sn_tracking = bool(pb.get('sn_tracking', False)) if perms.get('can_edit_batch') else False
                 max_qty = 100 if sn_tracking else 99999
                 if qty > max_qty:
                     qty = max_qty
@@ -399,7 +399,7 @@ def _apply_pending_sn_changes(item, perms):
         pending = json.loads(raw)
     except Exception:
         return
-    if not pending or not perms.get('can_edit_sn'):
+    if not pending or not perms.get('can_edit_batch'):
         return
     now = datetime.now(timezone.utc)
     for bid_str, changes in pending.items():

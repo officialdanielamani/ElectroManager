@@ -152,11 +152,9 @@ class User(UserMixin, db.Model):
         return self.has_permission('items', 'view') and (
             self.has_permission('items', 'create') or
             self.has_permission('items', 'edit_info') or
-            self.has_permission('items', 'edit_batch') or
-            self.has_permission('items', 'edit_quantity') or
-            self.has_permission('items', 'edit_price') or
-            self.has_permission('items', 'edit_sn') or
-            self.has_permission('items', 'edit_lending') or
+            self.has_permission('items', 'create_batch') or
+            self.has_permission('lending_return', 'edit_batch') or
+            self.has_permission('lending_return', 'edit_lending') or
             self.has_permission('items', 'edit_advance')
         )
     

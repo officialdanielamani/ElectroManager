@@ -3896,7 +3896,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <div class="mb-2">
                     <label class="form-label fw-semibold">Reason for removal <span class="text-danger">*</span></label>
-                    <select class="form-select mb-2" id="deleteSnReasonType" onchange="document.getElementById('deleteSnReasonOther').classList.toggle('d-none', this.value !== 'Other')">
+                    <select class="form-select mb-2" id="deleteSnReasonType" required>
                         <option value="">— Select reason —</option>
                         <option value="Damage">Damage</option>
                         <option value="Missing By Lender">Missing By Lender</option>
@@ -3905,7 +3905,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         <option value="Incorrect Item">Incorrect Item</option>
                         <option value="Other">Other</option>
                     </select>
-                    <textarea class="form-control d-none" id="deleteSnReasonOther" rows="2" maxlength="200" placeholder="Please specify..."></textarea>
+                    <label class="form-label form-label-sm mt-2">Additional notes (optional)</label>
+                    <textarea class="form-control" id="deleteSnReasonOther" rows="2" maxlength="200" placeholder="Please specify..."></textarea>
                 </div>
             </div>
             <div class="modal-footer">

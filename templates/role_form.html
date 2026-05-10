@@ -177,20 +177,7 @@
                                 <div class="row g-3">
                                     {{ perm_check('view_info', 'View Item Info', 'See Name, SKU, Type, Category, Footprint, Tags, Location, Min Qty') }}
                                     {{ perm_check('edit_info', 'Edit Item Info', 'Edit all Item Info fields') }}
-                                </div>
-                                <hr>
-
-                                <!-- Batch -->
-                                <h6 class="text-primary mb-2"><i class="bi bi-boxes"></i> Batch</h6>
-                                <p class="small text-muted mb-2">Price, Quantity, SN, Lending are kept separate because they relate to money and stock.</p>
-                                <div class="row g-3">
-                                    {{ perm_check('view_batch', 'View Batch', 'See batch section') }}
-                                    {{ perm_check('edit_batch', 'Edit Batch', 'Edit batch label, date, note, location') }}
-                                    {{ perm_check('edit_quantity', 'Edit Quantity', 'Change batch quantity (stock-sensitive)') }}
-                                    {{ perm_check('edit_price', 'Edit Price', 'Change batch price (money-sensitive)') }}
-                                    {{ perm_check('edit_sn', 'Edit Serial Number', 'Edit SN fields & tracking') }}
-                                    {{ perm_check('edit_lending', 'Edit Lending', 'Manage lend-to / lend-quantity') }}
-                                    {{ perm_check('delete_batch', 'Delete Batch', 'Remove a batch') }}
+                                    {{ perm_check('create_batch', 'Create Batch', 'Add new batches to an item') }}
                                 </div>
                                 <hr>
 
@@ -391,6 +378,74 @@
                                                        {% if perms.get('settings_sections', {}).get('location_management', {}).get('delete') %}checked{% endif %}
                                                        {% if role.is_system_role %}disabled{% endif %}>
                                                 <label class="form-check-label">Delete</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Lending & Return -->
+                                <div class="mb-4 p-3 bg-light rounded">
+                                    <h6 class="mb-3"><i class="bi bi-arrow-left-right"></i> Lending &amp; Return (/in-out) <code class="text-muted">/in-out</code></h6>
+                                    {% set lr_perms = perms.get('lending_return', {}) %}
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="lr_view_page" id="lr_view_page"
+                                                       {% if lr_perms.get('view_page') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label" for="lr_view_page">
+                                                    <strong>View Page</strong><br><small class="text-muted">Access the /in-out page</small>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="lr_view_log" id="lr_view_log"
+                                                       {% if lr_perms.get('view_log') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label" for="lr_view_log">
+                                                    <strong>View Log</strong><br><small class="text-muted">See lending and batch change history</small>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="lr_edit_batch" id="lr_edit_batch"
+                                                       {% if lr_perms.get('edit_batch') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label" for="lr_edit_batch">
+                                                    <strong>Edit Batch Item</strong><br><small class="text-muted">Edit quantity, price, and serial numbers</small>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="lr_delete_batch" id="lr_delete_batch"
+                                                       {% if lr_perms.get('delete_batch') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label" for="lr_delete_batch">
+                                                    <strong>Delete Batch</strong><br><small class="text-muted">Remove a batch permanently</small>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="lr_edit_lending" id="lr_edit_lending"
+                                                       {% if lr_perms.get('edit_lending') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label" for="lr_edit_lending">
+                                                    <strong>Edit Lending</strong><br><small class="text-muted">Manage lend-to records</small>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="lr_delete_lending" id="lr_delete_lending"
+                                                       {% if lr_perms.get('delete_lending') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label" for="lr_delete_lending">
+                                                    <strong>Delete Lending</strong><br><small class="text-muted">Remove lending records</small>
+                                                </label>
                                             </div>
                                         </div>
                                     </div>

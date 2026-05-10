@@ -183,6 +183,13 @@
                         </a>
                     </li>
                     {% endif %}
+                    {% if current_user.has_permission('lending_return', 'view_page') or current_user.is_admin() %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('in_out') %}active{% endif %}" href="{{ url_for('in_out.in_out') }}">
+                            <i class="bi bi-arrow-left-right"></i> In/Out
+                        </a>
+                    </li>
+                    {% endif %}
                     {% if current_user.has_permission('pages.visual_storage', 'view') %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('visual_storage.visual_storage') }}">

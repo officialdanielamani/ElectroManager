@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}In / Out{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="row g-3">
+
+        <!-- Left card: Lending/Return Scanner -->
+        <div class="col-lg-8">
+            <div class="card h-100">
+                <div class="card-header d-flex align-items-center gap-3">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="modeToggle" onchange="updateModeTitle()">
+                        <label class="form-check-label fw-semibold" for="modeToggle" id="modeLabel">Lending</label>
+                    </div>
+                    <span class="text-muted small">Toggle to switch between Lending and Return mode</span>
+                </div>
+                <div class="card-body">
+
+                    <!-- Image / Scan placeholder -->
+                    <div class="d-flex flex-column align-items-center justify-content-center bg-light rounded mb-4"
+                         style="height: 200px; border: 2px dashed #ccc; cursor: pointer;">
+                        <i class="bi bi-camera fs-1 text-muted"></i>
+                        <span class="text-muted mt-2">Scan or Upload Image</span>
+                    </div>
+
+                    <!-- Divider -->
+                    <div class="d-flex align-items-center mb-3">
+                        <hr class="flex-grow-1">
+                        <span class="mx-3 text-muted small">Or Search</span>
+                        <hr class="flex-grow-1">
+                    </div>
+
+                    <!-- Search input -->
+                    <input type="text" class="form-control" id="searchInput"
+                           placeholder="Search by item name, SKU, ISN, SN...">
+                </div>
+            </div>
+        </div>
+
+        <!-- Right card: Log -->
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-journal-text"></i> Log — Lending &amp; Return</h6>
+                </div>
+                <div class="card-body p-0" style="overflow-y: auto; max-height: 70vh;">
+                    {% if can_view_log %}
+                        {% if log_data %}
+                            <ul class="list-group list-group-flush">
+                            {% for entry in log_data %}
+                                {% set log = entry.log %}
+                                {% if log.action == 'update' and log.entity_type == 'batch' %}
+                                    <li class="list-group-item px-3 py-2">
+                                        <span class="badge bg-primary me-1">Modified</span>
+                                        <small class="text-muted">
+                                            {% if log.details %}[{{ log.details[:60] }}{% if log.details|length > 60 %}...{% endif %}]{% endif %}
+                                            <strong>{{ entry.username }}</strong> modified batch on {{ entry.timestamp }}
+                                        </small>
+                                    </li>
+                                {% elif log.action == 'delete' and log.entity_type == 'batch' %}
+                                    <li class="list-group-item px-3 py-2">
+                                        <span class="badge bg-danger me-1">Deleted</span>
+                                        <small class="text-muted">
+                                            {% if log.details %}[{{ log.details[:60] }}{% if log.details|length > 60 %}...{% endif %}]{% endif %}
+                                            <strong>{{ entry.username }}</strong> deleted batch on {{ entry.timestamp }}
+                                        </small>
+                                    </li>
+                                {% elif log.action == 'batch_sn_purge' %}
+                                    <li class="list-group-item px-3 py-2">
+                                        <span class="badge bg-warning text-dark me-1">SN Purge</span>
+                                        <small class="text-muted">
+                                            {% if log.details %}[{{ log.details[:60] }}{% if log.details|length > 60 %}...{% endif %}]{% endif %}
+                                            <strong>{{ entry.username }}</strong> purged SN batch on {{ entry.timestamp }}
+                                        </small>
+                                    </li>
+                                {% elif log.action == 'lend_update' %}
+                                    <li class="list-group-item px-3 py-2">
+                                        <span class="badge bg-info text-dark me-1">Lending</span>
+                                        <small class="text-muted">
+                                            {% if log.details %}[{{ log.details[:60] }}{% if log.details|length > 60 %}...{% endif %}]{% endif %}
+                                            <strong>{{ entry.username }}</strong> updated lending on {{ entry.timestamp }}
+                                        </small>
+                                    </li>
+                                {% elif log.action == 'sn_batch_save' %}
+                                    <li class="list-group-item px-3 py-2">
+                                        <span class="badge bg-secondary me-1">SN Save</span>
+                                        <small class="text-muted">
+                                            {% if log.details %}[{{ log.details[:60] }}{% if log.details|length > 60 %}...{% endif %}]{% endif %}
+                                            <strong>{{ entry.username }}</strong> saved SN changes on {{ entry.timestamp }}
+                                        </small>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+                            </ul>
+                        {% else %}
+                            <div class="p-3 text-muted text-center">No recent log entries.</div>
+                        {% endif %}
+                    {% else %}
+                        <div class="p-3 text-muted text-center">
+                            <i class="bi bi-lock"></i> No permission to view log.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+function updateModeTitle() {
+    const toggle = document.getElementById('modeToggle');
+    const label = document.getElementById('modeLabel');
+    label.textContent = toggle.checked ? 'Return' : 'Lending';
+}
+</script>
+{% endblock %}

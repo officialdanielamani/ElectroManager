@@ -94,10 +94,13 @@ def create_default_roles():
             "items": {
                 "view": True, "create": True, "delete": True,
                 "view_info": True, "edit_info": True,
-                "view_batch": True, "edit_batch": True,
-                "edit_quantity": True, "edit_price": True,
-                "edit_sn": True, "edit_lending": True, "delete_batch": True,
+                "create_batch": True,
                 "view_advance": True, "edit_advance": True, "delete_advance": True,
+            },
+            "lending_return": {
+                "view_page": True, "view_log": True,
+                "edit_batch": True, "delete_batch": True,
+                "edit_lending": True, "delete_lending": True,
             },
             "pages": {
                 "visual_storage": {"view": True, "edit": True},
@@ -139,10 +142,13 @@ def create_default_roles():
             "items": {
                 "view": True, "create": True, "delete": True,
                 "view_info": True, "edit_info": True,
-                "view_batch": True, "edit_batch": True,
-                "edit_quantity": True, "edit_price": True,
-                "edit_sn": True, "edit_lending": True, "delete_batch": True,
+                "create_batch": True,
                 "view_advance": True, "edit_advance": True, "delete_advance": True,
+            },
+            "lending_return": {
+                "view_page": True, "view_log": True,
+                "edit_batch": True, "delete_batch": False,
+                "edit_lending": True, "delete_lending": False,
             },
             "pages": {
                 "visual_storage": {"view": True, "edit": True},
@@ -184,10 +190,13 @@ def create_default_roles():
             "items": {
                 "view": True, "create": False, "delete": False,
                 "view_info": True, "edit_info": False,
-                "view_batch": True, "edit_batch": False,
-                "edit_quantity": False, "edit_price": False,
-                "edit_sn": False, "edit_lending": False, "delete_batch": False,
+                "create_batch": False,
                 "view_advance": True, "edit_advance": False, "delete_advance": False,
+            },
+            "lending_return": {
+                "view_page": True, "view_log": True,
+                "edit_batch": False, "delete_batch": False,
+                "edit_lending": False, "delete_lending": False,
             },
             "pages": {
                 "visual_storage": {"view": True, "edit": False},
@@ -227,12 +236,13 @@ def create_default_roles():
 
 def update_system_roles():
     """Patch existing system roles to add any missing permission keys introduced by new features."""
-    updates = {
+    # Migrate settings_sections.contacts if missing
+    contacts_updates = {
         'Admin':   {"contacts": {"view": True,  "edit": True,  "delete": True}},
         'Manager': {"contacts": {"view": True,  "edit": True,  "delete": False}},
         'Viewer':  {"contacts": {"view": False, "edit": False, "delete": False}},
     }
-    for role_name, new_keys in updates.items():
+    for role_name, new_keys in contacts_updates.items():
         role = Role.query.filter_by(name=role_name).first()
         if not role:
             continue
@@ -245,7 +255,24 @@ def update_system_roles():
                 changed = True
         if changed:
             role.set_permissions(perms)
-            print(f"Updated permissions for role: {role_name}")
+            print(f"Updated settings_sections permissions for role: {role_name}")
+
+    # Migrate lending_return section if missing
+    lr_updates = {
+        'Admin':   {"view_page": True,  "view_log": True,  "edit_batch": True,  "delete_batch": True,  "edit_lending": True,  "delete_lending": True},
+        'Manager': {"view_page": True,  "view_log": True,  "edit_batch": True,  "delete_batch": False, "edit_lending": True,  "delete_lending": False},
+        'Viewer':  {"view_page": True,  "view_log": True,  "edit_batch": False, "delete_batch": False, "edit_lending": False, "delete_lending": False},
+    }
+    for role_name, lr_perms in lr_updates.items():
+        role = Role.query.filter_by(name=role_name).first()
+        if not role:
+            continue
+        perms = role.get_permissions()
+        if 'lending_return' not in perms:
+            perms['lending_return'] = lr_perms
+            role.set_permissions(perms)
+            print(f"Added lending_return permissions for role: {role_name}")
+
     db.session.commit()
 
 

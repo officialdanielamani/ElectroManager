@@ -168,10 +168,11 @@ def item_permission_required(f):
         # Check if user has ANY item edit permission (not just 'edit')
         has_any_edit_perm = any([
             current_user.has_permission('items', action)
-            for action in ['create', 'delete', 'edit_info', 'edit_batch',
-                           'edit_quantity', 'edit_price', 'edit_sn',
-                           'edit_lending', 'delete_batch',
+            for action in ['create', 'delete', 'edit_info', 'create_batch',
                            'edit_advance', 'delete_advance']
+        ]) or any([
+            current_user.has_permission('lending_return', action)
+            for action in ['edit_batch', 'edit_lending', 'delete_batch', 'delete_lending']
         ])
 
         if not has_any_edit_perm:
@@ -233,47 +234,29 @@ def markdown_to_html(text):
 
 
 def get_item_edit_permissions(user):
-    """Get simplified item permissions grouped by Component / Info / Batch / Advance.
-
-    Schema:
-      items.view           - can see item in list/detail
-      items.view_info      - can see full Item Info section (else only UUID + name)
-      items.edit_info      - can edit Item Info fields
-      items.view_batch     - can see Batch section
-      items.edit_batch     - can edit general batch fields (label, date, note)
-      items.edit_quantity  - can edit batch quantity
-      items.edit_price     - can edit batch price
-      items.edit_sn        - can edit serial numbers
-      items.edit_lending   - can edit lending info
-      items.delete_batch   - can delete a batch
-      items.view_advance   - can see Advance Info section
-      items.edit_advance   - can edit Advance Info (files/URLs/magic params)
-      items.delete_advance - can delete advance items (files/URLs/magic params)
-      items.create         - can create new items
-      items.delete         - can delete items
-    """
+    """Get simplified item permissions grouped by Component / Info / Batch / Advance / LendingReturn."""
     is_admin = user.is_admin()
-    perms = {
-        # Component
+    lr = lambda perm: is_admin or user.has_permission('lending_return', perm)
+    return {
         'can_view': is_admin or user.has_permission('items', 'view'),
-        'can_create': user.has_permission('items', 'create'),
-        'can_delete': user.has_permission('items', 'delete'),
-        # Item Info
+        'can_create': is_admin or user.has_permission('items', 'create'),
+        'can_delete': is_admin or user.has_permission('items', 'delete'),
         'can_view_info': is_admin or user.has_permission('items', 'view_info'),
-        'can_edit_info': user.has_permission('items', 'edit_info'),
-        # Batch
-        'can_view_batch': is_admin or user.has_permission('items', 'view_batch'),
-        'can_edit_batch': user.has_permission('items', 'edit_batch'),
-        'can_edit_quantity': user.has_permission('items', 'edit_quantity'),
-        'can_edit_price': user.has_permission('items', 'edit_price'),
-        'can_edit_sn': user.has_permission('items', 'edit_sn'),
-        'can_edit_lending': user.has_permission('items', 'edit_lending'),
-        'can_delete_batch': user.has_permission('items', 'delete_batch'),
-        # Advance Info
+        'can_edit_info': is_admin or user.has_permission('items', 'edit_info'),
+        'can_view_batch': is_admin or user.has_permission('items', 'view_info'),  # implied by view_info
+        'can_create_batch': is_admin or user.has_permission('items', 'create_batch') or lr('edit_batch'),
+        'can_edit_batch': lr('edit_batch'),
+        'can_edit_quantity': lr('edit_batch'),   # merged into edit_batch
+        'can_edit_price': lr('edit_batch'),      # merged into edit_batch
+        'can_edit_sn': lr('edit_batch'),         # merged into edit_batch
+        'can_edit_lending': lr('edit_lending'),
+        'can_delete_batch': lr('delete_batch'),
+        'can_delete_lending': lr('delete_lending'),
         'can_view_advance': is_admin or user.has_permission('items', 'view_advance'),
-        'can_edit_advance': user.has_permission('items', 'edit_advance'),
-        'can_delete_advance': user.has_permission('items', 'delete_advance'),
+        'can_edit_advance': is_admin or user.has_permission('items', 'edit_advance'),
+        'can_delete_advance': is_admin or user.has_permission('items', 'delete_advance'),
+        'can_view_lr_page': is_admin or lr('view_page'),
+        'can_view_lr_log': is_admin or lr('view_log'),
         'is_admin': is_admin,
     }
-    return perms
 
