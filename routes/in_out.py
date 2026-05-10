@@ -8,6 +8,8 @@ import json
 
 in_out_bp = Blueprint('in_out', __name__)
 
+LOG_PAGE_SIZE = 25
+
 
 def _parse_dt(s):
     if not s:
@@ -24,7 +26,7 @@ def _format_log_details(action, details):
     """Convert raw log details to a human-readable string for display."""
     if not details:
         return ''
-    if action in ('return',):
+    if action == 'return':
         try:
             d = json.loads(details)
             parts = []
@@ -45,8 +47,32 @@ def _format_log_details(action, details):
             return ' | '.join(parts) if parts else details[:120]
         except (ValueError, TypeError):
             pass
-    # Truncate plain text
     return details[:120] + ('…' if len(details) > 120 else '')
+
+
+def _build_log_entries(page=1, can_view_log=True):
+    """Return (entries, total_pages) for the given log page."""
+    if not can_view_log:
+        return [], 0
+    actions = ['lend', 'return', 'update', 'delete', 'batch_sn_purge', 'lend_update', 'sn_batch_save']
+    q = (AuditLog.query
+         .filter(AuditLog.entity_type.in_(['batch', 'item', 'sn']))
+         .filter(AuditLog.action.in_(actions))
+         .order_by(AuditLog.timestamp.desc()))
+    total = q.count()
+    total_pages = max(1, (total + LOG_PAGE_SIZE - 1) // LOG_PAGE_SIZE)
+    page = max(1, min(page, total_pages))
+    raw = q.offset((page - 1) * LOG_PAGE_SIZE).limit(LOG_PAGE_SIZE).all()
+    entries = []
+    for log in raw:
+        user = User.query.get(log.user_id)
+        entries.append({
+            'log': log,
+            'username': user.username if user else 'Unknown',
+            'timestamp': log.timestamp.strftime('%d/%m/%Y %H:%M') if log.timestamp else '?',
+            'display': _format_log_details(log.action, log.details),
+        })
+    return entries, total_pages
 
 
 @in_out_bp.route('/in-out')
@@ -62,32 +88,28 @@ def in_out():
     can_only_self   = (not current_user.is_admin()
                        and current_user.has_permission('lending_return', 'only_self_lending')
                        and not current_user.has_permission('lending_return', 'edit_batch'))
+    scan_enabled    = Setting.get('lr_scan_enabled', 'false') == 'true'
 
-    # Contacts for lending form — use API endpoint instead of a Contact model
-    contacts = []
+    log_page = request.args.get('log_page', 1, type=int)
+    logs, log_total_pages = _build_log_entries(log_page, can_view_log)
 
-    # Log entries
-    logs = []
-    if can_view_log:
-        raw = (AuditLog.query
-               .filter(AuditLog.entity_type.in_(['batch', 'item', 'sn']))
-               .order_by(AuditLog.timestamp.desc())
-               .limit(100).all())
-        for log in raw:
-            user = User.query.get(log.user_id)
-            display = _format_log_details(log.action, log.details)
-            logs.append({
-                'log': log,
-                'username': user.username if user else 'Unknown',
-                'timestamp': log.timestamp.strftime('%d/%m/%Y %H:%M') if log.timestamp else '?',
-                'display': display,
-            })
+    # LR settings for form required-field indicators
+    lr_settings = {
+        'lend_start_date_required': Setting.get('lr_lend_start_date_required', 'false') == 'true',
+        'lend_start_time_required': Setting.get('lr_lend_start_time_required', 'false') == 'true',
+        'lend_end_date_required': Setting.get('lr_lend_end_date_required', 'false') == 'true',
+        'lend_end_time_required': Setting.get('lr_lend_end_time_required', 'false') == 'true',
+        'return_date_required': Setting.get('lr_return_date_required', 'false') == 'true',
+        'return_time_required': Setting.get('lr_return_time_required', 'false') == 'true',
+    }
 
     return render_template('in_out.html',
                            logs=logs, can_view_log=can_view_log,
+                           log_page=log_page, log_total_pages=log_total_pages,
                            can_lend=can_lend, can_edit_batch=can_edit_batch,
                            can_delete_batch=can_delete_batch, can_only_self=can_only_self,
-                           contacts=contacts,
+                           scan_enabled=scan_enabled,
+                           lr_settings=lr_settings,
                            current_user_id=current_user.id,
                            currency=Setting.get('currency', '$'))
 
@@ -209,7 +231,6 @@ def in_out_lend():
                      and not current_user.has_permission('lending_return', 'edit_batch'))
 
     if batch.sn_tracking_enabled:
-        # SN batch: lend individual SNs
         sn_ids    = data.get('sn_ids', [])
         lend_type = data.get('lend_to_type', '')
         try:
@@ -246,7 +267,6 @@ def in_out_lend():
                   f'Lent {updated} SN(s) from {batch.get_display_label()} of {item.name}')
         return jsonify({'success': True, 'updated': updated})
     else:
-        # Normal batch: add/replace lend records
         records = data.get('lend_records', [])
         total_qty = sum(max(1, int(r.get('qty', 1))) for r in records if isinstance(r, dict))
         if total_qty > batch.quantity:
@@ -312,7 +332,6 @@ def in_out_return():
                               'notes': return_notes, 'items': returned}))
         return jsonify({'success': True, 'returned': len(returned), 'on_time': all_on_time})
     else:
-        # Normal batch: process selected lend records
         lend_record_ids = data.get('lend_record_ids', [])
         return_qty  = int(data.get('return_qty', 0))
         returned_count = 0

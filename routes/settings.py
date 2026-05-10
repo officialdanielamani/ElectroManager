@@ -631,7 +631,8 @@ def settings_system():
             # Lending & Return settings
             lr_keys = ['lr_lend_start_date_required', 'lr_lend_start_time_required',
                        'lr_lend_end_date_required', 'lr_lend_end_time_required', 'lr_lend_self_use_now',
-                       'lr_return_date_required', 'lr_return_time_required', 'lr_return_self_use_now']
+                       'lr_return_date_required', 'lr_return_time_required', 'lr_return_self_use_now',
+                       'lr_scan_enabled']
             for key in lr_keys:
                 val = 'true' if key in request.form else 'false'
                 Setting.set(key, val, key)

@@ -295,6 +295,7 @@ def create_default_settings():
         ('lr_return_date_required', 'false', 'Return date is required'),
         ('lr_return_time_required', 'false', 'Return time is required (only if date required)'),
         ('lr_return_self_use_now', 'false', 'Only Self Lending must use current datetime for return'),
+        ('lr_scan_enabled', 'false', 'Enable QR/Barcode camera scanning on In/Out page'),
     ]
     
     for key, value, description in default_settings:
