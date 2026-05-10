@@ -318,7 +318,13 @@
                                 <div class="d-flex gap-1 align-items-center">
                                     {% if item_perms and item_perms.can_edit_info %}
                                     <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
-                                            onclick="event.stopPropagation(); openEditLocationModal({{ batch.id }}, {{ batch.follow_main_location | tojson }}, {{ (batch.location_id or '') | tojson }}, {{ (batch.rack_id or '') | tojson }}, {{ (batch.drawer or '') | tojson }}, '{{ item.uuid }}')"
+                                            data-el-batch-id="{{ batch.id }}"
+                                            data-el-follow-main="{{ 'true' if batch.follow_main_location else 'false' }}"
+                                            data-el-location-id="{{ batch.location_id or '' }}"
+                                            data-el-rack-id="{{ batch.rack_id or '' }}"
+                                            data-el-drawer="{{ batch.drawer or '' }}"
+                                            data-el-item-uuid="{{ item.uuid }}"
+                                            onclick="openEditLocationModal(event, this)"
                                             title="Edit batch location"><i class="bi bi-geo-alt"></i> Edit Location</button>
                                     {% endif %}
                                     <i class="bi bi-chevron-down"></i>
@@ -2880,7 +2886,14 @@ function elSwitchLocType() {
         document.getElementById('el_drawer_picker').style.display = 'none';
     }
 }
-function openEditLocationModal(batchId, followMain, locationId, rackId, drawer, itemUuid) {
+function openEditLocationModal(evt, btn) {
+    evt.stopPropagation();
+    var batchId  = btn.dataset.elBatchId;
+    var followMain = btn.dataset.elFollowMain === 'true';
+    var locationId = btn.dataset.elLocationId;
+    var rackId   = btn.dataset.elRackId;
+    var drawer   = btn.dataset.elDrawer;
+    var itemUuid = btn.dataset.elItemUuid;
     document.getElementById('el_batch_id').value = batchId;
     document.getElementById('el_item_uuid').value = itemUuid;
     document.getElementById('el_follow_main').checked = followMain;
