@@ -88,7 +88,8 @@ def in_out():
                            can_lend=can_lend, can_edit_batch=can_edit_batch,
                            can_delete_batch=can_delete_batch, can_only_self=can_only_self,
                            contacts=contacts,
-                           current_user_id=current_user.id)
+                           current_user_id=current_user.id,
+                           currency=Setting.get('currency', '$'))
 
 
 @in_out_bp.route('/in-out/search')
