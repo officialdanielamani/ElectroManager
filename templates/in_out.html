@@ -1,117 +1,532 @@
 {% extends "base.html" %}
-{% block title %}In / Out{% endblock %}
+{% block title %}In / Out — Electro Manager{% endblock %}
 {% block content %}
 <div class="container-fluid">
-    <div class="row g-3">
+<div class="row g-3">
 
-        <!-- Left card: Lending/Return Scanner -->
-        <div class="col-lg-8">
-            <div class="card h-100">
-                <div class="card-header d-flex align-items-center gap-3">
-                    <div class="form-check form-switch mb-0">
-                        <input class="form-check-input" type="checkbox" id="modeToggle" onchange="updateModeTitle()">
-                        <label class="form-check-label fw-semibold" for="modeToggle" id="modeLabel">Lending</label>
-                    </div>
-                    <span class="text-muted small">Toggle to switch between Lending and Return mode</span>
-                </div>
-                <div class="card-body">
-
-                    <!-- Image / Scan placeholder -->
-                    <div class="d-flex flex-column align-items-center justify-content-center bg-light rounded mb-4"
-                         style="height: 200px; border: 2px dashed #ccc; cursor: pointer;">
-                        <i class="bi bi-camera fs-1 text-muted"></i>
-                        <span class="text-muted mt-2">Scan or Upload Image</span>
-                    </div>
-
-                    <!-- Divider -->
-                    <div class="d-flex align-items-center mb-3">
-                        <hr class="flex-grow-1">
-                        <span class="mx-3 text-muted small">Or Search</span>
-                        <hr class="flex-grow-1">
-                    </div>
-
-                    <!-- Search input -->
-                    <input type="text" class="form-control" id="searchInput"
-                           placeholder="Search by item name, SKU, ISN, SN...">
-                </div>
-            </div>
+  <!-- LEFT: Search + Form (col-lg-8) -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <!-- Mode toggle: Lending / Return -->
+        <div class="d-flex align-items-center gap-3" id="modeToggleGroup">
+          <span class="fw-semibold" id="modeLabel">Lending</span>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="modeToggle" role="switch"
+                   onchange="onModeChange()" {% if not can_lend %}disabled{% endif %}>
+            <label class="form-check-label" for="modeToggle" id="modeLabelRight">Return</label>
+          </div>
         </div>
-
-        <!-- Right card: Log -->
-        <div class="col-lg-4">
-            <div class="card h-100">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="bi bi-journal-text"></i> Log — Lending &amp; Return</h6>
-                </div>
-                <div class="card-body p-0" style="overflow-y: auto; max-height: 70vh;">
-                    {% if can_view_log %}
-                        {% if log_data %}
-                            <ul class="list-group list-group-flush">
-                            {% for entry in log_data %}
-                                {% set log = entry.log %}
-                                {% if log.action == 'update' and log.entity_type == 'batch' %}
-                                    <li class="list-group-item px-3 py-2">
-                                        <span class="badge bg-primary me-1">Modified</span>
-                                        <small class="text-muted">
-                                            {% if log.details %}[{{ log.details[:60] }}{% if log.details|length > 60 %}...{% endif %}]{% endif %}
-                                            <strong>{{ entry.username }}</strong> modified batch on {{ entry.timestamp }}
-                                        </small>
-                                    </li>
-                                {% elif log.action == 'delete' and log.entity_type == 'batch' %}
-                                    <li class="list-group-item px-3 py-2">
-                                        <span class="badge bg-danger me-1">Deleted</span>
-                                        <small class="text-muted">
-                                            {% if log.details %}[{{ log.details[:60] }}{% if log.details|length > 60 %}...{% endif %}]{% endif %}
-                                            <strong>{{ entry.username }}</strong> deleted batch on {{ entry.timestamp }}
-                                        </small>
-                                    </li>
-                                {% elif log.action == 'batch_sn_purge' %}
-                                    <li class="list-group-item px-3 py-2">
-                                        <span class="badge bg-warning text-dark me-1">SN Purge</span>
-                                        <small class="text-muted">
-                                            {% if log.details %}[{{ log.details[:60] }}{% if log.details|length > 60 %}...{% endif %}]{% endif %}
-                                            <strong>{{ entry.username }}</strong> purged SN batch on {{ entry.timestamp }}
-                                        </small>
-                                    </li>
-                                {% elif log.action == 'lend_update' %}
-                                    <li class="list-group-item px-3 py-2">
-                                        <span class="badge bg-info text-dark me-1">Lending</span>
-                                        <small class="text-muted">
-                                            {% if log.details %}[{{ log.details[:60] }}{% if log.details|length > 60 %}...{% endif %}]{% endif %}
-                                            <strong>{{ entry.username }}</strong> updated lending on {{ entry.timestamp }}
-                                        </small>
-                                    </li>
-                                {% elif log.action == 'sn_batch_save' %}
-                                    <li class="list-group-item px-3 py-2">
-                                        <span class="badge bg-secondary me-1">SN Save</span>
-                                        <small class="text-muted">
-                                            {% if log.details %}[{{ log.details[:60] }}{% if log.details|length > 60 %}...{% endif %}]{% endif %}
-                                            <strong>{{ entry.username }}</strong> saved SN changes on {{ entry.timestamp }}
-                                        </small>
-                                    </li>
-                                {% endif %}
-                            {% endfor %}
-                            </ul>
-                        {% else %}
-                            <div class="p-3 text-muted text-center">No recent log entries.</div>
-                        {% endif %}
-                    {% else %}
-                        <div class="p-3 text-muted text-center">
-                            <i class="bi bi-lock"></i> No permission to view log.
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
+        <!-- Edit Batch checkbox -->
+        {% if can_edit_batch %}
+        <div class="form-check mb-0">
+          <input class="form-check-input" type="checkbox" id="editBatchCheck" onchange="onEditBatchChange()">
+          <label class="form-check-label" for="editBatchCheck"><strong>Edit Batch</strong></label>
         </div>
-
+        {% endif %}
+      </div>
+      <div class="card-body">
+        <!-- Image placeholder (scan area) -->
+        <div class="text-center rounded mb-3 py-4" style="background:#f8f9fa;border:2px dashed #dee2e6;">
+          <i class="bi bi-camera fs-2 text-muted"></i>
+          <div class="text-muted small mt-1">Scan barcode / QR code or search below</div>
+        </div>
+        <div class="text-center text-muted small mb-2">─────── Or Search ───────</div>
+        <!-- Search -->
+        <div class="mb-3">
+          <input type="text" class="form-control" id="inOutSearch"
+                 placeholder="Search by item name, UUID, ISN, batch ID ({uuid}-B{n})"
+                 oninput="debounceSearch(this.value)" autocomplete="off">
+        </div>
+        <!-- Search results -->
+        <div id="searchResults"></div>
+        <hr id="formDivider" class="d-none">
+        <!-- Action form (injected by JS) -->
+        <div id="actionForm"></div>
+      </div>
     </div>
+  </div>
+
+  <!-- RIGHT: Log (col-lg-4) -->
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-journal-text"></i> Log — Lending &amp; Return</h6>
+      </div>
+      <div class="card-body p-2" style="max-height:80vh;overflow-y:auto;">
+        {% if not can_view_log %}
+        <div class="text-muted small p-2">No permission to view log.</div>
+        {% elif not logs %}
+        <div class="text-muted small p-2">No log entries yet.</div>
+        {% else %}
+        {% for entry in logs %}
+        {% set log = entry.log %}
+        {% if log.action in ['lend','return','update','delete','batch_sn_purge','lend_update','sn_batch_save'] %}
+        <div class="border-bottom pb-2 mb-2 small">
+          {% if log.action == 'return' %}
+            {% if log.details and '"on_time": false' in log.details %}
+            <span class="badge bg-warning text-dark">Return Late</span>
+            {% else %}
+            <span class="badge bg-success">Return</span>
+            {% endif %}
+          {% elif log.action in ['lend', 'lend_update'] %}
+            <span class="badge bg-primary">Lend</span>
+          {% elif log.action in ['delete', 'batch_sn_purge'] %}
+            <span class="badge bg-danger">Delete</span>
+          {% elif log.action == 'update' %}
+            <span class="badge bg-secondary">Edit</span>
+          {% elif log.action == 'sn_batch_save' %}
+            <span class="badge bg-info">SN Edit</span>
+          {% endif %}
+          <span class="ms-1 fw-semibold">{{ entry.username }}</span>
+          <span class="text-muted ms-1">{{ entry.timestamp }}</span>
+          <div class="text-muted mt-1" style="font-size:0.78rem;word-break:break-word;">
+            {{ log.details[:120] if log.details else '' }}{% if log.details and log.details|length > 120 %}…{% endif %}
+          </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
 </div>
 
 <script>
-function updateModeTitle() {
-    const toggle = document.getElementById('modeToggle');
-    const label = document.getElementById('modeLabel');
-    label.textContent = toggle.checked ? 'Return' : 'Lending';
+/* ── State ── */
+var _mode = 'lending';    // 'lending' | 'return' | 'edit_batch'
+var _editBatch = false;
+var _selectedBatch = null;  // full batch detail JSON
+var _searchTimer = null;
+var _contacts = {{ contacts | tojson }};
+var _canLend = {{ can_lend | tojson }};
+var _canEditBatch = {{ can_edit_batch | tojson }};
+var _canDeleteBatch = {{ can_delete_batch | tojson }};
+var _canOnlySelf = {{ can_only_self | tojson }};
+var _currentUserId = {{ current_user_id }};
+
+function onModeChange() {
+    _mode = document.getElementById('modeToggle').checked ? 'return' : 'lending';
+    document.getElementById('modeLabel').textContent = _mode === 'return' ? 'Return' : 'Lending';
+    clearActionForm();
+}
+
+function onEditBatchChange() {
+    _editBatch = document.getElementById('editBatchCheck').checked;
+    var toggleGroup = document.getElementById('modeToggleGroup');
+    if (_editBatch) {
+        toggleGroup.style.opacity = '0.4';
+        toggleGroup.style.pointerEvents = 'none';
+        _mode = 'edit_batch';
+    } else {
+        toggleGroup.style.opacity = '';
+        toggleGroup.style.pointerEvents = '';
+        _mode = document.getElementById('modeToggle').checked ? 'return' : 'lending';
+    }
+    if (_selectedBatch) showActionForm(_selectedBatch);
+}
+
+function debounceSearch(val) {
+    clearTimeout(_searchTimer);
+    if (val.length < 2) { document.getElementById('searchResults').innerHTML = ''; return; }
+    _searchTimer = setTimeout(function() { doSearch(val); }, 300);
+}
+
+function doSearch(q) {
+    fetch('/in-out/search?q=' + encodeURIComponent(q))
+    .then(function(r) { return r.json(); })
+    .then(function(d) { renderResults(d); })
+    .catch(function() {});
+}
+
+function renderResults(data) {
+    var el = document.getElementById('searchResults');
+    if (!data.results || data.results.length === 0) {
+        el.innerHTML = '<div class="text-muted small">No results found.</div>';
+        return;
+    }
+    var html = '';
+    if (data.type === 'sn' || data.type === 'batch') {
+        /* Direct to batch */
+        var r = data.results[0];
+        html = renderBatchCard(r, true);
+    } else if (data.type === 'item_batches') {
+        var item = data.results[0];
+        html = renderItemCard(item, true);
+    } else {
+        /* Multiple items */
+        data.results.forEach(function(item) {
+            html += renderItemCard(item, false);
+        });
+    }
+    el.innerHTML = html;
+    /* Auto-select if single result is a batch or SN */
+    if (data.type === 'sn' && data.results[0]) {
+        selectBatch(data.results[0].id, data.results[0].preselected_sn_id);
+    } else if (data.type === 'batch' && data.results[0]) {
+        selectBatch(data.results[0].id, null);
+    }
+}
+
+function renderItemCard(item, expanded) {
+    var batchesHtml = '';
+    item.batches.forEach(function(b) {
+        batchesHtml += '<div class="ps-3 py-1 border-bottom d-flex justify-content-between align-items-center batch-row" ' +
+            'style="cursor:pointer;" onclick="selectBatch(' + b.id + ', null)">' +
+            '<span><i class="bi bi-box-seam me-1"></i>' + _esc(b.display_label) + '</span>' +
+            '<span class="text-muted small">Qty:' + b.quantity + ' Avail:' + b.available_qty +
+            (b.sn_tracking ? ' <span class="badge bg-dark" style="font-size:0.65rem;">SN</span>' : '') + '</span>' +
+            '</div>';
+    });
+    return '<div class="card mb-2">' +
+        '<div class="card-header py-2 px-3 d-flex justify-content-between align-items-center" style="cursor:pointer;" ' +
+        'onclick="this.nextElementSibling.classList.toggle(\'d-none\')">' +
+        '<span><strong>' + _esc(item.name) + '</strong>' +
+        (item.short_info ? ' <span class="text-muted">— ' + _esc(item.short_info) + '</span>' : '') +
+        '</span>' +
+        '<code class="text-muted small">' + _esc(item.uuid) + '</code>' +
+        '</div>' +
+        '<div class="card-body p-0' + (expanded ? '' : ' d-none') + '">' +
+        batchesHtml + '</div></div>';
+}
+
+function renderBatchCard(b, selected) {
+    return '<div class="card mb-2 border-primary">' +
+        '<div class="card-body py-2 px-3 d-flex justify-content-between align-items-center" style="cursor:pointer;" onclick="selectBatch(' + b.id + ', null)">' +
+        '<span><strong>' + _esc(b.item_name || b.display_label) + '</strong>' +
+        (b.item_short_info ? ' <span class="text-muted">— ' + _esc(b.item_short_info) + '</span>' : '') +
+        ' / ' + _esc(b.display_label) + '</span>' +
+        '<span class="text-muted small">Qty:' + b.quantity + '</span>' +
+        '</div></div>';
+}
+
+function _esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function selectBatch(batchId, preselectedSnId) {
+    fetch('/in-out/batch/' + batchId + '/detail')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        _selectedBatch = d;
+        _selectedBatch._preselectedSnId = preselectedSnId;
+        showActionForm(d);
+    });
+}
+
+function clearActionForm() {
+    document.getElementById('actionForm').innerHTML = '';
+    document.getElementById('formDivider').classList.add('d-none');
+}
+
+function showActionForm(batch) {
+    document.getElementById('formDivider').classList.remove('d-none');
+    var el = document.getElementById('actionForm');
+    if (_mode === 'edit_batch') {
+        el.innerHTML = buildEditBatchForm(batch);
+    } else if (_mode === 'return') {
+        el.innerHTML = buildReturnForm(batch);
+    } else {
+        el.innerHTML = buildLendForm(batch);
+    }
+}
+
+/* ── Lending Form ── */
+function buildLendForm(b) {
+    if (!_canLend) return '<div class="alert alert-warning">No permission to lend.</div>';
+    var html = '<h6><i class="bi bi-hand-index-thumb"></i> Lend — ' + _esc(b.display_label) + ' (' + _esc(b.item_name) + ')</h6>';
+
+    if (b.sn_tracking) {
+        /* SN batch: show available (non-deleted, non-lent) SNs */
+        var avail = (b.serial_numbers || []).filter(function(sn) { return !sn.is_deleted && !sn.lend_to_id; });
+        if (avail.length === 0) { return html + '<div class="alert alert-info">No available units to lend.</div>'; }
+        html += '<div class="mb-2"><label class="form-label fw-semibold">Select units to lend</label>' +
+            '<div style="max-height:200px;overflow-y:auto;border:1px solid #dee2e6;border-radius:4px;padding:4px;">';
+        avail.forEach(function(sn) {
+            var pre = (b._preselectedSnId && b._preselectedSnId === sn.id) ? 'checked' : '';
+            html += '<div class="form-check"><input class="form-check-input sn-lend-chk" type="checkbox" value="' + sn.id + '" ' + pre + '>' +
+                '<label class="form-check-label small"><code>' + _esc(sn.isn) + '</code>' + (sn.sn ? ' ' + _esc(sn.sn) : '') + '</label></div>';
+        });
+        html += '</div></div>';
+    } else {
+        html += '<div class="mb-2"><label class="form-label">Qty to Lend</label>' +
+            '<input type="number" class="form-control form-control-sm" id="lendQty" min="1" max="' + b.available_qty + '" value="1"></div>';
+    }
+
+    /* Contact selector — use search API */
+    if (!_canOnlySelf) {
+        html += '<div class="mb-2"><label class="form-label fw-semibold">Lend To <span class="text-danger">*</span></label>';
+        html += '<input type="hidden" id="lendContactId" value="">';
+        html += '<input type="hidden" id="lendContactType" value="">';
+        html += '<div class="border rounded px-2 py-1 d-flex align-items-center justify-content-between" style="cursor:pointer;background:var(--bs-body-bg);min-height:31px;" onclick="toggleLendContactSearch()">' +
+            '<span id="lendContactLabel" class="small text-muted">Click to search contact...</span>' +
+            '<i class="bi bi-x text-danger" id="lendContactClear" style="display:none;" onclick="event.stopPropagation();clearLendContact()"></i>' +
+            '</div>' +
+            '<div id="lendContactSearchPanel" style="display:none;" class="mt-1">' +
+            '<input type="text" class="form-control form-control-sm" id="lendContactSearchInput" placeholder="Search by name..." oninput="doLendContactSearch()">' +
+            '<div id="lendContactResults" class="border rounded" style="max-height:180px;overflow-y:auto;background:var(--bs-body-bg);"></div>' +
+            '</div></div>';
+    } else {
+        html += '<div class="alert alert-info py-1 small">Lending to yourself only.</div>';
+    }
+
+    html += '<div class="row g-2 mb-2">' +
+        '<div class="col-md-6"><label class="form-label form-label-sm">Start Date/Time</label>' +
+        '<input type="datetime-local" class="form-control form-control-sm" id="lendStart"></div>' +
+        '<div class="col-md-6"><label class="form-label form-label-sm">End Date/Time</label>' +
+        '<input type="datetime-local" class="form-control form-control-sm" id="lendEnd"></div></div>' +
+        '<div class="mb-2"><label class="form-label form-label-sm">Notes</label>' +
+        '<input type="text" class="form-control form-control-sm" id="lendNote" maxlength="128" placeholder="Optional notes"></div>' +
+        '<button class="btn btn-primary btn-sm" onclick="submitLend(' + b.id + ',' + (b.sn_tracking ? 'true' : 'false') + ')"><i class="bi bi-check-circle"></i> Confirm Lend</button>';
+    return html;
+}
+
+var _lendContactSearchTimer = null;
+function toggleLendContactSearch() {
+    var panel = document.getElementById('lendContactSearchPanel');
+    if (!panel) return;
+    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    document.getElementById('lendContactSearchInput').value = '';
+    document.getElementById('lendContactSearchInput').focus();
+    doLendContactSearch();
+}
+function doLendContactSearch() {
+    clearTimeout(_lendContactSearchTimer);
+    _lendContactSearchTimer = setTimeout(function() {
+        var q = document.getElementById('lendContactSearchInput').value.trim();
+        var el = document.getElementById('lendContactResults');
+        el.innerHTML = '<div class="text-muted small p-1">Loading...</div>';
+        fetch('/api/contacts/all?q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.length) { el.innerHTML = '<div class="text-muted small p-1">No contacts found.</div>'; return; }
+            var icons = {user:'bi-person-circle', person:'bi-person', organization:'bi-building', group:'bi-people'};
+            var badges = {user:'bg-primary', person:'bg-secondary', organization:'bg-success', group:'bg-info'};
+            el.innerHTML = data.map(function(c) {
+                var icon = icons[c.type] || 'bi-person';
+                var badge = badges[c.type] || 'bg-secondary';
+                var lbl = (c.label||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                var extra = c.extra ? '<small class="text-muted d-block">' + c.extra.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</small>' : '';
+                var rawLabel = (c.label||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+                return '<div class="d-flex align-items-center gap-2 p-1 border-bottom" style="cursor:pointer;" ' +
+                    'onclick="selectLendContact(\'' + c.type + '\',' + c.id + ',\'' + rawLabel + '\')">' +
+                    '<i class="bi ' + icon + ' text-muted small"></i>' +
+                    '<div class="flex-grow-1"><div class="small">' + lbl + '</div>' + extra + '</div>' +
+                    '<span class="badge ' + badge + '" style="font-size:0.65rem">' + c.type + '</span></div>';
+            }).join('');
+        })
+        .catch(function() { el.innerHTML = '<div class="text-danger small p-1">Search failed.</div>'; });
+    }, 300);
+}
+function selectLendContact(type, id, label) {
+    var hidId  = document.getElementById('lendContactId');
+    var hidType = document.getElementById('lendContactType');
+    var lbl = document.getElementById('lendContactLabel');
+    var clr = document.getElementById('lendContactClear');
+    if (hidId) hidId.value = id;
+    if (hidType) hidType.value = type;
+    if (lbl) { lbl.textContent = label; lbl.className = 'small'; }
+    if (clr) clr.style.display = '';
+    var panel = document.getElementById('lendContactSearchPanel');
+    if (panel) panel.style.display = 'none';
+}
+function clearLendContact() {
+    var hidId  = document.getElementById('lendContactId');
+    var hidType = document.getElementById('lendContactType');
+    var lbl = document.getElementById('lendContactLabel');
+    var clr = document.getElementById('lendContactClear');
+    if (hidId) hidId.value = '';
+    if (hidType) hidType.value = '';
+    if (lbl) { lbl.textContent = 'Click to search contact...'; lbl.className = 'small text-muted'; }
+    if (clr) clr.style.display = 'none';
+}
+
+function submitLend(batchId, snTracking) {
+    var payload = { batch_id: batchId };
+    if (snTracking) {
+        var ids = Array.from(document.querySelectorAll('.sn-lend-chk:checked')).map(function(c) { return parseInt(c.value); });
+        if (ids.length === 0) { alert('Select at least one unit.'); return; }
+        payload.sn_ids = ids;
+        if (!_canOnlySelf) {
+            var cid = document.getElementById('lendContactId');
+            var ctype = document.getElementById('lendContactType');
+            if (!cid || !cid.value) { alert('Select a contact.'); return; }
+            payload.lend_to_id = parseInt(cid.value);
+            payload.lend_to_type = (ctype && ctype.value) ? ctype.value : 'person';
+        } else {
+            payload.lend_to_id = _currentUserId;
+            payload.lend_to_type = 'user';
+        }
+        payload.lend_start = (document.getElementById('lendStart')||{}).value || '';
+        payload.lend_end   = (document.getElementById('lendEnd')||{}).value || '';
+        payload.lend_note  = (document.getElementById('lendNote')||{}).value || '';
+    } else {
+        var qty = parseInt((document.getElementById('lendQty')||{}).value) || 1;
+        var contact_id = null, contact_type = 'person';
+        if (!_canOnlySelf) {
+            var cid2 = document.getElementById('lendContactId');
+            var ctype2 = document.getElementById('lendContactType');
+            if (!cid2 || !cid2.value) { alert('Select a contact.'); return; }
+            contact_id = parseInt(cid2.value);
+            contact_type = (ctype2 && ctype2.value) ? ctype2.value : 'person';
+        } else {
+            contact_id = _currentUserId;
+            contact_type = 'user';
+        }
+        payload.lend_records = [{
+            contact_id: contact_id, type: contact_type, qty: qty,
+            start: (document.getElementById('lendStart')||{}).value || '',
+            end: (document.getElementById('lendEnd')||{}).value || '',
+            lend_note: (document.getElementById('lendNote')||{}).value || '',
+        }];
+    }
+    fetch('/in-out/lend', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
+    .then(function(r){ return r.json(); }).then(function(d){
+        if (d.success) { showToast('Lend recorded successfully.', 'success'); clearActionForm(); refreshLog(); }
+        else { alert(d.message || 'Error'); }
+    });
+}
+
+/* ── Return Form ── */
+function buildReturnForm(b) {
+    if (!_canLend) return '<div class="alert alert-warning">No permission to process returns.</div>';
+    var html = '<h6><i class="bi bi-box-arrow-in-left"></i> Return — ' + _esc(b.display_label) + ' (' + _esc(b.item_name) + ')</h6>';
+
+    if (b.sn_tracking) {
+        var lent = (b.serial_numbers || []).filter(function(sn) { return !sn.is_deleted && sn.lend_to_id; });
+        if (lent.length === 0) { return html + '<div class="alert alert-info">No lent units to return.</div>'; }
+        html += '<div class="mb-2"><label class="form-label fw-semibold">Select units to return</label>' +
+            '<div style="max-height:200px;overflow-y:auto;border:1px solid #dee2e6;border-radius:4px;padding:4px;">';
+        lent.forEach(function(sn) {
+            html += '<div class="form-check"><input class="form-check-input sn-return-chk" type="checkbox" value="' + sn.id + '">' +
+                '<label class="form-check-label small"><code>' + _esc(sn.isn) + '</code>' +
+                (sn.lend_display ? ' → <em>' + _esc(sn.lend_display) + '</em>' : '') +
+                (sn.lend_end ? ' <span class="text-muted">(due ' + _esc(sn.lend_end.slice(0,10)) + ')</span>' : '') + '</label></div>';
+        });
+        html += '</div></div>';
+    } else {
+        var recs = b.lend_records || [];
+        if (recs.length === 0) { return html + '<div class="alert alert-info">No lending records.</div>'; }
+        html += '<div class="mb-2"><label class="form-label fw-semibold">Select lending record(s) to return</label>';
+        recs.forEach(function(r, i) {
+            html += '<div class="form-check border rounded p-2 mb-1">' +
+                '<input class="form-check-input lend-rec-chk" type="checkbox" value="' + r.id + '" data-qty="' + (r.qty||1) + '">' +
+                '<label class="form-check-label small">' + _esc(r.label||'—') +
+                ' | Qty: ' + (r.qty||1) +
+                (r.end ? ' | Due: ' + _esc(r.end.slice(0,10)) : '') + '</label></div>';
+        });
+        html += '</div>';
+        html += '<div class="mb-2"><label class="form-label form-label-sm">Qty to Return</label>' +
+            '<input type="number" class="form-control form-control-sm" id="returnQty" min="1" value="1"></div>';
+    }
+
+    html += '<div class="mb-2"><label class="form-label form-label-sm">Return Date/Time <span class="text-muted">(leave blank for now)</span></label>' +
+        '<input type="datetime-local" class="form-control form-control-sm" id="returnDatetime"></div>' +
+        '<div class="mb-2"><label class="form-label form-label-sm">Return Notes</label>' +
+        '<input type="text" class="form-control form-control-sm" id="returnNotes" maxlength="128" placeholder="Optional"></div>' +
+        '<button class="btn btn-warning btn-sm" onclick="submitReturn(' + b.id + ',' + (b.sn_tracking ? 'true' : 'false') + ')"><i class="bi bi-check-circle"></i> Confirm Return</button>';
+    return html;
+}
+
+function submitReturn(batchId, snTracking) {
+    var payload = {
+        batch_id: batchId,
+        return_datetime: (document.getElementById('returnDatetime')||{}).value || '',
+        return_notes: (document.getElementById('returnNotes')||{}).value || '',
+    };
+    if (snTracking) {
+        var ids = Array.from(document.querySelectorAll('.sn-return-chk:checked')).map(function(c){ return parseInt(c.value); });
+        if (!ids.length) { alert('Select at least one unit.'); return; }
+        payload.sn_ids = ids;
+    } else {
+        var rids = Array.from(document.querySelectorAll('.lend-rec-chk:checked')).map(function(c){ return parseInt(c.value); });
+        if (!rids.length) { alert('Select at least one lending record.'); return; }
+        payload.lend_record_ids = rids;
+        payload.return_qty = parseInt((document.getElementById('returnQty')||{}).value) || 0;
+    }
+    fetch('/in-out/return', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
+    .then(function(r){ return r.json(); }).then(function(d){
+        if (d.success) {
+            var msg = d.on_time ? 'Returned on time.' : 'Returned (late).';
+            showToast(msg, d.on_time ? 'success' : 'warning');
+            clearActionForm(); refreshLog();
+        } else { alert(d.message || 'Error'); }
+    });
+}
+
+/* ── Edit Batch Form ── */
+function buildEditBatchForm(b) {
+    if (!_canEditBatch) return '<div class="alert alert-warning">No permission to edit batch.</div>';
+    return '<h6><i class="bi bi-pencil-square"></i> Edit Batch — ' + _esc(b.display_label) + ' (' + _esc(b.item_name) + ')</h6>' +
+    '<div class="row g-2 mb-2">' +
+    '<div class="col-md-4"><label class="form-label form-label-sm">Label</label>' +
+    '<input type="text" class="form-control form-control-sm" id="eb_label" value="' + _esc(b.batch_label) + '" maxlength="50"></div>' +
+    '<div class="col-md-4"><label class="form-label form-label-sm">Manufacturer</label>' +
+    '<input type="text" class="form-control form-control-sm" id="eb_manuf" value="' + _esc(b.manufacturer) + '" maxlength="100"></div>' +
+    (!b.sn_tracking ? '<div class="col-md-4"><label class="form-label form-label-sm">Quantity</label>' +
+    '<input type="number" class="form-control form-control-sm" id="eb_qty" value="' + b.quantity + '" min="0"></div>' : '') +
+    '</div>' +
+    '<div class="row g-2 mb-2">' +
+    '<div class="col-md-4"><label class="form-label form-label-sm">Price/Unit</label>' +
+    '<input type="number" step="0.01" class="form-control form-control-sm" id="eb_price" value="' + b.price_per_unit + '" min="0"></div>' +
+    '<div class="col-md-4"><label class="form-label form-label-sm">Purchase Date</label>' +
+    '<input type="date" class="form-control form-control-sm" id="eb_date" value="' + _esc(b.purchase_date) + '"></div>' +
+    '<div class="col-md-4"><label class="form-label form-label-sm">Note</label>' +
+    '<input type="text" class="form-control form-control-sm" id="eb_note" value="' + _esc(b.note) + '" maxlength="256"></div>' +
+    '</div>' +
+    '<div class="d-flex gap-2">' +
+    '<button class="btn btn-primary btn-sm" onclick="submitEditBatch(' + b.id + ', ' + (b.sn_tracking ? 'true' : 'false') + ')"><i class="bi bi-save"></i> Save Batch</button>' +
+    (_canDeleteBatch ? '<button class="btn btn-outline-danger btn-sm" onclick="submitDeleteBatch(' + b.id + ', \'' + _esc(b.display_label) + '\')"><i class="bi bi-trash"></i> Delete Batch</button>' : '') +
+    '</div>';
+}
+
+function submitEditBatch(batchId, snTracking) {
+    var payload = {
+        batch_label: (document.getElementById('eb_label')||{}).value || '',
+        manufacturer: (document.getElementById('eb_manuf')||{}).value || '',
+        price_per_unit: parseFloat((document.getElementById('eb_price')||{}).value) || 0,
+        purchase_date: (document.getElementById('eb_date')||{}).value || '',
+        note: (document.getElementById('eb_note')||{}).value || '',
+    };
+    if (!snTracking) payload.quantity = parseInt((document.getElementById('eb_qty')||{}).value) || 0;
+    fetch('/in-out/batch/' + batchId + '/edit', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
+    .then(function(r){ return r.json(); }).then(function(d){
+        if (d.success) { showToast('Batch updated.', 'success'); refreshLog(); }
+        else { alert(d.message || 'Error'); }
+    });
+}
+
+function submitDeleteBatch(batchId, label) {
+    if (!confirm('Delete batch "' + label + '"? This cannot be undone.')) return;
+    fetch('/in-out/batch/' + batchId + '/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+    .then(function(r){ return r.json(); }).then(function(d){
+        if (d.success) {
+            showToast(d.message || 'Batch deleted.', 'success');
+            clearActionForm();
+            document.getElementById('searchResults').innerHTML = '';
+            document.getElementById('inOutSearch').value = '';
+            refreshLog();
+        } else { alert(d.message || 'Error'); }
+    });
+}
+
+/* ── Utilities ── */
+function showToast(msg, type) {
+    var t = document.createElement('div');
+    t.className = 'position-fixed bottom-0 end-0 p-3';
+    t.style.zIndex = 9999;
+    t.innerHTML = '<div class="toast show align-items-center text-white bg-' + (type==='success'?'success':type==='warning'?'warning':'danger') + ' border-0">' +
+        '<div class="d-flex"><div class="toast-body">' + msg + '</div>' +
+        '<button type="button" class="btn-close btn-close-white me-2 m-auto" onclick="this.closest(\'.position-fixed\').remove()"></button></div></div>';
+    document.body.appendChild(t);
+    setTimeout(function(){ t.remove(); }, 4000);
+}
+
+function refreshLog() {
+    setTimeout(function(){ window.location.reload(); }, 1000);
 }
 </script>
 {% endblock %}

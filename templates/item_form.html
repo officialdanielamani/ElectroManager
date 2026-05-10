@@ -317,15 +317,7 @@
                                 </div>
                                 <div class="d-flex gap-1 align-items-center">
                                     <i class="bi bi-chevron-down"></i>
-                                    {% if item_perms and item_perms.can_edit_batch %}
-                                    {% if not batch.sn_tracking_enabled %}
-                                    <button type="button" class="btn btn-sm btn-outline-info py-0 px-1" onclick="event.stopPropagation(); openTransferModal({{ batch.id }}, {{ batch.get_available_quantity() }})" title="Transfer Quantity"><i class="bi bi-arrow-left-right"></i></button>
-                                    <button type="button" class="btn btn-sm py-0 px-1" style="background-color:#c9a227;color:#fff;border-color:#c9a227;" onclick="event.stopPropagation(); openLendManageModal({{ batch.id }}, {{ batch.quantity }})" title="Manage Lending"><i class="bi bi-hand-index-thumb"></i></button>
-                                    <span id="lendPendingBadge_{{ batch.id }}" class="d-none badge bg-warning text-dark align-self-center" style="font-size:0.7rem;">Pending</span>
-                                    {% endif %}
-                                    <button type="button" class="btn btn-sm btn-outline-warning py-0 px-1" onclick="event.stopPropagation(); openEditBatchModal({{ batch.id }}, '{{ batch.batch_label|e if batch.batch_label else '' }}', '{{ batch.manufacturer|e if batch.manufacturer else '' }}', {{ batch.quantity }}, {{ batch.price_per_unit }}, '{{ batch.purchase_date.strftime('%Y-%m-%d') if batch.purchase_date else '' }}', '{{ batch.note|e if batch.note else '' }}', {{ 'true' if batch.sn_tracking_enabled else 'false' }}, {{ 'true' if (batch.follow_main_location if batch.follow_main_location is not none else true) else 'false' }}, {{ batch.location_id or 'null' }}, {{ batch.rack_id or 'null' }}, '{{ batch.drawer|e if batch.drawer else '' }}')" title="Edit"><i class="bi bi-pencil"></i></button>
-                                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="event.stopPropagation(); deleteBatchJS({{ batch.id }}, '{{ batch.get_display_label()|e }}')" title="Delete"><i class="bi bi-trash"></i></button>
-                                    {% endif %}
+                                    <a href="{{ url_for('in_out.in_out') }}" class="btn btn-sm btn-outline-primary py-0 px-1" onclick="event.stopPropagation()" title="Manage lending, return and edit in In/Out page"><i class="bi bi-arrow-left-right"></i> In/Out</a>
                                 </div>
                             </div>
                             <div class="collapse" id="batchBody{{ batch.id }}">
@@ -420,10 +412,6 @@
                                             <input type="number" class="form-control" id="addSnQty{{ batch.id }}" min="1" max="100" value="1" style="width:55px">
                                             <button class="btn btn-outline-success" type="button" onclick="addSnToBatch({{ batch.id }})"><i class="bi bi-plus"></i></button>
                                         </div>
-                                        {% if item_perms and item_perms.can_edit_lending %}
-                                        <button type="button" class="btn btn-sm btn-outline-warning" onclick="openSnBulkLendModal({{ batch.id }})"><i class="bi bi-hand-index-thumb"></i> Manage Lending</button>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="openSnReturnModal({{ batch.id }})"><i class="bi bi-box-arrow-in-left"></i> Manage Return</button>
-                                        {% endif %}
                                         <span id="snUnsavedBadge_{{ batch.id }}" class="d-none badge bg-warning text-dark align-self-center">Pending</span>
                                     </div>
                                     {% endif %}
@@ -445,7 +433,7 @@
                                             <tbody id="snTableBody_{{ batch.id }}"></tbody>
                                         </table>
                                     </div>
-                                    <small class="text-muted">Double-click SN or Info to edit inline. Click Lend to set lending. Use <strong>Manage Lending</strong> for bulk lending. Removed entries kept for record.</small>
+                                    <small class="text-muted">Double-click SN or Info to edit inline. Click Lend to set lending. Use <strong><a href="{{ url_for('in_out.in_out') }}">In/Out page</a></strong> for bulk lending &amp; return. Removed entries kept for record.</small>
                                     {% elif batch.sn_tracking_enabled and batch.serial_numbers|length == 0 and item_perms and item_perms.can_edit_batch %}
                                     <hr class="my-2">
                                     <div class="d-flex align-items-center gap-2">
@@ -2724,130 +2712,6 @@ function batchUpdateDrawerGrid(prefix) {
     </div>
 </div>
 
-<div class="modal fade" id="editBatchModalDialog" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Batch</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="eb_id">
-                <div class="mb-2">
-                    <label class="form-label form-label-sm">Batch Label</label>
-                    <input type="text" class="form-control form-control-sm" id="eb_label" maxlength="32">
-                </div>
-                <div class="mb-2">
-                    <label class="form-label form-label-sm">Manufacturer <small class="text-muted">(optional, max 128)</small></label>
-                    <input type="text" class="form-control form-control-sm" id="eb_manufacturer" maxlength="128">
-                </div>
-                <div id="eb_snInfo" class="mb-2 p-2 bg-light rounded small"></div>
-                <div id="eb_qtySection">
-                    <div class="row mb-2">
-                        <div class="col-4">
-                            <label class="form-label form-label-sm">Quantity</label>
-                            <input type="number" class="form-control form-control-sm" id="eb_qty" min="0" max="99999" oninput="ebCalcFromQtyPrice()">
-                        </div>
-                        <div class="col-4">
-                            <label class="form-label form-label-sm">Price / Unit</label>
-                            <input type="number" class="form-control form-control-sm" id="eb_price" min="0" step="0.0001" oninput="ebCalcFromQtyPrice()">
-                        </div>
-                        <div class="col-4">
-                            <label class="form-label form-label-sm">Total Price <small class="text-muted">(auto)</small></label>
-                            <input type="number" class="form-control form-control-sm" id="eb_total" min="0" step="0.01" oninput="ebCalcFromTotal()">
-                        </div>
-                    </div>
-                    <div class="mb-2"><small class="text-muted"><i class="bi bi-info-circle"></i> Fill any two — third auto-calculates. Qty=0 treated as 1.</small></div>
-                </div>
-                <div id="eb_priceOnlySection" style="display:none;">
-                    <div class="row mb-2">
-                        <div class="col-6">
-                            <label class="form-label form-label-sm">Price / Unit</label>
-                            <input type="number" class="form-control form-control-sm" id="eb_price2" min="0" step="0.0001" oninput="ebCalcFromPrice2()">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label form-label-sm">Total Price <small class="text-muted">(auto)</small></label>
-                            <input type="number" class="form-control form-control-sm" id="eb_total2" min="0" step="0.01" oninput="ebCalcFromTotal2()">
-                        </div>
-                    </div>
-                </div>
-                <div class="mb-2">
-                    <label class="form-label form-label-sm">Date of Purchase</label>
-                    <input type="date" class="form-control form-control-sm" id="eb_date">
-                </div>
-                <div class="mb-2">
-                    <label class="form-label form-label-sm">Note</label>
-                    <input type="text" class="form-control form-control-sm" id="eb_note" maxlength="128">
-                </div>
-                <div class="border rounded p-2 mb-2">
-                    <div class="form-check mb-2">
-                        <input class="form-check-input" type="checkbox" id="eb_follow_main" onchange="ebToggleLocation()">
-                        <label class="form-check-label" for="eb_follow_main">
-                            <strong>Follow Main Location</strong>
-                            <small class="text-muted d-block">Use the item's main physical storage location for this batch.</small>
-                        </label>
-                    </div>
-                    <div id="eb_batchLocSection" style="display:none;">
-                        <div class="btn-group btn-group-sm w-100 mb-2" role="group">
-                            <input type="radio" class="btn-check" name="eb_loc_type" id="eb_type_general" value="general" checked onchange="ebSwitchLocType()">
-                            <label class="btn btn-outline-primary btn-sm" for="eb_type_general"><i class="bi bi-geo-alt"></i> General Location</label>
-                            <input type="radio" class="btn-check" name="eb_loc_type" id="eb_type_drawer" value="drawer" onchange="ebSwitchLocType()">
-                            <label class="btn btn-outline-primary btn-sm" for="eb_type_drawer"><i class="bi bi-grid-3x3-gap"></i> Drawer Storage</label>
-                        </div>
-                        <div id="eb_generalSection">
-                            <label class="form-label form-label-sm">Location</label>
-                            <select class="form-select form-select-sm" id="eb_location_id">
-                                <option value="">— None —</option>
-                                {% for loc in locations %}
-                                <option value="{{ loc.id }}">{{ loc.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div id="eb_drawerSection" style="display:none;">
-                            <div class="row g-2 mb-2" style="position: relative;">
-                                <div class="col-4" style="overflow: visible;">
-                                    <label class="form-label form-label-sm">Location</label>
-                                    <select class="form-select form-select-sm" id="eb_storage_location_select" onchange="batchUpdateStorageRackSelect('eb')">
-                                        <option value="">All</option>
-                                        {% for loc in locations %}
-                                        <option value="{{ loc.id }}">{{ loc.name }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="col-4" style="overflow: visible;">
-                                    <label class="form-label form-label-sm">Rack</label>
-                                    <select class="form-select form-select-sm" id="eb_rack_id" onchange="batchUpdateDrawerGrid('eb')">
-                                        <option value="">Select</option>
-                                        {% for rack in racks %}
-                                        <option value="{{ rack.id }}" data-rows="{{ rack.rows }}" data-cols="{{ rack.cols }}" data-location="{{ rack.physical_location.id if rack.physical_location else '' }}">{{ rack.name }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="col-4" style="overflow: visible;">
-                                    <label class="form-label form-label-sm">Drawer</label>
-                                    <input type="text" class="form-control form-control-sm" id="eb_drawer" maxlength="50" readonly placeholder="Select">
-                                </div>
-                            </div>
-                            <div id="eb_drawer_picker" style="display:none;">
-                                <div class="p-2 border rounded drawer-grid-container">
-                                    <small class="text-muted d-block mb-2">Click to select:</small>
-                                    <div id="eb_drawer_short_info_hint" class="text-info" style="font-size:0.75rem;min-height:1.1em;margin-bottom:4px;"></div>
-                                    <div id="eb_drawer_grid" style="display:inline-grid; gap:4px; background: transparent;"></div>
-                                </div>
-                            </div>
-                            <small class="text-muted d-block">Precise cell-level organization</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="submitEditBatch()"><i class="bi bi-save"></i> Save Changes</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script>
 /* ── Batch card open tracking ── */
 var lastOpenBatchId = null;
@@ -2960,179 +2824,6 @@ function submitAddBatch() {
         .then(function(r) { if (r.redirected) { window.location.href = r.url; } else { reloadKeepBatch(); } })
         .catch(function(e) { alert('Error: ' + e); });
 }
-
-/* ── Edit Batch ── */
-function openEditBatchModal(batchId, label, manufacturer, qty, price, date, note, snTracking, followMain, batchLocId, batchRackId, batchDrawer) {
-    document.getElementById('eb_id').value = batchId;
-    document.getElementById('eb_label').value = label;
-    document.getElementById('eb_manufacturer').value = manufacturer;
-    document.getElementById('eb_qty').value = qty;
-    document.getElementById('eb_price').value = price;
-    document.getElementById('eb_price2').value = price;
-    document.getElementById('eb_date').value = date;
-    document.getElementById('eb_note').value = note;
-    // Per-batch location
-    document.getElementById('eb_follow_main').checked = followMain !== false;
-    document.getElementById('eb_location_id').value = batchLocId || '';
-    document.getElementById('eb_storage_location_select').value = '';
-    batchUpdateStorageRackSelect('eb');
-    document.getElementById('eb_rack_id').value = batchRackId || '';
-    document.getElementById('eb_drawer').value = batchDrawer || '';
-    var ebIsDrawer = !!batchRackId;
-    document.getElementById('eb_type_drawer').checked = ebIsDrawer;
-    document.getElementById('eb_type_general').checked = !ebIsDrawer;
-    document.getElementById('eb_generalSection').style.display = ebIsDrawer ? 'none' : 'block';
-    document.getElementById('eb_drawerSection').style.display = ebIsDrawer ? 'block' : 'none';
-    batchUpdateDrawerGrid('eb');
-    ebToggleLocation();
-    // Pre-fill total fields
-    var displayQty = Math.max(1, parseFloat(qty) || 0);
-    var p = parseFloat(price) || 0;
-    document.getElementById('eb_total').value = (p * displayQty).toFixed(2);
-    document.getElementById('eb_total2').value = (p * displayQty).toFixed(2);
-    if (snTracking) {
-        document.getElementById('eb_qtySection').style.display = 'none';
-        document.getElementById('eb_priceOnlySection').style.display = 'block';
-        document.getElementById('eb_snInfo').innerHTML = '<i class="bi bi-upc-scan"></i> <strong>Tracking Enabled</strong> — Qty: ' + qty + '. Use Add/Delete in SN table to change quantity.';
-        document.getElementById('eb_snInfo').style.display = 'block';
-    } else {
-        document.getElementById('eb_qtySection').style.display = 'block';
-        document.getElementById('eb_priceOnlySection').style.display = 'none';
-        document.getElementById('eb_snInfo').innerHTML = '<i class="bi bi-upc-scan"></i> Tracking: <span class="badge bg-secondary">Disabled</span>';
-        document.getElementById('eb_snInfo').style.display = 'block';
-    }
-    new bootstrap.Modal(document.getElementById('editBatchModalDialog')).show();
-}
-function ebToggleLocation() {
-    var follow = document.getElementById('eb_follow_main').checked;
-    document.getElementById('eb_batchLocSection').style.display = follow ? 'none' : 'block';
-}
-function ebSwitchLocType() {
-    var isDrawer = document.getElementById('eb_type_drawer').checked;
-    document.getElementById('eb_generalSection').style.display = isDrawer ? 'none' : 'block';
-    document.getElementById('eb_drawerSection').style.display = isDrawer ? 'block' : 'none';
-    if (isDrawer) {
-        document.getElementById('eb_location_id').value = '';
-        batchUpdateDrawerGrid('eb');
-    } else {
-        document.getElementById('eb_rack_id').value = '';
-        document.getElementById('eb_drawer').value = '';
-        document.getElementById('eb_drawer_picker').style.display = 'none';
-    }
-}
-/* Auto-calc helpers for Edit Batch (non-SN) */
-function ebCalcFromQtyPrice() {
-    var qty = parseFloat(document.getElementById('eb_qty').value) || 0;
-    var price = parseFloat(document.getElementById('eb_price').value) || 0;
-    document.getElementById('eb_total').value = (price * Math.max(1, qty)).toFixed(2);
-}
-function ebCalcFromTotal() {
-    var qty = parseFloat(document.getElementById('eb_qty').value) || 0;
-    var total = parseFloat(document.getElementById('eb_total').value) || 0;
-    document.getElementById('eb_price').value = (total / Math.max(1, qty)).toFixed(4);
-}
-/* Auto-calc helpers for Edit Batch (SN-tracking, price-only) */
-function ebCalcFromPrice2() {
-    var price = parseFloat(document.getElementById('eb_price2').value) || 0;
-    document.getElementById('eb_total2').value = price.toFixed(2);
-}
-function ebCalcFromTotal2() {
-    var total = parseFloat(document.getElementById('eb_total2').value) || 0;
-    document.getElementById('eb_price2').value = total.toFixed(4);
-}
-function submitEditBatch() {
-    var batchId = document.getElementById('eb_id').value;
-    var fd = new FormData();
-    fd.append('batch_label', document.getElementById('eb_label').value);
-    fd.append('manufacturer', document.getElementById('eb_manufacturer').value);
-    var snTracking = document.getElementById('eb_qtySection').style.display === 'none';
-    if (snTracking) {
-        fd.append('quantity', document.getElementById('eb_qty').value);
-        fd.append('price_per_unit', document.getElementById('eb_price2').value);
-    } else {
-        fd.append('quantity', document.getElementById('eb_qty').value);
-        fd.append('price_per_unit', document.getElementById('eb_price').value);
-    }
-    fd.append('purchase_date', document.getElementById('eb_date').value);
-    fd.append('note', document.getElementById('eb_note').value);
-    if (document.getElementById('eb_follow_main').checked) {
-        fd.append('follow_main_location', 'on');
-    } else if (document.getElementById('eb_type_drawer').checked) {
-        fd.append('batch_rack_id', document.getElementById('eb_rack_id').value);
-        fd.append('batch_drawer', document.getElementById('eb_drawer').value);
-    } else {
-        fd.append('batch_location_id', document.getElementById('eb_location_id').value);
-    }
-    fetch('/item/{{ item.uuid }}/batch/' + batchId + '/edit', { method: 'POST', body: fd })
-        .then(function(r) {
-            if (r.ok || r.redirected) {
-                bootstrap.Modal.getInstance(document.getElementById('editBatchModalDialog')).hide();
-                lastOpenBatchId = batchId;
-                reloadKeepBatch();
-            } else {
-                alert('Error saving batch changes.');
-            }
-        })
-        .catch(function(e) { alert('Error: ' + e); });
-}
-
-/* ── Delete Batch ── */
-function deleteBatchJS(batchId, label) {
-    if (!confirm('Delete batch "' + label + '"?')) return;
-    fetch('/item/{{ item.uuid }}/batch/' + batchId + '/delete', { method: 'POST' })
-        .then(function(r) { if (r.redirected) { window.location.href = r.url; } else { reloadKeepBatch(); } })
-        .catch(function(e) { alert('Error: ' + e); });
-}
-
-/* ── Qty Transfer Modal ── */
-var currentTransferFromBatchId = null;
-function openTransferModal(batchId, availableQty) {
-    if (availableQty <= 0) {
-        alert('No available quantity to transfer. Please ensure items are not fully lent or used in a project.');
-        return;
-    }
-    currentTransferFromBatchId = batchId;
-    document.getElementById('transfer_from_batch_id').value = batchId;
-    var qtyInput = document.getElementById('transfer_qty_input');
-    qtyInput.max = availableQty;
-    qtyInput.value = 1;
-    document.getElementById('transfer_max_hint').textContent = '(Max available: ' + availableQty + ')';
-
-    var sel = document.getElementById('transfer_to_batch_id');
-    for (var i = 0; i < sel.options.length; i++) {
-        var opt = sel.options[i];
-        if (opt.value === "") continue;
-        var optId = parseInt(opt.value);
-        if (optId === batchId) {
-            opt.style.display = 'none';
-        } else {
-            opt.style.display = '';
-        }
-    }
-    sel.value = '';
-    new bootstrap.Modal(document.getElementById('transferModalDialog')).show();
-}
-
-function submitTransferBatch() {
-    var fromId = currentTransferFromBatchId;
-    var toId = document.getElementById('transfer_to_batch_id').value;
-    var qty = parseInt(document.getElementById('transfer_qty_input').value);
-    var maxQty = parseInt(document.getElementById('transfer_qty_input').max);
-
-    if (!toId) { alert('Select a destination batch.'); return; }
-    if (!qty || qty <= 0) { alert('Enter a valid quantity.'); return; }
-    if (qty > maxQty) { alert('Cannot transfer more than available quantity (' + maxQty + ').'); return; }
-
-    var fd = new FormData();
-    fd.append('from_batch_id', fromId);
-    fd.append('to_batch_id', toId);
-    fd.append('transfer_quantity', qty);
-
-    fetch('/item/{{ item.uuid }}/batch/transfer', { method: 'POST', body: fd })
-        .then(function(r) { reloadKeepBatch(); })
-        .catch(function(e) { alert('Error: ' + e); });
-}
-
 
 /* ── SN: Select all checkbox ── */
 function toggleAllSn(source, batchId) {
@@ -3272,292 +2963,6 @@ function saveEditDetails() {
 var _snBulkEditBatchId = null;
 
 
-/* ── Lending Management Modal ── */
-{% if item is defined %}
-var _batchLendData = {{ batch_lend_data|tojson if batch_lend_data is defined else '{}'|safe }};
-var _snAllData     = {{ sn_all_data|tojson if sn_all_data is defined else '{}'|safe }};
-{% else %}
-var _batchLendData = {};
-var _snAllData = {};
-{% endif %}
-var _lmBatchId = null;
-var _lmBatchQty = 0;
-var _lmLendRecords = [];
-var _lrMode = 'add';
-var _lrEditIdx = -1;
-var _lrSearchTimer = null;
-
-function openLendManageModal(batchId, batchQty) {
-    _lmBatchId = batchId;
-    _lmBatchQty = batchQty;
-    _lmLendRecords = JSON.parse(JSON.stringify(_batchLendData[batchId] || []));
-    renderLendRecordsTable();
-    cancelLrForm();
-    new bootstrap.Modal(document.getElementById('lendManageModal')).show();
-}
-
-function submitLendManage() {
-    _batchLendData[_lmBatchId] = JSON.parse(JSON.stringify(_lmLendRecords));
-    _lendDirtyBatches[_lmBatchId] = true;
-    bootstrap.Modal.getInstance(document.getElementById('lendManageModal')).hide();
-    _updateLendSaveBtn(_lmBatchId);
-}
-
-var _lendDirtyBatches = {};
-function _updateLendSaveBtn(batchId) {
-    var badge = document.getElementById('lendPendingBadge_' + batchId);
-    if (badge) badge.classList.toggle('d-none', !_lendDirtyBatches[batchId]);
-    _updatePendingBanner();
-}
-function _updatePendingBanner() {
-    var banner = document.getElementById('pendingChangesBanner');
-    if (!banner) return;
-    var hasSnChanges = Object.keys(_snState||{}).some(function(bid){ return _snHasChanges(parseInt(bid)); });
-    var hasLendChanges = Object.keys(_lendDirtyBatches||{}).some(function(bid){ return _lendDirtyBatches[bid]; });
-    banner.classList.toggle('d-none', !(hasSnChanges || hasLendChanges));
-}
-
-function formatLendDateTime(s) {
-    if (!s) return '—';
-    var d = new Date(s);
-    if (isNaN(d.getTime())) return s;
-    var dd = String(d.getDate()).padStart(2,'0');
-    var mm = String(d.getMonth()+1).padStart(2,'0');
-    var yyyy = d.getFullYear();
-    var hh = d.getHours(), min = d.getMinutes();
-    if (hh === 0 && min === 0) return dd+'/'+mm+'/'+yyyy;
-    return dd+'/'+mm+'/'+yyyy+' '+String(hh).padStart(2,'0')+':'+String(min).padStart(2,'0');
-}
-
-function renderLendRecordsTable() {
-    var el = document.getElementById('lm_lend_records_table');
-    if (!el) return;
-    if (!_lmLendRecords.length) {
-        el.innerHTML = '<div class="text-muted small p-1">No lending records yet.</div>';
-        return;
-    }
-    var rows = _lmLendRecords.map(function(r, i) {
-        var label = (r.label || '—').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        var note = r.lend_note ? ('<span class="text-muted" title="' + r.lend_note.replace(/"/g,'&quot;') + '"><i class="bi bi-sticky"></i> ' + r.lend_note.replace(/</g,'&lt;').replace(/>/g,'&gt;').slice(0, 30) + (r.lend_note.length > 30 ? '…' : '') + '</span>') : '—';
-        var notify = r.notify ? '<i class="bi bi-bell-fill text-warning" title="Remind ' + (r.days||3) + ' days before"></i>' : '—';
-        return '<tr>' +
-            '<td><input type="checkbox" class="form-check-input lend-return-check" value="' + i + '"></td>' +
-            '<td class="small">' + label + '</td>' +
-            '<td class="small text-center">' + (r.qty||1) + '</td>' +
-            '<td class="small">' + formatLendDateTime(r.start) + '</td>' +
-            '<td class="small">' + formatLendDateTime(r.end) + '</td>' +
-            '<td class="small">' + note + '</td>' +
-            '<td class="text-center">' + notify + '</td>' +
-            '<td class="text-end text-nowrap">' +
-            '<button type="button" class="btn btn-link btn-sm p-0 me-1 text-primary" onclick="editLendRecord(' + i + ')"><i class="bi bi-pencil"></i></button>' +
-            '<button type="button" class="btn btn-link btn-sm p-0 text-danger" onclick="deleteLendRecord(' + i + ')"><i class="bi bi-trash"></i></button>' +
-            '</td></tr>';
-    }).join('');
-    el.innerHTML = '<table class="table table-sm table-bordered mb-0 small">' +
-        '<thead class="table-light"><tr><th style="width:25px"></th><th>Lend To</th><th class="text-center">Qty</th><th>Start</th><th>End</th><th>Notes</th><th class="text-center"><i class="bi bi-bell" title="Notify"></i></th><th></th></tr></thead>' +
-        '<tbody>' + rows + '</tbody></table>';
-}
-
-function showLrForm(mode) {
-    _lrMode = mode;
-    if (mode === 'add') {
-        _lrEditIdx = -1;
-        document.getElementById('lr_to_type').value = '';
-        document.getElementById('lr_to_id').value = '';
-        document.getElementById('lr_to_label').textContent = 'Click to search contact...';
-        document.getElementById('lr_to_label').className = 'small text-muted';
-        document.getElementById('lr_to_clear').style.display = 'none';
-        document.getElementById('lr_qty').value = 1;
-        document.getElementById('lr_start').value = '';
-        document.getElementById('lr_end').value = '';
-        document.getElementById('lr_note').value = '';
-        document.getElementById('lr_notify').checked = false;
-        document.getElementById('lr_notify_days').value = 3;
-        document.getElementById('lr_notify_days_section').style.display = 'none';
-        document.getElementById('lr_search_panel').style.display = 'none';
-        document.getElementById('lr_save_btn').innerHTML = '<i class="bi bi-plus"></i> Add';
-    }
-    var slot = document.getElementById('lm_lr_form_slot');
-    var form = document.getElementById('lr_shared_form');
-    slot.appendChild(form);
-    form.style.display = '';
-}
-
-function editLendRecord(idx) {
-    var r = _lmLendRecords[idx];
-    if (!r) return;
-    _lrMode = 'edit';
-    _lrEditIdx = idx;
-    document.getElementById('lr_to_type').value = r.type || '';
-    document.getElementById('lr_to_id').value = r.contact_id || '';
-    var lbl = document.getElementById('lr_to_label');
-    if (r.label) { lbl.textContent = r.label; lbl.className = 'small'; document.getElementById('lr_to_clear').style.display = ''; }
-    else { lbl.textContent = 'Click to search contact...'; lbl.className = 'small text-muted'; document.getElementById('lr_to_clear').style.display = 'none'; }
-    document.getElementById('lr_qty').value = r.qty || 1;
-    document.getElementById('lr_start').value = r.start || '';
-    document.getElementById('lr_end').value = r.end || '';
-    document.getElementById('lr_note').value = r.lend_note || '';
-    document.getElementById('lr_notify').checked = !!r.notify;
-    document.getElementById('lr_notify_days').value = r.days || 3;
-    document.getElementById('lr_notify_days_section').style.display = r.notify ? '' : 'none';
-    document.getElementById('lr_search_panel').style.display = 'none';
-    document.getElementById('lr_save_btn').innerHTML = '<i class="bi bi-save"></i> Update';
-    var slot = document.getElementById('lm_lr_form_slot');
-    var form = document.getElementById('lr_shared_form');
-    slot.appendChild(form);
-    form.style.display = '';
-}
-
-function deleteLendRecord(idx) {
-    _lmLendRecords.splice(idx, 1);
-    renderLendRecordsTable();
-}
-
-function cancelLrForm() {
-    document.getElementById('lr_shared_form').style.display = 'none';
-    document.getElementById('lr_search_panel').style.display = 'none';
-}
-
-function saveLrForm() {
-    var lbl = document.getElementById('lr_to_label');
-    var contactId = document.getElementById('lr_to_id').value ? parseInt(document.getElementById('lr_to_id').value) : null;
-    if (!contactId) {
-        document.getElementById('lr_to_label').style.outline = '2px solid red';
-        setTimeout(function() { document.getElementById('lr_to_label').style.outline = ''; }, 1800);
-        alert('Lend to contact is required. Please search and select a contact.');
-        return;
-    }
-    var label = (lbl.className.indexOf('text-muted') !== -1) ? '' : lbl.textContent;
-    var record = {
-        type: document.getElementById('lr_to_type').value,
-        contact_id: contactId,
-        label: label,
-        qty: parseInt(document.getElementById('lr_qty').value) || 1,
-        start: document.getElementById('lr_start').value,
-        end: document.getElementById('lr_end').value,
-        lend_note: document.getElementById('lr_note').value.trim().slice(0, 128),
-        notify: document.getElementById('lr_notify').checked,
-        days: parseInt(document.getElementById('lr_notify_days').value) || 3
-    };
-    if (_lrMode === 'edit' && _lrEditIdx >= 0) _lmLendRecords[_lrEditIdx] = record;
-    else _lmLendRecords.push(record);
-    cancelLrForm();
-    renderLendRecordsTable();
-}
-
-function showReturnForm() {
-    var checked = document.querySelectorAll('.lend-return-check:checked');
-    if (checked.length === 0) { alert('Select at least one lending record to return.'); return; }
-    document.getElementById('lmReturnForm').classList.remove('d-none');
-    // Set qty to sum of selected records
-    var total = 0;
-    checked.forEach(function(cb) {
-        var idx = parseInt(cb.value);
-        if (_lmLendRecords[idx]) total += (_lmLendRecords[idx].qty || 1);
-    });
-    document.getElementById('lmReturnQty').value = total;
-    document.getElementById('lmReturnQty').max = total;
-}
-
-function hideReturnForm() {
-    document.getElementById('lmReturnForm').classList.add('d-none');
-}
-
-function doReturnLending() {
-    var checked = document.querySelectorAll('.lend-return-check:checked');
-    if (checked.length === 0) { alert('Select at least one lending record to return.'); return; }
-    var returnDatetime = document.getElementById('lmReturnDatetime').value;
-    var returnQty = parseInt(document.getElementById('lmReturnQty').value) || 1;
-    var returnNotes = document.getElementById('lmReturnNotes').value.trim().slice(0, 128);
-
-    checked.forEach(function(cb) {
-        var idx = parseInt(cb.value);
-        if (!_lmLendRecords[idx]) return;
-        var rec = _lmLendRecords[idx];
-        var lendQty = rec.qty || 1;
-        if (returnQty >= lendQty) {
-            // Full return — mark record as returned (will be removed)
-            _lmLendRecords[idx]._returned = true;
-            _lmLendRecords[idx]._return_datetime = returnDatetime;
-            _lmLendRecords[idx]._return_notes = returnNotes;
-        } else {
-            // Partial return — reduce qty
-            _lmLendRecords[idx].qty = lendQty - returnQty;
-            _lmLendRecords[idx]._partial_return = true;
-            _lmLendRecords[idx]._return_datetime = returnDatetime;
-            _lmLendRecords[idx]._return_notes = returnNotes;
-        }
-    });
-
-    // Remove fully returned records from the display array
-    _lmLendRecords = _lmLendRecords.filter(function(r) { return !r._returned; });
-
-    renderLendRecordsTable();
-    hideReturnForm();
-}
-
-function toggleLrSearch() {
-    var panel = document.getElementById('lr_search_panel');
-    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
-    panel.style.display = '';
-    document.getElementById('lr_search_input').value = '';
-    document.getElementById('lr_search_input').focus();
-    doLrSearch();
-}
-
-function doLrSearch() {
-    clearTimeout(_lrSearchTimer);
-    _lrSearchTimer = setTimeout(function() {
-        var q = document.getElementById('lr_search_input').value.trim();
-        var resultsDiv = document.getElementById('lr_search_results');
-        resultsDiv.innerHTML = '<div class="text-muted small p-1">Loading...</div>';
-        fetch('/api/contacts/all?q=' + encodeURIComponent(q))
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (!data.length) { resultsDiv.innerHTML = '<div class="text-muted small p-1">No contacts found.</div>'; return; }
-                var icons = {user:'bi-person-circle', person:'bi-person', organization:'bi-building', group:'bi-people'};
-                var badges = {user:'bg-primary', person:'bg-secondary', organization:'bg-success', group:'bg-info'};
-                resultsDiv.innerHTML = data.map(function(c) {
-                    var icon = icons[c.type] || 'bi-person';
-                    var badge = badges[c.type] || 'bg-secondary';
-                    var lbl = (c.label||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-                    var extra = c.extra ? '<small class="text-muted d-block">' + c.extra.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</small>' : '';
-                    var rawLabel = (c.label||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-                    return '<div class="d-flex align-items-center gap-2 p-1 border-bottom" style="cursor:pointer;" ' +
-                        'onclick="selectLrContact(\'' + c.type + '\',' + c.id + ',\'' + rawLabel + '\')">' +
-                        '<i class="bi ' + icon + ' text-muted small"></i>' +
-                        '<div class="flex-grow-1"><div class="small">' + lbl + '</div>' + extra + '</div>' +
-                        '<span class="badge ' + badge + '" style="font-size:0.65rem">' + c.type + '</span></div>';
-                }).join('');
-            })
-            .catch(function() { resultsDiv.innerHTML = '<div class="text-danger small p-1">Search failed.</div>'; });
-    }, 300);
-}
-
-function selectLrContact(type, id, label) {
-    document.getElementById('lr_to_type').value = type;
-    document.getElementById('lr_to_id').value = id;
-    var lbl = document.getElementById('lr_to_label');
-    lbl.textContent = label;
-    lbl.className = 'small';
-    document.getElementById('lr_to_clear').style.display = '';
-    document.getElementById('lr_search_panel').style.display = 'none';
-}
-
-function clearLrContact() {
-    document.getElementById('lr_to_type').value = '';
-    document.getElementById('lr_to_id').value = '';
-    var lbl = document.getElementById('lr_to_label');
-    lbl.textContent = 'Click to search contact...';
-    lbl.className = 'small text-muted';
-    document.getElementById('lr_to_clear').style.display = 'none';
-}
-
-function toggleLrNotify() {
-    document.getElementById('lr_notify_days_section').style.display =
-        document.getElementById('lr_notify').checked ? '' : 'none';
-}
-
 /* ── SN Lend Shared Form (snlend + snbulk) ── */
 var _snlActiveBatchId = null;
 var _snlSearchTimer = null;
@@ -3691,107 +3096,14 @@ function submitSnLend() {
     _snRender(batchId);
 }
 
-/* ── Bulk SN Lend Modal ── */
-var _snBulkBatchId = null;
-function openSnBulkLendModal(batchId) {
-    _snBulkBatchId = batchId;
-    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
-    if (!checked.length) { alert('Select at least one serial number first.'); return; }
-    document.getElementById('snBulkLend_info').textContent = checked.length + ' SN(s) selected';
-    _snlMoveForm('snbulk_form_slot');
-    _snlResetForm('', '', '', '', '', false, 3, '');
-    new bootstrap.Modal(document.getElementById('snBulkLendModal')).show();
-}
-var _snReturnBatchId = null;
-function openSnReturnModal(batchId) {
-    var s = _snState[batchId];
-    if (!s) return;
-    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
-    var lentChecked = Array.from(checked).filter(function(cb) {
-        var id = parseInt(cb.value);
-        var row = s.rows.find(function(r) { return r.id === id; });
-        return row && row.lend_to_id && !row._del && !row._add;
-    });
-    if (lentChecked.length === 0) { alert('Select at least one currently lent serial number to return.'); return; }
-    _snReturnBatchId = batchId;
-    document.getElementById('snReturnCount').textContent = lentChecked.length;
-    document.getElementById('snReturnDatetime').value = '';
-    document.getElementById('snReturnNotes').value = '';
-    new bootstrap.Modal(document.getElementById('snReturnModalDialog')).show();
-}
-
-function doSnReturn() {
-    var batchId = _snReturnBatchId;
-    var s = _snState[batchId];
-    if (!s) return;
-    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
-    var returnDatetime = document.getElementById('snReturnDatetime').value;
-    var returnNotes = document.getElementById('snReturnNotes').value.trim().slice(0, 128);
-
-    Array.from(checked).forEach(function(cb) {
-        var id = parseInt(cb.value);
-        var row = s.rows.find(function(r) { return r.id === id; });
-        if (!row || !row.lend_to_id) return;
-        // Mark as returned: clear lending fields, mark lend_dirty
-        row.lend_to_id = null;
-        row.lend_to_type = '';
-        row.lend_display = '';
-        row.lend_start = '';
-        row.lend_end = '';
-        row.lend_note = returnNotes;
-        row._lend_dirty = true;
-        row._return_datetime = returnDatetime;
-        row._return_notes = returnNotes;
-    });
-
-    _snRender(batchId);
-    _snUpdateSaveBtn(batchId);
-    bootstrap.Modal.getInstance(document.getElementById('snReturnModalDialog')).hide();
-}
-
-function submitSnBulkLend(clearMode) {
-    var checked = document.querySelectorAll('.sn-check-' + _snBulkBatchId + ':checked:not([disabled])');
-    if (!checked.length) { alert('No SNs selected.'); return; }
-    var snIds = Array.from(checked).map(function(cb) { return parseInt(cb.value); });
-    var s = _snState[_snBulkBatchId];
-    if (!s) return;
-    var lendId = null, lendType = '', lendDisplay = '', lendStart = '', lendEnd = '', lendNote = '', lendNotify = false, lendDays = 3;
-    if (!clearMode) {
-        var lendIdRaw = document.getElementById('snl_to_id').value;
-        lendId = lendIdRaw ? parseInt(lendIdRaw) : null;
-        if (!lendId) {
-            document.getElementById('snl_to_label').style.outline = '2px solid red';
-            setTimeout(function() { document.getElementById('snl_to_label').style.outline = ''; }, 1800);
-            alert('Lend to contact is required.');
-            return;
-        }
-        lendType    = document.getElementById('snl_to_type').value;
-        lendDisplay = document.getElementById('snl_to_label').textContent.trim();
-        lendStart   = document.getElementById('snl_start').value;
-        lendEnd     = document.getElementById('snl_end').value;
-        lendNote    = document.getElementById('snl_note').value.trim().slice(0,128);
-        lendNotify  = document.getElementById('snl_notify').checked;
-        lendDays    = parseInt(document.getElementById('snl_notify_days').value) || 3;
-    }
-    s.rows.forEach(function(row) {
-        if (snIds.indexOf(row.id) === -1 || row.is_deleted || row._del || row._add) return;
-        row.lend_to_id   = lendId;
-        row.lend_to_type = lendType;
-        row.lend_display = lendDisplay;
-        row.lend_start   = lendStart;
-        row.lend_end     = lendEnd;
-        row.lend_note    = lendNote;
-        row.lend_notify  = lendNotify;
-        row.lend_days    = lendDays;
-        row._lend_dirty  = true;
-    });
-    bootstrap.Modal.getInstance(document.getElementById('snBulkLendModal')).hide();
-    _snRender(_snBulkBatchId);
-}
-
 /* ══════════════════════════════════════════════════════════
    SN STATE MANAGER — all changes local until Save SN Changes
    ══════════════════════════════════════════════════════════ */
+{% if item is defined %}
+var _snAllData = {{ sn_all_data|tojson if sn_all_data is defined else '{}'|safe }};
+{% else %}
+var _snAllData = {};
+{% endif %}
 var _snState = {};   // batchId -> { rows: [...], _nextTempId: -1 }
 
 function _esc(s) {
@@ -3811,6 +3123,13 @@ function _snInit(batchId) {
 function _snHasChanges(batchId) {
     var s = _snState[batchId]; if (!s) return false;
     return s.rows.some(function(r) { return r._add||r._del||r._dirty||r._lend_dirty; });
+}
+
+function _updatePendingBanner() {
+    var banner = document.getElementById('pendingChangesBanner');
+    if (!banner) return;
+    var hasSnChanges = Object.keys(_snState||{}).some(function(bid){ return _snHasChanges(parseInt(bid)); });
+    banner.classList.toggle('d-none', !hasSnChanges);
 }
 
 function _snUpdateSaveBtn(batchId) {
@@ -3900,14 +3219,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             var snField = document.getElementById('pending_sn_changes');
             if (snField) snField.value = JSON.stringify(snChanges);
-
-            // Serialize all pending lend changes for normal batches
-            var lendChanges = {};
-            Object.keys(_lendDirtyBatches).forEach(function(bid) {
-                if (_lendDirtyBatches[bid]) lendChanges[bid] = _batchLendData[bid] || [];
-            });
-            var lendField = document.getElementById('pending_lend_changes');
-            if (lendField) lendField.value = JSON.stringify(lendChanges);
         });
     }
 });
@@ -3937,7 +3248,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
                 <div class="alert alert-info py-1 px-2 small mb-0">
-                    <i class="bi bi-info-circle"></i> To set lending, use the <strong>Manage Lending</strong> button in the batch toolbar.
+                    <i class="bi bi-info-circle"></i> To set lending, use the <strong><a href="{{ url_for('in_out.in_out') }}" target="_blank">In/Out page</a></strong>.
                 </div>
             </div>
             <div class="modal-footer">
@@ -3948,39 +3259,6 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 </div>
 
-<div class="modal fade" id="transferModalDialog" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Transfer Between Batches</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="transfer_from_batch_id">
-                <div class="alert alert-info p-2 small">
-                    <i class="bi bi-info-circle"></i> Transfer non-tracked batch quantities. Max qty restricted to actual available components.
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">To Batch</label>
-                    <select class="form-select" id="transfer_to_batch_id">
-                        <option value="">-- Select Destination Batch --</option>
-                        {% for b in item.batches %}
-                        <option value="{{ b.id }}">{{ b.get_display_label() }} (Qty: {{ b.quantity }}){% if b.sn_tracking_enabled %} [Tracking]{% endif %}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Transfer Quantity <span id="transfer_max_hint" class="text-muted"></span></label>
-                    <input type="number" class="form-control" id="transfer_qty_input" min="1" value="1">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-info" onclick="submitTransferBatch()"><i class="bi bi-arrow-left-right"></i> Transfer</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <div class="modal fade" id="deleteSnModalDialog" tabindex="-1">
     <div class="modal-dialog">
@@ -4012,32 +3290,6 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-danger" onclick="doDeleteSn()"><i class="bi bi-trash"></i> Confirm Remove</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="snReturnModalDialog" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
-                <h5 class="modal-title"><i class="bi bi-box-arrow-in-left"></i> Return Serial Numbers</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p class="mb-2">Returning <strong><span id="snReturnCount">0</span></strong> selected lent unit(s).</p>
-                <div class="mb-2">
-                    <label class="form-label form-label-sm">Return Date/Time <span class="text-muted">(optional)</span></label>
-                    <input type="datetime-local" class="form-control form-control-sm" id="snReturnDatetime">
-                </div>
-                <div class="mb-2">
-                    <label class="form-label form-label-sm">Return Notes <small class="text-muted">(max 128 chars)</small></label>
-                    <input type="text" class="form-control form-control-sm" id="snReturnNotes" maxlength="128" placeholder="Optional notes about this return">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-warning" onclick="doSnReturn()"><i class="bi bi-check-circle"></i> Confirm Return</button>
             </div>
         </div>
     </div>
@@ -4376,204 +3628,6 @@ document.addEventListener('DOMContentLoaded', function() {
 })();
 </script>
 {% endif %}
-
-<!-- Manage Lending Modal -->
-<div class="modal fade" id="lendManageModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header py-2">
-                <h5 class="modal-title"><i class="bi bi-hand-index-thumb text-warning"></i> Manage Lending &amp; Return</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-3">
-                <div id="lm_lend_records_table" class="mb-2"></div>
-                <div id="lmReturnForm" class="d-none mt-3 border-top pt-3">
-                    <h6><i class="bi bi-box-arrow-in-left"></i> Return Selected Lending</h6>
-                    <div class="row g-2 mb-2">
-                        <div class="col-md-6">
-                            <label class="form-label form-label-sm">Return Date/Time <span class="text-muted">(optional)</span></label>
-                            <input type="datetime-local" class="form-control form-control-sm" id="lmReturnDatetime">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label form-label-sm">Qty to Return</label>
-                            <input type="number" class="form-control form-control-sm" id="lmReturnQty" min="1" value="1">
-                        </div>
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label form-label-sm">Return Notes <small class="text-muted">(max 128 chars)</small></label>
-                        <input type="text" class="form-control form-control-sm" id="lmReturnNotes" maxlength="128" placeholder="Optional notes about this return">
-                    </div>
-                    <button type="button" class="btn btn-warning btn-sm" onclick="doReturnLending()"><i class="bi bi-check-circle"></i> Confirm Return</button>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="hideReturnForm()">Cancel</button>
-                </div>
-                <div id="lm_lr_form_slot"></div>
-                <div class="d-flex gap-2 mt-1">
-                    <button type="button" class="btn btn-outline-warning btn-sm" onclick="showLrForm('add')"><i class="bi bi-plus"></i> Add Lending Record</button>
-                    <button type="button" class="btn btn-sm btn-outline-warning" id="lmReturnBtn" onclick="showReturnForm()"><i class="bi bi-box-arrow-in-left"></i> Return</button>
-                </div>
-            </div>
-            <div class="modal-footer py-2">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="submitLendManage()"><i class="bi bi-save"></i> Save</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Shared Lend Record Sub-form (moved dynamically into active modal slot) -->
-<div id="lr_shared_form" style="display:none;" class="border rounded p-2 bg-light">
-    <div class="mb-2">
-        <label class="form-label form-label-sm mb-1">Contact</label>
-        <input type="hidden" id="lr_to_type">
-        <input type="hidden" id="lr_to_id">
-        <div class="border rounded px-2 py-1 d-flex align-items-center justify-content-between"
-             style="cursor:pointer; background:var(--bs-body-bg); min-height:31px;"
-             onclick="toggleLrSearch()">
-            <span id="lr_to_label" class="small text-muted">Click to search contact...</span>
-            <i class="bi bi-x text-danger" id="lr_to_clear" style="display:none;"
-               onclick="event.stopPropagation(); clearLrContact()"></i>
-        </div>
-        <div id="lr_search_panel" style="display:none;" class="mt-1">
-            <input type="text" class="form-control form-control-sm" id="lr_search_input"
-                   placeholder="Search by name, email..." oninput="doLrSearch()">
-            <div id="lr_search_results" class="border rounded"
-                 style="max-height:180px; overflow-y:auto; background:var(--bs-body-bg);"></div>
-        </div>
-    </div>
-    <div class="row g-2 mb-2">
-        <div class="col-4">
-            <label class="form-label form-label-sm mb-1">Quantity</label>
-            <input type="number" class="form-control form-control-sm" id="lr_qty" min="1" value="1">
-        </div>
-        <div class="col-4">
-            <label class="form-label form-label-sm mb-1">Start <small class="text-muted">(date+time optional)</small></label>
-            <input type="datetime-local" class="form-control form-control-sm" id="lr_start">
-        </div>
-        <div class="col-4">
-            <label class="form-label form-label-sm mb-1">End <small class="text-muted">(date+time optional)</small></label>
-            <input type="datetime-local" class="form-control form-control-sm" id="lr_end">
-        </div>
-    </div>
-    <div class="mb-2">
-        <label class="form-label form-label-sm mb-1">Lending Notes <small class="text-muted">(max 128, optional)</small></label>
-        <input type="text" class="form-control form-control-sm" id="lr_note" maxlength="128" placeholder="Optional note about this lending">
-    </div>
-    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-        <div class="form-check form-switch mb-0">
-            <input class="form-check-input" type="checkbox" id="lr_notify" onchange="toggleLrNotify()">
-            <label class="form-check-label small" for="lr_notify">Notify</label>
-        </div>
-        <div id="lr_notify_days_section" style="display:none;">
-            <div class="input-group input-group-sm">
-                <span class="input-group-text">Remind</span>
-                <input type="number" class="form-control" id="lr_notify_days" min="1" value="3" style="width:50px">
-                <span class="input-group-text">days before</span>
-            </div>
-        </div>
-    </div>
-    <div class="d-flex gap-2">
-        <button type="button" class="btn btn-sm btn-primary" id="lr_save_btn" onclick="saveLrForm()"><i class="bi bi-plus"></i> Add</button>
-        <button type="button" class="btn btn-sm btn-secondary" onclick="cancelLrForm()">Cancel</button>
-    </div>
-</div>
-
-<!-- Lend Contact Picker Modal -->
-<!-- Shared SN Lend Form (moved dynamically into active SN modal slot) -->
-<div id="snl_shared_form" style="display:none;">
-    <div class="mb-2">
-        <label class="form-label form-label-sm mb-1">Contact <span class="text-danger">*</span></label>
-        <input type="hidden" id="snl_to_type">
-        <input type="hidden" id="snl_to_id">
-        <div class="border rounded px-2 py-1 d-flex align-items-center justify-content-between"
-             style="cursor:pointer; background:var(--bs-body-bg); min-height:31px;"
-             onclick="toggleSnlSearch()">
-            <span id="snl_to_label" class="small text-muted">Click to search contact...</span>
-            <i class="bi bi-x text-danger" id="snl_to_clear" style="display:none;"
-               onclick="event.stopPropagation(); clearSnlContact()"></i>
-        </div>
-        <div id="snl_search_panel" style="display:none;" class="mt-1">
-            <input type="text" class="form-control form-control-sm" id="snl_search_input"
-                   placeholder="Search by name, email..." oninput="doSnlSearch()">
-            <div id="snl_search_results" class="border rounded"
-                 style="max-height:200px; overflow-y:auto; background:var(--bs-body-bg);"></div>
-        </div>
-    </div>
-    <div class="mb-2">
-        <label class="form-label form-label-sm mb-1">Lending Notes <small class="text-muted">(max 128, optional)</small></label>
-        <input type="text" class="form-control form-control-sm" id="snl_note" maxlength="128" placeholder="Optional note about this lending">
-    </div>
-    <div class="row g-2 mb-2">
-        <div class="col-6">
-            <label class="form-label form-label-sm mb-1">Start <small class="text-muted">(date+time optional)</small></label>
-            <input type="datetime-local" class="form-control form-control-sm" id="snl_start">
-        </div>
-        <div class="col-6">
-            <label class="form-label form-label-sm mb-1">End <small class="text-muted">(date+time optional)</small></label>
-            <input type="datetime-local" class="form-control form-control-sm" id="snl_end">
-        </div>
-    </div>
-    <div class="d-flex flex-wrap align-items-center gap-2">
-        <div class="form-check form-switch mb-0">
-            <input class="form-check-input" type="checkbox" id="snl_notify" onchange="toggleSnlNotify()">
-            <label class="form-check-label small" for="snl_notify">Enable notification</label>
-        </div>
-        <div id="snl_notify_days_section" style="display:none;">
-            <div class="input-group input-group-sm">
-                <span class="input-group-text">Remind</span>
-                <input type="number" class="form-control" id="snl_notify_days" min="1" value="3" style="width:55px">
-                <span class="input-group-text">days before end</span>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Per-SN Lending Modal -->
-<div class="modal fade" id="snLendModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header py-2">
-                <h6 class="modal-title"><i class="bi bi-hand-index-thumb text-warning"></i> Set Lending — <span id="snLend_sn_ref" class="text-muted small"></span></h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="snLend_sn_id">
-                <div id="snlend_form_slot" class="mb-2"></div>
-            </div>
-            <div class="modal-footer py-2">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-outline-warning btn-sm" onclick="clearSnlModal()">
-                    <i class="bi bi-x"></i> Clear
-                </button>
-                <button type="button" class="btn btn-primary" onclick="submitSnLend()">
-                    <i class="bi bi-save"></i> Save
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Bulk SN Lending Modal -->
-<div class="modal fade" id="snBulkLendModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header py-2">
-                <h6 class="modal-title"><i class="bi bi-hand-index-thumb text-warning"></i> Manage Lending — <span id="snBulkLend_info" class="text-muted small"></span></h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p class="text-muted small mb-2">Apply lending info to all <strong>selected</strong> serial numbers. Leave contact blank to only update dates/notify.</p>
-                <div id="snbulk_form_slot" class="mb-2"></div>
-                <button type="button" class="btn btn-outline-danger btn-sm mt-1" onclick="submitSnBulkLend(true)">
-                    <i class="bi bi-x-circle"></i> Clear Lending for Selected
-                </button>
-            </div>
-            <div class="modal-footer py-2">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="submitSnBulkLend(false)"><i class="bi bi-save"></i> Save to Selected</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- ===== Thumbnail Picker Modal ===== -->
 {% if item %}
