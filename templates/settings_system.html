@@ -378,7 +378,7 @@
                 <div class="card-body">
                     <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox" id="lr_scan_enabled" name="lr_scan_enabled"
-                               {% if Setting.get('lr_scan_enabled','false')=='true' %}checked{% endif %}>
+                               {% if Setting.get('lr_scan_enabled', false) %}checked{% endif %}>
                         <label class="form-check-label" for="lr_scan_enabled">
                             <strong>Enable using camera to scan item QR/Barcode</strong>
                             <small class="text-muted d-block">When disabled, the scan area on In/Out page shows "Admin Disabled Scan QR/Barcode"</small>
@@ -390,35 +390,35 @@
                         <div class="col-md-6">
                             <div class="form-check mb-2">
                                 <input class="form-check-input" type="checkbox" id="lr_lend_start_date_required" name="lr_lend_start_date_required"
-                                       {% if Setting.get('lr_lend_start_date_required','false')=='true' %}checked{% endif %}
+                                       {% if Setting.get('lr_lend_start_date_required', false) %}checked{% endif %}
                                        onchange="document.getElementById('lr_lend_start_time_required').disabled = !this.checked">
                                 <label class="form-check-label" for="lr_lend_start_date_required"><strong>Start Date required</strong></label>
                             </div>
                             <div class="form-check ms-3">
                                 <input class="form-check-input" type="checkbox" id="lr_lend_start_time_required" name="lr_lend_start_time_required"
-                                       {% if Setting.get('lr_lend_start_time_required','false')=='true' %}checked{% endif %}
-                                       {% if Setting.get('lr_lend_start_date_required','false')!='true' %}disabled{% endif %}>
+                                       {% if Setting.get('lr_lend_start_time_required', false) %}checked{% endif %}
+                                       {% if not Setting.get('lr_lend_start_date_required', false) %}disabled{% endif %}>
                                 <label class="form-check-label" for="lr_lend_start_time_required">Start Time required <small class="text-muted">(only if Start Date required)</small></label>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-check mb-2">
                                 <input class="form-check-input" type="checkbox" id="lr_lend_end_date_required" name="lr_lend_end_date_required"
-                                       {% if Setting.get('lr_lend_end_date_required','false')=='true' %}checked{% endif %}
+                                       {% if Setting.get('lr_lend_end_date_required', false) %}checked{% endif %}
                                        onchange="document.getElementById('lr_lend_end_time_required').disabled = !this.checked">
                                 <label class="form-check-label" for="lr_lend_end_date_required"><strong>End Date required</strong></label>
                             </div>
                             <div class="form-check ms-3">
                                 <input class="form-check-input" type="checkbox" id="lr_lend_end_time_required" name="lr_lend_end_time_required"
-                                       {% if Setting.get('lr_lend_end_time_required','false')=='true' %}checked{% endif %}
-                                       {% if Setting.get('lr_lend_end_date_required','false')!='true' %}disabled{% endif %}>
+                                       {% if Setting.get('lr_lend_end_time_required', false) %}checked{% endif %}
+                                       {% if not Setting.get('lr_lend_end_date_required', false) %}disabled{% endif %}>
                                 <label class="form-check-label" for="lr_lend_end_time_required">End Time required <small class="text-muted">(only if End Date required)</small></label>
                             </div>
                         </div>
                         <div class="col-12">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="lr_lend_self_use_now" name="lr_lend_self_use_now"
-                                       {% if Setting.get('lr_lend_self_use_now','false')=='true' %}checked{% endif %}>
+                                       {% if Setting.get('lr_lend_self_use_now', false) %}checked{% endif %}>
                                 <label class="form-check-label" for="lr_lend_self_use_now">Only Self Lending must use current date/time for Start <small class="text-muted">(cannot manually set start date)</small></label>
                             </div>
                         </div>
@@ -429,21 +429,21 @@
                         <div class="col-md-6">
                             <div class="form-check mb-2">
                                 <input class="form-check-input" type="checkbox" id="lr_return_date_required" name="lr_return_date_required"
-                                       {% if Setting.get('lr_return_date_required','false')=='true' %}checked{% endif %}
+                                       {% if Setting.get('lr_return_date_required', false) %}checked{% endif %}
                                        onchange="document.getElementById('lr_return_time_required').disabled = !this.checked">
                                 <label class="form-check-label" for="lr_return_date_required"><strong>Return Date required</strong></label>
                             </div>
                             <div class="form-check ms-3">
                                 <input class="form-check-input" type="checkbox" id="lr_return_time_required" name="lr_return_time_required"
-                                       {% if Setting.get('lr_return_time_required','false')=='true' %}checked{% endif %}
-                                       {% if Setting.get('lr_return_date_required','false')!='true' %}disabled{% endif %}>
+                                       {% if Setting.get('lr_return_time_required', false) %}checked{% endif %}
+                                       {% if not Setting.get('lr_return_date_required', false) %}disabled{% endif %}>
                                 <label class="form-check-label" for="lr_return_time_required">Return Time required <small class="text-muted">(only if Return Date required)</small></label>
                             </div>
                         </div>
                         <div class="col-12">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="lr_return_self_use_now" name="lr_return_self_use_now"
-                                       {% if Setting.get('lr_return_self_use_now','false')=='true' %}checked{% endif %}>
+                                       {% if Setting.get('lr_return_self_use_now', false) %}checked{% endif %}>
                                 <label class="form-check-label" for="lr_return_self_use_now">Only Self Lending must use current date/time for Return <small class="text-muted">(cannot manually set return date)</small></label>
                             </div>
                         </div>

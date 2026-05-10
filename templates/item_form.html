@@ -2605,8 +2605,9 @@ function batchUpdateDrawerGrid(prefix) {
                         <input class="form-check-input" type="checkbox" id="addBatchSnTracking" onchange="toggleAddBatchTracking()">
                         <label class="form-check-label" for="addBatchSnTracking"><strong><i class="bi bi-upc-scan"></i> Enable Serial Number Tracking</strong></label>
                     </div>
-                    <small class="text-muted d-block mt-1" id="addBatchTrackingInfo"><strong>OFF:</strong> Simple batch — unlimited quantity, manual lending.</small>
-                    <small class="text-danger d-block mt-1"><i class="bi bi-exclamation-triangle"></i> <strong>Warning:</strong> This setting cannot be changed after the batch is created. Choose carefully.</small>
+                    <small class="text-muted d-block mt-1" id="addBatchTrackingInfo"><strong>OFF:</strong> Simple batch — unlimited quantity, quantity based lending.</small>
+                    <small class="text-muted d-block mt-1"><i class="bi bi-info-circle"></i> To change the batch information and lending is on In-Out page</small>
+                    <small class="text-danger d-block mt-1"><i class="bi bi-exclamation-triangle"></i> <strong>Warning:</strong> This setting cannot be changed after the batch is created. Batch information also fixed after Save Batch. Choose carefully.</small>
                 </div>
                 <div class="mb-2">
                     <label class="form-label form-label-sm">Batch Label <small class="text-muted">(optional, max 32)</small></label>
@@ -2794,11 +2795,11 @@ function toggleAddBatchTracking() {
     if (on) {
         qi.max = 100; if (parseInt(qi.value) > 100) qi.value = 100;
         document.getElementById('ab_qtyHint').textContent = '(max 100)';
-        document.getElementById('addBatchTrackingInfo').innerHTML = '<strong>ON:</strong> Each unit gets SN/ISN. Max 100 per batch.';
+        document.getElementById('addBatchTrackingInfo').innerHTML = '<strong>ON:</strong> Serial number tracking — max 100 per batch, individual item management, all things is recorded.';
     } else {
         qi.max = 99999;
         document.getElementById('ab_qtyHint').textContent = '(no limit)';
-        document.getElementById('addBatchTrackingInfo').innerHTML = '<strong>OFF:</strong> Simple batch — unlimited quantity, manual lending.';
+        document.getElementById('addBatchTrackingInfo').innerHTML = '<strong>OFF:</strong> Simple batch — unlimited quantity, quantity based lending.';
     }
 }
 function submitAddBatch() {
@@ -3234,6 +3235,15 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div class="modal-body">
                 <input type="hidden" id="pendingBatchEditIndex" value="">
+                <div class="mb-3 p-2 border rounded">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="pbTrackingCheck" onchange="togglePbTracking()">
+                        <label class="form-check-label" for="pbTrackingCheck"><strong><i class="bi bi-upc-scan"></i> Enable Serial Number Tracking</strong></label>
+                    </div>
+                    <small class="text-muted d-block mt-1" id="pbTrackingInfo"><strong>OFF:</strong> Simple batch — unlimited quantity, quantity based lending.</small>
+                    <small class="text-muted d-block mt-1"><i class="bi bi-info-circle"></i> To change the batch information and lending is on In-Out page</small>
+                    <small class="text-danger d-block mt-1"><i class="bi bi-exclamation-triangle"></i> <strong>Warning:</strong> This setting cannot be changed after the batch is created. Batch information also fixed after Save Batch. Choose carefully.</small>
+                </div>
                 <div class="mb-2">
                     <label class="form-label form-label-sm">Batch Name / Label</label>
                     <input type="text" class="form-control form-control-sm" id="pbLabel" maxlength="32" placeholder="Optional label">
@@ -3241,14 +3251,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="mb-2">
                     <label class="form-label form-label-sm">Manufacturer <small class="text-muted">(optional, max 128)</small></label>
                     <input type="text" class="form-control form-control-sm" id="pbManufacturer" maxlength="128">
-                </div>
-                <div class="mb-2 p-2 border rounded">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="pbTrackingCheck" onchange="togglePbTracking()">
-                        <label class="form-check-label" for="pbTrackingCheck"><strong><i class="bi bi-upc-scan"></i> Enable Serial Number Tracking</strong></label>
-                    </div>
-                    <small class="text-muted d-block mt-1" id="pbTrackingInfo"><strong>OFF:</strong> Simple batch — unlimited quantity, manual lending.</small>
-                    <small class="text-danger d-block mt-1"><i class="bi bi-exclamation-triangle"></i> <strong>Warning:</strong> This setting cannot be changed after the batch is created. Choose carefully.</small>
                 </div>
                 <div class="mb-2">
                     <label class="form-label form-label-sm">Quantity</label>
@@ -3269,7 +3271,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <small class="text-muted"><i class="bi bi-info-circle"></i> Fill any two fields — the third auto-calculates. Qty=0 treated as 1 for price calculation.</small>
                 </div>
                 <div class="mb-2">
-                    <label class="form-label form-label-sm">Date</label>
+                    <label class="form-label form-label-sm">Date of Purchase</label>
                     <input type="date" class="form-control form-control-sm" id="pbDate">
                 </div>
                 <div class="mb-2">
@@ -3531,7 +3533,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var infoEl = document.getElementById('pbTrackingInfo');
         var qtyInput = document.getElementById('pbQty');
         var note = document.getElementById('pbQtyNote');
-        if (infoEl) infoEl.innerHTML = tracking ? '<strong>ON:</strong> Serial number tracking — max 100 per batch, individual item management.' : '<strong>OFF:</strong> Simple batch — unlimited quantity, manual lending.';
+        if (infoEl) infoEl.innerHTML = tracking ? '<strong>ON:</strong> Serial number tracking — max 100 per batch, individual item management, all things is recorded.' : '<strong>OFF:</strong> Simple batch — unlimited quantity, quantity based lending.';
         if (tracking) {
             qtyInput.max = '100';
             note.textContent = 'Max 100 for tracking batches.';

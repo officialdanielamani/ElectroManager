@@ -611,7 +611,9 @@ function _ebRenderSnTable(batchId) {
         '<span class="input-group-text">Add</span>' +
         '<input type="number" class="form-control" id="eb_add_qty" min="1" max="100" value="1" style="width:55px">' +
         '<button class="btn btn-outline-success" type="button" onclick="_ebAddSn(' + batchId + ')"><i class="bi bi-plus"></i></button>' +
-        '</div></div>' +
+        '</div>' +
+        '<button type="button" class="btn btn-sm btn-outline-warning ms-2" onclick="_ebOpenPurgeModal(' + batchId + ')"><i class="bi bi-eraser"></i> Clear Deleted Serial Number</button>' +
+        '</div>' +
         '<div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:0.82rem;">' +
         '<thead><tr>' +
         '<th style="width:30px"><input type="checkbox" id="eb_chk_all" onchange="_ebToggleAll(this)"></th>' +
@@ -694,6 +696,32 @@ function _ebConfirmDelete() {
     bootstrap.Modal.getInstance(document.getElementById('ebDeleteSnModal')).hide();
     document.getElementById('actionForm').innerHTML = buildEditBatchForm(_selectedBatch);
     _ebCalcTotalSn();
+}
+
+var _ebPurgeBatchId = null;
+function _ebOpenPurgeModal(batchId) {
+    _ebPurgeBatchId = batchId;
+    new bootstrap.Modal(document.getElementById('ebPurgeSnModal')).show();
+}
+function _ebConfirmPurge() {
+    if (!_ebPurgeBatchId) return;
+    var btn = document.getElementById('ebPurgeSnConfirmBtn');
+    btn.disabled = true;
+    fetch('/in-out/batch/' + _ebPurgeBatchId + '/purge-deleted-sn', { method: 'POST',
+        headers: {'X-CSRFToken': document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : ''} })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            bootstrap.Modal.getInstance(document.getElementById('ebPurgeSnModal')).hide();
+            btn.disabled = false;
+            if (d.success) {
+                sessionStorage.setItem('inout_mode', _isReturn ? '1' : '0');
+                sessionStorage.setItem('inout_edit_batch', '1');
+                window.location.reload();
+            } else {
+                alert(d.message || 'Error purging serial numbers.');
+            }
+        })
+        .catch(function(e) { btn.disabled = false; alert('Error: ' + e); });
 }
 
 function _ebAddSn(batchId) {
@@ -912,6 +940,27 @@ function refreshLog() {
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-danger" onclick="_ebConfirmDelete()"><i class="bi bi-trash"></i> Confirm Remove</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Purge Deleted SN Modal -->
+<div class="modal fade" id="ebPurgeSnModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="bi bi-eraser"></i> Clear Deleted Serial Numbers</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure want to continue for free up the batch?</p>
+                <p class="text-danger"><strong>This action can't be undo.</strong></p>
+                <p class="text-muted small mb-0">All soft-deleted serial number records will be permanently removed. Those serial number slots will become available for new entries.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No</button>
+                <button type="button" class="btn btn-warning" id="ebPurgeSnConfirmBtn" onclick="_ebConfirmPurge()"><i class="bi bi-eraser"></i> Yes</button>
             </div>
         </div>
     </div>

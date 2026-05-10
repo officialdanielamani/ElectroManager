@@ -88,19 +88,19 @@ def in_out():
     can_only_self   = (not current_user.is_admin()
                        and current_user.has_permission('lending_return', 'only_self_lending')
                        and not current_user.has_permission('lending_return', 'edit_batch'))
-    scan_enabled    = Setting.get('lr_scan_enabled', 'false') == 'true'
+    scan_enabled    = Setting.get('lr_scan_enabled', False) is True
 
     log_page = request.args.get('log_page', 1, type=int)
     logs, log_total_pages = _build_log_entries(log_page, can_view_log)
 
     # LR settings for form required-field indicators
     lr_settings = {
-        'lend_start_date_required': Setting.get('lr_lend_start_date_required', 'false') == 'true',
-        'lend_start_time_required': Setting.get('lr_lend_start_time_required', 'false') == 'true',
-        'lend_end_date_required': Setting.get('lr_lend_end_date_required', 'false') == 'true',
-        'lend_end_time_required': Setting.get('lr_lend_end_time_required', 'false') == 'true',
-        'return_date_required': Setting.get('lr_return_date_required', 'false') == 'true',
-        'return_time_required': Setting.get('lr_return_time_required', 'false') == 'true',
+        'lend_start_date_required': Setting.get('lr_lend_start_date_required', False) is True,
+        'lend_start_time_required': Setting.get('lr_lend_start_time_required', False) is True,
+        'lend_end_date_required': Setting.get('lr_lend_end_date_required', False) is True,
+        'lend_end_time_required': Setting.get('lr_lend_end_time_required', False) is True,
+        'return_date_required': Setting.get('lr_return_date_required', False) is True,
+        'return_time_required': Setting.get('lr_return_time_required', False) is True,
     }
 
     return render_template('in_out.html',
@@ -398,6 +398,31 @@ def in_out_edit_batch(batch_id):
               f'Edited batch {batch.get_display_label()} of {item.name} via /in-out '
               f'(qty: {orig_qty}→{batch.quantity})')
     return jsonify({'success': True})
+
+
+@in_out_bp.route('/in-out/batch/<int:batch_id>/purge-deleted-sn', methods=['POST'])
+@login_required
+def in_out_purge_deleted_sn(batch_id):
+    """Hard-delete all soft-deleted serial numbers for a batch, freeing their slots."""
+    if not (current_user.is_admin() or current_user.has_permission('lending_return', 'edit_batch')):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+    batch = ItemBatch.query.get_or_404(batch_id)
+    item  = batch.item
+    deleted_sns = BatchSerialNumber.query.filter_by(batch_id=batch_id, is_deleted=True).all()
+    if not deleted_sns:
+        return jsonify({'success': True, 'freed': 0, 'message': 'No deleted serial numbers to purge.'})
+    freed = len(deleted_sns)
+    isn_list = ', '.join(sn.internal_serial_number for sn in deleted_sns)
+    for sn in deleted_sns:
+        db.session.delete(sn)
+    item.recalculate_from_batches()
+    item.updated_by = current_user.id
+    item.updated_at = datetime.now(timezone.utc)
+    db.session.commit()
+    log_audit(current_user.id, 'batch_sn_purge', 'batch', batch_id,
+              f'Purged {freed} deleted SN(s) from batch "{batch.get_display_label()}" of {item.name} | ISNs: {isn_list}')
+    return jsonify({'success': True, 'freed': freed,
+                    'message': f'Freed {freed} deleted serial number(s).'})
 
 
 @in_out_bp.route('/in-out/batch/<int:batch_id>/delete', methods=['POST'])
