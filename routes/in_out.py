@@ -404,7 +404,7 @@ def in_out_edit_batch(batch_id):
 @login_required
 def in_out_purge_deleted_sn(batch_id):
     """Hard-delete all soft-deleted serial numbers for a batch, freeing their slots."""
-    if not (current_user.is_admin() or current_user.has_permission('lending_return', 'edit_batch')):
+    if not (current_user.is_admin() or current_user.has_permission('lending_return', 'delete_batch')):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
     batch = ItemBatch.query.get_or_404(batch_id)
     item  = batch.item
