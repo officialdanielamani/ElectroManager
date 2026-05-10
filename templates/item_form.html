@@ -321,7 +321,7 @@
                                     {% if not batch.sn_tracking_enabled %}
                                     <button type="button" class="btn btn-sm btn-outline-info py-0 px-1" onclick="event.stopPropagation(); openTransferModal({{ batch.id }}, {{ batch.get_available_quantity() }})" title="Transfer Quantity"><i class="bi bi-arrow-left-right"></i></button>
                                     <button type="button" class="btn btn-sm py-0 px-1" style="background-color:#c9a227;color:#fff;border-color:#c9a227;" onclick="event.stopPropagation(); openLendManageModal({{ batch.id }}, {{ batch.quantity }})" title="Manage Lending"><i class="bi bi-hand-index-thumb"></i></button>
-                                    <button type="button" id="lendSaveBtn_{{ batch.id }}" class="d-none btn btn-sm btn-success py-0 px-1" onclick="event.stopPropagation(); flushBatchLend({{ batch.id }})" title="Save Lending Changes"><i class="bi bi-floppy"></i></button>
+                                    <span id="lendPendingBadge_{{ batch.id }}" class="d-none badge bg-warning text-dark align-self-center" style="font-size:0.7rem;">Pending</span>
                                     {% endif %}
                                     <button type="button" class="btn btn-sm btn-outline-warning py-0 px-1" onclick="event.stopPropagation(); openEditBatchModal({{ batch.id }}, '{{ batch.batch_label|e if batch.batch_label else '' }}', '{{ batch.manufacturer|e if batch.manufacturer else '' }}', {{ batch.quantity }}, {{ batch.price_per_unit }}, '{{ batch.purchase_date.strftime('%Y-%m-%d') if batch.purchase_date else '' }}', '{{ batch.note|e if batch.note else '' }}', {{ 'true' if batch.sn_tracking_enabled else 'false' }}, {{ 'true' if (batch.follow_main_location if batch.follow_main_location is not none else true) else 'false' }}, {{ batch.location_id or 'null' }}, {{ batch.rack_id or 'null' }}, '{{ batch.drawer|e if batch.drawer else '' }}')" title="Edit"><i class="bi bi-pencil"></i></button>
                                     <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="event.stopPropagation(); deleteBatchJS({{ batch.id }}, '{{ batch.get_display_label()|e }}')" title="Delete"><i class="bi bi-trash"></i></button>
@@ -423,8 +423,7 @@
                                         {% if item_perms and item_perms.can_edit_lending %}
                                         <button type="button" class="btn btn-sm btn-outline-warning" onclick="openSnBulkLendModal({{ batch.id }})"><i class="bi bi-hand-index-thumb"></i> Manage Lending</button>
                                         {% endif %}
-                                        <span id="snUnsavedBadge_{{ batch.id }}" class="d-none badge bg-warning text-dark align-self-center ms-auto">Unsaved</span>
-                                        <button type="button" id="snSaveBtn_{{ batch.id }}" class="d-none btn btn-sm btn-success" onclick="snSaveChanges({{ batch.id }})"><i class="bi bi-floppy"></i> Save SN Changes</button>
+                                        <span id="snUnsavedBadge_{{ batch.id }}" class="d-none badge bg-warning text-dark align-self-center">Pending</span>
                                     </div>
                                     {% endif %}
 
@@ -484,6 +483,10 @@
                     {% endif %}
                     <input type="hidden" name="quantity" id="quantity" value="{{ item.quantity if item else 0 }}">
                     <input type="hidden" name="price" value="{{ item.price if item else 0 }}">
+                    {% if item %}
+                    <input type="hidden" name="pending_sn_changes"   id="pending_sn_changes"   value="{}">
+                    <input type="hidden" name="pending_lend_changes" id="pending_lend_changes" value="{}">
+                    {% endif %}
                 </div>
             </div>
 
@@ -912,6 +915,13 @@
                 </div>
             </div>
 
+            {% if item %}
+            <div id="pendingChangesBanner" class="alert alert-warning d-none py-2 px-3 mb-2">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <strong>Pending Changes</strong> — Click <strong>Update Item</strong> to save all changes.
+                <span class="text-muted small ms-2">Back or Refresh to discard.</span>
+            </div>
+            {% endif %}
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <a href="{{ url_for('item.items') }}" class="btn btn-secondary">
                     <i class="bi bi-x-circle"></i> Cancel
@@ -3171,14 +3181,20 @@ function openDeleteSnModal(batchId) {
     if (checked.length === 0) { alert('Select at least one serial number.'); return; }
     _deleteSnBatchId = batchId;
     document.getElementById('deleteSnCount').textContent = checked.length;
-    document.getElementById('deleteSnReason').value = '';
+    document.getElementById('deleteSnReasonType').value = '';
+    document.getElementById('deleteSnReasonOther').value = '';
+    document.getElementById('deleteSnReasonOther').classList.add('d-none');
     new bootstrap.Modal(document.getElementById('deleteSnModalDialog')).show();
 }
 function doDeleteSn() {
     var batchId = _deleteSnBatchId;
     var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked:not([disabled])');
     var ids = Array.from(checked).map(function(cb) { return parseInt(cb.value); });
-    var reason = document.getElementById('deleteSnReason').value.trim().slice(0, 256);
+    var reasonType = document.getElementById('deleteSnReasonType').value;
+    if (!reasonType) { alert('Please select a reason for removal.'); return; }
+    var reason = reasonType === 'Other'
+        ? ('Other: ' + document.getElementById('deleteSnReasonOther').value.trim()).slice(0, 256)
+        : reasonType;
     var s = _snState[batchId];
     if (s) {
         s.rows = s.rows.map(function(row) {
@@ -3288,22 +3304,16 @@ function submitLendManage() {
 
 var _lendDirtyBatches = {};
 function _updateLendSaveBtn(batchId) {
-    var btn = document.getElementById('lendSaveBtn_' + batchId);
-    if (btn) btn.classList.toggle('d-none', !_lendDirtyBatches[batchId]);
+    var badge = document.getElementById('lendPendingBadge_' + batchId);
+    if (badge) badge.classList.toggle('d-none', !_lendDirtyBatches[batchId]);
+    _updatePendingBanner();
 }
-function flushBatchLend(batchId) {
-    var fd = new FormData();
-    fd.append('lend_records', JSON.stringify(_batchLendData[batchId] || []));
-    fetch('/item/{{ item.uuid if item is defined else "" }}/batch/' + batchId + '/manage_lend', {
-        method: 'POST', body: fd
-    }).then(function(r) { return r.json(); })
-    .then(function(d) {
-        if (d.success) {
-            _lendDirtyBatches[batchId] = false;
-            _updateLendSaveBtn(batchId);
-            reloadKeepBatch();
-        } else { alert(d.message || 'Error saving lending records.'); }
-    }).catch(function(e) { alert('Error: ' + e); });
+function _updatePendingBanner() {
+    var banner = document.getElementById('pendingChangesBanner');
+    if (!banner) return;
+    var hasSnChanges = Object.keys(_snState||{}).some(function(bid){ return _snHasChanges(parseInt(bid)); });
+    var hasLendChanges = Object.keys(_lendDirtyBatches||{}).some(function(bid){ return _lendDirtyBatches[bid]; });
+    banner.classList.toggle('d-none', !(hasSnChanges || hasLendChanges));
 }
 
 function formatLendDateTime(s) {
@@ -3705,10 +3715,9 @@ function _snHasChanges(batchId) {
 
 function _snUpdateSaveBtn(batchId) {
     var has = _snHasChanges(batchId);
-    var btn = document.getElementById('snSaveBtn_' + batchId);
-    if (btn) btn.classList.toggle('d-none', !has);
     var badge = document.getElementById('snUnsavedBadge_' + batchId);
     if (badge) badge.classList.toggle('d-none', !has);
+    _updatePendingBanner();
 }
 
 function _snRender(batchId) {
@@ -3761,77 +3770,44 @@ function _snRender(batchId) {
     _snUpdateSaveBtn(batchId);
 }
 
-function snSaveChanges(batchId) {
-    var s = _snState[batchId]; if (!s) return;
-    var adds    = s.rows.filter(function(r){ return r._add; }).length;
-    var deletes = s.rows.filter(function(r){ return r._del; }).map(function(r){ return {sn_id:r.id, reason:r._del_reason}; });
-    var edits   = s.rows.filter(function(r){ return r._dirty && !r._add && !r._del; }).map(function(r){
-        return {sn_id:r.id, sn:r._editSn, info:r._editInfo};
-    });
-    var lend_changes = s.rows.filter(function(r){ return r._lend_dirty && !r._add && !r._del; }).map(function(r){
-        return {sn_id:r.id, lend_to_type:r.lend_to_type, lend_to_id:r.lend_to_id,
-                lend_start:r.lend_start, lend_end:r.lend_end, lend_note:r.lend_note,
-                lend_notify:r.lend_notify, lend_days:r.lend_days};
-    });
-    fetch('/item/{{ item.uuid if item is defined else "" }}/batch/' + batchId + '/sn/save-pending', {
-        method: 'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({batch_id:batchId, adds:adds, deletes:deletes, edits:edits, lend_changes:lend_changes})
-    }).then(function(r){ return r.json(); }).then(function(d){
-        if (d.success) reloadKeepBatch(); else alert(d.message || 'Error saving SN changes.');
-    }).catch(function(e){ alert('Error: '+e); });
-}
-
-function _snFlushSilent(batchId) {
-    var s = _snState[batchId];
-    if (!s || !_snHasChanges(batchId)) return Promise.resolve();
-    var adds = s.rows.filter(function(r){ return r._add; }).length;
-    var deletes = s.rows.filter(function(r){ return r._del; }).map(function(r){ return {sn_id:r.id, reason:r._del_reason}; });
-    var edits = s.rows.filter(function(r){ return r._dirty && !r._add && !r._del; }).map(function(r){ return {sn_id:r.id, sn:r._editSn, info:r._editInfo}; });
-    var lend_changes = s.rows.filter(function(r){ return r._lend_dirty && !r._add && !r._del; }).map(function(r){
-        return {sn_id:r.id, lend_to_type:r.lend_to_type, lend_to_id:r.lend_to_id, lend_start:r.lend_start, lend_end:r.lend_end, lend_note:r.lend_note, lend_notify:r.lend_notify, lend_days:r.lend_days};
-    });
-    return fetch('/item/{{ item.uuid if item is defined else "" }}/batch/' + batchId + '/sn/save-pending', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({batch_id: batchId, adds: adds, deletes: deletes, edits: edits, lend_changes: lend_changes})
-    }).then(function(r){ return r.json(); }).then(function(d){
-        if (!d.success) throw new Error(d.message || 'Error saving SN changes for batch ' + batchId);
-    });
-}
-
-function _lendFlushSilent(batchId) {
-    if (!_lendDirtyBatches[batchId]) return Promise.resolve();
-    var fd = new FormData();
-    fd.append('lend_records', JSON.stringify(_batchLendData[batchId] || []));
-    return fetch('/item/{{ item.uuid if item is defined else "" }}/batch/' + batchId + '/manage_lend', {
-        method: 'POST', body: fd
-    }).then(function(r){ return r.json(); }).then(function(d){
-        if (!d.success) throw new Error(d.message || 'Error saving lending for batch ' + batchId);
-    });
-}
 
 document.addEventListener('DOMContentLoaded', function() {
     Object.keys(_snAllData).forEach(function(batchId) {
         _snInit(parseInt(batchId));
     });
 
-    var _flushing = false;
     var form = document.getElementById('itemForm');
     if (form) {
-        form.addEventListener('submit', function(e) {
-            if (_flushing) return;
-            var dirtySnBatches   = Object.keys(_snState).map(Number).filter(function(bid){ return _snHasChanges(bid); });
-            var dirtyLendBatches = Object.keys(_lendDirtyBatches).map(Number).filter(function(bid){ return _lendDirtyBatches[bid]; });
-            if (dirtySnBatches.length === 0 && dirtyLendBatches.length === 0) return;
-            e.preventDefault();
-            var promises = [];
-            dirtySnBatches.forEach(function(bid){ promises.push(_snFlushSilent(bid)); });
-            dirtyLendBatches.forEach(function(bid){ promises.push(_lendFlushSilent(bid)); });
-            Promise.all(promises).then(function() {
-                _flushing = true;
-                form.submit();
-            }).catch(function(err) {
-                alert('Failed to save batch changes: ' + err.message + '\nPlease use the Save buttons on each batch first.');
+        form.addEventListener('submit', function() {
+            // Serialize all pending SN changes into hidden field
+            var snChanges = {};
+            Object.keys(_snState).forEach(function(bid) {
+                var batchId = parseInt(bid);
+                if (!_snHasChanges(batchId)) return;
+                var s = _snState[batchId];
+                snChanges[batchId] = {
+                    adds: s.rows.filter(function(r){ return r._add; }).length,
+                    deletes: s.rows.filter(function(r){ return r._del; }).map(function(r){ return {sn_id:r.id, reason:r._del_reason}; }),
+                    edits: s.rows.filter(function(r){ return r._dirty && !r._add && !r._del; }).map(function(r){
+                        return {sn_id:r.id, sn:r._editSn !== null ? r._editSn : r.sn, info:r._editInfo !== null ? r._editInfo : r.info};
+                    }),
+                    lend_changes: s.rows.filter(function(r){ return r._lend_dirty && !r._add && !r._del; }).map(function(r){
+                        return {sn_id:r.id, lend_to_type:r.lend_to_type, lend_to_id:r.lend_to_id,
+                                lend_start:r.lend_start, lend_end:r.lend_end, lend_note:r.lend_note,
+                                lend_notify:r.lend_notify, lend_days:r.lend_days};
+                    })
+                };
             });
+            var snField = document.getElementById('pending_sn_changes');
+            if (snField) snField.value = JSON.stringify(snChanges);
+
+            // Serialize all pending lend changes for normal batches
+            var lendChanges = {};
+            Object.keys(_lendDirtyBatches).forEach(function(bid) {
+                if (_lendDirtyBatches[bid]) lendChanges[bid] = _batchLendData[bid] || [];
+            });
+            var lendField = document.getElementById('pending_lend_changes');
+            if (lendField) lendField.value = JSON.stringify(lendChanges);
         });
     }
 });
@@ -3919,8 +3895,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     <i class="bi bi-exclamation-triangle"></i> Batch quantity will be reduced. The ISN entries will remain visible in the table as "Removed" for audit purposes.
                 </div>
                 <div class="mb-2">
-                    <label class="form-label">Reason for removal <span class="text-muted">(optional, max 256 chars)</span></label>
-                    <textarea class="form-control" id="deleteSnReason" rows="3" maxlength="256" placeholder="e.g. Damaged in testing, Component failure, Lost during transit..."></textarea>
+                    <label class="form-label fw-semibold">Reason for removal <span class="text-danger">*</span></label>
+                    <select class="form-select mb-2" id="deleteSnReasonType" onchange="document.getElementById('deleteSnReasonOther').classList.toggle('d-none', this.value !== 'Other')">
+                        <option value="">— Select reason —</option>
+                        <option value="Damage">Damage</option>
+                        <option value="Missing By Lender">Missing By Lender</option>
+                        <option value="Missing on Own">Missing on Own</option>
+                        <option value="Sold">Sold</option>
+                        <option value="Incorrect Item">Incorrect Item</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <textarea class="form-control d-none" id="deleteSnReasonOther" rows="2" maxlength="200" placeholder="Please specify..."></textarea>
                 </div>
             </div>
             <div class="modal-footer">

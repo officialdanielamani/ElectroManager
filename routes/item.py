@@ -380,6 +380,141 @@ def item_qr_svg(uuid):
     return qr_svg, 200, {'Content-Type': 'image/svg+xml'}
 
 
+def _parse_dt(s):
+    if not s:
+        return None
+    for fmt in ('%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d'):
+        try:
+            return datetime.strptime(s, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _apply_pending_sn_changes(item, perms):
+    """Process pending_sn_changes submitted as a hidden JSON field on the edit form."""
+    from models import ItemBatch, BatchSerialNumber
+    raw = request.form.get('pending_sn_changes', '{}')
+    try:
+        pending = json.loads(raw)
+    except Exception:
+        return
+    if not pending or not perms.get('can_edit_sn'):
+        return
+    now = datetime.now(timezone.utc)
+    for bid_str, changes in pending.items():
+        try:
+            batch = ItemBatch.query.get(int(bid_str))
+        except Exception:
+            continue
+        if not batch or batch.item_id != item.id or not batch.sn_tracking_enabled:
+            continue
+        adds        = int(changes.get('adds', 0))
+        deletes     = changes.get('deletes', [])
+        edits       = changes.get('edits', [])
+        lend_changes = changes.get('lend_changes', [])
+
+        if adds > 0 and perms.get('can_edit_quantity'):
+            active = sum(1 for sn in batch.serial_numbers if not sn.is_deleted)
+            adds = min(adds, 100 - active)
+            if adds > 0:
+                max_seq = db.session.query(db.func.max(BatchSerialNumber.sequence_number)).filter_by(batch_id=batch.id).scalar() or 0
+                date_str = batch.purchase_date.strftime('%Y%m%d') if batch.purchase_date else '00000000'
+                pfx = f"B{batch.batch_number:02d}"
+                for i in range(1, adds + 1):
+                    seq = max_seq + i
+                    isn = f"{item.uuid}-{date_str}-{pfx}-{seq:03d}"
+                    db.session.add(BatchSerialNumber(batch_id=batch.id, sequence_number=seq,
+                                                    internal_serial_number=isn, serial_number='', info=''))
+                batch.quantity += adds
+
+        if deletes and perms.get('can_edit_quantity'):
+            deleted = 0
+            for d in deletes:
+                try:
+                    sn_obj = BatchSerialNumber.query.get(int(d.get('sn_id', 0)))
+                except Exception:
+                    continue
+                if sn_obj and sn_obj.batch_id == batch.id and not sn_obj.is_deleted:
+                    sn_obj.is_deleted = True
+                    sn_obj.deleted_by_id = current_user.id
+                    sn_obj.deleted_at = now
+                    sn_obj.deleted_reason = (d.get('reason', '') or '').strip()[:256] or None
+                    deleted += 1
+            batch.quantity = max(batch.quantity - deleted, 0)
+
+        for e in edits:
+            try:
+                sn_obj = BatchSerialNumber.query.get(int(e.get('sn_id', 0)))
+            except Exception:
+                continue
+            if not sn_obj or sn_obj.batch_id != batch.id or sn_obj.is_deleted:
+                continue
+            if e.get('sn') is not None:
+                sn_obj.serial_number = str(e['sn']).strip()[:200]
+            if e.get('info') is not None:
+                sn_obj.info = str(e['info']).strip()[:32]
+
+        if perms.get('can_edit_lending'):
+            for lc in lend_changes:
+                try:
+                    sn_obj = BatchSerialNumber.query.get(int(lc.get('sn_id', 0)))
+                except Exception:
+                    continue
+                if not sn_obj or sn_obj.batch_id != batch.id or sn_obj.is_deleted:
+                    continue
+                try:
+                    lend_id = int(lc['lend_to_id']) if lc.get('lend_to_id') else None
+                except (ValueError, TypeError):
+                    lend_id = None
+                if lend_id:
+                    sn_obj.lend_to_type = lc.get('lend_to_type', '')
+                    sn_obj.lend_to_id = lend_id
+                    sn_obj.lend_start = _parse_dt(lc.get('lend_start', ''))
+                    sn_obj.lend_end   = _parse_dt(lc.get('lend_end', ''))
+                    sn_obj.lend_note  = (lc.get('lend_note', '') or '').strip()[:128] or None
+                    sn_obj.lend_notify_enabled    = bool(lc.get('lend_notify', False))
+                    try:
+                        sn_obj.lend_notify_before_days = int(lc.get('lend_days', 3))
+                    except (ValueError, TypeError):
+                        sn_obj.lend_notify_before_days = 3
+                else:
+                    sn_obj.lend_to_type = ''
+                    sn_obj.lend_to_id = None
+                    sn_obj.lend_start = None
+                    sn_obj.lend_end   = None
+                    sn_obj.lend_note  = None
+                    sn_obj.lend_notify_enabled     = False
+                    sn_obj.lend_notify_before_days = 3
+
+    item.recalculate_from_batches()
+
+
+def _apply_pending_lend_changes(item, perms):
+    """Process pending_lend_changes submitted as a hidden JSON field on the edit form."""
+    from models import ItemBatch, BatchLendRecord
+    from routes.batch import _save_lend_records
+    raw = request.form.get('pending_lend_changes', '{}')
+    try:
+        pending = json.loads(raw)
+    except Exception:
+        return
+    if not pending or not perms.get('can_edit_lending'):
+        return
+    for bid_str, records in pending.items():
+        try:
+            batch = ItemBatch.query.get(int(bid_str))
+        except Exception:
+            continue
+        if not batch or batch.item_id != item.id or batch.sn_tracking_enabled:
+            continue
+        total_qty = sum(max(1, int(r.get('qty', 1))) for r in records if isinstance(r, dict))
+        if total_qty > batch.quantity:
+            continue  # skip invalid — don't crash the whole save
+        BatchLendRecord.query.filter_by(batch_id=batch.id).delete()
+        _save_lend_records(batch, records, batch.quantity)
+
+
 @item_bp.route('/item/<string:uuid>/edit', endpoint='item_edit', methods=['GET', 'POST'])
 @login_required
 @item_permission_required
@@ -463,9 +598,15 @@ def item_edit(uuid):
 
         item.updated_at = datetime.now(timezone.utc)
         item.updated_by = current_user.id
-        
+
+        # ── Pending SN changes (deferred from JS state) ──
+        _apply_pending_sn_changes(item, perms)
+
+        # ── Pending normal-batch lend changes (deferred from JS state) ──
+        _apply_pending_lend_changes(item, perms)
+
         db.session.commit()
-        
+
         log_audit(current_user.id, 'update', 'item', item.id, f'Updated item: {item.name}')
         flash(f'Item "{item.name}" updated successfully!', 'success')
         return redirect(url_for('item.item_detail', uuid=item.uuid))
