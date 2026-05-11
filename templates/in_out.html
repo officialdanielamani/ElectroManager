@@ -30,17 +30,17 @@
         <!-- Camera Scan Area -->
         {% if scan_enabled %}
         <div class="mb-3" id="scanArea">
-          <div style="position:relative;display:inline-block;width:100%;">
+          <div style="position:relative;display:block;width:100%;">
             <video id="scanVideo" autoplay playsinline muted
                    style="width:100%;max-height:220px;object-fit:cover;border-radius:6px;background:#000;display:none;"></video>
             <div id="aimOverlay" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
                  width:55%;height:65%;border:3px solid red;border-radius:4px;pointer-events:none;box-shadow:0 0 0 9999px rgba(0,0,0,0.3);"></div>
+            <div id="scanPlaceholder" class="text-center rounded py-3" style="background:#f8f9fa;border:2px dashed #dee2e6;">
+              <i class="bi bi-camera fs-2 text-muted"></i>
+              <div class="text-muted small mt-1" id="scanMsg">Scan barcode / QR code or search below</div>
+            </div>
           </div>
           <canvas id="scanCanvas" style="display:none;"></canvas>
-          <div id="scanPlaceholder" class="text-center rounded py-3" style="background:#f8f9fa;border:2px dashed #dee2e6;">
-            <i class="bi bi-camera fs-2 text-muted"></i>
-            <div class="text-muted small mt-1" id="scanMsg">Scan barcode / QR code or search below</div>
-          </div>
           <div class="d-flex gap-2 mt-2">
             <button class="btn btn-sm btn-outline-secondary" id="cameraToggleBtn" onclick="toggleCamera()">
               <i class="bi bi-camera"></i> Start Camera

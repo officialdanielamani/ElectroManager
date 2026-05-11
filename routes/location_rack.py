@@ -117,20 +117,17 @@ def location_new():
                     db.session.commit()
                     return render_template('location_form.html', form=form, location=None)
                 
-                # Use UUID-based directory structure: /uploads/locations/{location_uuid}/
-                picture_uuid = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(12))
-                
                 if ext == 'jpg':
                     ext = 'jpeg'
-                filename = f"{picture_uuid}.{ext}"
-                
-                # Create location-specific directory with UUID
+                filename = f"{location.uuid}.{ext}"
                 location_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations', location.uuid)
                 os.makedirs(location_dir, exist_ok=True)
-                
-                filepath = os.path.join(location_dir, filename)
-                file.save(filepath)
-                # Store path as {location_uuid}/{picture_uuid}.ext
+                # Remove any old picture with a different extension
+                for old_ext in ['png', 'jpeg', 'webp']:
+                    old_f = os.path.join(location_dir, f"{location.uuid}.{old_ext}")
+                    if old_f != os.path.join(location_dir, filename) and os.path.exists(old_f):
+                        os.remove(old_f)
+                file.save(os.path.join(location_dir, filename))
                 location.picture = f"{location.uuid}/{filename}"
                 db.session.commit()
         
@@ -198,19 +195,16 @@ def location_edit(uuid):
                     if is_safe_file_path(old_path) and os.path.exists(old_path):
                         os.remove(old_path)
                 
-                # Use UUID-based path: /uploads/locations/{location_uuid}/{picture_uuid}.ext
-                picture_uuid = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(12))
-                
                 if ext == 'jpg':
                     ext = 'jpeg'
-                filename = f"{picture_uuid}.{ext}"
-                
+                filename = f"{location.uuid}.{ext}"
                 location_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations', location.uuid)
                 os.makedirs(location_dir, exist_ok=True)
-                
-                filepath = os.path.join(location_dir, filename)
-                file.save(filepath)
-                # Store path as {location_uuid}/{picture_uuid}.ext
+                for old_ext in ['png', 'jpeg', 'webp']:
+                    old_f = os.path.join(location_dir, f"{location.uuid}.{old_ext}")
+                    if old_f != os.path.join(location_dir, filename) and os.path.exists(old_f):
+                        os.remove(old_f)
+                file.save(os.path.join(location_dir, filename))
                 location.picture = f"{location.uuid}/{filename}"
         
         db.session.commit()
@@ -365,20 +359,16 @@ def rack_new():
                     flash('Only PNG, JPEG, and WebP images are allowed.', 'danger')
                     return redirect(url_for('location_rack.rack_new'))
                 
-                # Use UUID-based directory structure: /uploads/racks/{rack_uuid}/
-                picture_uuid = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(12))
-                
                 if ext == 'jpg':
                     ext = 'jpeg'
-                filename = f"{picture_uuid}.{ext}"
-                
-                # Create rack-specific directory with UUID
+                filename = f"{rack.uuid}.{ext}"
                 rack_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks', rack.uuid)
                 os.makedirs(rack_dir, exist_ok=True)
-                
-                filepath = os.path.join(rack_dir, filename)
-                file.save(filepath)
-                # Store path as {rack_uuid}/{picture_uuid}.ext
+                for old_ext in ['png', 'jpeg', 'webp']:
+                    old_f = os.path.join(rack_dir, f"{rack.uuid}.{old_ext}")
+                    if old_f != os.path.join(rack_dir, filename) and os.path.exists(old_f):
+                        os.remove(old_f)
+                file.save(os.path.join(rack_dir, filename))
                 rack.picture = f"{rack.uuid}/{filename}"
                 db.session.commit()
         
@@ -512,19 +502,16 @@ def rack_edit(uuid):
                     if is_safe_file_path(old_path) and os.path.exists(old_path):
                         os.remove(old_path)
                 
-                # Use UUID-based path: /uploads/racks/{rack_uuid}/{picture_uuid}.ext
-                picture_uuid = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(12))
-                
                 if ext == 'jpg':
                     ext = 'jpeg'
-                filename = f"{picture_uuid}.{ext}"
-                
+                filename = f"{rack.uuid}.{ext}"
                 rack_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks', rack.uuid)
                 os.makedirs(rack_dir, exist_ok=True)
-                
-                filepath = os.path.join(rack_dir, filename)
-                file.save(filepath)
-                # Store path as {rack_uuid}/{picture_uuid}.ext
+                for old_ext in ['png', 'jpeg', 'webp']:
+                    old_f = os.path.join(rack_dir, f"{rack.uuid}.{old_ext}")
+                    if old_f != os.path.join(rack_dir, filename) and os.path.exists(old_f):
+                        os.remove(old_f)
+                file.save(os.path.join(rack_dir, filename))
                 rack.picture = f"{rack.uuid}/{filename}"
         
         db.session.commit()
