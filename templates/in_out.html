@@ -30,8 +30,12 @@
         <!-- Camera Scan Area -->
         {% if scan_enabled %}
         <div class="mb-3" id="scanArea">
-          <video id="scanVideo" autoplay playsinline muted
-                 style="width:100%;max-height:220px;object-fit:cover;border-radius:6px;background:#000;display:none;"></video>
+          <div style="position:relative;display:inline-block;width:100%;">
+            <video id="scanVideo" autoplay playsinline muted
+                   style="width:100%;max-height:220px;object-fit:cover;border-radius:6px;background:#000;display:none;"></video>
+            <div id="aimOverlay" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+                 width:55%;height:65%;border:3px solid red;border-radius:4px;pointer-events:none;box-shadow:0 0 0 9999px rgba(0,0,0,0.3);"></div>
+          </div>
           <canvas id="scanCanvas" style="display:none;"></canvas>
           <div id="scanPlaceholder" class="text-center rounded py-3" style="background:#f8f9fa;border:2px dashed #dee2e6;">
             <i class="bi bi-camera fs-2 text-muted"></i>
@@ -57,9 +61,13 @@
 
         <!-- Search -->
         <div class="mb-3">
-          <input type="text" class="form-control" id="inOutSearch"
-                 placeholder="Search by item name, UUID, ISN, batch ID ({uuid}-B{n})"
-                 oninput="debounceSearch(this.value)" autocomplete="off">
+          <div class="input-group">
+            <input type="text" class="form-control" id="inOutSearch"
+                   placeholder="Search by item name, UUID, ISN, batch ID ({uuid}-B{n})"
+                   oninput="debounceSearch(this.value)" autocomplete="off">
+            <button class="btn btn-outline-secondary" type="button" id="clearSearchBtn"
+                    onclick="clearSearch()" title="Clear search"><i class="bi bi-x-lg"></i></button>
+          </div>
         </div>
 
         <!-- Search results -->
@@ -295,6 +303,14 @@ function showActionForm(batch) {
 
 /* ── Required label helper ── */
 function _req(flag) { return flag ? ' <span class="text-danger">*</span>' : ''; }
+function _setNow(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var now = new Date();
+    var pad = function(n){ return String(n).padStart(2,'0'); };
+    el.value = now.getFullYear() + '-' + pad(now.getMonth()+1) + '-' + pad(now.getDate()) +
+               'T' + pad(now.getHours()) + ':' + pad(now.getMinutes());
+}
 
 /* ── Lending Form ── */
 function buildLendForm(b) {
@@ -337,7 +353,8 @@ function buildLendForm(b) {
     var endReq   = _lrSettings.lend_end_date_required;
     html += '<div class="row g-2 mb-2">' +
         '<div class="col-md-6"><label class="form-label form-label-sm">Start Date/Time' + _req(startReq) + '</label>' +
-        '<input type="datetime-local" class="form-control form-control-sm" id="lendStart"' + (startReq ? ' required' : '') + '></div>' +
+        '<div class="input-group input-group-sm"><button class="btn btn-outline-secondary" type="button" onclick="_setNow(\'lendStart\')" title="Set to now"><i class="bi bi-clock"></i> Now</button>' +
+        '<input type="datetime-local" class="form-control" id="lendStart"' + (startReq ? ' required' : '') + '></div></div>' +
         '<div class="col-md-6"><label class="form-label form-label-sm">End Date/Time' + _req(endReq) + '</label>' +
         '<input type="datetime-local" class="form-control form-control-sm" id="lendEnd"' + (endReq ? ' required' : '') + '></div></div>' +
         '<div class="mb-2"><label class="form-label form-label-sm">Notes</label>' +
@@ -481,22 +498,23 @@ function buildReturnForm(b) {
     } else {
         var recs = b.lend_records || [];
         if (recs.length === 0) { return html + '<div class="alert alert-info">No lending records.</div>'; }
-        html += '<div class="mb-2"><label class="form-label fw-semibold">Select lending record(s) to return</label>';
+        html += '<div class="mb-2"><label class="form-label fw-semibold">Select lending record(s) to return</label>' +
+            '<div style="max-height:200px;overflow-y:auto;border:1px solid #dee2e6;border-radius:4px;padding:4px;">';
         recs.forEach(function(r) {
             var chkId = 'lend-rec-' + r.id;
-            html += '<div class="form-check border rounded p-2 mb-1">' +
+            html += '<div class="form-check p-2 border-bottom">' +
                 '<input class="form-check-input lend-rec-chk" type="checkbox" id="' + chkId + '" value="' + r.id + '" data-qty="' + (r.qty||1) + '">' +
-                '<label class="form-check-label small" for="' + chkId + '">' + _esc(r.label||'—') +
-                ' | Qty: ' + (r.qty||1) +
-                (r.end ? ' | Due: ' + _esc(r.end.slice(0,10)) : '') + '</label></div>';
+                '<label class="form-check-label small" for="' + chkId + '"><strong>' + _esc(r.label||'—') + '</strong>' +
+                ' <span class="badge bg-secondary ms-1">Qty: ' + (r.qty||1) + '</span>' +
+                (r.end ? ' <span class="text-muted">(due ' + _esc(r.end.slice(0,10)) + ')</span>' : '') +
+                '</label></div>';
         });
-        html += '</div>';
-        html += '<div class="mb-2"><label class="form-label form-label-sm">Qty to Return</label>' +
-            '<input type="number" class="form-control form-control-sm" id="returnQty" min="1" value="1"></div>';
+        html += '</div></div>';
     }
 
     html += '<div class="mb-2"><label class="form-label form-label-sm">Return Date/Time' + _req(retReq) + (retReq ? '' : ' <span class="text-muted">(leave blank for now)</span>') + '</label>' +
-        '<input type="datetime-local" class="form-control form-control-sm" id="returnDatetime"' + (retReq ? ' required' : '') + '></div>' +
+        '<div class="input-group input-group-sm"><button class="btn btn-outline-secondary" type="button" onclick="_setNow(\'returnDatetime\')" title="Set to now"><i class="bi bi-clock"></i> Now</button>' +
+        '<input type="datetime-local" class="form-control" id="returnDatetime"' + (retReq ? ' required' : '') + '></div></div>' +
         '<div class="mb-2"><label class="form-label form-label-sm">Return Notes</label>' +
         '<input type="text" class="form-control form-control-sm" id="returnNotes" maxlength="128" placeholder="Optional"></div>' +
         '<button class="btn btn-warning btn-sm" onclick="submitReturn(' + b.id + ',' + (b.sn_tracking ? 'true' : 'false') + ')"><i class="bi bi-check-circle"></i> Confirm Return</button>';
@@ -520,7 +538,7 @@ function submitReturn(batchId, snTracking) {
         var rids = Array.from(document.querySelectorAll('.lend-rec-chk:checked')).map(function(c){ return parseInt(c.value); });
         if (!rids.length) { alert('Select at least one lending record.'); return; }
         payload.lend_record_ids = rids;
-        payload.return_qty = parseInt((document.getElementById('returnQty')||{}).value) || 0;
+        payload.return_qty = 0; // 0 = return full qty of each selected record
     }
     fetch('/in-out/return', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
     .then(function(r){ return r.json(); }).then(function(d){
@@ -811,6 +829,7 @@ function _startCamera() {
         var ph = document.getElementById('scanPlaceholder');
         if (video) { video.srcObject = stream; video.style.display = ''; }
         if (ph) ph.style.display = 'none';
+        var aim = document.getElementById('aimOverlay'); if (aim) aim.style.display = '';
         document.getElementById('cameraToggleBtn').innerHTML = '<i class="bi bi-camera-video-off"></i> Stop Camera';
         document.getElementById('redoBtn').classList.remove('d-none');
         _scanPaused = false;
@@ -832,13 +851,22 @@ function _stopCamera() {
     var ph = document.getElementById('scanPlaceholder');
     if (video) { video.srcObject = null; video.style.display = 'none'; }
     if (ph) ph.style.display = '';
+    var aim = document.getElementById('aimOverlay'); if (aim) aim.style.display = 'none';
     document.getElementById('cameraToggleBtn').innerHTML = '<i class="bi bi-camera"></i> Start Camera';
     document.getElementById('redoBtn').classList.add('d-none');
     _scanPaused = false;
 }
 
+function clearSearch() {
+    var el = document.getElementById('inOutSearch');
+    if (el) { el.value = ''; debounceSearch(''); }
+    clearActionForm();
+    document.getElementById('searchResults').innerHTML = '';
+}
+
 function redoScan() {
     _scanPaused = false;
+    clearSearch();
     if (_camStream) _scanLoop();
 }
 

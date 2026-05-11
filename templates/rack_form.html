@@ -59,7 +59,7 @@
                         <label for="picture" class="form-label">Picture</label>
                         {% if rack and rack.picture %}
                         <div class="mb-2">
-                            <img src="{{ url_for('location_rack.rack_picture', filename=rack.picture) }}" 
+                            <img src="{{ url_for('location_rack.rack_picture', filepath=rack.picture) }}"
                                  alt="{{ rack.name }}" style="max-width: 200px; max-height: 200px; border-radius: 4px;">
                             <div class="mt-2">
                                 <div class="form-check">
@@ -260,6 +260,28 @@
                         <span class="badge" style="background:#fd7e14;">&nbsp;&nbsp;&nbsp;</span> Unavailable
                     </small>
                 </div>
+
+                <div class="d-flex gap-2 mt-3 flex-wrap align-items-center">
+                    <button class="btn btn-primary btn-sm" onclick="doMerge()" disabled
+                            id="btnMergeBottom" style="display:none;">
+                        <i class="bi bi-table"></i> Merge Selected
+                    </button>
+                    <button class="btn btn-warning btn-sm" onclick="doSplit()" style="display:none;"
+                            id="btnSplitBottom">
+                        <i class="bi bi-layout-split"></i> Split Merged Cell
+                    </button>
+                    <button class="btn btn-danger btn-sm" onclick="doMarkUnavailable(true)" style="display:none;"
+                            id="btnMarkUnavailableBottom">
+                        <i class="bi bi-slash-circle"></i> Mark Unavailable
+                    </button>
+                    <button class="btn btn-success btn-sm" onclick="doMarkUnavailable(false)" style="display:none;"
+                            id="btnMarkAvailableBottom">
+                        <i class="bi bi-check-circle"></i> Mark Available
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="clearLayoutSelection()">
+                        <i class="bi bi-x-circle"></i> Clear Selection
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -454,6 +476,7 @@ function layoutCellClick(cell) {
 
         document.getElementById('layoutStatus').textContent =
             `Selected merge group (master: ${splitTarget}) — Split to undo merge, or toggle availability`;
+        _mirrorBottomButtons();
         return;
     }
 
@@ -473,6 +496,15 @@ function layoutCellClick(cell) {
     updateToolbar();
 }
 
+function _mirrorBottomButtons() {
+    ['btnMerge','btnSplit','btnMarkUnavailable','btnMarkAvailable'].forEach(function(id) {
+        var top = document.getElementById(id);
+        var bot = document.getElementById(id + 'Bottom');
+        if (!top || !bot) return;
+        bot.disabled = top.disabled;
+        bot.style.display = top.style.display || (top.disabled !== undefined ? '' : 'none');
+    });
+}
 function updateToolbar() {
     const cells = Array.from(selectedCells);
     const btn = document.getElementById('btnMerge');
@@ -513,6 +545,7 @@ function updateToolbar() {
         btn.disabled = true;
         status.textContent = `${cells.length} cells selected — cells must be adjacent (connected)`;
     }
+    _mirrorBottomButtons();
 }
 
 function clearLayoutSelection() {
@@ -526,6 +559,7 @@ function clearLayoutSelection() {
     document.getElementById('btnMarkUnavailable').style.display = 'none';
     document.getElementById('btnMarkAvailable').style.display = 'none';
     document.getElementById('layoutStatus').textContent = '';
+    _mirrorBottomButtons();
 }
 
 function doMerge() {

@@ -9,7 +9,7 @@ from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemE
 from helpers import is_safe_url, format_currency, is_safe_file_path
 from utils import save_file, log_audit, admin_required, permission_required, item_permission_required, format_file_size, allowed_file
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
+from werkzeug.utils import secure_filename, safe_join
 from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
 import os
@@ -217,7 +217,7 @@ def location_edit(uuid):
         
         log_audit(current_user.id, 'update', 'location', location.id, f'Updated location: {location.name}')
         flash(f'Location "{location.name}" updated successfully!', 'success')
-        return redirect(url_for('location_rack.location_management'))
+        return redirect(url_for('location_rack.location_detail', uuid=location.uuid))
     
     max_file_size_mb = int(Setting.get('max_file_size_mb', '10'))
     return render_template('location_form.html', form=form, location=location, max_file_size_mb=max_file_size_mb)
@@ -531,7 +531,7 @@ def rack_edit(uuid):
         
         log_audit(current_user.id, 'update', 'rack', rack.id, f'Updated rack: {rack.name} (size: {rows}x{cols})')
         flash(f'Rack "{rack.name}" updated successfully!', 'success')
-        return redirect(url_for('location_rack.location_management'))
+        return redirect(url_for('location_rack.rack_detail', uuid=rack.uuid))
     
     # GET - show form
     locations = Location.query.order_by(Location.name).all()
