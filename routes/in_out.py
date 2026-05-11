@@ -82,7 +82,7 @@ def in_out():
         abort(403)
 
     can_view_log    = current_user.is_admin() or current_user.has_permission('lending_return', 'view_log')
-    can_lend        = current_user.is_admin() or current_user.has_permission('lending_return', 'edit_lending')
+    can_lend        = current_user.is_admin() or current_user.has_permission('lending_return', 'edit_lending') or current_user.has_permission('lending_return', 'only_self_lending')
     can_edit_batch  = current_user.is_admin() or current_user.has_permission('lending_return', 'edit_batch')
     can_delete_batch= current_user.is_admin() or current_user.has_permission('lending_return', 'delete_batch')
     can_only_self   = (not current_user.is_admin()
@@ -217,7 +217,10 @@ def in_out_batch_detail(batch_id):
 @login_required
 def in_out_lend():
     """Process a new lending record (normal batch or SN batch)."""
-    if not (current_user.is_admin() or current_user.has_permission('lending_return', 'edit_lending')):
+    can_lend = (current_user.is_admin()
+                or current_user.has_permission('lending_return', 'edit_lending')
+                or current_user.has_permission('lending_return', 'only_self_lending'))
+    if not can_lend:
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
 
     data       = request.get_json()
@@ -294,7 +297,10 @@ def in_out_lend():
 @login_required
 def in_out_return():
     """Process return of lent items."""
-    if not (current_user.is_admin() or current_user.has_permission('lending_return', 'edit_lending')):
+    can_lend = (current_user.is_admin()
+                or current_user.has_permission('lending_return', 'edit_lending')
+                or current_user.has_permission('lending_return', 'only_self_lending'))
+    if not can_lend:
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
 
     data       = request.get_json()
