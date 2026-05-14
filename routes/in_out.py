@@ -212,7 +212,12 @@ def _batch_json(batch, item, sn_row=None):
 def _session_json(session):
     """Serialise a LendingSession for JS consumption."""
     items = []
-    for rec in session.lend_records:
+    is_return = (session.mode == 'return')
+
+    # For lend sessions: use the forward link (lending_session_id → lend_records)
+    # For return sessions: use the reverse link (return_session_id → returned_lend_records)
+    lend_recs = session.returned_lend_records if is_return else session.lend_records
+    for rec in lend_recs:
         try:
             batch = rec.batch
             item = batch.item
@@ -232,7 +237,9 @@ def _session_json(session):
             })
         except Exception:
             pass
-    for sn in session.serial_number_records:
+
+    sn_recs = session.returned_sn_records if is_return else session.serial_number_records
+    for sn in sn_recs:
         try:
             if sn.is_deleted:
                 continue
@@ -580,6 +587,7 @@ def in_out_submit_cart():
                 sn.lend_end            = None
                 sn.lend_note           = item_note
                 sn.lend_notify_enabled = False
+                sn.return_session_id   = session_obj.id
                 batch.item.updated_by  = current_user.id
                 batch.item.updated_at  = now
                 processed += 1
@@ -597,9 +605,11 @@ def in_out_submit_cart():
                 if not on_time:
                     any_late = True
                 if return_qty >= rec.quantity:
-                    rec.returned_at = return_dt.replace(tzinfo=None)
+                    rec.returned_at       = return_dt.replace(tzinfo=None)
+                    rec.return_session_id = session_obj.id
                 else:
                     rec.quantity -= return_qty
+                    rec.return_session_id = session_obj.id
                 batch.item.updated_by = current_user.id
                 batch.item.updated_at = now
                 processed += 1
