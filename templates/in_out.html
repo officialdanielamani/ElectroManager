@@ -783,6 +783,21 @@ function _addSnPickerItem(batchId, snId) {
 function _tryAddNormalToCart(batchData) {
     if (_mode === 'return') {
         var recs = batchData.lend_records || [];
+        /* Filter by adv contact if one is set */
+        var aCid   = _adv.contactId;
+        var aCtype = _adv.contactType;
+        if (aCid && aCtype) {
+            var filtered = recs.filter(function(r) {
+                return String(r.contact_id) === String(aCid) && r.type === aCtype;
+            });
+            if (filtered.length > 0) {
+                recs = filtered;
+            } else {
+                showToast('No lending record found for the selected contact.', 'warning');
+                _playSound('error');
+                return;
+            }
+        }
         if (!recs.length) {
             showToast('No lending records to return for "' + batchData.display_label + '".', 'warning');
             _playSound('error');
@@ -1308,10 +1323,34 @@ function _tryAutoSubmitSingle(batchData, resultType) {
                 showActionForm(batchData);
                 return;
             }
+            /* Prefer matching contact from adv default or open detail form */
+            var aCid   = _adv.contactId   || _getVal('detailContactId');
+            var aCtype = _adv.contactType || _getVal('detailContactType');
+            var targetRec = null;
+            if (aCid && aCtype) {
+                targetRec = recs.find(function(r) {
+                    return String(r.contact_id) === String(aCid) && r.type === aCtype;
+                });
+                if (!targetRec) {
+                    showToast('No lending record found for the selected contact.', 'warning');
+                    _playSound('error');
+                    _selectedBatch = batchData;
+                    showActionForm(batchData);
+                    return;
+                }
+            } else if (recs.length === 1) {
+                targetRec = recs[0];
+            } else {
+                /* Multiple records and no contact set — cannot auto-determine; show form */
+                showToast('Multiple lending records exist. Select which to return.', 'warning');
+                _selectedBatch = batchData;
+                showActionForm(batchData);
+                return;
+            }
             cartItem = { _key: ++_cartKey, type: 'lend_record', batch_id: batchData.id,
-                         lend_record_id: recs[0].id,
+                         lend_record_id: targetRec.id,
                          item_name: batchData.item_name, batch_label: batchData.display_label,
-                         qty: recs[0].qty, note: '' };
+                         qty: targetRec.qty, note: '' };
         } else {
             if (batchData.available_qty < 1) {
                 showToast('No stock available to lend.', 'warning');
