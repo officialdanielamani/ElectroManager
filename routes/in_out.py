@@ -509,14 +509,19 @@ def in_out_submit_cart():
             elif item_type == 'lend_record':
                 lend_record_id = cart_item.get('lend_record_id')
                 rec = BatchLendRecord.query.get(lend_record_id)
-                if not rec or rec.batch_id != batch.id:
-                    errors.append(f'Lend record {lend_record_id} not found')
+                if not rec or rec.batch_id != batch.id or rec.returned_at is not None:
+                    errors.append(f'Lend record {lend_record_id} not found or already returned')
                     continue
+                return_qty = max(1, int(cart_item.get('qty') or rec.quantity))
+                return_qty = min(return_qty, rec.quantity)
                 lend_end = rec.lend_end
                 on_time  = (lend_end is None) or (return_dt.replace(tzinfo=None) <= lend_end)
                 if not on_time:
                     any_late = True
-                rec.returned_at = return_dt.replace(tzinfo=None)
+                if return_qty >= rec.quantity:
+                    rec.returned_at = return_dt.replace(tzinfo=None)
+                else:
+                    rec.quantity -= return_qty
                 batch.item.updated_by = current_user.id
                 batch.item.updated_at = now
                 processed += 1
