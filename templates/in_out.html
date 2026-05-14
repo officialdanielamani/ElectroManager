@@ -608,42 +608,106 @@ function renderResults(data) {
 
 function _renderSessionCard(session) {
     _sessionCache[session.lending_id] = session;
+    var isReturn   = (session.mode === 'return');
     var returnable = (session.items || []).filter(function(i){ return i.returnable; });
-    var html = '<div class="card mb-2 border-info">' +
-        '<div class="card-header py-2 px-3 d-flex align-items-center justify-content-between bg-info bg-opacity-10">' +
-        '<span><i class="bi bi-receipt me-1"></i><strong>Lending Session</strong> ' +
-        '<code class="ms-1">' + _esc(session.lending_id) + '</code></span>' +
-        '<span class="badge bg-' + (session.mode === 'lend' ? 'primary' : 'success') + '">' + _esc(session.mode) + '</span>' +
-        '</div>' +
-        '<div class="card-body py-2 px-3 small">' +
-        '<div class="row g-1 mb-2">' +
-        (session.lend_to_label ? '<div class="col-auto"><i class="bi bi-person me-1"></i>' + _esc(session.lend_to_label) + '</div>' : '') +
-        (session.lend_start ? '<div class="col-auto text-muted"><i class="bi bi-calendar-check me-1"></i>' + _esc(session.lend_start.slice(0,10)) + '</div>' : '') +
-        (session.lend_end ? '<div class="col-auto text-muted"><i class="bi bi-calendar-x me-1"></i>' + _esc(session.lend_end.slice(0,10)) + '</div>' : '') +
-        (session.notes ? '<div class="col-12 text-muted fst-italic">' + _esc(session.notes) + '</div>' : '') +
-        '</div>' +
-        '<div class="mb-2"><strong>' + returnable.length + '</strong> item(s) available' +
-        (returnable.length > 0 ? ' to ' + (_mode === 'return' ? 'return' : 'view') : '') + '</div>';
+    var allItems   = session.items || [];
 
-    if (returnable.length > 0) {
-        html += '<div style="max-height:160px;overflow-y:auto;border:1px solid var(--bs-border-color);border-radius:4px;padding:4px;" class="mb-2">';
-        returnable.forEach(function(it) {
-            var label = _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span>';
-            if (it.type === 'sn') {
-                label += ' — <code style="font-size:0.78rem">' + _esc(it.isn) + '</code>';
+    var headerColor = isReturn ? 'success' : 'info';
+    var modeLabel   = isReturn ? 'Return Session' : 'Lending Session';
+    var modeBadge   = isReturn
+        ? '<span class="badge bg-success">return</span>'
+        : '<span class="badge bg-primary">lend</span>';
+
+    var html = '<div class="card mb-2 border-' + headerColor + '">' +
+        '<div class="card-header py-2 px-3 d-flex align-items-center justify-content-between bg-' + headerColor + ' bg-opacity-10">' +
+        '<span><i class="bi bi-receipt me-1"></i><strong>' + modeLabel + '</strong> ' +
+        '<code class="ms-1">' + _esc(session.lending_id) + '</code></span>' +
+        '<div class="d-flex align-items-center gap-2">' + modeBadge +
+        '<button class="btn btn-sm btn-outline-secondary py-0" onclick="showSessionDetailModal(\'' + _esc(session.lending_id) + '\')">' +
+        '<i class="bi bi-info-circle"></i> Detail</button>' +
+        '</div></div>' +
+        '<div class="card-body py-2 px-3 small">';
+
+    if (isReturn) {
+        /* ── Return session card ── */
+        html += '<div class="text-muted mb-2">' +
+            '<i class="bi bi-box-arrow-in-left me-1"></i>' +
+            'Returned on <strong>' + _esc(session.created_at || '') + '</strong>' +
+            ' by <strong>' + _esc(session.created_by_label || '') + '</strong>' +
+            (session.notes ? ' — <em>' + _esc(session.notes) + '</em>' : '') +
+            '</div>';
+
+        var normals = allItems.filter(function(i){ return i.type === 'lend_record'; });
+        var sns     = allItems.filter(function(i){ return i.type === 'sn'; });
+
+        if (normals.length) {
+            html += '<div class="fw-semibold text-muted mb-1"><i class="bi bi-box-seam me-1"></i>Standard Items</div>' +
+                '<div style="max-height:140px;overflow-y:auto;border:1px solid var(--bs-border-color);border-radius:4px;padding:4px;" class="mb-2">';
+            normals.forEach(function(it) {
+                var badge = it.on_time === false
+                    ? '<span class="badge bg-warning text-dark me-1" style="font-size:0.65rem;">Late</span>'
+                    : '<span class="badge bg-success me-1" style="font-size:0.65rem;">On time</span>';
+                html += '<div class="py-1 border-bottom d-flex align-items-center gap-1">' + badge +
+                    _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span>' +
+                    ' &times;' + (it.qty || 1) +
+                    (it.lend_display ? ' — <em class="text-muted">' + _esc(it.lend_display) + '</em>' : '') +
+                    '</div>';
+            });
+            html += '</div>';
+        }
+
+        if (sns.length) {
+            html += '<div class="fw-semibold text-muted mb-1"><i class="bi bi-fingerprint me-1"></i>Serial-Tracked Items</div>' +
+                '<div style="max-height:140px;overflow-y:auto;border:1px solid var(--bs-border-color);border-radius:4px;padding:4px;" class="mb-2">';
+            sns.forEach(function(it) {
+                var badge = it.on_time === false
+                    ? '<span class="badge bg-warning text-dark me-1" style="font-size:0.65rem;">Late</span>'
+                    : '<span class="badge bg-success me-1" style="font-size:0.65rem;">On time</span>';
+                html += '<div class="py-1 border-bottom d-flex align-items-center gap-1">' + badge +
+                    _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span>' +
+                    ' — <code style="font-size:0.78rem">' + _esc(it.isn || '') + '</code>' +
+                    (it.lend_display ? ' — <em class="text-muted">' + _esc(it.lend_display) + '</em>' : '') +
+                    '</div>';
+            });
+            html += '</div>';
+        }
+
+        if (!normals.length && !sns.length) {
+            html += '<div class="text-muted">No items recorded in this return session.</div>';
+        }
+
+    } else {
+        /* ── Lend session card ── */
+        html += '<div class="row g-1 mb-2">' +
+            (session.lend_to_label ? '<div class="col-auto"><i class="bi bi-person me-1"></i>' + _esc(session.lend_to_label) + '</div>' : '') +
+            (session.lend_start ? '<div class="col-auto text-muted"><i class="bi bi-calendar-check me-1"></i>' + _esc(session.lend_start.slice(0,10)) + '</div>' : '') +
+            (session.lend_end ? '<div class="col-auto text-muted"><i class="bi bi-calendar-x me-1"></i>' + _esc(session.lend_end.slice(0,10)) + '</div>' : '') +
+            (session.notes ? '<div class="col-12 text-muted fst-italic">' + _esc(session.notes) + '</div>' : '') +
+            '</div>' +
+            '<div class="mb-2"><strong>' + returnable.length + '</strong> item(s) available' +
+            (returnable.length > 0 ? ' to ' + (_mode === 'return' ? 'return' : 'view') : '') + '</div>';
+
+        if (returnable.length > 0) {
+            html += '<div style="max-height:160px;overflow-y:auto;border:1px solid var(--bs-border-color);border-radius:4px;padding:4px;" class="mb-2">';
+            returnable.forEach(function(it) {
+                var label = _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span>';
+                if (it.type === 'sn') {
+                    label += ' — <code style="font-size:0.78rem">' + _esc(it.isn) + '</code>';
+                } else {
+                    label += ' &times;' + it.qty;
+                }
+                html += '<div class="py-1 border-bottom">' + label + '</div>';
+            });
+            html += '</div>';
+            if (_mode === 'return') {
+                html += '<button class="btn btn-sm btn-success" onclick="addSessionToCart(\'' + _esc(session.lending_id) + '\')">' +
+                    '<i class="bi bi-cart-plus"></i> Add All to Return Cart</button>';
             } else {
-                label += ' &times;' + it.qty;
+                html += '<div class="text-muted small">Switch to <strong>Return</strong> mode to process returns from this session.</div>';
             }
-            html += '<div class="py-1 border-bottom">' + label + '</div>';
-        });
-        html += '</div>';
-        if (_mode === 'return') {
-            html += '<button class="btn btn-sm btn-success" onclick="addSessionToCart(\'' + _esc(session.lending_id) + '\')">' +
-                '<i class="bi bi-cart-plus"></i> Add All to Return Cart</button>';
-        } else {
-            html += '<div class="text-muted small">Switch to <strong>Return</strong> mode to process returns from this session.</div>';
         }
     }
+
     html += '</div></div>';
     return html;
 }
