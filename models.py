@@ -742,6 +742,7 @@ class BatchSerialNumber(db.Model):
     lend_notify_enabled = db.Column(db.Boolean, default=False)
     lend_notify_before_days = db.Column(db.Integer, default=3)
     lend_note = db.Column(db.String(128), nullable=True)
+    lending_session_id = db.Column(db.Integer, db.ForeignKey('lending_sessions.id'), nullable=True)
     is_deleted = db.Column(db.Boolean, default=False)
     deleted_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     deleted_at = db.Column(db.DateTime, nullable=True)
@@ -749,6 +750,7 @@ class BatchSerialNumber(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     deleted_by = db.relationship('User', foreign_keys=[deleted_by_id])
+    lending_session = db.relationship('LendingSession', foreign_keys=[lending_session_id], backref=db.backref('serial_number_records', lazy=True))
 
     def get_lend_to_display(self):
         if not self.lend_to_id or not self.lend_to_type:
@@ -788,7 +790,10 @@ class BatchLendRecord(db.Model):
     lend_notify_enabled = db.Column(db.Boolean, default=False)
     lend_notify_before_days = db.Column(db.Integer, default=3)
     lend_note = db.Column(db.String(128), nullable=True)
+    lending_session_id = db.Column(db.Integer, db.ForeignKey('lending_sessions.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    lending_session = db.relationship('LendingSession', foreign_keys=[lending_session_id], backref=db.backref('lend_records', lazy=True))
 
     def get_lend_to_display(self):
         if not self.lend_to_id or not self.lend_to_type:
@@ -812,6 +817,58 @@ class BatchLendRecord(db.Model):
 
     def __repr__(self):
         return f'<BatchLendRecord batch={self.batch_id} to={self.lend_to_type}:{self.lend_to_id}>'
+
+
+def _generate_lending_id():
+    """Generate a unique lending session ID: YYYYMMDD-XXXXXX (6 uppercase alphanumeric chars)."""
+    chars = string.ascii_uppercase + string.digits
+    while True:
+        date_str = datetime.now().strftime('%Y%m%d')
+        rand_part = ''.join(secrets.choice(chars) for _ in range(6))
+        candidate = f"{date_str}-{rand_part}"
+        if not LendingSession.query.filter_by(lending_id=candidate).first():
+            return candidate
+
+
+class LendingSession(db.Model):
+    """Groups multiple lending/return records under a single session ID."""
+    __tablename__ = 'lending_sessions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    lending_id = db.Column(db.String(20), unique=True, nullable=False)
+    mode = db.Column(db.String(10), nullable=False)  # 'lend' or 'return'
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    lend_to_type = db.Column(db.String(20), default='')
+    lend_to_id = db.Column(db.Integer, nullable=True)
+    lend_start = db.Column(db.DateTime, nullable=True)
+    lend_end = db.Column(db.DateTime, nullable=True)
+    notes = db.Column(db.String(256), nullable=True)
+
+    creator = db.relationship('User', foreign_keys=[created_by_id])
+
+    def get_lend_to_display(self):
+        if not self.lend_to_id or not self.lend_to_type:
+            return ''
+        try:
+            if self.lend_to_type == 'user':
+                obj = User.query.get(self.lend_to_id)
+                return obj.username if obj else f'User #{self.lend_to_id}'
+            elif self.lend_to_type == 'person':
+                obj = ContactPerson.query.get(self.lend_to_id)
+                return obj.name if obj else f'Person #{self.lend_to_id}'
+            elif self.lend_to_type == 'organization':
+                obj = ContactOrganization.query.get(self.lend_to_id)
+                return obj.name if obj else f'Org #{self.lend_to_id}'
+            elif self.lend_to_type == 'group':
+                obj = ContactGroup.query.get(self.lend_to_id)
+                return obj.name if obj else f'Group #{self.lend_to_id}'
+        except Exception:
+            pass
+        return ''
+
+    def __repr__(self):
+        return f'<LendingSession {self.lending_id}>'
 
 
 class Attachment(db.Model):
