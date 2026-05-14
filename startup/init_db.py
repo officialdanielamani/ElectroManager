@@ -11,10 +11,26 @@ import json
 
 
 
+def _add_missing_columns():
+    """Add new columns to existing tables without a migration script."""
+    with db.engine.connect() as conn:
+        additions = [
+            ("batch_lend_records",   "lend_note", "VARCHAR(128)"),
+            ("batch_serial_numbers", "lend_note", "VARCHAR(128)"),
+        ]
+        for table, col, col_type in additions:
+            try:
+                conn.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+                conn.commit()
+                print(f"[OK] Added column {table}.{col}")
+            except Exception:
+                pass  # column already exists
+
 def init_db():
     with app.app_context():
         print("Creating database tables...")
         db.create_all()
+        _add_missing_columns()
         print("Database tables created!")
 
         create_default_roles()
@@ -35,6 +51,7 @@ def init_db():
             print(f"\nCreating default admin user: {admin_username}...")
             admin = User(
                 username=admin_username,
+                name=admin_username,
                 email=admin_email,
                 role_id=admin_role.id,
                 is_active=True,
@@ -77,10 +94,13 @@ def create_default_roles():
             "items": {
                 "view": True, "create": True, "delete": True,
                 "view_info": True, "edit_info": True,
-                "view_batch": True, "edit_batch": True,
-                "edit_quantity": True, "edit_price": True,
-                "edit_sn": True, "edit_lending": True, "delete_batch": True,
+                "create_batch": True,
                 "view_advance": True, "edit_advance": True, "delete_advance": True,
+            },
+            "lending_return": {
+                "view_page": True, "only_self_lending": False, "view_log": True,
+                "edit_batch": True, "delete_batch": True,
+                "edit_lending": True, "delete_lending": True,
             },
             "pages": {
                 "visual_storage": {"view": True, "edit": True},
@@ -122,10 +142,13 @@ def create_default_roles():
             "items": {
                 "view": True, "create": True, "delete": True,
                 "view_info": True, "edit_info": True,
-                "view_batch": True, "edit_batch": True,
-                "edit_quantity": True, "edit_price": True,
-                "edit_sn": True, "edit_lending": True, "delete_batch": True,
+                "create_batch": True,
                 "view_advance": True, "edit_advance": True, "delete_advance": True,
+            },
+            "lending_return": {
+                "view_page": True, "only_self_lending": False, "view_log": True,
+                "edit_batch": True, "delete_batch": False,
+                "edit_lending": True, "delete_lending": False,
             },
             "pages": {
                 "visual_storage": {"view": True, "edit": True},
@@ -167,10 +190,13 @@ def create_default_roles():
             "items": {
                 "view": True, "create": False, "delete": False,
                 "view_info": True, "edit_info": False,
-                "view_batch": True, "edit_batch": False,
-                "edit_quantity": False, "edit_price": False,
-                "edit_sn": False, "edit_lending": False, "delete_batch": False,
+                "create_batch": False,
                 "view_advance": True, "edit_advance": False, "delete_advance": False,
+            },
+            "lending_return": {
+                "view_page": True, "only_self_lending": False, "view_log": True,
+                "edit_batch": False, "delete_batch": False,
+                "edit_lending": False, "delete_lending": False,
             },
             "pages": {
                 "visual_storage": {"view": True, "edit": False},
@@ -210,12 +236,13 @@ def create_default_roles():
 
 def update_system_roles():
     """Patch existing system roles to add any missing permission keys introduced by new features."""
-    updates = {
+    # Migrate settings_sections.contacts if missing
+    contacts_updates = {
         'Admin':   {"contacts": {"view": True,  "edit": True,  "delete": True}},
         'Manager': {"contacts": {"view": True,  "edit": True,  "delete": False}},
         'Viewer':  {"contacts": {"view": False, "edit": False, "delete": False}},
     }
-    for role_name, new_keys in updates.items():
+    for role_name, new_keys in contacts_updates.items():
         role = Role.query.filter_by(name=role_name).first()
         if not role:
             continue
@@ -228,7 +255,28 @@ def update_system_roles():
                 changed = True
         if changed:
             role.set_permissions(perms)
-            print(f"Updated permissions for role: {role_name}")
+            print(f"Updated settings_sections permissions for role: {role_name}")
+
+    # Migrate lending_return section if missing
+    lr_updates = {
+        'Admin':   {"view_page": True,  "only_self_lending": False, "view_log": True,  "edit_batch": True,  "delete_batch": True,  "edit_lending": True,  "delete_lending": True},
+        'Manager': {"view_page": True,  "only_self_lending": False, "view_log": True,  "edit_batch": True,  "delete_batch": False, "edit_lending": True,  "delete_lending": False},
+        'Viewer':  {"view_page": True,  "only_self_lending": False, "view_log": True,  "edit_batch": False, "delete_batch": False, "edit_lending": False, "delete_lending": False},
+    }
+    for role_name, lr_perms in lr_updates.items():
+        role = Role.query.filter_by(name=role_name).first()
+        if not role:
+            continue
+        perms = role.get_permissions()
+        if 'lending_return' not in perms:
+            perms['lending_return'] = lr_perms
+            role.set_permissions(perms)
+            print(f"Added lending_return permissions for role: {role_name}")
+        elif 'only_self_lending' not in perms['lending_return']:
+            perms['lending_return']['only_self_lending'] = False
+            role.set_permissions(perms)
+            print(f"Added only_self_lending to lending_return for role: {role_name}")
+
     db.session.commit()
 
 
@@ -239,6 +287,15 @@ def create_default_settings():
         ('items_per_page', '20', 'Number of items to display per page'),
         ('low_stock_threshold', '5', 'Default low stock threshold'),
         ('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx', 'Allowed file extensions for uploads'),
+        ('lr_lend_start_date_required', 'false', 'Lending start date is required'),
+        ('lr_lend_start_time_required', 'false', 'Lending start time is required (only if date required)'),
+        ('lr_lend_end_date_required', 'false', 'Lending end date is required'),
+        ('lr_lend_end_time_required', 'false', 'Lending end time is required (only if date required)'),
+        ('lr_lend_self_use_now', 'false', 'Only Self Lending must use current datetime for start'),
+        ('lr_return_date_required', 'false', 'Return date is required'),
+        ('lr_return_time_required', 'false', 'Return time is required (only if date required)'),
+        ('lr_return_self_use_now', 'false', 'Only Self Lending must use current datetime for return'),
+        ('lr_scan_enabled', 'false', 'Enable QR/Barcode camera scanning on In/Out page'),
     ]
     
     for key, value, description in default_settings:

@@ -117,6 +117,7 @@ def visual_storage():
             'uuid': rack.uuid,
             'name': rack.name,
             'description': rack.description,
+            'short_info': rack.short_info or '',
             'physical_location': rack.physical_location,
             'rows': rack.rows,
             'cols': rack.cols,
@@ -124,6 +125,7 @@ def visual_storage():
             'item_count': len(items_main) + len(batches_here),
             'unavailable_drawers': rack.get_unavailable_drawers(),
             'merged_cells': rack.get_merged_cells(),
+            'drawer_info': rack.get_drawer_info(),
             'skip_cells': list(skip_cells),
             'cell_spans': cell_spans,
             'group_cells': group_cells,
@@ -183,10 +185,12 @@ def get_drawer_contents(rack_uuid, drawer_id):
         'entries': entries,
         'rack': {
             'id': rack.id,
+            'uuid': rack.uuid,
             'name': rack.name
         },
         'drawer_id': drawer_id,
-        'is_unavailable': rack.is_drawer_unavailable(drawer_id)
+        'is_unavailable': rack.is_drawer_unavailable(drawer_id),
+        'short_info': rack.get_drawer_short_info(drawer_id),
     })
 
 
@@ -226,6 +230,29 @@ def toggle_drawer_availability():
         logging.error(f"Error toggling drawer availability: {str(e)}")
         return jsonify({'success': False, 'error': 'An error occurred while toggling drawer availability'})
 
+
+@visual_storage_bp.route('/api/drawer/update-info', methods=['POST'])
+@login_required
+@permission_required("settings_sections.location_management", "edit")
+def update_drawer_info():
+    """Save or clear the short-info text for a specific drawer."""
+    try:
+        data = request.get_json()
+        rack_uuid = data.get('rack_id')
+        drawer_id = data.get('drawer_id')
+        short_info = (data.get('short_info', '') or '').strip()[:128]
+
+        rack = Rack.query.filter_by(uuid=rack_uuid).first_or_404()
+        rack.set_drawer_short_info(drawer_id, short_info)
+        db.session.commit()
+
+        log_audit(current_user.id, 'update', 'rack', rack.id,
+                  f'Updated short info for drawer {drawer_id} in rack {rack.name}')
+        return jsonify({'success': True, 'short_info': short_info})
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error updating drawer info: {str(e)}")
+        return jsonify({'success': False, 'error': 'An error occurred while updating drawer info'})
 
 
 @visual_storage_bp.route('/api/drawer/move-items', methods=['POST'])

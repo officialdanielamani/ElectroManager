@@ -179,7 +179,9 @@ def item_new():
     racks = Rack.query.order_by(Rack.name).all()
     racks_data = [{'id': r.id, 'name': r.name, 'rows': r.rows, 'cols': r.cols,
                    'unavailable_drawers': r.get_unavailable_drawers(),
-                   'merged_cells': r.get_merged_cells()} for r in racks]
+                   'merged_cells': r.get_merged_cells(),
+                   'drawer_info': r.get_drawer_info(),
+                   'same_item_drawers': []} for r in racks]
     all_tags = [{'id': t.id, 'name': t.name, 'color': t.color} for t in Tag.query.order_by(Tag.name).all()]
     
     prefill_rack_uuid = request.args.get('rack_id', type=str)
@@ -220,6 +222,7 @@ def item_new():
         item = Item(
             name=form.name.data,
             sku=form.sku.data if form.sku.data else None,
+            short_info=form.short_info.data if form.short_info.data else None,
             info=form.info.data,
             description=form.description.data if perms['can_edit_advance'] else None,
             quantity=0,
@@ -256,11 +259,12 @@ def item_new():
                 qty = int(pb.get('quantity', 0)) if perms.get('can_edit_quantity') else 0
                 if qty < 0:
                     qty = 0
-                sn_tracking = bool(pb.get('sn_tracking', False)) if perms.get('can_edit_sn') else False
+                sn_tracking = bool(pb.get('sn_tracking', False)) if perms.get('can_edit_batch') else False
                 max_qty = 100 if sn_tracking else 99999
                 if qty > max_qty:
                     qty = max_qty
                 label = str(pb.get('label', '')).strip()[:32] or None
+                manufacturer = str(pb.get('manufacturer', '')).strip()[:128] or None
                 price = float(pb.get('price', 0) or 0) if perms.get('can_edit_price') else 0.0
                 if price < 0:
                     price = 0.0
@@ -293,10 +297,13 @@ def item_new():
                     batch_rack_id = None
                     batch_drawer = None
 
+                note = str(pb.get('note', '')).strip()[:128] or None
                 batch = ItemBatch(
                     item_id=item.id,
                     batch_number=item.get_next_batch_number(),
                     batch_label=label,
+                    manufacturer=manufacturer,
+                    note=note,
                     quantity=qty,
                     price_per_unit=price,
                     purchase_date=purchase_date,
@@ -349,8 +356,10 @@ def item_detail(uuid):
     from models import StickerTemplate
     qr_templates = StickerTemplate.query.filter_by(template_type='Items').all()
     
-    return render_template('item_detail.html', item=item, attachment_form=attachment_form, 
-                         currency_symbol=currency_symbol, currency_decimal_places=currency_decimal_places, qr_templates=qr_templates)
+    return render_template('item_detail.html', item=item, attachment_form=attachment_form,
+                         currency_symbol=currency_symbol, currency_decimal_places=currency_decimal_places, qr_templates=qr_templates,
+                         download_all_item_attachments=Setting.get('download_all_item_attachments', True),
+                         download_all_item_share_files=Setting.get('download_all_item_share_files', True))
 
 
 @item_bp.route('/item/<string:uuid>/qr', endpoint='item_qr_svg')
@@ -364,11 +373,146 @@ def item_qr_svg(uuid):
         abort(403)
     
     from qr_utils import generate_qr_svg
-    
-    qr_data = f'/item/{item.uuid}'
+
+    qr_data = item.uuid
     qr_svg = generate_qr_svg(qr_data, 160, 160, error_correction='M')
     
     return qr_svg, 200, {'Content-Type': 'image/svg+xml'}
+
+
+def _parse_dt(s):
+    if not s:
+        return None
+    for fmt in ('%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d'):
+        try:
+            return datetime.strptime(s, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _apply_pending_sn_changes(item, perms):
+    """Process pending_sn_changes submitted as a hidden JSON field on the edit form."""
+    from models import ItemBatch, BatchSerialNumber
+    raw = request.form.get('pending_sn_changes', '{}')
+    try:
+        pending = json.loads(raw)
+    except Exception:
+        return
+    if not pending or not perms.get('can_edit_batch'):
+        return
+    now = datetime.now(timezone.utc)
+    for bid_str, changes in pending.items():
+        try:
+            batch = ItemBatch.query.get(int(bid_str))
+        except Exception:
+            continue
+        if not batch or batch.item_id != item.id or not batch.sn_tracking_enabled:
+            continue
+        adds        = int(changes.get('adds', 0))
+        deletes     = changes.get('deletes', [])
+        edits       = changes.get('edits', [])
+        lend_changes = changes.get('lend_changes', [])
+
+        if adds > 0 and perms.get('can_edit_quantity'):
+            active = sum(1 for sn in batch.serial_numbers if not sn.is_deleted)
+            adds = min(adds, 100 - active)
+            if adds > 0:
+                max_seq = db.session.query(db.func.max(BatchSerialNumber.sequence_number)).filter_by(batch_id=batch.id).scalar() or 0
+                date_str = batch.purchase_date.strftime('%Y%m%d') if batch.purchase_date else '00000000'
+                pfx = f"B{batch.batch_number:02d}"
+                for i in range(1, adds + 1):
+                    seq = max_seq + i
+                    isn = f"{item.uuid}-{date_str}-{pfx}-{seq:03d}"
+                    db.session.add(BatchSerialNumber(batch_id=batch.id, sequence_number=seq,
+                                                    internal_serial_number=isn, serial_number='', info=''))
+                batch.quantity += adds
+
+        if deletes and perms.get('can_edit_quantity'):
+            deleted = 0
+            for d in deletes:
+                try:
+                    sn_obj = BatchSerialNumber.query.get(int(d.get('sn_id', 0)))
+                except Exception:
+                    continue
+                if sn_obj and sn_obj.batch_id == batch.id and not sn_obj.is_deleted:
+                    sn_obj.is_deleted = True
+                    sn_obj.deleted_by_id = current_user.id
+                    sn_obj.deleted_at = now
+                    sn_obj.deleted_reason = (d.get('reason', '') or '').strip()[:256] or None
+                    deleted += 1
+            batch.quantity = max(batch.quantity - deleted, 0)
+
+        for e in edits:
+            try:
+                sn_obj = BatchSerialNumber.query.get(int(e.get('sn_id', 0)))
+            except Exception:
+                continue
+            if not sn_obj or sn_obj.batch_id != batch.id or sn_obj.is_deleted:
+                continue
+            if e.get('sn') is not None:
+                sn_obj.serial_number = str(e['sn']).strip()[:200]
+            if e.get('info') is not None:
+                sn_obj.info = str(e['info']).strip()[:32]
+
+        if perms.get('can_edit_lending'):
+            for lc in lend_changes:
+                try:
+                    sn_obj = BatchSerialNumber.query.get(int(lc.get('sn_id', 0)))
+                except Exception:
+                    continue
+                if not sn_obj or sn_obj.batch_id != batch.id or sn_obj.is_deleted:
+                    continue
+                try:
+                    lend_id = int(lc['lend_to_id']) if lc.get('lend_to_id') else None
+                except (ValueError, TypeError):
+                    lend_id = None
+                if lend_id:
+                    sn_obj.lend_to_type = lc.get('lend_to_type', '')
+                    sn_obj.lend_to_id = lend_id
+                    sn_obj.lend_start = _parse_dt(lc.get('lend_start', ''))
+                    sn_obj.lend_end   = _parse_dt(lc.get('lend_end', ''))
+                    sn_obj.lend_note  = (lc.get('lend_note', '') or '').strip()[:128] or None
+                    sn_obj.lend_notify_enabled    = bool(lc.get('lend_notify', False))
+                    try:
+                        sn_obj.lend_notify_before_days = int(lc.get('lend_days', 3))
+                    except (ValueError, TypeError):
+                        sn_obj.lend_notify_before_days = 3
+                else:
+                    sn_obj.lend_to_type = ''
+                    sn_obj.lend_to_id = None
+                    sn_obj.lend_start = None
+                    sn_obj.lend_end   = None
+                    sn_obj.lend_note  = None
+                    sn_obj.lend_notify_enabled     = False
+                    sn_obj.lend_notify_before_days = 3
+
+    item.recalculate_from_batches()
+
+
+def _apply_pending_lend_changes(item, perms):
+    """Process pending_lend_changes submitted as a hidden JSON field on the edit form."""
+    from models import ItemBatch, BatchLendRecord
+    from routes.batch import _save_lend_records
+    raw = request.form.get('pending_lend_changes', '{}')
+    try:
+        pending = json.loads(raw)
+    except Exception:
+        return
+    if not pending or not perms.get('can_edit_lending'):
+        return
+    for bid_str, records in pending.items():
+        try:
+            batch = ItemBatch.query.get(int(bid_str))
+        except Exception:
+            continue
+        if not batch or batch.item_id != item.id or batch.sn_tracking_enabled:
+            continue
+        total_qty = sum(max(1, int(r.get('qty', 1))) for r in records if isinstance(r, dict))
+        if total_qty > batch.quantity:
+            continue  # skip invalid — don't crash the whole save
+        BatchLendRecord.query.filter_by(batch_id=batch.id).delete()
+        _save_lend_records(batch, records, batch.quantity)
 
 
 @item_bp.route('/item/<string:uuid>/edit', endpoint='item_edit', methods=['GET', 'POST'])
@@ -396,9 +540,20 @@ def item_edit(uuid):
     form = ItemEditForm(obj=item, perms=perms)
     locations = Location.query.order_by(Location.name).all()
     racks = Rack.query.order_by(Rack.name).all()
+
+    # Build per-rack map of drawers used by this item (main + batch overrides)
+    _sid = {}  # rack_id → [{drawer, label}]
+    if item.rack_id and item.drawer:
+        _sid.setdefault(item.rack_id, []).append({'drawer': item.drawer, 'label': 'Main Location'})
+    for _b in item.batches:
+        if not _b.follow_main_location and _b.rack_id and _b.drawer:
+            _sid.setdefault(_b.rack_id, []).append({'drawer': _b.drawer, 'label': _b.get_display_label()})
+
     racks_data = [{'id': r.id, 'name': r.name, 'rows': r.rows, 'cols': r.cols,
                    'unavailable_drawers': r.get_unavailable_drawers(),
-                   'merged_cells': r.get_merged_cells()} for r in racks]
+                   'merged_cells': r.get_merged_cells(),
+                   'drawer_info': r.get_drawer_info(),
+                   'same_item_drawers': _sid.get(r.id, [])} for r in racks]
     all_tags = [{'id': t.id, 'name': t.name, 'color': t.color} for t in Tag.query.order_by(Tag.name).all()]
     
     if form.validate_on_submit():
@@ -406,6 +561,7 @@ def item_edit(uuid):
         if perms['can_edit_info']:
             item.name = form.name.data
             item.sku = form.sku.data if form.sku.data else None
+            item.short_info = form.short_info.data if form.short_info.data else None
             item.info = form.info.data
             item.min_quantity = form.min_quantity.data or 0
             item.no_stock_warning = form.no_stock_warning.data
@@ -442,9 +598,15 @@ def item_edit(uuid):
 
         item.updated_at = datetime.now(timezone.utc)
         item.updated_by = current_user.id
-        
+
+        # ── Pending SN changes (deferred from JS state) ──
+        _apply_pending_sn_changes(item, perms)
+
+        # ── Pending normal-batch lend changes (deferred from JS state) ──
+        _apply_pending_lend_changes(item, perms)
+
         db.session.commit()
-        
+
         log_audit(current_user.id, 'update', 'item', item.id, f'Updated item: {item.name}')
         flash(f'Item "{item.name}" updated successfully!', 'success')
         return redirect(url_for('item.item_detail', uuid=item.uuid))
@@ -454,9 +616,13 @@ def item_edit(uuid):
     extensions_str = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
     
     batch_lend_data = {b.id: b.get_lend_records_data() for b in item.batches}
+    sn_all_data = {}
+    for batch in item.batches:
+        if batch.sn_tracking_enabled:
+            sn_all_data[batch.id] = batch.get_serial_numbers_data()
     share_files_item = SharedFile.query.filter_by(category='item').order_by(SharedFile.name).all()
     share_files_icon = SharedFile.query.filter_by(category='icon').order_by(SharedFile.name).all()
-    return render_template('item_form.html', form=form, item=item, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='Edit Item', currency=Setting.get('currency', '$'), max_file_size_mb=max_size_mb, allowed_file_types=extensions_str, item_perms=perms, batch_lend_data=batch_lend_data, share_files_item=share_files_item, share_files_icon=share_files_icon)
+    return render_template('item_form.html', form=form, item=item, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='Edit Item', currency=Setting.get('currency', '$'), max_file_size_mb=max_size_mb, allowed_file_types=extensions_str, item_perms=perms, batch_lend_data=batch_lend_data, sn_all_data=sn_all_data, share_files_item=share_files_item, share_files_icon=share_files_icon)
 
 
 
@@ -681,6 +847,53 @@ def delete_attachment(id):
     log_audit(current_user.id, 'delete', 'attachment', id, f'Deleted attachment: {attachment.original_filename}')
     flash('Attachment deleted successfully!', 'success')
     return redirect(url_for('item.item_edit', uuid=item.uuid))
+
+
+@item_bp.route('/item/<string:uuid>/download-attachments', endpoint='item_download_attachments')
+@login_required
+@item_permission_required
+def item_download_attachments(uuid):
+    if not Setting.get('download_all_item_attachments', True):
+        abort(403)
+    import zipfile, io
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    if not item.attachments:
+        flash('No attachments to download.', 'warning')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for att in item.attachments:
+            full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], att.filename)
+            if os.path.exists(full_path):
+                zf.write(full_path, att.original_filename)
+    buf.seek(0)
+    from flask import send_file as _send_file
+    log_audit(current_user.id, 'download', 'item', item.id, f'Downloaded all attachments for item: {item.name}')
+    return _send_file(buf, download_name=f"{item.uuid}_attachments.zip", as_attachment=True, mimetype='application/zip')
+
+
+@item_bp.route('/item/<string:uuid>/download-share-files', endpoint='item_download_share_files')
+@login_required
+@item_permission_required
+def item_download_share_files(uuid):
+    if not Setting.get('download_all_item_share_files', True):
+        abort(403)
+    import zipfile, io
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    if not item.linked_share_files:
+        flash('No share files to download.', 'warning')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for sf in item.linked_share_files:
+            full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', sf.category, sf.filename)
+            if os.path.exists(full_path):
+                zf.write(full_path, f"{sf.name}.{sf.ext}")
+    buf.seek(0)
+    from flask import send_file as _send_file
+    log_audit(current_user.id, 'download', 'item', item.id, f'Downloaded all share files for item: {item.name}')
+    return _send_file(buf, download_name=f"{item.uuid}_share_files.zip", as_attachment=True, mimetype='application/zip')
+
 
 
 

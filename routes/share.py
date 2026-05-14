@@ -7,7 +7,7 @@ import os
 import zipfile
 
 logger = logging.getLogger(__name__)
-from flask import Blueprint, render_template, redirect, url_for, flash, request, send_from_directory, current_app, jsonify, send_file
+from flask import Blueprint, render_template, redirect, url_for, flash, request, send_from_directory, current_app, jsonify, send_file, abort
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from models import db, SharedFile, Setting, User
@@ -15,15 +15,23 @@ from utils import log_audit
 
 share_bp = Blueprint('share', __name__)
 
-SHARE_CATEGORIES = ['item', 'icon', 'profile', 'project', 'sticker']
+SHARE_CATEGORIES = ['item', 'project', 'profile', 'sticker', 'icon']
 IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'}
 
 CATEGORY_DEFAULTS = {
     'item':    {'extensions': 'pdf,png,jpg,jpeg,gif,txt,doc,docx', 'max_size': '10'},
-    'icon':    {'extensions': 'svg,png,jpeg,jpg',                  'max_size': '5'},
+    'icon':    {'extensions': 'png,jpg,jpeg',                      'max_size': '5'},
     'profile': {'extensions': 'jpg,jpeg,png',                      'max_size': '1'},
     'project': {'extensions': 'pdf,png,jpg,jpeg,gif,txt,doc,docx', 'max_size': '10'},
     'sticker': {'extensions': 'png,jpg,jpeg',                      'max_size': '1'},
+}
+
+DEMO_LIMITS = {
+    'item':    {'extensions': 'jpg,jpeg,png,txt', 'max_size': '1'},
+    'icon':    {'extensions': 'jpg,jpeg,png',     'max_size': '1'},
+    'profile': {'extensions': 'jpg,jpeg,png',     'max_size': '1'},
+    'project': {'extensions': 'jpg,jpeg,png,txt', 'max_size': '1'},
+    'sticker': {'extensions': 'jpg,jpeg,png',     'max_size': '1'},
 }
 
 PROFILE_FIXED = True  # profile limits are not configurable
@@ -86,6 +94,10 @@ def get_share_config(category):
     """Return (allowed_ext_set, max_bytes) for the given category."""
     if category == 'profile':
         return {'jpg', 'jpeg', 'png'}, 1 * 1024 * 1024
+    if current_app.config.get('DEMO_MODE', False):
+        d = DEMO_LIMITS.get(category, DEMO_LIMITS['item'])
+        exts = {e.strip().lower() for e in d['extensions'].split(',') if e.strip()}
+        return exts, int(d['max_size']) * 1024 * 1024
     d = CATEGORY_DEFAULTS.get(category, CATEGORY_DEFAULTS['item'])
     ext_str = Setting.get(f'share_{category}_extensions', d['extensions'])
     size_mb_str = Setting.get(f'share_{category}_max_size', d['max_size'])
@@ -137,7 +149,8 @@ def share_files():
                            can_add=can_add, can_edit=can_edit, can_delete=can_delete,
                            counts=counts,
                            share_ext=share_ext,
-                           share_size=share_size)
+                           share_size=share_size,
+                           download_all_share_files_page=Setting.get('download_all_share_files_page', True))
 
 
 @share_bp.route('/settings/share-files/upload', endpoint='share_upload', methods=['POST'])
@@ -392,6 +405,49 @@ def share_bulk_download():
 
     buf.seek(0)
     return send_file(buf, as_attachment=True, download_name='share_files.zip', mimetype='application/zip')
+
+
+@share_bp.route('/settings/share-files/download-all', endpoint='share_download_all')
+@login_required
+def share_download_all():
+    if not current_user.has_permission('settings_sections.share_files', 'view'):
+        abort(403)
+    if not Setting.get('download_all_share_files_page', True):
+        abort(403)
+
+    category = request.args.get('category', '')
+    query = SharedFile.query
+    if category in SHARE_CATEGORIES:
+        query = query.filter_by(category=category)
+    files = query.order_by(SharedFile.name).all()
+
+    if not files:
+        flash('No files to download.', 'warning')
+        return redirect(url_for('share.share_files', category=category))
+
+    buf = io.BytesIO()
+    seen_names = {}
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for sf in files:
+            try:
+                file_path = _share_file_path(current_app.config['UPLOAD_FOLDER'], sf.category, sf.filename)
+            except ValueError:
+                continue
+            if not os.path.exists(file_path):
+                continue
+            arc_name = sf.name if sf.name.lower().endswith(f'.{sf.ext}') else f'{sf.name}.{sf.ext}'
+            if arc_name in seen_names:
+                seen_names[arc_name] += 1
+                base, dot_ext = arc_name.rsplit('.', 1)
+                arc_name = f'{base}_{seen_names[arc_name]}.{dot_ext}'
+            else:
+                seen_names[arc_name] = 0
+            zf.write(file_path, arc_name)
+
+    buf.seek(0)
+    zip_name = f"share_{category}_files.zip" if category else "share_all_files.zip"
+    log_audit(current_user.id, 'download', 'share_files', 0, f'Downloaded all share files (category={category or "all"})')
+    return send_file(buf, as_attachment=True, download_name=zip_name, mimetype='application/zip')
 
 
 @share_bp.route('/uploads/share/<category>/<path:filename>', endpoint='share_serve')

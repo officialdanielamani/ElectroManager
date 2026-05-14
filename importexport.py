@@ -13,6 +13,7 @@ from models import (
     Location, Rack, Category, Footprint, Tag, Item,
     ProjectCategory, ProjectTag, ProjectStatus,
     ContactOrganization, ContactPerson, ContactGroup, ContactGroupMember,
+    Setting,
 )
 
 
@@ -94,12 +95,14 @@ class DataExporter:
             {
                 'name': r.name,
                 'description': r.description or '',
+                'short_info': r.short_info or '',
                 'location_name': r.physical_location.name if r.physical_location else None,
                 'color': r.color,
                 'rows': r.rows,
                 'cols': r.cols,
                 'unavailable_drawers': r.unavailable_drawers or '[]',
                 'merged_cells': r.merged_cells or '[]',
+                'drawer_info': r.drawer_info or '{}',
             }
             for r in Rack.query.all()
         ]}
@@ -160,6 +163,13 @@ class DataExporter:
             {'name': o.name, 'email': o.email or '', 'tel': o.tel or '', 'url': o.url or '',
              'address': o.address or '', 'zip_code': o.zip_code or '', 'info': o.info or ''}
             for o in ContactOrganization.query.all()
+        ]}
+
+    @staticmethod
+    def export_system_settings():
+        return {'system_settings': [
+            {'key': s.key, 'value': s.value, 'description': s.description or ''}
+            for s in Setting.query.all()
         ]}
 
     @staticmethod
@@ -227,6 +237,8 @@ class DataExporter:
             export_data.update(DataExporter.export_contact_organizations())
         if selections.get('contact_groups'):
             export_data.update(DataExporter.export_contact_groups())
+        if selections.get('system_settings'):
+            export_data.update(DataExporter.export_system_settings())
 
         return export_data
 
@@ -398,12 +410,14 @@ class DataImporter:
                 rack = Rack(
                     name=name,
                     description=rd.get('description') or '',
+                    short_info=rd.get('short_info') or None,
                     location_id=location_id,
                     color=rd.get('color') or '#6c757d',
                     rows=rd.get('rows', 5),
                     cols=rd.get('cols', 5),
                     unavailable_drawers=rd.get('unavailable_drawers', '[]'),
                     merged_cells=rd.get('merged_cells', '[]'),
+                    drawer_info=rd.get('drawer_info') or None,
                 )
                 db.session.add(rack)
                 imported += 1
@@ -639,6 +653,25 @@ class DataImporter:
         self.results['skipped'] += skipped
         self.results['errors'].extend(errors)
 
+    def import_system_settings(self, data):
+        imported = 0
+        skipped = 0
+        errors = []
+        for sd in data.get('system_settings', []):
+            try:
+                key = sd.get('key', '').strip()
+                if not key:
+                    continue
+                Setting.set(key, sd.get('value', ''), sd.get('description', ''))
+                imported += 1
+            except Exception as e:
+                errors.append(f"Setting '{sd.get('key', '?')}': {str(e)[:50]}")
+        db.session.commit()
+        self.results['details']['system_settings'] = {'imported': imported, 'skipped': skipped}
+        self.results['imported'] += imported
+        self.results['skipped'] += skipped
+        self.results['errors'].extend(errors)
+
     def import_selective(self, data, selections):
         """
         Import selected data types.
@@ -695,5 +728,7 @@ class DataImporter:
             self.import_contact_persons(data)
         if selections.get('contact_groups'):
             self.import_contact_groups(data)
+        if selections.get('system_settings'):
+            self.import_system_settings(data)
 
         return self.results

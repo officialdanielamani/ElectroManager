@@ -341,6 +341,39 @@ body {
     background-color: #383838 !important;
 }
 
+/* Markdown editor toolbar for dark theme */
+.md-editor-wrapper {
+    border-color: #4d4d4d !important;
+}
+
+.md-editor-toolbar {
+    border-bottom-color: #4d4d4d !important;
+}
+
+.md-editor-toolbar .btn-outline-secondary {
+    color: #b0b0b0 !important;
+    border-color: #4d4d4d !important;
+    background-color: transparent !important;
+}
+
+.md-editor-toolbar .btn-outline-secondary:hover,
+.md-editor-toolbar .btn-outline-secondary:focus {
+    background-color: #4d4d4d !important;
+    color: #e0e0e0 !important;
+}
+
+.md-editor-toolbar .btn-outline-primary {
+    color: #667eea !important;
+    border-color: #667eea !important;
+    background-color: transparent !important;
+}
+
+.md-editor-toolbar .btn-outline-primary:hover,
+.md-editor-toolbar .btn-primary {
+    background-color: #667eea !important;
+    color: #fff !important;
+}
+
 /* Sortable table headers for dark theme */
 table thead th a {
     color: #e0e0e0 !important;

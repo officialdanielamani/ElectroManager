@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Parameter - {{ project.name }} - Electro Manager{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <h2>Edit Parameter for: {{ project.name }}</h2>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title">
+                    {{ proj_param.parameter.name }}
+                    {% if proj_param.parameter.param_type == 'number' %}
+                    <span class="badge bg-primary">Number</span>
+                    {% elif proj_param.parameter.param_type == 'date' %}
+                    <span class="badge bg-info">Date</span>
+                    {% else %}
+                    <span class="badge bg-secondary">String</span>
+                    {% endif %}
+                </h5>
+                <p class="card-text">Current: {{ proj_param.get_display_text() }}</p>
+            </div>
+        </div>
+
+        {% if proj_param.parameter.param_type == 'number' %}
+        <div class="alert alert-info mb-3">
+            <h6 class="alert-heading"><i class="bi bi-info-circle"></i> Number Parameter Constraints</h6>
+            <ul class="mb-0">
+                <li><strong>Type:</strong> {% if proj_param.parameter.is_whole_number %}Whole numbers only{% else %}Decimal (up to {{ proj_param.parameter.number_decimal_places }} places){% endif %}</li>
+                {% if proj_param.parameter.number_min is not none %}<li><strong>Minimum:</strong> {{ proj_param.parameter.number_min }}</li>{% endif %}
+                {% if proj_param.parameter.number_max is not none %}<li><strong>Maximum:</strong> {{ proj_param.parameter.number_max }}</li>{% endif %}
+                {% if proj_param.parameter.number_step is not none %}<li><strong>Step:</strong> {{ proj_param.parameter.number_step }}</li>{% endif %}
+                {% if proj_param.parameter.number_required %}<li><strong>Required:</strong> Yes</li>{% endif %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <form method="POST" id="parameterForm">
+            {% if proj_param.parameter.param_type == 'number' %}
+            <div class="mb-3">
+                <label class="form-label">Operation</label>
+                <select name="operation" id="operation" class="form-select" onchange="updateFields()">
+                    <option value="min" {% if proj_param.operation == 'min' %}selected{% endif %}>Min</option>
+                    <option value="max" {% if proj_param.operation == 'max' %}selected{% endif %}>Max</option>
+                    <option value="value" {% if proj_param.operation == 'value' %}selected{% endif %}>Value</option>
+                    <option value="range" {% if proj_param.operation == 'range' %}selected{% endif %}>Range</option>
+                </select>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label" id="value1_label">Value</label>
+                        <input type="number" name="value" id="value1Input" class="form-control"
+                               value="{{ proj_param.value or '' }}"
+                               step="{% if proj_param.parameter.is_whole_number %}1{% else %}any{% endif %}"
+                               {% if proj_param.parameter.number_min is not none %}min="{{ proj_param.parameter.number_min }}"{% endif %}
+                               {% if proj_param.parameter.number_max is not none %}max="{{ proj_param.parameter.number_max }}"{% endif %}
+                               onchange="validateNumberInput(this, 'value1')">
+                        <small class="text-muted" id="value1Help"></small>
+                        <small class="text-danger" id="value1Error" style="display:none;"></small>
+                    </div>
+                </div>
+                <div class="col-md-6" id="value2_group" style="{% if proj_param.operation != 'range' %}display:none;{% endif %}">
+                    <div class="mb-3">
+                        <label class="form-label">Max Value</label>
+                        <input type="number" name="value2" id="value2Input" class="form-control"
+                               value="{{ proj_param.value2 or '' }}"
+                               step="{% if proj_param.parameter.is_whole_number %}1{% else %}any{% endif %}"
+                               {% if proj_param.parameter.number_min is not none %}min="{{ proj_param.parameter.number_min }}"{% endif %}
+                               {% if proj_param.parameter.number_max is not none %}max="{{ proj_param.parameter.number_max }}"{% endif %}
+                               onchange="validateNumberInput(this, 'value2')">
+                        <small class="text-muted" id="value2Help"></small>
+                        <small class="text-danger" id="value2Error" style="display:none;"></small>
+                    </div>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Unit</label>
+                <select name="unit" class="form-select">
+                    {% for unit in proj_param.parameter.units %}
+                    <option value="{{ unit.unit }}" {% if proj_param.unit == unit.unit %}selected{% endif %}>{{ unit.unit }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {% elif proj_param.parameter.param_type == 'date' %}
+            <div class="mb-3">
+                <label class="form-label">Operation</label>
+                <select name="operation" id="operation" class="form-select" onchange="updateFields()">
+                    <option value="start" {% if proj_param.operation == 'start' %}selected{% endif %}>Start</option>
+                    <option value="end" {% if proj_param.operation == 'end' %}selected{% endif %}>End</option>
+                    <option value="value" {% if proj_param.operation == 'value' %}selected{% endif %}>Value</option>
+                    <option value="duration" {% if proj_param.operation == 'duration' %}selected{% endif %}>Duration</option>
+                </select>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label" id="value1_label">Date</label>
+                        <input type="date" name="value" class="form-control" value="{{ proj_param.value or '' }}">
+                    </div>
+                </div>
+                <div class="col-md-6" id="value2_group" style="{% if proj_param.operation != 'duration' %}display:none;{% endif %}">
+                    <div class="mb-3">
+                        <label class="form-label">End Date</label>
+                        <input type="date" name="value2" class="form-control" value="{{ proj_param.value2 or '' }}">
+                    </div>
+                </div>
+            </div>
+
+            {% elif proj_param.parameter.param_type == 'string' %}
+            {% set param = proj_param.parameter %}
+            {% set sel_min = param.string_select_min or 0 %}
+            {% set sel_max = param.string_select_max if param.string_select_max is not none else 1 %}
+            {% set _str_vals = proj_param.get_selected_string_values() %}
+            {% set cur_predefined = _str_vals[0] %}
+            {% set cur_custom = _str_vals[1] %}
+            <div class="alert alert-info py-2 mb-3">
+                <i class="bi bi-info-circle"></i>
+                {% if sel_max == -1 %}Select at least <strong>{{ sel_min }}</strong> option(s) (no upper limit).
+                {% else %}Select <strong>{{ sel_min }}</strong> to <strong>{{ sel_max }}</strong> option(s).{% endif %}
+                {% if param.string_allow_custom %}<br><small class="text-muted">A non-empty custom value counts as one selection.</small>{% endif %}
+            </div>
+            {% if param.string_options %}
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Options</label>
+                <div class="border rounded p-2" id="predefined-options-box">
+                    {% for option in param.string_options %}
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input string-option-check"
+                               name="string_options" value="{{ option.value }}" id="opt_{{ loop.index }}"
+                               {% if option.value in cur_predefined %}checked{% endif %}
+                               onchange="validateStringSelectionCount()">
+                        <label class="form-check-label" for="opt_{{ loop.index }}">{{ option.value }}</label>
+                    </div>
+                    {% endfor %}
+                </div>
+                <small class="text-danger" id="selectionCountError" style="display:none;"></small>
+            </div>
+            {% else %}
+            <p class="text-muted">No predefined options available.</p>
+            {% endif %}
+            {% if param.string_allow_custom %}
+            <div class="mb-3 border rounded p-3 bg-light">
+                <label class="form-label fw-semibold"><i class="bi bi-pencil-square"></i> Custom Value</label>
+                {% if param.string_regex_info %}
+                <div class="alert alert-secondary py-1 mb-2 small"><i class="bi bi-info-circle"></i> {{ param.string_regex_info }}</div>
+                {% endif %}
+                <div class="input-group">
+                    <input type="text" id="customValueInput" class="form-control" maxlength="128"
+                           placeholder="Enter custom value (max 128 chars)"
+                           value="{{ cur_custom[0] if cur_custom else '' }}">
+                    {% if param.string_regex %}
+                    <button type="button" class="btn btn-outline-secondary" onclick="validateCustomInput()">
+                        <i class="bi bi-check-circle"></i> Validate
+                    </button>
+                    {% endif %}
+                </div>
+                <small class="text-muted">Max 128 characters.</small>
+                <div id="customValidateMsg" class="mt-1" style="display:none;"></div>
+            </div>
+            <input type="hidden" name="string_custom_value" id="string_custom_value_hidden"
+                   value="{{ cur_custom[0] if cur_custom else '' }}">
+            {% endif %}
+            {% endif %}
+
+            <div class="mb-3">
+                <label class="form-label">Description (Optional)</label>
+                <textarea name="description" class="form-control" rows="3">{{ proj_param.description or '' }}</textarea>
+            </div>
+            <div>
+                <button type="submit" class="btn btn-primary" id="submitBtn">Save Changes</button>
+                <a href="{{ url_for('project.project_edit', project_id=project.project_id) }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+const paramConstraints = {
+    isWholeNumber: {{ 'true' if proj_param.parameter.param_type == 'number' and proj_param.parameter.is_whole_number else 'false' }},
+    decimalPlaces: {{ proj_param.parameter.number_decimal_places if proj_param.parameter.param_type == 'number' else 0 }},
+    min: {{ proj_param.parameter.number_min if proj_param.parameter.param_type == 'number' and proj_param.parameter.number_min is not none else 'null' }},
+    max: {{ proj_param.parameter.number_max if proj_param.parameter.param_type == 'number' and proj_param.parameter.number_max is not none else 'null' }},
+    step: {{ proj_param.parameter.number_step if proj_param.parameter.param_type == 'number' and proj_param.parameter.number_step is not none else 'null' }},
+    paramType: '{{ proj_param.parameter.param_type }}',
+    strSelectMin: {{ proj_param.parameter.string_select_min or 0 }},
+    strSelectMax: {{ proj_param.parameter.string_select_max if proj_param.parameter.string_select_max is not none else 1 }},
+    strAllowCustom: {{ 'true' if proj_param.parameter.string_allow_custom else 'false' }},
+    strRegex: {{ proj_param.parameter.string_regex | tojson }}
+};
+
+function getStringSelectionCount() {
+    const checks = document.querySelectorAll('.string-option-check:checked');
+    const customInput = document.getElementById('customValueInput');
+    return checks.length + (customInput && customInput.value.trim() ? 1 : 0);
+}
+function validateStringSelectionCount() {
+    const total = getStringSelectionCount();
+    const errEl = document.getElementById('selectionCountError');
+    if (!errEl) return true;
+    if (total < paramConstraints.strSelectMin) { errEl.textContent = `Select at least ${paramConstraints.strSelectMin} option(s). Currently: ${total}`; errEl.style.display = 'block'; return false; }
+    if (paramConstraints.strSelectMax !== -1 && total > paramConstraints.strSelectMax) { errEl.textContent = `Select at most ${paramConstraints.strSelectMax} option(s). Currently: ${total}`; errEl.style.display = 'block'; return false; }
+    errEl.style.display = 'none'; return true;
+}
+function validateCustomInput() {
+    const input = document.getElementById('customValueInput');
+    const msgEl = document.getElementById('customValidateMsg');
+    if (!input || !msgEl) return true;
+    const val = input.value.trim();
+    if (!val) { msgEl.innerHTML = '<span class="text-muted">Nothing to validate.</span>'; msgEl.style.display = 'block'; return true; }
+    if (val.length > 128) { msgEl.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Value too long (max 128 characters).</span>'; msgEl.style.display = 'block'; return false; }
+    const predefinedValues = Array.from(document.querySelectorAll('.string-option-check')).map(cb => cb.value);
+    if (predefinedValues.includes(val)) { msgEl.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Already a predefined option.</span>'; msgEl.style.display = 'block'; return false; }
+    if (paramConstraints.strRegex) {
+        try { if (!new RegExp('^(?:' + paramConstraints.strRegex + ')$').test(val)) { msgEl.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Does not match required format.</span>'; msgEl.style.display = 'block'; return false; } }
+        catch(e) {}
+    }
+    msgEl.innerHTML = '<span class="text-success"><i class="bi bi-check-circle"></i> Valid!</span>'; msgEl.style.display = 'block'; return true;
+}
+function validateNumberInput(input, fieldId) {
+    if (paramConstraints.paramType !== 'number') return true;
+    const value = input.value.trim();
+    const errorElement = document.getElementById(fieldId + 'Error');
+    const helpElement = document.getElementById(fieldId + 'Help');
+    if (!value) { errorElement.style.display = 'none'; helpElement.textContent = ''; return true; }
+    try {
+        const numValue = parseFloat(value);
+        if (paramConstraints.isWholeNumber && numValue !== parseInt(numValue)) { errorElement.textContent = 'Must be a whole number'; errorElement.style.display = 'block'; return false; }
+        if (!paramConstraints.isWholeNumber) { const dec = value.split('.')[1]; if (dec && dec.length > paramConstraints.decimalPlaces) { errorElement.textContent = `Maximum ${paramConstraints.decimalPlaces} decimal places allowed`; errorElement.style.display = 'block'; return false; } }
+        if (paramConstraints.min !== null && numValue < paramConstraints.min) { errorElement.textContent = `Value must be >= ${paramConstraints.min}`; errorElement.style.display = 'block'; return false; }
+        if (paramConstraints.max !== null && numValue > paramConstraints.max) { errorElement.textContent = `Value must be <= ${paramConstraints.max}`; errorElement.style.display = 'block'; return false; }
+        if (paramConstraints.step && paramConstraints.step > 0) {
+            const base = paramConstraints.min !== null ? paramConstraints.min : 0;
+            const remainder = Math.abs((numValue - base) % paramConstraints.step);
+            if (remainder > 0.0001 && remainder < (paramConstraints.step - 0.0001)) { errorElement.textContent = `Value must be a multiple of ${paramConstraints.step} from base ${base}`; errorElement.style.display = 'block'; return false; }
+        }
+        errorElement.style.display = 'none'; helpElement.textContent = '✓ Valid'; return true;
+    } catch(e) { errorElement.textContent = 'Invalid number format'; errorElement.style.display = 'block'; return false; }
+}
+function updateFields() {
+    const operation = document.getElementById('operation').value;
+    const value2Group = document.getElementById('value2_group');
+    const value1Label = document.getElementById('value1_label');
+    if (paramConstraints.paramType === 'number') {
+        if (operation === 'range') { value1Label.textContent = 'Min Value'; value2Group.style.display = 'block'; }
+        else { value1Label.textContent = 'Value'; value2Group.style.display = 'none'; }
+    } else if (paramConstraints.paramType === 'date') {
+        if (operation === 'duration') { value1Label.textContent = 'Start Date'; value2Group.style.display = 'block'; }
+        else { value1Label.textContent = 'Date'; value2Group.style.display = 'none'; }
+    }
+}
+document.addEventListener('DOMContentLoaded', function() {
+    const customInput = document.getElementById('customValueInput');
+    const hiddenField = document.getElementById('string_custom_value_hidden');
+    if (customInput && hiddenField) {
+        customInput.addEventListener('input', function() { hiddenField.value = this.value; validateStringSelectionCount(); });
+    }
+});
+document.getElementById('parameterForm').addEventListener('submit', function(e) {
+    if (paramConstraints.paramType === 'string') {
+        const customInput = document.getElementById('customValueInput');
+        const hiddenField = document.getElementById('string_custom_value_hidden');
+        if (customInput && hiddenField) hiddenField.value = customInput.value.trim();
+        if (customInput && customInput.value.trim() && !validateCustomInput()) { e.preventDefault(); return false; }
+        if (!validateStringSelectionCount()) { e.preventDefault(); return false; }
+    }
+    if (paramConstraints.paramType === 'number') {
+        const value1 = document.getElementById('value1Input').value.trim();
+        const operation = document.getElementById('operation').value;
+        if (!value1) { e.preventDefault(); alert('Value is required'); return false; }
+        if (!validateNumberInput(document.getElementById('value1Input'), 'value1')) { e.preventDefault(); alert('Please fix the errors in Value field'); return false; }
+        if (operation === 'range') {
+            const value2 = document.getElementById('value2Input').value.trim();
+            if (!value2) { e.preventDefault(); alert('Max Value is required for range operation'); return false; }
+            if (!validateNumberInput(document.getElementById('value2Input'), 'value2')) { e.preventDefault(); alert('Please fix the errors in Max Value field'); return false; }
+            if (parseFloat(value1) >= parseFloat(value2)) { e.preventDefault(); alert('Min Value must be less than Max Value'); return false; }
+        }
+    }
+});
+</script>
+{% endblock %}

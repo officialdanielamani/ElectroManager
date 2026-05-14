@@ -166,6 +166,47 @@ body {
     border-color: rgba(102, 126, 234, 0.3) !important;
 }
 
+/* Markdown editor toolbar for blue theme */
+.md-editor-wrapper {
+    border-color: rgba(102, 126, 234, 0.35) !important;
+}
+
+.md-editor-toolbar {
+    background: rgba(255, 255, 255, 0.9) !important;
+    border-bottom-color: rgba(102, 126, 234, 0.25) !important;
+}
+
+.md-editor-toolbar .btn-outline-secondary {
+    color: #4a5568 !important;
+    border-color: rgba(102, 126, 234, 0.3) !important;
+    background-color: transparent !important;
+}
+
+.md-editor-toolbar .btn-outline-secondary:hover,
+.md-editor-toolbar .btn-outline-secondary:focus {
+    background-color: rgba(102, 126, 234, 0.15) !important;
+    color: #2d3748 !important;
+    border-color: rgba(102, 126, 234, 0.5) !important;
+}
+
+.md-editor-toolbar .btn-outline-primary {
+    color: #667eea !important;
+    border-color: #667eea !important;
+    background-color: transparent !important;
+}
+
+.md-editor-toolbar .btn-outline-primary:hover,
+.md-editor-toolbar .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: #fff !important;
+    border-color: transparent !important;
+}
+
+.md-editor-preview {
+    background: rgba(255, 255, 255, 0.95) !important;
+    color: #212529 !important;
+}
+
 /* Sortable table headers for blue theme */
 table thead th a {
     color: #fff !important;

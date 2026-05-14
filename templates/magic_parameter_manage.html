@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Manage {{ parameter.name }} - Inventory Manager{% endblock %}
+{% block title %}Manage {{ parameter.name }} - Electro Manager{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -14,8 +14,9 @@
             </div>
             <div class="card-body">
                 <form method="POST" action="{{ url_for('magic_parameter.magic_parameter_edit', id=parameter.id) }}">
+                    <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
                     <div class="mb-3">
-                        <label class="form-label">Name</label>
+                        <label class="form-label required">Name</label>
                         <input type="text" name="name" class="form-control" value="{{ parameter.name }}" required>
                     </div>
                     
@@ -295,42 +296,51 @@
         </div>
 
         {% if parameter.string_allow_custom %}
-        <!-- Custom String Options from Items -->
+        <!-- Custom String Options from Items and Projects -->
         {% set custom_vals = {} %}
         {% for ip in parameter.item_parameters %}
             {% for sv in ip.string_values %}
                 {% if sv.is_custom %}
                     {% if sv.value not in custom_vals %}
-                        {% set _ = custom_vals.update({sv.value: []}) %}
+                        {% set _ = custom_vals.update({sv.value: {'items': [], 'projects': []}}) %}
                     {% endif %}
-                    {% set _ = custom_vals[sv.value].append(ip.item) %}
+                    {% set _ = custom_vals[sv.value]['items'].append(ip.item) %}
+                {% endif %}
+            {% endfor %}
+        {% endfor %}
+        {% for pp in parameter.project_parameters %}
+            {% for sv in pp.string_values %}
+                {% if sv.is_custom %}
+                    {% if sv.value not in custom_vals %}
+                        {% set _ = custom_vals.update({sv.value: {'items': [], 'projects': []}}) %}
+                    {% endif %}
+                    {% set _ = custom_vals[sv.value]['projects'].append(pp.project) %}
                 {% endif %}
             {% endfor %}
         {% endfor %}
         <div class="card mb-3">
             <div class="card-header bg-warning">
-                <h5 class="mb-0"><i class="bi bi-pencil-square"></i> Custom Options (from Items)</h5>
+                <h5 class="mb-0"><i class="bi bi-pencil-square"></i> Custom Options (from Items &amp; Projects)</h5>
             </div>
             <div class="card-body">
                 {% if custom_vals %}
                 <div class="list-group">
-                    {% for val, items_list in custom_vals.items() %}
+                    {% for val, usage in custom_vals.items() %}
                     <div class="list-group-item">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <strong>{{ val }}</strong>
-                                <div class="mt-1">
-                                    {% for itm in items_list %}
-                                    <a href="{{ url_for('item.item_detail', uuid=itm.uuid) }}" class="badge bg-secondary text-decoration-none me-1">{{ itm.name }}</a>
-                                    {% endfor %}
-                                </div>
-                            </div>
+                        <strong>{{ val }}</strong>
+                        <div class="mt-1">
+                            {% for itm in usage['items'] %}
+                            <a href="{{ url_for('item.item_detail', uuid=itm.uuid) }}" class="badge bg-secondary text-decoration-none me-1">{{ itm.name }}</a>
+                            {% endfor %}
+                            {% for proj in usage['projects'] %}
+                            <a href="{{ url_for('project.project_detail', project_id=proj.project_id) }}" class="badge bg-primary text-decoration-none me-1">{{ proj.name }}</a>
+                            {% endfor %}
                         </div>
                     </div>
                     {% endfor %}
                 </div>
                 {% else %}
-                <p class="text-muted">No custom options have been added by items yet.</p>
+                <p class="text-muted">No custom options have been added by items or projects yet.</p>
                 {% endif %}
             </div>
         </div>
@@ -355,7 +365,7 @@
         <!-- Items Using This Parameter -->
         <div class="card mt-3">
             <div class="card-header">
-                <h5 class="mb-0">Items Using This Parameter</h5>
+                <h5 class="mb-0"><i class="bi bi-box-seam"></i> Items Using This Parameter</h5>
             </div>
             <div class="card-body">
                 {% if parameter.item_parameters %}
@@ -370,6 +380,28 @@
                 </div>
                 {% else %}
                 <p class="text-muted">No items are using this parameter yet.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Projects Using This Parameter -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-kanban"></i> Projects Using This Parameter</h5>
+            </div>
+            <div class="card-body">
+                {% if parameter.project_parameters %}
+                <div class="list-group">
+                    {% for proj_param in parameter.project_parameters %}
+                    <a href="{{ url_for('project.project_detail', project_id=proj_param.project.project_id) }}" class="list-group-item list-group-item-action">
+                        <strong>{{ proj_param.project.name }}</strong>
+                        <br>
+                        <small class="text-muted">{{ proj_param.get_display_text() }}</small>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted">No projects are using this parameter yet.</p>
                 {% endif %}
             </div>
         </div>

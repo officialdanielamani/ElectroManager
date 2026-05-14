@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ item.name }} - Inventory Manager{% endblock %}
+{% block title %}{{ item.name }} - Electro Manager{% endblock %}
 
 {% block content %}
 
@@ -56,7 +56,7 @@
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h4 class="mb-0"><i class="bi bi-box"></i> {{ item.name }}</h4>
                 <div class="d-flex gap-2 flex-wrap">
-                    {% if current_user.has_permission('items', 'edit_info') or current_user.has_permission('items', 'edit_batch') or current_user.has_permission('items', 'edit_quantity') or current_user.has_permission('items', 'edit_price') or current_user.has_permission('items', 'edit_sn') or current_user.has_permission('items', 'edit_lending') or current_user.has_permission('items', 'edit_advance') %}
+                    {% if current_user.has_permission('items', 'edit_info') or current_user.has_permission('lending_return', 'edit_batch') or current_user.has_permission('lending_return', 'edit_lending') or current_user.has_permission('items', 'edit_advance') %}
                     <a href="{{ url_for('item.item_edit', uuid=item.uuid) }}" class="btn btn-warning btn-sm">
                         <i class="bi bi-pencil"></i> Edit
                     </a>
@@ -64,17 +64,15 @@
                     <button onclick="printItemDetail()" class="btn btn-info btn-sm">
                         <i class="bi bi-printer"></i> Print
                     </button>
+                    <a href="{{ url_for('item.item_qr_sticker', uuid=item.uuid) }}" class="btn btn-success btn-sm">
+                        <i class="bi bi-qr-code"></i> Print QR
+                    </a>
                     {% if current_user.has_permission('items', 'delete') %}
                     <form method="POST" action="{{ url_for('item.item_delete', uuid=item.uuid) }}" style="display:inline">
                         <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Delete this item?')">
                             <i class="bi bi-trash"></i> Delete
                         </button>
                     </form>
-                    {% endif %}
-                    {% if qr_templates %}
-                    <a href="{{ url_for('item.item_qr_sticker', uuid=item.uuid) }}" class="btn btn-success btn-sm">
-                        <i class="bi bi-qr-code"></i> Print QR
-                    </a>
                     {% endif %}
                     <a href="{{ url_for('item.items') }}" class="btn btn-secondary btn-sm">
                         <i class="bi bi-arrow-left"></i> Back
@@ -141,6 +139,50 @@
                         <div class="markdown-content p-3 bg-light rounded mt-2" style="border-left: 4px solid var(--bs-info, #0dcaf0);">
                             {{ item.description|markdown }}
                         </div>
+                    </div>
+                </div>
+                <hr>
+                {% endif %}
+
+                <!-- Magic Parameters -->
+                {% if item.magic_parameters %}
+                <div class="mb-3 px-1">
+                    <strong><i class="bi bi-magic"></i> Magic Parameters:</strong>
+                    <div class="list-group mt-2">
+                        {% for param in item.magic_parameters %}
+                        <div class="list-group-item p-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <small class="text-muted">
+                                        {% if param.parameter.param_type == 'number' %}
+                                            {% if param.operation == 'min' %}MIN{% elif param.operation == 'max' %}MAX{% elif param.operation == 'range' %}RANGE{% elif param.operation == 'value' %}VALUE{% endif %}:
+                                        {% elif param.parameter.param_type == 'date' %}
+                                            {% if param.operation == 'start' %}START{% elif param.operation == 'end' %}END{% elif param.operation == 'duration' %}DURATION{% endif %}{% if param.operation == 'value' %}{% endif %}
+                                        {% endif %}
+                                        <strong>{{ param.parameter.name }}</strong>
+                                        {% if param.parameter.param_type == 'number' %}
+                                            {{ param.value }} {% if param.operation == 'range' %}- {{ param.value2 }}{% endif %} {{ param.unit }}
+                                        {% elif param.parameter.param_type == 'date' %}
+                                            {% if param.operation != 'value' %}on {% endif %}{{ param.value }} {% if param.operation == 'duration' %}to {{ param.value2 }}{% endif %}
+                                        {% elif param.parameter.param_type == 'string' %}
+                                            {% set _sv = param.get_selected_string_values() %}
+                                            {% set _pre = _sv[0] %}
+                                            {% set _cust = _sv[1] %}
+                                            {% if _pre or _cust %}
+                                                {% if _pre %}{{ _pre | join(', ') }}{% endif %}
+                                                {% if _cust %} | Custom: {{ _cust | join(', ') }}{% endif %}
+                                            {% elif param.string_option %}{{ param.string_option }}
+                                            {% else %}(none){% endif %}
+                                        {% endif %}
+                                        {% if param.description %}{{ param.description }}{% endif %}
+                                        {% if param.parameter.param_type == 'date' and param.parameter.notify_enabled %}
+                                        <i class="bi bi-bell-fill text-warning" title="Notifications enabled"></i>
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
                     </div>
                 </div>
                 <hr>
@@ -228,7 +270,12 @@
                                 <small class="text-muted ms-2"><i class="bi bi-sticky"></i> {{ batch.note }}</small>
                                 {% endif %}
                             </div>
-                            <i class="bi bi-chevron-down"></i>
+                            <div class="d-flex align-items-center gap-2">
+                                <button class="btn btn-outline-secondary btn-sm" onclick="event.stopPropagation()" title="Print QR Batch">
+                                    <i class="bi bi-qr-code"></i> Print QR Batch
+                                </button>
+                                <i class="bi bi-chevron-down"></i>
+                            </div>
                         </div>
                         <div class="collapse" id="batchCollapse{{ batch.id }}">
                             <div class="card-body">
@@ -245,6 +292,12 @@
                                     <div class="col-md-3"><strong>Available Qty:</strong> {{ batch.get_available_quantity() }}</div>
                                     <div class="col-md-3"><strong>Date:</strong> {{ batch.purchase_date.strftime('%d/%m/%Y') if batch.purchase_date else 'N/A' }}</div>
                                     <div class="col-md-6"><strong>Note:</strong> {{ batch.note or 'N/A' }}</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-12 small">
+                                        <strong>Batch UID:</strong>
+                                        <code class="user-select-all">{{ batch.get_batch_uid() }}</code>
+                                    </div>
                                 </div>
                                 <div class="row mb-2">
                                     <div class="col-md-12">
@@ -281,8 +334,8 @@
                                         <tr>
                                             <td>{{ rec.get_lend_to_display() or '—' }}</td>
                                             <td class="text-center">{{ rec.quantity }}</td>
-                                            <td>{{ rec.lend_start.strftime('%d/%m/%Y') if rec.lend_start else '—' }}</td>
-                                            <td>{{ rec.lend_end.strftime('%d/%m/%Y') if rec.lend_end else '—' }}</td>
+                                            <td>{% if rec.lend_start %}{{ rec.lend_start.strftime('%d/%m/%Y') }}{% if rec.lend_start.hour or rec.lend_start.minute %} {{ rec.lend_start.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
+                                            <td>{% if rec.lend_end %}{{ rec.lend_end.strftime('%d/%m/%Y') }}{% if rec.lend_end.hour or rec.lend_end.minute %} {{ rec.lend_end.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
                                             <td class="text-center">{% if rec.lend_notify_enabled %}<i class="bi bi-bell-fill text-warning" title="Remind {{ rec.lend_notify_before_days }} days before"></i>{% else %}—{% endif %}</td>
                                         </tr>
                                         {% endfor %}
@@ -294,10 +347,8 @@
                                 <!-- Serial Numbers Table (if enabled) -->
                                 {% if batch.sn_tracking_enabled and batch.serial_numbers|length > 0 %}
                                 <hr>
-                                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                <div class="mb-2">
                                     <strong><i class="bi bi-upc-scan"></i> Serial Numbers</strong>
-                                </div>
-                                <!-- SN edit actions moved to Item Edit page -->
                                 </div>
                                 <div class="table-responsive">
                                     <table class="table table-sm table-bordered sn-table" id="snTable{{ batch.id }}">
@@ -312,23 +363,20 @@
                                                 <th>Lend To</th>
                                                 <th>Lend Start</th>
                                                 <th>Lend End</th>
+                                                <th>Status</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {% for sn in batch.serial_numbers %}
-                                            <tr data-sn-id="{{ sn.id }}">
+                                            {% set sn_project_used = sn.id in batch.get_project_used_sn_ids() %}
+                                            <tr data-sn-id="{{ sn.id }}" {% if sn.is_deleted %}class="table-secondary text-decoration-line-through" style="opacity:0.55"{% endif %}>
                                                 <td><input type="checkbox" class="form-check-input sn-check-{{ batch.id }}" value="{{ sn.id }}"></td>
                                                 <td>{{ sn.sequence_number }}</td>
-                                                <td>
-                                                    <span class="sn-val" id="snVal{{ sn.id }}">{{ sn.serial_number or '-' }}</span>
-                                                </td>
+                                                <td>{{ sn.serial_number or '-' }}</td>
                                                 <td><code style="font-size:0.8rem">{{ sn.internal_serial_number }}</code></td>
+                                                <td>{{ sn.info or '-' }}</td>
                                                 <td>
-                                                    <span class="info-val" id="infoVal{{ sn.id }}">{{ sn.info or '-' }}</span>
-                                                </td>
-                                                <td>
-                                                    {% set sn_project_used = sn.id in (batch.get_project_used_sn_ids() if batch.get_project_used_sn_ids is defined else []) %}
-                                                    {% if sn_project_used %}
+                                                    {% if not sn.is_deleted and sn_project_used %}
                                                     {% for bom in batch.bom_uses if bom.used_quantity > 0 and bom.serial_numbers %}
                                                         {% set sn_ids = bom.serial_numbers | from_json %}
                                                         {% if sn.id in sn_ids %}<a href="{{ url_for('project.project_detail', project_id=bom.project.project_id) }}" target="_blank" class="badge bg-info text-decoration-none">{{ bom.project.name }}</a>{% endif %}
@@ -336,35 +384,32 @@
                                                     {% else %}-{% endif %}
                                                 </td>
                                                 <td>
-                                                    {% if sn_project_used %}
-                                                    <span class="text-muted" style="opacity:0.5">{{ sn.get_lend_to_display() or '-' }}</span>
+                                                    {% if not sn.is_deleted %}
+                                                        {% if sn_project_used %}<span class="text-muted" style="opacity:0.5">{{ sn.get_lend_to_display() or '-' }}</span>
+                                                        {% else %}{{ sn.get_lend_to_display() or '-' }}{% endif %}
+                                                    {% else %}-{% endif %}
+                                                </td>
+                                                <td class="small">{% if not sn.is_deleted and sn.lend_start %}{{ sn.lend_start.strftime('%d/%m/%Y') }}{% if sn.lend_start.hour or sn.lend_start.minute %} {{ sn.lend_start.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
+                                                <td class="small">{% if not sn.is_deleted and sn.lend_end %}{{ sn.lend_end.strftime('%d/%m/%Y') }}{% if sn.lend_end.hour or sn.lend_end.minute %} {{ sn.lend_end.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
+                                                <td>
+                                                    {% if sn.is_deleted %}
+                                                    <span class="badge bg-danger" title="Removed by {{ sn.deleted_by.username if sn.deleted_by else 'unknown' }} on {{ sn.deleted_at.strftime('%Y-%m-%d %H:%M') if sn.deleted_at else '?' }}{% if sn.deleted_reason %} — {{ sn.deleted_reason }}{% endif %}">Removed</span>
+                                                    {% if sn.deleted_reason %}<div class="text-muted" style="font-size:0.72rem">{{ sn.deleted_reason[:40] }}{% if sn.deleted_reason|length > 40 %}…{% endif %}</div>{% endif %}
+                                                    {% elif sn.lend_to_id %}
+                                                    <span class="badge bg-warning text-dark">Lending</span>
                                                     {% else %}
-                                                    <span class="lend-val" id="lendVal{{ sn.id }}">{{ sn.get_lend_to_display() or '-' }}</span>
+                                                    <span class="badge bg-success">Active</span>
                                                     {% endif %}
                                                 </td>
-                                                <td class="small">{{ sn.lend_start.strftime('%d/%m/%Y') if sn.lend_start else '—' }}</td>
-                                                <td class="small">{{ sn.lend_end.strftime('%d/%m/%Y') if sn.lend_end else '—' }}</td>
                                             </tr>
                                             {% endfor %}
                                         </tbody>
                                     </table>
                                 </div>
+                                <small class="text-muted">Removed entries are kept for audit record.</small>
                                 {% endif %}
 
-                                <!-- Add SN when tracking enabled but batch empty -->
-                                {% if batch.sn_tracking_enabled and batch.serial_numbers|length == 0 and current_user.has_permission('items', 'edit_batch') %}
-                                <hr>
-                                <div class="d-flex align-items-center gap-2 mb-2">
-                                    <strong><i class="bi bi-upc-scan"></i> Serial Numbers</strong>
-                                    <div class="input-group input-group-sm" style="width:auto">
-                                        <span class="input-group-text">Add</span>
-                                        <input type="number" class="form-control" id="addSnQty{{ batch.id }}" min="1" max="100" value="1" style="width:60px">
-                                        <button class="btn btn-outline-success" type="button" onclick="addSnToBatch({{ batch.id }}, 0)"><i class="bi bi-plus"></i></button>
-                                    </div>
-                                </div>
-                                {% endif %}
-
-                                <!-- Batch Actions moved to Item Edit page -->
+                                <!-- Batch Actions on Item Edit page -->
                             </div>
                         </div>
                     </div>
@@ -373,57 +418,18 @@
                     {% endfor %}
                 </div>
 
-                <hr>
-
-                <!-- Magic Parameters -->
-                {% if item.magic_parameters %}
-                <div class="mb-3 px-1">
-                    <strong><i class="bi bi-magic"></i> Magic Parameters:</strong>
-                    <div class="list-group mt-2">
-                        {% for param in item.magic_parameters %}
-                        <div class="list-group-item p-2">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <small class="text-muted">
-                                        {% if param.parameter.param_type == 'number' %}
-                                            {% if param.operation == 'min' %}MIN{% elif param.operation == 'max' %}MAX{% elif param.operation == 'range' %}RANGE{% elif param.operation == 'value' %}VALUE{% endif %}:
-                                        {% elif param.parameter.param_type == 'date' %}
-                                            {% if param.operation == 'start' %}START{% elif param.operation == 'end' %}END{% elif param.operation == 'duration' %}DURATION{% endif %}{% if param.operation == 'value' %}{% endif %}
-                                        {% endif %}
-                                        <strong>{{ param.parameter.name }}</strong>
-                                        {% if param.parameter.param_type == 'number' %}
-                                            {{ param.value }} {% if param.operation == 'range' %}- {{ param.value2 }}{% endif %} {{ param.unit }}
-                                        {% elif param.parameter.param_type == 'date' %}
-                                            {% if param.operation != 'value' %}on {% endif %}{{ param.value }} {% if param.operation == 'duration' %}to {{ param.value2 }}{% endif %}
-                                        {% elif param.parameter.param_type == 'string' %}
-                                            {% set _sv = param.get_selected_string_values() %}
-                                            {% set _pre = _sv[0] %}
-                                            {% set _cust = _sv[1] %}
-                                            {% if _pre or _cust %}
-                                                {% if _pre %}{{ _pre | join(', ') }}{% endif %}
-                                                {% if _cust %} | Custom: {{ _cust | join(', ') }}{% endif %}
-                                            {% elif param.string_option %}{{ param.string_option }}
-                                            {% else %}(none){% endif %}
-                                        {% endif %}
-                                        {% if param.description %}{{ param.description }}{% endif %}
-                                        {% if param.parameter.param_type == 'date' and param.parameter.notify_enabled %}
-                                        <i class="bi bi-bell-fill text-warning" title="Notifications enabled"></i>
-                                        {% endif %}
-                                    </small>
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                <hr>
-                {% endif %}
-
                 <!-- Images -->
                 {% set images = item.attachments | selectattr('file_type', 'in', ['png', 'jpg', 'jpeg', 'gif', 'webp']) | list %}
                 {% if images %}
                 <div class="mb-3">
-                    <strong><i class="bi bi-images"></i> Images ({{ images|length }})</strong>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <strong><i class="bi bi-images"></i> Images ({{ images|length }})</strong>
+                        {% if download_all_item_attachments %}
+                        <a href="{{ url_for('item.item_download_attachments', uuid=item.uuid) }}" class="btn btn-sm btn-outline-secondary" title="Download all attachments as ZIP">
+                            <i class="bi bi-download"></i> Download All
+                        </a>
+                        {% endif %}
+                    </div>
                     <div class="image-grid mt-2">
                         {% for att in images %}
                         <div class="image-grid-item" onclick="openImageModal('{{ url_for('uploaded_file', filename=att.filename) }}', '{{ att.original_filename }}')">
@@ -461,7 +467,14 @@
                 {% set sf_images = item.linked_share_files | selectattr('is_image') | list %}
                 {% set sf_others = item.linked_share_files | rejectattr('is_image') | list %}
                 <div class="mb-3">
-                    <strong><i class="bi bi-folder-fill"></i> Share Files ({{ item.linked_share_files|length }})</strong>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <strong><i class="bi bi-folder-fill"></i> Share Files ({{ item.linked_share_files|length }})</strong>
+                        {% if download_all_item_share_files %}
+                        <a href="{{ url_for('item.item_download_share_files', uuid=item.uuid) }}" class="btn btn-sm btn-outline-secondary" title="Download all share files as ZIP">
+                            <i class="bi bi-download"></i> Download All
+                        </a>
+                        {% endif %}
+                    </div>
                     {% if sf_images %}
                     <div class="image-grid mt-2">
                         {% for sf in sf_images %}
@@ -532,7 +545,6 @@ document.addEventListener('DOMContentLoaded', function() { renderDatasheets(); }
 </script>
 
                 <!-- Info -->
-                <hr>
                 <div class="mb-3 px-1">
                     <strong><i class="bi bi-clock-history"></i> Created &amp; Updated:</strong>
                     <div class="mt-2">
@@ -549,42 +561,8 @@ document.addEventListener('DOMContentLoaded', function() { renderDatasheets(); }
 
 <!-- Add/Edit Batch operations are on the Edit Item page -->
 
-<!-- Transfer SN Modal (tracking enabled - move selected SNs to another batch) -->
-{% if current_user.has_permission('items', 'edit_batch') and item.has_any_tracking and item.batches|length >= 2 %}
-<div class="modal fade" id="transferSnModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Transfer Selected Serial Numbers</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p class="text-muted small">Moving <strong><span id="transferSnCount">0</span></strong> selected item(s). ISN kept as-is (renamed only if collision detected).</p>
-                <div class="alert alert-info p-2 small">
-                    <i class="bi bi-info-circle"></i> Serial numbers can only be transferred to batches with tracking enabled.
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Transfer to Batch</label>
-                    <select class="form-select" id="transferSnTarget">
-                        {% for b in item.batches %}
-                        {% if b.sn_tracking_enabled %}
-                        <option value="{{ b.id }}" data-tracking="1">{{ b.get_display_label() }} (Qty: {{ b.quantity }}) [Tracking]</option>
-                        {% endif %}
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-info" onclick="doTransferSn()"><i class="bi bi-arrow-left-right"></i> Transfer</button>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
 <!-- Transfer Modal (quantity based - for non-tracking batches) -->
-{% if current_user.has_permission('items', 'edit_batch') and item.batches|length >= 2 %}
+{% if current_user.has_permission('lending_return', 'edit_batch') and item.batches|length >= 2 %}
 <div class="modal fade" id="transferModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -595,7 +573,7 @@ document.addEventListener('DOMContentLoaded', function() { renderDatasheets(); }
                 </div>
                 <div class="modal-body">
                     <div class="alert alert-info p-2 small">
-                        <i class="bi bi-info-circle"></i> Qty-based transfer is from non-tracked batches only. Tracked batches use the SN Transfer button.
+                        <i class="bi bi-info-circle"></i> Qty-based transfer is for non-tracked batches only. Serial number tracked batches are non-transferable.
                     </div>
                     <div class="mb-3">
                         <label class="form-label">From Batch</label>
@@ -732,7 +710,9 @@ function saveInlineEdit(snId, field, batchId) {
 
 /* ── Select-all checkbox ── */
 function toggleAllSn(source, batchId) {
-    document.querySelectorAll('.sn-check-' + batchId).forEach(function(cb) { cb.checked = source.checked; });
+    document.querySelectorAll('.sn-check-' + batchId).forEach(function(cb) {
+        cb.checked = source.checked;
+    });
 }
 
 /* ── Bulk Edit Details modal ── */
@@ -805,82 +785,6 @@ function saveEditDetails() {
     .catch(e => alert('Error: ' + e));
 }
 
-/* ── Delete selected SNs ── */
-function deleteSelectedSn(batchId) {
-    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
-    if (checked.length === 0) { alert('Please select at least one serial number.'); return; }
-    if (!confirm('Delete ' + checked.length + ' selected serial number(s)? Quantity will be reduced accordingly.')) return;
-    var ids = [];
-    checked.forEach(function(cb) { ids.push(parseInt(cb.value)); });
-    fetch('{{ url_for("batch.delete_selected_sn", uuid=item.uuid) }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sn_ids: ids, batch_id: batchId })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) { if (data.success) location.reload(); else alert(data.message || 'Error'); })
-    .catch(function(e) { alert('Error: ' + e); });
-}
-
-/* ── Transfer selected SNs modal ── */
-var transferSnFromBatchId = null;
-var transferSnIds = [];
-function openTransferSnModal(batchId) {
-    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
-    if (checked.length === 0) { alert('Please select at least one serial number.'); return; }
-    transferSnFromBatchId = batchId;
-    transferSnIds = [];
-    checked.forEach(function(cb) { transferSnIds.push(parseInt(cb.value)); });
-    document.getElementById('transferSnCount').textContent = transferSnIds.length;
-    // Hide the source batch from target options
-    var sel = document.getElementById('transferSnTarget');
-    for (var i = 0; i < sel.options.length; i++) {
-        sel.options[i].style.display = (parseInt(sel.options[i].value) === batchId) ? 'none' : '';
-        if (parseInt(sel.options[i].value) !== batchId) sel.selectedIndex = i;
-    }
-    new bootstrap.Modal(document.getElementById('transferSnModal')).show();
-}
-function doTransferSn() {
-    var targetId = parseInt(document.getElementById('transferSnTarget').value);
-    if (targetId === transferSnFromBatchId) { alert('Cannot transfer to same batch.'); return; }
-    fetch('{{ url_for("batch.transfer_selected_sn", uuid=item.uuid) }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sn_ids: transferSnIds, from_batch_id: transferSnFromBatchId, to_batch_id: targetId })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) { if (data.success) location.reload(); else alert(data.message || 'Error'); })
-    .catch(function(e) { alert('Error: ' + e); });
-}
-
-/* ── Add SNs to batch ── */
-function addSnToBatch(batchId, currentQty) {
-    var input = document.getElementById('addSnQty' + batchId);
-    var qty = parseInt(input.value) || 0;
-    if (qty < 1) { alert('Enter at least 1.'); return; }
-    if (currentQty + qty > 100) { alert('Maximum 100 per batch. Can add up to ' + (100 - currentQty) + '.'); return; }
-    fetch('{{ url_for("batch.add_sn_to_batch", uuid=item.uuid) }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ batch_id: batchId, quantity: qty })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) { if (data.success) location.reload(); else alert(data.message || 'Error'); })
-    .catch(function(e) { alert('Error: ' + e); });
-}
-
-/* ── Remap ISN ── */
-function remapIsn(batchId) {
-    if (!confirm('Regenerate ISN sequence for this batch? Existing ISN values will be replaced with new sequential numbers. SN, Info, and Lend to will be kept.')) return;
-    fetch('{{ url_for("batch.remap_isn", uuid=item.uuid) }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ batch_id: batchId })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) { if (data.success) location.reload(); else alert(data.message || 'Error'); })
-    .catch(function(e) { alert('Error: ' + e); });
-}
 
 function confirmDisableSn() {
     const clearCheck = document.getElementById('clearSnsCheck');
@@ -902,7 +806,7 @@ function toggleAddBatchTracking() {
         qtyInput.max = 100;
         if (parseInt(qtyInput.value) > 100) qtyInput.value = 100;
         hint.textContent = '(max 100)';
-        info.innerHTML = '<strong>ON:</strong> Each unit gets a Serial Number (SN) and Internal Serial Number (ISN). Max 100 per batch. Use Add/Delete/Transfer to manage individually.';
+        info.innerHTML = '<strong>ON:</strong> Each unit gets a Serial Number (SN) and Internal Serial Number (ISN). Max 100 per batch. Use Add/Delete to manage individually.';
         warn.classList.remove('d-none');
         lendSection.style.display = 'none';
     } else {

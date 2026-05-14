@@ -1,14 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}{{ title }} - Inventory Manager{% endblock %}
+{% block title %}{{ title }} - Electro Manager{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-md-6 offset-md-3">
         <h2>{{ title }}</h2>
         <form method="POST">
+            <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
             <div class="form-group mb-3">
-                <label class="form-label">Template Name</label>
+                <label class="form-label required">Template Name</label>
                 <input type="text" name="name" class="form-control" value="{{ template.name if template else '' }}" required>
             </div>
             

@@ -9,7 +9,7 @@ from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemE
 from helpers import is_safe_url, format_currency, is_safe_file_path
 from utils import save_file, log_audit, admin_required, permission_required, item_permission_required, format_file_size, allowed_file
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
+from werkzeug.utils import secure_filename, safe_join
 from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
 import os
@@ -95,7 +95,7 @@ def location_new():
             file = form.picture.data
             
             # Check file size against system settings
-            max_size_mb = int(Setting.get('max_file_size_mb', '10'))
+            max_size_mb = 10  # fixed for location/rack pictures
             max_size_bytes = max_size_mb * 1024 * 1024
             
             file.seek(0, 2)
@@ -103,7 +103,7 @@ def location_new():
             file.seek(0)
             
             if file_size > max_size_bytes:
-                flash(f'File size exceeds maximum allowed size of {max_size_mb}MB', 'danger')
+                flash('Location/rack pictures must be smaller than 10MB.', 'danger')
                 db.session.delete(location)
                 db.session.commit()
                 return render_template('location_form.html', form=form, location=None)
@@ -111,26 +111,23 @@ def location_new():
             # Only allow PNG and JPEG
             if file.filename and allowed_file(file.filename):
                 ext = file.filename.rsplit('.', 1)[1].lower()
-                if ext not in ['png', 'jpg', 'jpeg']:
-                    flash('Only PNG and JPEG images are allowed for locations!', 'danger')
+                if ext not in ['png', 'jpg', 'jpeg', 'webp']:
+                    flash('Only PNG, JPEG, and WebP images are allowed.', 'danger')
                     db.session.delete(location)
                     db.session.commit()
                     return render_template('location_form.html', form=form, location=None)
                 
-                # Use UUID-based directory structure: /uploads/locations/{location_uuid}/
-                picture_uuid = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(12))
-                
                 if ext == 'jpg':
                     ext = 'jpeg'
-                filename = f"{picture_uuid}.{ext}"
-                
-                # Create location-specific directory with UUID
+                filename = f"{location.uuid}.{ext}"
                 location_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations', location.uuid)
                 os.makedirs(location_dir, exist_ok=True)
-                
-                filepath = os.path.join(location_dir, filename)
-                file.save(filepath)
-                # Store path as {location_uuid}/{picture_uuid}.ext
+                # Remove any old picture with a different extension
+                for old_ext in ['png', 'jpeg', 'webp']:
+                    old_f = os.path.join(location_dir, f"{location.uuid}.{old_ext}")
+                    if old_f != os.path.join(location_dir, filename) and os.path.exists(old_f):
+                        os.remove(old_f)
+                file.save(os.path.join(location_dir, filename))
                 location.picture = f"{location.uuid}/{filename}"
                 db.session.commit()
         
@@ -175,7 +172,7 @@ def location_edit(uuid):
             file = form.picture.data
             if hasattr(file, 'filename') and file.filename and allowed_file(file.filename):
                 # Check file size against system settings
-                max_size_mb = int(Setting.get('max_file_size_mb', '10'))
+                max_size_mb = 10  # fixed for location/rack pictures
                 max_size_bytes = max_size_mb * 1024 * 1024
                 
                 file.seek(0, 2)
@@ -183,13 +180,13 @@ def location_edit(uuid):
                 file.seek(0)
                 
                 if file_size > max_size_bytes:
-                    flash(f'File size exceeds maximum allowed size of {max_size_mb}MB', 'danger')
+                    flash('Location/rack pictures must be smaller than 10MB.', 'danger')
                     return render_template('location_form.html', form=form, location=location)
                 
                 # Only allow PNG and JPEG
                 ext = file.filename.rsplit('.', 1)[1].lower()
-                if ext not in ['png', 'jpg', 'jpeg']:
-                    flash('Only PNG and JPEG images are allowed for locations!', 'danger')
+                if ext not in ['png', 'jpg', 'jpeg', 'webp']:
+                    flash('Only PNG, JPEG, and WebP images are allowed.', 'danger')
                     return render_template('location_form.html', form=form, location=location)
                 
                 # Delete old picture if exists
@@ -198,26 +195,23 @@ def location_edit(uuid):
                     if is_safe_file_path(old_path) and os.path.exists(old_path):
                         os.remove(old_path)
                 
-                # Use UUID-based path: /uploads/locations/{location_uuid}/{picture_uuid}.ext
-                picture_uuid = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(12))
-                
                 if ext == 'jpg':
                     ext = 'jpeg'
-                filename = f"{picture_uuid}.{ext}"
-                
+                filename = f"{location.uuid}.{ext}"
                 location_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations', location.uuid)
                 os.makedirs(location_dir, exist_ok=True)
-                
-                filepath = os.path.join(location_dir, filename)
-                file.save(filepath)
-                # Store path as {location_uuid}/{picture_uuid}.ext
+                for old_ext in ['png', 'jpeg', 'webp']:
+                    old_f = os.path.join(location_dir, f"{location.uuid}.{old_ext}")
+                    if old_f != os.path.join(location_dir, filename) and os.path.exists(old_f):
+                        os.remove(old_f)
+                file.save(os.path.join(location_dir, filename))
                 location.picture = f"{location.uuid}/{filename}"
         
         db.session.commit()
         
         log_audit(current_user.id, 'update', 'location', location.id, f'Updated location: {location.name}')
         flash(f'Location "{location.name}" updated successfully!', 'success')
-        return redirect(url_for('location_rack.location_management'))
+        return redirect(url_for('location_rack.location_detail', uuid=location.uuid))
     
     max_file_size_mb = int(Setting.get('max_file_size_mb', '10'))
     return render_template('location_form.html', form=form, location=location, max_file_size_mb=max_file_size_mb)
@@ -311,26 +305,28 @@ def rack_new():
         name = request.form.get('name')
         
         # Allow duplicate names - UUID ensures uniqueness
+        short_info = request.form.get('short_info', '')[:128] or None
         description = request.form.get('description')
         location_id = request.form.get('location_id')
         color = request.form.get('color', '#6c757d')
         rows = int(request.form.get('rows', 5))
         cols = int(request.form.get('cols', 5))
-        
+
         # Validate against global max settings
         max_rows = int(Setting.get('max_drawer_rows', '10'))
         max_cols = int(Setting.get('max_drawer_cols', '10'))
-        
+
         if rows < 1 or rows > max_rows:
             flash(f'Rows must be between 1 and {max_rows}!', 'danger')
             return redirect(url_for('location_rack.rack_new'))
-        
+
         if cols < 1 or cols > max_cols:
             flash(f'Columns must be between 1 and {max_cols}!', 'danger')
             return redirect(url_for('location_rack.rack_new'))
-        
+
         rack = Rack(
             name=name,
+            short_info=short_info,
             description=description,
             location_id=int(location_id) if location_id and location_id != '0' else None,
             color=color,
@@ -345,7 +341,7 @@ def rack_new():
             file = request.files['picture']
             
             # Check file size against system settings
-            max_size_mb = int(Setting.get('max_file_size_mb', '10'))
+            max_size_mb = 10  # fixed for location/rack pictures
             max_size_bytes = max_size_mb * 1024 * 1024
             
             file.seek(0, 2)
@@ -353,30 +349,26 @@ def rack_new():
             file.seek(0)
             
             if file_size > max_size_bytes:
-                flash(f'File size exceeds maximum allowed size of {max_size_mb}MB', 'danger')
+                flash('Location/rack pictures must be smaller than 10MB.', 'danger')
                 return redirect(url_for('location_rack.rack_new'))
             
             # Only allow PNG and JPEG
             if file.filename and allowed_file(file.filename):
                 ext = file.filename.rsplit('.', 1)[1].lower()
-                if ext not in ['png', 'jpg', 'jpeg']:
-                    flash('Only PNG and JPEG images are allowed for racks!', 'danger')
+                if ext not in ['png', 'jpg', 'jpeg', 'webp']:
+                    flash('Only PNG, JPEG, and WebP images are allowed.', 'danger')
                     return redirect(url_for('location_rack.rack_new'))
-                
-                # Use UUID-based directory structure: /uploads/racks/{rack_uuid}/
-                picture_uuid = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(12))
                 
                 if ext == 'jpg':
                     ext = 'jpeg'
-                filename = f"{picture_uuid}.{ext}"
-                
-                # Create rack-specific directory with UUID
+                filename = f"{rack.uuid}.{ext}"
                 rack_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks', rack.uuid)
                 os.makedirs(rack_dir, exist_ok=True)
-                
-                filepath = os.path.join(rack_dir, filename)
-                file.save(filepath)
-                # Store path as {rack_uuid}/{picture_uuid}.ext
+                for old_ext in ['png', 'jpeg', 'webp']:
+                    old_f = os.path.join(rack_dir, f"{rack.uuid}.{old_ext}")
+                    if old_f != os.path.join(rack_dir, filename) and os.path.exists(old_f):
+                        os.remove(old_f)
+                file.save(os.path.join(rack_dir, filename))
                 rack.picture = f"{rack.uuid}/{filename}"
                 db.session.commit()
         
@@ -407,6 +399,7 @@ def rack_edit(uuid):
         
         # Allow duplicate names - UUID ensures uniqueness
         rack.name = new_name
+        rack.short_info = request.form.get('short_info', '')[:128] or None
         rack.description = request.form.get('description')
         rack.color = request.form.get('color', '#6c757d')
         location_id = request.form.get('location_id')
@@ -486,7 +479,7 @@ def rack_edit(uuid):
             file = request.files['picture']
             if hasattr(file, 'filename') and file.filename and allowed_file(file.filename):
                 # Check file size against system settings
-                max_size_mb = int(Setting.get('max_file_size_mb', '10'))
+                max_size_mb = 10  # fixed for location/rack pictures
                 max_size_bytes = max_size_mb * 1024 * 1024
                 
                 file.seek(0, 2)
@@ -494,13 +487,13 @@ def rack_edit(uuid):
                 file.seek(0)
                 
                 if file_size > max_size_bytes:
-                    flash(f'File size exceeds maximum allowed size of {max_size_mb}MB', 'danger')
+                    flash('Location/rack pictures must be smaller than 10MB.', 'danger')
                     return redirect(url_for('location_rack.rack_edit', uuid=uuid))
                 
                 # Only allow PNG and JPEG
                 ext = file.filename.rsplit('.', 1)[1].lower()
-                if ext not in ['png', 'jpg', 'jpeg']:
-                    flash('Only PNG and JPEG images are allowed for racks!', 'danger')
+                if ext not in ['png', 'jpg', 'jpeg', 'webp']:
+                    flash('Only PNG, JPEG, and WebP images are allowed.', 'danger')
                     return redirect(url_for('location_rack.rack_edit', uuid=uuid))
                 
                 # Delete old picture if exists
@@ -509,26 +502,23 @@ def rack_edit(uuid):
                     if is_safe_file_path(old_path) and os.path.exists(old_path):
                         os.remove(old_path)
                 
-                # Use UUID-based path: /uploads/racks/{rack_uuid}/{picture_uuid}.ext
-                picture_uuid = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(12))
-                
                 if ext == 'jpg':
                     ext = 'jpeg'
-                filename = f"{picture_uuid}.{ext}"
-                
+                filename = f"{rack.uuid}.{ext}"
                 rack_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks', rack.uuid)
                 os.makedirs(rack_dir, exist_ok=True)
-                
-                filepath = os.path.join(rack_dir, filename)
-                file.save(filepath)
-                # Store path as {rack_uuid}/{picture_uuid}.ext
+                for old_ext in ['png', 'jpeg', 'webp']:
+                    old_f = os.path.join(rack_dir, f"{rack.uuid}.{old_ext}")
+                    if old_f != os.path.join(rack_dir, filename) and os.path.exists(old_f):
+                        os.remove(old_f)
+                file.save(os.path.join(rack_dir, filename))
                 rack.picture = f"{rack.uuid}/{filename}"
         
         db.session.commit()
         
         log_audit(current_user.id, 'update', 'rack', rack.id, f'Updated rack: {rack.name} (size: {rows}x{cols})')
         flash(f'Rack "{rack.name}" updated successfully!', 'success')
-        return redirect(url_for('location_rack.location_management'))
+        return redirect(url_for('location_rack.rack_detail', uuid=rack.uuid))
     
     # GET - show form
     locations = Location.query.order_by(Location.name).all()
@@ -648,13 +638,15 @@ def api_add_location():
 def add_rack():
     """Add a new rack"""
     name = request.form.get('name')
+    short_info = request.form.get('short_info', '')[:128] or None
     description = request.form.get('description')
     location = request.form.get('location')
     rows = int(request.form.get('rows', 5))
     cols = int(request.form.get('cols', 5))
-    
+
     rack = Rack(
         name=name,
+        short_info=short_info,
         description=description,
         location_id=location if location else None,
         rows=rows,
@@ -681,6 +673,7 @@ def edit_rack():
         return redirect(url_for('location_rack.rack_management'))
     
     rack.name = request.form.get('name', rack.name)
+    rack.short_info = request.form.get('short_info', '')[:128] or None
     rack.description = request.form.get('description', rack.description)
     rack.location_id = request.form.get('location') or None
     
@@ -708,6 +701,28 @@ def delete_rack():
     log_audit(current_user.id, 'delete', 'rack', rack_id, f'Deleted rack: {rack_name}')
     flash(f'Rack "{rack_name}" deleted successfully!', 'success')
     return redirect(url_for('location_rack.rack_management'))
+
+
+@location_rack_bp.route('/location/<string:uuid>/qr', endpoint='location_qr_svg')
+@login_required
+def location_qr_svg(uuid):
+    """Generate inline QR code SVG for a location (pure UUID)"""
+    from models import Location
+    from qr_utils import generate_qr_svg
+    location = Location.query.filter_by(uuid=uuid).first_or_404()
+    qr_svg = generate_qr_svg(location.uuid, 160, 160, error_correction='M')
+    return qr_svg, 200, {'Content-Type': 'image/svg+xml'}
+
+
+@location_rack_bp.route('/rack/<string:uuid>/qr', endpoint='rack_qr_svg')
+@login_required
+def rack_qr_svg(uuid):
+    """Generate inline QR code SVG for a rack (pure UUID)"""
+    from models import Rack
+    from qr_utils import generate_qr_svg
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
+    qr_svg = generate_qr_svg(rack.uuid, 160, 160, error_correction='M')
+    return qr_svg, 200, {'Content-Type': 'image/svg+xml'}
 
 
 @location_rack_bp.route('/location/<string:uuid>/qr-sticker', endpoint='location_qr_sticker')

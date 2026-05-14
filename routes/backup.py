@@ -30,13 +30,15 @@ def backup_restore():
     if not current_user.has_permission('settings_sections.backup_restore', 'view'):
         flash('You do not have permission to view backups.', 'danger')
         return redirect(url_for('settings.settings'))
-    
+
     can_upload_export = current_user.has_permission('settings_sections.backup_restore', 'upload_export')
     can_delete = current_user.has_permission('settings_sections.backup_restore', 'delete')
-    
+    demo_mode = current_app.config.get('DEMO_MODE', False)
+
     return render_template('backup_restore.html',
                           can_upload_export=can_upload_export,
-                          can_delete=can_delete)
+                          can_delete=can_delete,
+                          demo_mode=demo_mode)
 
 
 
@@ -44,6 +46,9 @@ def backup_restore():
 @login_required
 @permission_required("settings_sections.backup_restore", "upload_export")
 def backup_download():
+    if current_app.config.get('DEMO_MODE', False):
+        flash('Database backup is disabled in Demo Mode.', 'warning')
+        return redirect(url_for('backup.backup_restore'))
     import shutil
     import os
     db_path = current_app.config.get('SQLALCHEMY_DATABASE_URI', 'sqlite:///inventory.db').replace('sqlite:///', '')
@@ -60,6 +65,9 @@ def backup_download():
 @login_required
 @permission_required("settings_sections.backup_restore", "upload_export")
 def backup_restore_upload():
+    if current_app.config.get('DEMO_MODE', False):
+        flash('Database restore is disabled in Demo Mode.', 'warning')
+        return redirect(url_for('backup.backup_restore'))
     import shutil
     import os
     if 'backup' not in request.files:
@@ -85,6 +93,9 @@ def backup_restore_upload():
 @permission_required("settings_sections.backup_restore", "upload_export")
 def export_selective():
     """Export selected data types"""
+    if current_app.config.get('DEMO_MODE', False):
+        flash('Config export is disabled in Demo Mode.', 'warning')
+        return redirect(url_for('backup.backup_restore'))
     from importexport import DataExporter
     
     try:
@@ -111,6 +122,7 @@ def export_selective():
             'contact_persons': request.form.get('contact_persons') == 'on',
             'contact_organizations': request.form.get('contact_orgs') == 'on',
             'contact_groups': request.form.get('contact_groups') == 'on',
+            'system_settings': request.form.get('system_settings') == 'on',
         }
 
         if not any(v for v in selections.values()):
@@ -138,6 +150,9 @@ def export_selective():
 @permission_required("settings_sections.backup_restore", "upload_export")
 def import_selective():
     """Import selected data types"""
+    if current_app.config.get('DEMO_MODE', False):
+        flash('Config import is disabled in Demo Mode.', 'warning')
+        return redirect(url_for('backup.backup_restore'))
     from importexport import DataImporter
     
     try:
@@ -180,6 +195,7 @@ def import_selective():
             'contact_persons': request.form.get('contact_persons') == 'on',
             'contact_organizations': request.form.get('contact_orgs') == 'on',
             'contact_groups': request.form.get('contact_groups') == 'on',
+            'system_settings': request.form.get('system_settings') == 'on',
         }
 
         if not any(v for v in selections.values()):

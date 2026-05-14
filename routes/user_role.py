@@ -3,7 +3,7 @@ User Role Routes Blueprint
 """
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file, abort, current_app
 from flask_login import login_required, current_user, login_user, logout_user
-from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate
+from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate, SharedFile
 from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEditForm, AttachmentForm, 
                    SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm)
 from helpers import is_safe_url, format_currency, is_safe_file_path
@@ -31,43 +31,26 @@ def users():
         flash('You do not have permission to view users.', 'danger')
         return redirect(url_for('settings.settings'))
     
-    from models import Setting, Role
+    from models import Role
     users = User.query.order_by(User.username).all()
     roles = Role.query.order_by(Role.name).all()
-    signup_enabled = Setting.get('signup_enabled', True)
-    
+
     can_create_user = current_user.has_permission('settings_sections.users_roles', 'users_create')
     can_edit_user = current_user.has_permission('settings_sections.users_roles', 'users_edit')
     can_delete_user = current_user.has_permission('settings_sections.users_roles', 'users_delete')
     can_create_role = current_user.has_permission('settings_sections.users_roles', 'roles_create')
     can_edit_role = current_user.has_permission('settings_sections.users_roles', 'roles_edit')
     can_delete_role = current_user.has_permission('settings_sections.users_roles', 'roles_delete')
-    
-    return render_template('users.html', 
-                          users=users, 
-                          roles=roles, 
-                          signup_enabled=signup_enabled,
+
+    return render_template('users.html',
+                          users=users,
+                          roles=roles,
                           can_create_user=can_create_user,
                           can_edit_user=can_edit_user,
                           can_delete_user=can_delete_user,
                           can_create_role=can_create_role,
                           can_edit_role=can_edit_role,
                           can_delete_role=can_delete_role)
-
-
-
-@user_role_bp.route('/toggle-signup', endpoint='toggle_signup', methods=['POST'])
-@login_required
-@permission_required("settings_sections.users_roles", "users_edit")
-def toggle_signup():
-    from models import Setting
-    signup_enabled = request.form.get('signup_enabled') == 'on'
-    Setting.set('signup_enabled', signup_enabled, 'Enable/disable user signup form')
-    
-    status = 'enabled' if signup_enabled else 'disabled'
-    flash(f'User signup form has been {status}.', 'success')
-    log_audit(current_user.id, 'update', 'setting', 0, f'Signup form {status}')
-    return redirect(url_for('user_role.users'))
 
 
 @user_role_bp.route('/change-password', endpoint='change_password', methods=['POST'])
@@ -97,11 +80,17 @@ def change_password():
         flash('New passwords do not match.', 'danger')
         return redirect(url_for('settings.settings_general'))
     
-    # Check minimum length
-    if len(new_password) < 6:
-        flash('New password must be at least 6 characters.', 'danger')
+    # Check minimum length and alphanumeric requirement
+    if len(new_password) < 8:
+        flash('New password must be at least 8 characters.', 'danger')
         return redirect(url_for('settings.settings_general'))
-    
+
+    has_letter = any(c.isalpha() for c in new_password)
+    has_digit = any(c.isdigit() for c in new_password)
+    if not (has_letter and has_digit):
+        flash('New password must contain both letters and numbers.', 'danger')
+        return redirect(url_for('settings.settings_general'))
+
     # Set new password
     current_user.set_password(new_password)
     current_user.failed_login_attempts = 0  # Reset failed attempts
@@ -127,16 +116,18 @@ def user_new():
         
         if existing_username:
             flash(f'Username "{form.username.data}" already exists!', 'danger')
-            return render_template('user_form.html', form=form, title='New User')
-        
+            return render_template('user_form.html', form=form, title='New User', profile_share_files=SharedFile.query.filter_by(category='profile').order_by(SharedFile.created_at.desc()).all())
+
         if existing_email:
             flash(f'Email "{form.email.data}" already registered!', 'danger')
-            return render_template('user_form.html', form=form, title='New User')
+            return render_template('user_form.html', form=form, title='New User', profile_share_files=SharedFile.query.filter_by(category='profile').order_by(SharedFile.created_at.desc()).all())
         
         _pps = request.form.get('profile_picture_source', 'share')
         if _pps not in ('upload', 'share', 'both'):
             _pps = 'share'
         user = User(
+            name=(form.name.data or '').strip()[:64] or None,
+            short_info=(form.short_info.data or '').strip()[:128] or None,
             username=form.username.data,
             email=form.email.data,
             role_id=form.role_id.data,
@@ -144,32 +135,38 @@ def user_new():
             max_login_attempts=form.max_login_attempts.data or 0,
             allow_password_reset=form.allow_password_reset.data,
             allow_profile_picture_change=form.allow_profile_picture_change.data,
+            allow_change_short_info=form.allow_change_short_info.data,
             profile_picture_source=_pps if form.allow_profile_picture_change.data else 'upload',
             auto_unlock_enabled=form.auto_unlock_enabled.data,
             auto_unlock_minutes=form.auto_unlock_minutes.data
         )
         user.set_password(form.password.data)
-        
+
+        # Handle share file profile photo
+        share_file = request.form.get('share_profile_file', '').strip()
+        if share_file and not form.profile_photo.data:
+            user.profile_photo = f'share/{share_file}'
+
         # Handle profile photo upload
-        if form.profile_photo.data:
+        if not share_file and form.profile_photo.data:
             file = form.profile_photo.data
             if file and allowed_file(file.filename, {'png', 'jpg', 'jpeg'}):
                 # Check file size (max 1MB)
                 file.seek(0, os.SEEK_END)
                 file_size = file.tell()
                 file.seek(0)
-                
+
                 if file_size > 1024 * 1024:  # 1MB
                     flash('Profile photo must be smaller than 1MB', 'danger')
-                    return render_template('user_form.html', form=form, title='New User')
-                
+                    return render_template('user_form.html', form=form, title='New User', profile_share_files=SharedFile.query.filter_by(category='profile').order_by(SharedFile.created_at.desc()).all())
+
                 # Save with username as filename - sanitize extension
                 ext = secure_filename(file.filename.rsplit('.', 1)[1].lower())
                 filename = f"{secure_filename(form.username.data)}.{ext}"
                 filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', filename)
                 file.save(filepath)
                 user.profile_photo = filename
-        
+
         db.session.add(user)
         db.session.commit()
         
@@ -177,7 +174,7 @@ def user_new():
         flash(f'User "{user.username}" created successfully!', 'success')
         return redirect(url_for('user_role.users'))
     
-    return render_template('user_form.html', form=form, title='New User')
+    return render_template('user_form.html', form=form, title='New User', profile_share_files=SharedFile.query.filter_by(category='profile').order_by(SharedFile.created_at.desc()).all())
 
 
 
@@ -244,6 +241,8 @@ def user_edit(id):
             return redirect(url_for('user_role.user_edit', id=user.id))
         
         # Regular form submission (full user edit)
+        user.name = (form.name.data or '').strip()[:64] or None
+        user.short_info = (form.short_info.data or '').strip()[:128] or None
         user.username = form.username.data
         user.email = form.email.data
         user.role_id = form.role_id.data
@@ -251,6 +250,7 @@ def user_edit(id):
         user.max_login_attempts = form.max_login_attempts.data or 0
         user.allow_password_reset = form.allow_password_reset.data
         user.allow_profile_picture_change = form.allow_profile_picture_change.data
+        user.allow_change_short_info = form.allow_change_short_info.data
         user.auto_unlock_enabled = form.auto_unlock_enabled.data
         user.auto_unlock_minutes = form.auto_unlock_minutes.data
         if form.allow_profile_picture_change.data:
@@ -258,6 +258,34 @@ def user_edit(id):
             if src not in ('upload', 'share', 'both'):
                 src = 'share'
             user.profile_picture_source = src
+
+        # Handle share file profile photo
+        share_file = request.form.get('share_profile_file', '').strip()
+        if share_file:
+            if user.profile_photo and not user.profile_photo.startswith('share/'):
+                # delete old uploaded file
+                old_fp = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
+                if is_safe_file_path(old_fp) and os.path.exists(old_fp):
+                    os.remove(old_fp)
+            user.profile_photo = f'share/{share_file}'
+
+        # Handle profile photo upload in regular submit too
+        if not share_file and form.profile_photo.data and form.profile_photo.data.filename:
+            file = form.profile_photo.data
+            if file and allowed_file(file.filename, {'png', 'jpg', 'jpeg'}):
+                file.seek(0, os.SEEK_END)
+                file_size = file.tell()
+                file.seek(0)
+                if file_size <= 1024 * 1024:
+                    if user.profile_photo and not user.profile_photo.startswith('share/'):
+                        old_fp = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
+                        if is_safe_file_path(old_fp) and os.path.exists(old_fp):
+                            os.remove(old_fp)
+                    ext = secure_filename(file.filename.rsplit('.', 1)[1].lower())
+                    filename = f"{secure_filename(form.username.data)}.{ext}"
+                    filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', filename)
+                    file.save(filepath)
+                    user.profile_photo = filename
 
         # Check if admin is unlocking the account
         unlock_account = request.form.get('unlock_account')
@@ -268,28 +296,54 @@ def user_edit(id):
             timestamp = datetime.now(tz_module.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
             log_audit(current_user.id, 'update', 'user', user.id, f'{current_user.username} manually unlock: {user.username} on {timestamp}')
             flash(f'Account "{user.username}" has been unlocked.', 'success')
-        
+
         if form.password.data:
             user.set_password(form.password.data)
-        
+
         db.session.commit()
-        
+
         log_audit(current_user.id, 'update', 'user', user.id, f'Updated user: {user.username}')
         flash(f'User "{user.username}" updated successfully!', 'success')
         return redirect(url_for('user_role.users'))
     else:
         # Pre-populate form fields on GET request (for display)
+        form.name.data = user.name
+        form.short_info.data = user.short_info
         form.username.data = user.username
         form.email.data = user.email
         form.role_id.data = user.role_id
         form.is_active.data = user.is_active
         form.max_login_attempts.data = user.max_login_attempts
         form.allow_password_reset.data = user.allow_password_reset
+        form.allow_profile_picture_change.data = user.allow_profile_picture_change
+        form.allow_change_short_info.data = user.allow_change_short_info
         form.auto_unlock_enabled.data = user.auto_unlock_enabled
         form.auto_unlock_minutes.data = user.auto_unlock_minutes
-    
-    return render_template('user_form.html', form=form, user=user, title='Edit User', config=current_app.config)
 
+    return render_template('user_form.html', form=form, user=user, title='Edit User', config=current_app.config, profile_share_files=SharedFile.query.filter_by(category='profile').order_by(SharedFile.created_at.desc()).all())
+
+
+@user_role_bp.route('/user/<int:user_id>/choose-profile-photo', endpoint='admin_choose_profile_photo')
+@login_required
+@permission_required("settings_sections.users_roles", "users_edit")
+def admin_choose_profile_photo(user_id):
+    user = User.query.get_or_404(user_id)
+    files = SharedFile.query.filter_by(category='profile').order_by(SharedFile.created_at.desc()).all()
+    back_url = url_for('user_role.user_edit', id=user_id)
+    return render_template('choose_profile_photo.html', files=files, back_url=back_url, for_user_id=user_id)
+
+
+@user_role_bp.route('/user/<int:user_id>/choose-profile-photo/select/<int:file_id>', endpoint='admin_select_share_profile_photo', methods=['POST'])
+@login_required
+@permission_required("settings_sections.users_roles", "users_edit")
+def admin_select_share_profile_photo(user_id, file_id):
+    user = User.query.get_or_404(user_id)
+    sf = SharedFile.query.filter_by(id=file_id, category='profile').first_or_404()
+    user.profile_photo = f'share/{sf.filename}'
+    db.session.commit()
+    log_audit(current_user.id, 'update', 'user', user.id, f'Set profile photo from share for user {user.username}: {sf.name}')
+    flash('Profile picture updated.', 'success')
+    return redirect(url_for('user_role.user_edit', id=user_id))
 
 
 @user_role_bp.route('/user/<int:id>/delete', endpoint='user_delete', methods=['POST'])
@@ -375,18 +429,21 @@ def role_new():
                 # Item Info
                 "view_info": False,
                 "edit_info": False,
-                # Batch
-                "view_batch": False,
-                "edit_batch": False,
-                "edit_quantity": False,
-                "edit_price": False,
-                "edit_sn": False,
-                "edit_lending": False,
-                "delete_batch": False,
+                # Batch creation
+                "create_batch": False,
                 # Advance Info
                 "view_advance": False,
                 "edit_advance": False,
                 "delete_advance": False,
+            },
+            # Lending & Return permissions
+            "lending_return": {
+                "view_page": False,
+                "view_log": False,
+                "edit_batch": False,
+                "delete_batch": False,
+                "edit_lending": False,
+                "delete_lending": False,
             },
             # Page Permissions
             "pages": {
@@ -459,22 +516,27 @@ def role_edit(id):
                 "pages": {},
                 "settings_sections": {}
             }
-            
+
             # Items permissions (simplified schema)
             item_actions = [
                 # Component
                 'view', 'create', 'delete',
                 # Item Info
                 'view_info', 'edit_info',
-                # Batch
-                'view_batch', 'edit_batch', 'edit_quantity', 'edit_price',
-                'edit_sn', 'edit_lending', 'delete_batch',
+                # Batch creation
+                'create_batch',
                 # Advance Info
                 'view_advance', 'edit_advance', 'delete_advance',
             ]
             for action in item_actions:
                 checkbox_name = f'items_{action}'
                 perms['items'][action] = checkbox_name in request.form
+
+            # Lending & Return permissions
+            lr_actions = ['view_page', 'only_self_lending', 'view_log', 'edit_batch', 'delete_batch', 'edit_lending', 'delete_lending']
+            perms['lending_return'] = {}
+            for action in lr_actions:
+                perms['lending_return'][action] = f'lr_{action}' in request.form
             
             # Page permissions (Settings page removed - accessible to all users)
             # Visual Storage and Notifications edit controlled by settings_sections

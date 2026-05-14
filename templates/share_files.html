@@ -70,11 +70,16 @@
 
     <!-- Bulk action buttons (shown only when files exist) -->
     {% if files %}
-    <div class="d-flex gap-2 align-items-center" id="bulkActions">
+    <div class="d-flex gap-2 align-items-center flex-wrap" id="bulkActions">
         <span class="text-muted small me-1" id="selectedCount">0 selected</span>
         <button class="btn btn-sm btn-outline-primary" id="btnBulkDownload" onclick="bulkDownload()" disabled title="Download selected as ZIP">
             <i class="bi bi-download"></i> Download
         </button>
+        {% if download_all_share_files_page %}
+        <a href="{{ url_for('share.share_download_all', category=category_filter) }}" class="btn btn-sm btn-outline-secondary" title="Download all visible files as ZIP">
+            <i class="bi bi-download"></i> Download All
+        </a>
+        {% endif %}
         {% if can_delete %}
         <button class="btn btn-sm btn-outline-danger" id="btnBulkDelete" onclick="showBulkDeleteConfirm()" disabled title="Delete selected">
             <i class="bi bi-trash"></i> Delete

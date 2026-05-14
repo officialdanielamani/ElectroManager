@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ 'Edit' if location else 'Add' }} Location - Inventory Manager{% endblock %}
+{% block title %}{{ 'Edit' if location else 'Add' }} Location - Electro Manager{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
@@ -15,7 +15,8 @@
             <div class="card-body">
                 <form method="POST" enctype="multipart/form-data">
                     {{ form.hidden_tag() }}
-                    
+                    <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
+
                     {% if location %}
                     <div class="mb-3">
                         <label class="form-label fw-bold">UUID</label>
@@ -30,7 +31,7 @@
                     {% endif %}
                     
                     <div class="mb-3">
-                        {{ form.name.label(class="form-label") }}
+                        {{ form.name.label(class="form-label required") }}
                         {{ form.name(class="form-control" + (" is-invalid" if form.name.errors else "")) }}
                         {% if form.name.errors %}
                             <div class="invalid-feedback">
@@ -41,8 +42,8 @@
 
                     <div class="mb-3">
                         {{ form.info.label(class="form-label") }}
-                        {{ form.info(class="form-control", placeholder="Short description or note") }}
-                        <small class="text-muted">Optional short info (max 500 characters)</small>
+                        {{ form.info(class="form-control", maxlength="128", placeholder="Brief note shown on location cards (max 128 chars)") }}
+                        <small class="text-muted">Optional short info (max 128 characters)</small>
                     </div>
 
                     <div class="mb-3">

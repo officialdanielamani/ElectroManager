@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Magic Parameters - Inventory Manager{% endblock %}
+{% block title %}Magic Parameters - Electro Manager{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
@@ -234,11 +234,12 @@
                 <div class="modal-body">
                     <!-- Error Alert -->
                     <div id="formErrors" class="alert alert-danger" style="display: none;"></div>
-                    
+                    <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
+
                     <input type="hidden" name="param_type" id="modalParamType">
-                    
+
                     <div class="mb-3">
-                        <label class="form-label">Parameter Name</label>
+                        <label class="form-label required">Parameter Name</label>
                         <input type="text" name="name" id="paramName" class="form-control" required>
                     </div>
                     

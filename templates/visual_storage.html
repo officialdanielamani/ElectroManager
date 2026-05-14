@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Visual Storage - Inventory Manager{% endblock %}
+{% block title %}Visual Storage - Electro Manager{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
@@ -23,9 +23,9 @@
 {% if locations|length > 0 or all_racks|length > 1 %}
 <div class="row mb-3">
     <div class="col-md-12">
-        <div class="card">
+        <div class="card" id="filterCard">
             <div class="card-body">
-                <div class="row g-2 align-items-end">
+                <div class="row g-2 align-items-end flex-wrap">
                     <div class="col-auto">
                         <label class="form-label mb-0">Location:</label>
                         <select id="locationFilter" class="form-select form-select-sm" onchange="filterByLocation(this.value)" style="min-width: 200px;">
@@ -117,8 +117,8 @@
                             <i class="bi bi-box-seam"></i> {{ rack.name }}
                             <span class="badge bg-primary">{{ rack.item_count }} items</span>
                         </h5>
-                        {% if rack.description %}
-                        <small>{{ rack.description }}</small>
+                        {% if rack.short_info %}
+                        <small class="rack-header-short-info d-block text-truncate" style="max-width:100%;opacity:0.85;" title="{{ rack.short_info }}">{{ rack.short_info }}</small>
                         {% endif %}
                         {% if rack.physical_location %}
                         <div><small>
@@ -139,8 +139,9 @@
                     </a>
                 </div>
             </div>
-            <div class="card-body">
-                <div class="drawer-grid" style="grid-template-columns: repeat({{ rack.cols }}, minmax(0, 1fr));">
+            <div class="card-body p-2 p-sm-3">
+                <div class="drawer-grid-scroll-wrapper">
+                <div class="drawer-grid" style="grid-template-columns: repeat({{ rack.cols }}, minmax(72px, 1fr)); min-width: {{ rack.cols * 76 }}px;">
                     {% for row in range(rack.rows) %}
                     {% for col in range(rack.cols) %}
                     {% set drawer_id = "R%d-C%d"|format(row + 1, col + 1) %}
@@ -152,6 +153,7 @@
                     {% set drawer_data = rack.drawers.get(effective_id) %}
                     {% set is_unavailable = effective_id in rack.unavailable_drawers %}
                     {% set entry_count = (drawer_data['items']|length + drawer_data['batches']|length) if drawer_data else 0 %}
+                    {% set d_short_info = rack.drawer_info.get(effective_id, '') if rack.drawer_info else '' %}
                     <div class="drawer-cell {% if is_unavailable %}unavailable{% elif entry_count %}has-items{% else %}empty{% endif %}{% if span %} merged-cell{% elif grp %} group-cell group-{{ grp.role }}{% endif %}"
                          data-drawer="{{ drawer_id }}"
                          data-rack="{{ rack.uuid }}"
@@ -164,24 +166,28 @@
                             {% if grp and grp.role == 'master' %}<span class="merged-badge">{{ grp.count }} cells</span>{% endif %}
                             {% if is_slave %}<span class="merged-badge text-muted">→{{ grp.master }}</span>{% endif %}
                         </div>
+                        {% if d_short_info and not is_slave %}
+                        <div class="drawer-short-info" title="{{ d_short_info }}">{{ d_short_info }}</div>
+                        {% endif %}
                         <div class="drawer-count">
                             {% if is_slave %}
-                            <span class="text-muted" style="font-size:0.7rem;">part of group</span>
+                            <span class="text-muted" style="font-size:0.65rem;">part of group</span>
                             {% elif is_unavailable and entry_count %}
-                            <span class="badge bg-secondary">Unavailable</span>
-                            <span class="badge bg-info mt-1">{{ entry_count }}</span>
+                            <span class="drawer-unavail-tag">Unavailable</span>
+                            <span class="badge bg-info">{{ entry_count }}</span>
                             {% elif is_unavailable %}
-                            <span class="badge bg-secondary">Unavailable</span>
+                            <span class="drawer-unavail-tag">Unavailable</span>
                             {% elif entry_count %}
                             <span class="badge bg-success">{{ entry_count }}</span>
                             {% else %}
-                            <span class="text-muted">Empty</span>
+                            <span class="text-muted" style="font-size:0.7rem;">Empty</span>
                             {% endif %}
                         </div>
                     </div>
                     {% endif %}
                     {% endfor %}
                     {% endfor %}
+                </div>
                 </div>
             </div>
         </div>
@@ -354,6 +360,12 @@
 </div>
 
 <style>
+/* ── Horizontal-scroll wrapper so racks never crush on narrow screens ── */
+.drawer-grid-scroll-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
 .drawer-grid {
     display: grid;
     gap: 5px;
@@ -361,12 +373,12 @@
 }
 
 .drawer-cell {
-    min-width: 0;
-    min-height: 120px;
+    min-width: 72px;
+    min-height: 100px;
     border: 2px solid var(--dc-normal-border);
     border-radius: 8px;
     text-align: center;
-    padding: 8px;
+    padding: 6px 4px;
     cursor: pointer;
     transition: all 0.3s;
     position: relative;
@@ -376,6 +388,8 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    word-break: break-word;
+    overflow: hidden;
 }
 .drawer-cell:hover {
     border-color: var(--dc-merged-border);
@@ -530,16 +544,43 @@
 }
 
 .drawer-label {
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     font-weight: bold;
     color: var(--dc-normal-color);
-    margin-bottom: 4px;
+    margin-bottom: 2px;
+    line-height: 1.2;
 }
 .drawer-cell.unavailable .drawer-label { color: var(--dc-unavail-color); }
 
+.drawer-short-info {
+    font-size: 0.75rem;
+    font-style: italic;
+    opacity: 0.9;
+    color: inherit;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-bottom: 3px;
+    padding: 0 2px;
+}
+
+.drawer-unavail-tag {
+    display: block;
+    font-size: 0.62rem;
+    font-weight: 600;
+    color: var(--dc-unavail-color);
+    line-height: 1.3;
+}
+
 .drawer-count {
-    font-size: 0.9rem;
-    margin-top: 4px;
+    font-size: 0.85rem;
+    margin-top: 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
 }
 
 .rack-section {
@@ -596,16 +637,20 @@
     color: #dc3545;
 }
 
+/* ── Mobile: compact cells, keep grid scrollable ── */
 @media (max-width: 768px) {
     .drawer-cell {
-        width: 80px;
-        height: 80px;
-        padding: 4px;
+        min-width: 72px;
+        min-height: 85px;
+        padding: 4px 3px;
     }
-    
-    .drawer-label {
-        font-size: 0.65rem;
-    }
+    .drawer-label { font-size: 0.6rem; }
+    .drawer-short-info { font-size: 0.68rem; }
+    /* Stack filter controls vertically */
+    #filterCard .row.g-2 { flex-direction: column; }
+    #filterCard .col-auto { width: 100%; }
+    #filterCard select,
+    #filterCard .input-group { width: 100% !important; min-width: unset !important; }
 }
 </style>
 
@@ -834,7 +879,21 @@ function openDrawer(rackName, drawerId, rackId) {
         .then(data => {
             let html = '';
 
-            
+            // Short Info section (always shown; editable only with location_management.edit)
+            {% if current_user.has_permission('settings_sections.location_management', 'edit') %}
+            html += '<div class="mb-2">';
+            html += '<label class="form-label form-label-sm mb-1 fw-bold"><i class="bi bi-info-circle"></i> Short Info <small class="text-muted fw-normal">(max 128 chars)</small></label>';
+            html += `<div class="d-flex gap-2">`;
+            html += `<input type="text" class="form-control form-control-sm" id="drawerShortInfo" maxlength="128" placeholder="Optional note for this drawer..." value="${(data.short_info || '').replace(/"/g, '&quot;')}">`;
+            html += `<button class="btn btn-sm btn-outline-primary text-nowrap" onclick="saveDrawerShortInfo()"><i class="bi bi-save"></i> Save</button>`;
+            html += `</div>`;
+            html += '</div>';
+            {% else %}
+            if (data.short_info) {
+                html += `<div class="mb-2 p-2 bg-light rounded small text-muted"><i class="bi bi-info-circle"></i> ${data.short_info.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+            }
+            {% endif %}
+
             {% if current_user.has_permission('settings_sections.location_management', 'edit') %}
             // Controls section
             html += '<div class="mb-3 p-2 bg-light rounded">';
@@ -938,6 +997,32 @@ function toggleDrawerAvailability() {
     .catch(error => {
         alert('Error: ' + error);
     });
+}
+
+function saveDrawerShortInfo() {
+    const input = document.getElementById('drawerShortInfo');
+    if (!input) return;
+    const shortInfo = input.value.trim().slice(0, 128);
+    fetch('/api/drawer/update-info', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            rack_id: currentRackId,
+            drawer_id: currentDrawerId,
+            short_info: shortInfo
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            input.value = data.short_info || '';
+            input.classList.add('border-success');
+            setTimeout(() => location.reload(), 800);
+        } else {
+            alert('Error: ' + (data.error || 'Failed to save short info'));
+        }
+    })
+    .catch(err => alert('Error: ' + err));
 }
 
 function toggleMoveLocationType(type) {

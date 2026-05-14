@@ -1,13 +1,14 @@
 """
 Project Routes Blueprint
 """
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, current_app, abort
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, current_app, abort, send_file
 from flask_login import login_required, current_user
 from models import (db, User, Item, ItemBatch, BatchSerialNumber, Setting,
                     Project, ProjectCategory, ProjectTag, ProjectStatus,
                     ProjectPerson, ProjectGroup, ProjectGroupMember,
                     ContactPerson, ContactOrganization,
-                    ProjectBOMItem, ProjectAttachment, ProjectURL, SharedFile)
+                    ProjectBOMItem, ProjectAttachment, ProjectURL, SharedFile,
+                    MagicParameter, ProjectParameter, ProjectParameterStringValue)
 from utils import log_audit, permission_required, allowed_file
 from werkzeug.utils import secure_filename
 from datetime import datetime, timezone
@@ -274,7 +275,9 @@ def project_detail(project_id):
                            currency=currency,
                            currency_decimal=currency_decimal,
                            can_edit=can_edit,
-                           can_delete=can_delete)
+                           can_delete=can_delete,
+                           download_all_project_attachments=Setting.get('download_all_project_attachments', True),
+                           download_all_project_share_files=Setting.get('download_all_project_share_files', True))
 
 
 # ==================== EDIT PROJECT ====================
@@ -344,6 +347,229 @@ def project_edit(project_id):
                            share_files_project=SharedFile.query.filter_by(category='project').order_by(SharedFile.name).all(),
                            currency=Setting.get('currency', 'USD'),
                            currency_decimal=int(Setting.get('currency_decimal_places', '2')))
+
+
+# ==================== PROJECT MAGIC PARAMETERS ====================
+
+@project_bp.route('/project/<project_id>/populate-template', endpoint='project_populate_template', methods=['POST'])
+@login_required
+def project_populate_template(project_id):
+    if not current_user.has_permission('projects', 'edit'):
+        flash('You do not have permission to edit projects.', 'danger')
+        return redirect(url_for('project.projects'))
+
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    from models import ParameterTemplate
+    template_id = int(request.form.get('template_id', 0))
+    template = ParameterTemplate.query.get(template_id)
+    if not template:
+        flash('Invalid template selected.', 'danger')
+        return redirect(url_for('project.project_edit', project_id=project_id))
+
+    added_count = 0
+    for tp in template.template_parameters:
+        proj_param = ProjectParameter(
+            project_id=project.id,
+            parameter_id=tp.parameter_id,
+            operation=tp.operation,
+            value=tp.value,
+            value2=tp.value2,
+            unit=tp.unit,
+            description=tp.description
+        )
+        db.session.add(proj_param)
+        added_count += 1
+
+    db.session.commit()
+    log_audit(current_user.id, 'update', 'project', project.id, f'Applied template "{template.name}" to project: {project.name}')
+    flash(f'Added {added_count} parameters from template "{template.name}"!', 'success')
+    return redirect(url_for('project.project_edit', project_id=project_id))
+
+
+@project_bp.route('/project/<project_id>/add-parameter', endpoint='project_add_parameter', methods=['POST'])
+@login_required
+def project_add_parameter(project_id):
+    if not current_user.has_permission('projects', 'edit'):
+        flash('You do not have permission to edit projects.', 'danger')
+        return redirect(url_for('project.projects'))
+
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+
+    param_type = request.form.get('param_type')
+    parameter_id = int(request.form.get('parameter_id', 0))
+    operation = request.form.get('operation')
+    value = request.form.get('value', '').strip()
+    value2 = request.form.get('value2', '').strip()
+    unit = request.form.get('unit', '').strip()
+    description = request.form.get('description', '').strip()
+
+    parameter = MagicParameter.query.get(parameter_id)
+    if not parameter:
+        flash('Invalid parameter selected.', 'danger')
+        return redirect(url_for('project.project_edit', project_id=project_id))
+
+    errors = []
+
+    if param_type == 'string':
+        selected_options = request.form.getlist('string_options')
+        custom_value = request.form.get('string_custom_value', '').strip()
+        custom_values = [custom_value] if custom_value else []
+        for opt in selected_options:
+            if len(opt) > 128:
+                errors.append(f"Option value too long (max 128 characters): {opt[:30]}...")
+        for cv in custom_values:
+            if len(cv) > 128:
+                errors.append("Custom value too long (max 128 characters)")
+        if not errors:
+            ok, err = parameter.validate_string_selections(selected_options, custom_values)
+            if not ok:
+                errors.append(err)
+    elif param_type == 'number':
+        if parameter.number_required and not value:
+            errors.append('This number parameter is required')
+        if value:
+            is_valid, error_msg = parameter.validate_number_value(value, False)
+            if not is_valid:
+                errors.append(f"Value: {error_msg}")
+        if value2 and operation == 'range':
+            is_valid, error_msg = parameter.validate_number_value(value2, True)
+            if not is_valid:
+                errors.append(f"Value2: {error_msg}")
+        if operation == 'range' and value and value2:
+            try:
+                if float(value) >= float(value2):
+                    errors.append('Range start must be less than range end')
+            except ValueError:
+                pass
+
+    if errors:
+        for error in errors:
+            flash(error, 'danger')
+        return redirect(url_for('project.project_edit', project_id=project_id))
+
+    proj_param = ProjectParameter(
+        project_id=project.id,
+        parameter_id=parameter_id,
+        operation=operation if param_type in ['number', 'date'] else None,
+        value=value if param_type in ['number', 'date'] else None,
+        value2=value2 if operation in ['range', 'duration'] else None,
+        unit=unit if param_type == 'number' else None,
+        description=description
+    )
+    db.session.add(proj_param)
+    db.session.flush()
+
+    if param_type == 'string':
+        for opt in selected_options:
+            db.session.add(ProjectParameterStringValue(project_parameter_id=proj_param.id, value=opt, is_custom=False))
+        for cv in custom_values:
+            db.session.add(ProjectParameterStringValue(project_parameter_id=proj_param.id, value=cv, is_custom=True))
+
+    db.session.commit()
+    log_audit(current_user.id, 'update', 'project', project.id, f'Added parameter to project: {project.name}')
+    flash('Parameter added successfully!', 'success')
+    return redirect(url_for('project.project_edit', project_id=project_id))
+
+
+@project_bp.route('/project/<project_id>/delete-parameter/<int:param_id>', endpoint='project_delete_parameter', methods=['POST'])
+@login_required
+def project_delete_parameter(project_id, param_id):
+    if not current_user.has_permission('projects', 'edit'):
+        flash('You do not have permission to edit projects.', 'danger')
+        return redirect(url_for('project.projects'))
+
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    proj_param = ProjectParameter.query.get_or_404(param_id)
+
+    if proj_param.project_id != project.id:
+        flash('Invalid parameter.', 'danger')
+        return redirect(url_for('project.project_edit', project_id=project_id))
+
+    db.session.delete(proj_param)
+    db.session.commit()
+    log_audit(current_user.id, 'update', 'project', project.id, f'Removed parameter from project: {project.name}')
+    flash('Parameter removed successfully!', 'success')
+    return redirect(url_for('project.project_edit', project_id=project_id))
+
+
+@project_bp.route('/project/<project_id>/edit-parameter/<int:param_id>', endpoint='project_edit_parameter', methods=['GET', 'POST'])
+@login_required
+def project_edit_parameter(project_id, param_id):
+    if not current_user.has_permission('projects', 'edit'):
+        flash('You do not have permission to edit projects.', 'danger')
+        return redirect(url_for('project.projects'))
+
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    proj_param = ProjectParameter.query.get_or_404(param_id)
+
+    if proj_param.project_id != project.id:
+        flash('Invalid parameter.', 'danger')
+        return redirect(url_for('project.project_edit', project_id=project_id))
+
+    if request.method == 'POST':
+        param = proj_param.parameter
+        operation = request.form.get('operation')
+        value = request.form.get('value', '').strip()
+        value2 = request.form.get('value2', '').strip() if operation in ['range', 'duration'] else None
+
+        errors = []
+
+        if param.param_type == 'string':
+            selected_options = request.form.getlist('string_options')
+            custom_value = request.form.get('string_custom_value', '').strip()
+            custom_values = [custom_value] if custom_value else []
+            for opt in selected_options:
+                if len(opt) > 128:
+                    errors.append(f"Option value too long (max 128 characters): {opt[:30]}...")
+            for cv in custom_values:
+                if len(cv) > 128:
+                    errors.append("Custom value too long (max 128 characters)")
+            if not errors:
+                ok, err = param.validate_string_selections(selected_options, custom_values)
+                if not ok:
+                    errors.append(err)
+        elif param.param_type == 'number':
+            if param.number_required and not value:
+                errors.append('This number parameter is required')
+            if value:
+                is_valid, error_msg = param.validate_number_value(value, False)
+                if not is_valid:
+                    errors.append(f"Value: {error_msg}")
+            if value2 and operation in ['range', 'duration']:
+                is_valid, error_msg = param.validate_number_value(value2, True)
+                if not is_valid:
+                    errors.append(f"Value2: {error_msg}")
+            if operation == 'range' and value and value2:
+                try:
+                    if float(value) >= float(value2):
+                        errors.append('Range start must be less than range end')
+                except ValueError:
+                    pass
+
+        if errors:
+            for error in errors:
+                flash(error, 'danger')
+            return redirect(url_for('project.project_edit_parameter', project_id=project_id, param_id=param_id))
+
+        proj_param.operation = operation
+        proj_param.value = value
+        proj_param.value2 = value2
+        proj_param.unit = request.form.get('unit', '').strip()
+        proj_param.description = request.form.get('description', '').strip()
+
+        if param.param_type == 'string':
+            ProjectParameterStringValue.query.filter_by(project_parameter_id=proj_param.id).delete()
+            for opt in selected_options:
+                db.session.add(ProjectParameterStringValue(project_parameter_id=proj_param.id, value=opt, is_custom=False))
+            for cv in custom_values:
+                db.session.add(ProjectParameterStringValue(project_parameter_id=proj_param.id, value=cv, is_custom=True))
+
+        db.session.commit()
+        log_audit(current_user.id, 'update', 'project', project.id, f'Updated parameter for project: {project.name}')
+        flash('Parameter updated successfully!', 'success')
+        return redirect(url_for('project.project_edit', project_id=project_id))
+
+    return render_template('project_parameter_edit.html', project=project, proj_param=proj_param)
 
 
 # ==================== DELETE PROJECT ====================
@@ -603,6 +829,53 @@ def project_attachment_delete(att_id):
     db.session.commit()
     flash('Attachment deleted.', 'success')
     return redirect(url_for('project.project_detail', project_id=project.project_id))
+
+
+@project_bp.route('/project/<project_id>/download-attachments', endpoint='project_download_attachments')
+@login_required
+def project_download_attachments(project_id):
+    if not current_user.has_permission('projects', 'view'):
+        abort(403)
+    if not Setting.get('download_all_project_attachments', True):
+        abort(403)
+    import zipfile, io
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    all_atts = ProjectAttachment.query.filter_by(project_id=project.id).all()
+    if not all_atts:
+        flash('No attachments to download.', 'warning')
+        return redirect(url_for('project.project_detail', project_id=project_id))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for att in all_atts:
+            full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], att.file_path)
+            if os.path.exists(full_path):
+                zf.write(full_path, f"{att.attachment_type}/{att.original_filename}")
+    buf.seek(0)
+    log_audit(current_user.id, 'download', 'project', project.id, f'Downloaded all attachments for project: {project.name}')
+    return send_file(buf, download_name=f"{project.project_id}_attachments.zip", as_attachment=True, mimetype='application/zip')
+
+
+@project_bp.route('/project/<project_id>/download-share-files', endpoint='project_download_share_files')
+@login_required
+def project_download_share_files(project_id):
+    if not current_user.has_permission('projects', 'view'):
+        abort(403)
+    if not Setting.get('download_all_project_share_files', True):
+        abort(403)
+    import zipfile, io
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    if not project.linked_share_files:
+        flash('No share files to download.', 'warning')
+        return redirect(url_for('project.project_detail', project_id=project_id))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for sf in project.linked_share_files:
+            full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', sf.category, sf.filename)
+            if os.path.exists(full_path):
+                zf.write(full_path, f"{sf.name}.{sf.ext}")
+    buf.seek(0)
+    log_audit(current_user.id, 'download', 'project', project.id, f'Downloaded all share files for project: {project.name}')
+    return send_file(buf, download_name=f"{project.project_id}_share_files.zip", as_attachment=True, mimetype='application/zip')
 
 
 # ==================== PROJECT URLS ====================

@@ -1,28 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Home - Inventory Manager{% endblock %}
+{% block title %}Home - Electro Manager{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-md-12 text-center" style="margin-top: 100px;">
-        <h1><i class="bi bi-box-seam"></i> Welcome to Inventory Manager</h1>
+        <h1><i class="bi bi-box-seam"></i> Welcome to Electro Manager</h1>
         <p class="lead mt-4">Manage your inventory efficiently and effectively</p>
         
-        <div class="mt-5">
-            {% if current_user.has_permission('items', 'view') %}
-            <a href="{{ url_for('item.items') }}" class="btn btn-primary btn-lg mx-2">
-                <i class="bi bi-box"></i> Items
-            </a>
-            {% endif %}
-            {% if current_user.has_permission('pages.visual_storage', 'view') %}
-            <a href="{{ url_for('visual_storage.visual_storage') }}" class="btn btn-info btn-lg mx-2">
-                <i class="bi bi-grid-3x3"></i> Visual Storage
-            </a>
-            {% endif %}
-            <a href="{{ url_for('settings.settings') }}" class="btn btn-secondary btn-lg mx-2">
-                <i class="bi bi-gear"></i> Settings
-            </a>
-        </div>
     </div>
 </div>
 {% endblock %}

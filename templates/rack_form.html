@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ 'Edit' if rack else 'Add' }} Rack - Inventory Manager{% endblock %}
+{% block title %}{{ 'Edit' if rack else 'Add' }} Rack - Electro Manager{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
@@ -14,6 +14,7 @@
         <div class="card">
             <div class="card-body">
                 <form method="POST" enctype="multipart/form-data">
+                    <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
                     {% if rack %}
                     <div class="mb-3">
                         <label class="form-label fw-bold">UUID</label>
@@ -28,8 +29,13 @@
                     {% endif %}
                     
                     <div class="mb-3">
-                        <label for="name" class="form-label">Rack Name <span class="text-danger">*</span></label>
+                        <label for="name" class="form-label required">Rack Name</label>
                         <input type="text" class="form-control" id="name" name="name" value="{{ rack.name if rack else '' }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="short_info" class="form-label">Short Info</label>
+                        <input type="text" class="form-control" id="short_info" name="short_info" value="{{ rack.short_info if rack and rack.short_info else '' }}" maxlength="128" placeholder="Brief note shown on location cards (max 128 chars)">
                     </div>
 
                     <div class="mb-3">
@@ -53,7 +59,7 @@
                         <label for="picture" class="form-label">Picture</label>
                         {% if rack and rack.picture %}
                         <div class="mb-2">
-                            <img src="{{ url_for('location_rack.rack_picture', filename=rack.picture) }}" 
+                            <img src="{{ url_for('location_rack.rack_picture', filepath=rack.picture) }}"
                                  alt="{{ rack.name }}" style="max-width: 200px; max-height: 200px; border-radius: 4px;">
                             <div class="mt-2">
                                 <div class="form-check">
@@ -89,14 +95,14 @@
 
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="rows" class="form-label">Rows <span class="text-danger">*</span></label>
+                            <label for="rows" class="form-label required">Rows</label>
                             <input type="number" class="form-control" id="rows" name="rows" 
                                    value="{{ rack.rows if rack else 5 }}" min="1" max="{{ max_drawer_rows }}" required>
                             <small class="text-muted">Max: {{ max_drawer_rows }} rows (set by admin)</small>
                         </div>
 
                         <div class="col-md-6 mb-3">
-                            <label for="cols" class="form-label">Columns <span class="text-danger">*</span></label>
+                            <label for="cols" class="form-label required">Columns</label>
                             <input type="number" class="form-control" id="cols" name="cols" 
                                    value="{{ rack.cols if rack else 5 }}" min="1" max="{{ max_drawer_cols }}" required>
                             <small class="text-muted">Max: {{ max_drawer_cols }} columns (set by admin)</small>
@@ -158,7 +164,7 @@
     <div class="col-md-12">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-grid-3x3-gap"></i> Cell Layout Manager
+                <h5 class="mb-0"><i class="bi bi-grid-3x3-gap"></i> Rack Layout
                     <small class="text-muted fw-normal ms-2">Merge, split, or mark cells as unavailable</small>
                 </h5>
             </div>
@@ -192,6 +198,7 @@
 
                 <!-- Rack grid preview -->
                 {% set unavailable_drawers = rack.get_unavailable_drawers() %}
+                {% set drawer_info_map = rack.get_drawer_info() %}
                 <div id="layoutGrid" class="layout-grid"
                      style="display:grid; grid-template-columns: repeat({{ rack.cols }}, minmax(0, 1fr)); gap:6px; max-width: {{ rack.cols * 86 }}px;">
                     {% set skip_cells, cell_spans, group_cells = rack.compute_merge_layout() %}
@@ -202,10 +209,14 @@
                     {% set span = cell_spans.get(drawer_id) %}
                     {% set grp = group_cells.get(drawer_id) %}
                     {% set is_unavail = drawer_id in unavailable_drawers %}
+                    {% set is_slave = grp and grp.role == 'slave' %}
+                    {% set effective_id = grp.master if is_slave else drawer_id %}
+                    {% set d_short_info = drawer_info_map.get(effective_id, '') %}
                     <div class="layout-cell {% if span %}merged{% elif grp %}group-{{ grp.role }}{% endif %}{% if is_unavail %} unavailable{% endif %}"
                          data-drawer="{{ drawer_id }}"
                          data-is-merged="{{ 'true' if (span or (grp and grp.role == 'master')) else 'false' }}"
                          data-unavailable="{{ 'true' if is_unavail else 'false' }}"
+                         data-short-info="{{ d_short_info | e }}"
                          {% if grp %}data-group-master="{{ grp.master }}"{% endif %}
                          {% if span %}
                          style="grid-row: span {{ span.rowspan }}; grid-column: span {{ span.colspan }};"
@@ -214,6 +225,9 @@
                          {% endif %}
                          onclick="layoutCellClick(this)">
                         <div class="layout-cell-label">{{ drawer_id }}</div>
+                        {% if d_short_info and not is_slave %}
+                        <div class="layout-cell-short-info" title="{{ d_short_info }}">{{ d_short_info }}</div>
+                        {% endif %}
                         <div class="layout-cell-badge">
                             {% if span %}
                             <span class="badge bg-primary" style="font-size:0.6rem;">{{ span.rowspan }}×{{ span.colspan }}</span>
@@ -234,7 +248,9 @@
                     {% endfor %}
                 </div>
 
-                <div class="mt-3">
+                <div id="layoutShortInfoHint" class="text-info mt-2" style="font-size:0.8rem;min-height:1.2em;"></div>
+
+                <div class="mt-2">
                     <small class="text-muted">
                         <span class="badge bg-light border text-dark me-1">&nbsp;&nbsp;&nbsp;</span> Normal &nbsp;
                         <span class="badge bg-primary me-1">&nbsp;&nbsp;&nbsp;</span> Merged (rect) &nbsp;
@@ -243,6 +259,28 @@
                         <span class="badge bg-success me-1">&nbsp;&nbsp;&nbsp;</span> Selected &nbsp;
                         <span class="badge" style="background:#fd7e14;">&nbsp;&nbsp;&nbsp;</span> Unavailable
                     </small>
+                </div>
+
+                <div class="d-flex gap-2 mt-3 flex-wrap align-items-center">
+                    <button class="btn btn-primary btn-sm" onclick="doMerge()" disabled
+                            id="btnMergeBottom" style="display:none;">
+                        <i class="bi bi-table"></i> Merge Selected
+                    </button>
+                    <button class="btn btn-warning btn-sm" onclick="doSplit()" style="display:none;"
+                            id="btnSplitBottom">
+                        <i class="bi bi-layout-split"></i> Split Merged Cell
+                    </button>
+                    <button class="btn btn-danger btn-sm" onclick="doMarkUnavailable(true)" style="display:none;"
+                            id="btnMarkUnavailableBottom">
+                        <i class="bi bi-slash-circle"></i> Mark Unavailable
+                    </button>
+                    <button class="btn btn-success btn-sm" onclick="doMarkUnavailable(false)" style="display:none;"
+                            id="btnMarkAvailableBottom">
+                        <i class="bi bi-check-circle"></i> Mark Available
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="clearLayoutSelection()">
+                        <i class="bi bi-x-circle"></i> Clear Selection
+                    </button>
                 </div>
             </div>
         </div>
@@ -330,6 +368,16 @@
     font-size: 0.72rem;
     font-weight: 700;
 }
+.layout-cell-short-info {
+    font-size: 0.6rem;
+    font-style: italic;
+    opacity: 0.85;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 2px;
+}
 .layout-cell-badge {
     margin-top: 2px;
 }
@@ -393,8 +441,10 @@ function cellsConnected(cells) {
 function layoutCellClick(cell) {
     const drawerId = cell.dataset.drawer;
     const isMerged = cell.dataset.isMerged === 'true';
-    // Slave cells of a non-rectangular group redirect to master for split
     const groupMaster = cell.dataset.groupMaster || null;
+    const shortInfo = cell.dataset.shortInfo || '';
+    const hintEl = document.getElementById('layoutShortInfoHint');
+    if (hintEl) hintEl.textContent = shortInfo ? `📝 ${shortInfo}` : '';
 
     // If clicking a merged master cell or a group-slave: enter split mode
     if (isMerged || groupMaster) {
@@ -426,6 +476,7 @@ function layoutCellClick(cell) {
 
         document.getElementById('layoutStatus').textContent =
             `Selected merge group (master: ${splitTarget}) — Split to undo merge, or toggle availability`;
+        _mirrorBottomButtons();
         return;
     }
 
@@ -445,6 +496,15 @@ function layoutCellClick(cell) {
     updateToolbar();
 }
 
+function _mirrorBottomButtons() {
+    ['btnMerge','btnSplit','btnMarkUnavailable','btnMarkAvailable'].forEach(function(id) {
+        var top = document.getElementById(id);
+        var bot = document.getElementById(id + 'Bottom');
+        if (!top || !bot) return;
+        bot.disabled = top.disabled;
+        bot.style.display = top.style.display || (top.disabled !== undefined ? '' : 'none');
+    });
+}
 function updateToolbar() {
     const cells = Array.from(selectedCells);
     const btn = document.getElementById('btnMerge');
@@ -485,6 +545,7 @@ function updateToolbar() {
         btn.disabled = true;
         status.textContent = `${cells.length} cells selected — cells must be adjacent (connected)`;
     }
+    _mirrorBottomButtons();
 }
 
 function clearLayoutSelection() {
@@ -498,6 +559,7 @@ function clearLayoutSelection() {
     document.getElementById('btnMarkUnavailable').style.display = 'none';
     document.getElementById('btnMarkAvailable').style.display = 'none';
     document.getElementById('layoutStatus').textContent = '';
+    _mirrorBottomButtons();
 }
 
 function doMerge() {

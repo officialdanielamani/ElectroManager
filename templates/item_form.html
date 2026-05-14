@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ title }} - Inventory Manager{% endblock %}
+{% block title %}{{ title }} - Electro Manager{% endblock %}
 
 {% block content %}
 
@@ -26,6 +26,7 @@
     <div class="col-md-10">
         <form method="POST" id="itemForm">
             {{ form.hidden_tag() }}
+            <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
 
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0"><i class="bi bi-box"></i> {{ title }}</h5>
@@ -45,13 +46,20 @@
                 <div class="card-body">
                     <div class="row mb-2">
                         <div class="col-md-8">
-                            <label class="form-label form-label-sm">Component Name *</label>
+                            <label class="form-label form-label-sm required">Component Name</label>
                             {{ form.name(class="form-control form-control-sm" + (" is-invalid" if form.name.errors else
                             ""), disabled=(item_perms and not item_perms.can_edit_info)) }}
                         </div>
                         <div class="col-md-4">
                             <label class="form-label form-label-sm">SKU</label>
                             {{ form.sku(class="form-control form-control-sm", disabled=(item_perms and not item_perms.can_edit_info)) }}
+                        </div>
+                    </div>
+
+                    <div class="row mb-2">
+                        <div class="col-12">
+                            <label class="form-label form-label-sm">Short Info</label>
+                            {{ form.short_info(class="form-control form-control-sm", maxlength="128", placeholder="Brief summary shown on cards (max 128 chars)", disabled=(item_perms and not item_perms.can_edit_info)) }}
                         </div>
                     </div>
 
@@ -210,8 +218,16 @@
 
                                 <div id="drawer_picker" style="display: none;">
                                     <div class="p-2 border rounded drawer-grid-container">
-                                        <small class="text-muted d-block mb-2">Click to select:</small>
-                                        <div id="drawer_grid" style="display: inline-grid; gap: 4px; background: transparent;"></div>
+                                        <div class="d-flex align-items-center gap-3 mb-1 flex-wrap">
+                                            <small class="text-muted">Click to select:</small>
+                                            {% if item %}
+                                            <small><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e6a817;margin-right:3px;"></span><span class="text-muted">another batch/location of this item</span></small>
+                                            {% endif %}
+                                        </div>
+                                        <div id="drawer_short_info_hint" class="text-muted small mb-1 fst-italic" style="min-height:1.2em;"></div>
+                                        <div style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
+                                            <div id="drawer_grid" style="display: inline-grid; gap: 4px; background: transparent;"></div>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -267,11 +283,12 @@
                     <div class="mb-2 border rounded p-2" id="batches-section">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <label class="form-label form-label-sm mb-0">
-                                <i class="bi bi-collection"></i> Batches ({{ item.batches|length }})
+                                <i class="bi bi-collection"></i> Batches
+                                <span class="badge {% if item.batches|length >= 32 %}bg-danger{% elif item.batches|length >= 28 %}bg-warning text-dark{% else %}bg-secondary{% endif %} ms-1">{{ item.batches|length }}/32</span>
                                 <small class="text-muted ms-2">Total Qty: {{ item.get_overall_quantity() }} | Price: {{ currency }}{{ "%.2f"|format(item.get_overall_total_price()) }} | Value: {{ currency }}{{ "%.2f"|format(item.get_overall_total_value()) }}</small>
                             </label>
                             {% if item_perms and item_perms.can_edit_batch %}
-                            <button type="button" class="btn btn-sm btn-success" onclick="openAddBatchModal()">
+                            <button type="button" class="btn btn-sm btn-success" onclick="openAddBatchModal()" {% if item.batches|length >= 32 %}disabled title="Maximum 32 batches reached"{% endif %}>
                                 <i class="bi bi-plus-circle"></i> Add Batch
                             </button>
                             {% endif %}
@@ -299,15 +316,18 @@
                                     {% if batch.note %}<small class="text-muted ms-2"><i class="bi bi-sticky"></i> {{ batch.note }}</small>{% endif %}
                                 </div>
                                 <div class="d-flex gap-1 align-items-center">
+                                    {% if item_perms and item_perms.can_edit_info %}
+                                    <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
+                                            data-el-batch-id="{{ batch.id }}"
+                                            data-el-follow-main="{{ 'true' if batch.follow_main_location else 'false' }}"
+                                            data-el-location-id="{{ batch.location_id or '' }}"
+                                            data-el-rack-id="{{ batch.rack_id or '' }}"
+                                            data-el-drawer="{{ batch.drawer or '' }}"
+                                            data-el-item-uuid="{{ item.uuid }}"
+                                            onclick="openEditLocationModal(event, this)"
+                                            title="Edit batch location"><i class="bi bi-geo-alt"></i> Edit Location</button>
+                                    {% endif %}
                                     <i class="bi bi-chevron-down"></i>
-                                    {% if item_perms and item_perms.can_edit_batch %}
-                                    {% if not batch.sn_tracking_enabled %}
-                                    <button type="button" class="btn btn-sm btn-outline-info py-0 px-1" onclick="event.stopPropagation(); openTransferModal({{ batch.id }}, {{ batch.get_available_quantity() }})" title="Transfer Quantity"><i class="bi bi-arrow-left-right"></i></button>
-                                    <button type="button" class="btn btn-sm py-0 px-1" style="background-color:#c9a227;color:#fff;border-color:#c9a227;" onclick="event.stopPropagation(); openLendManageModal({{ batch.id }}, {{ batch.quantity }})" title="Manage Lending"><i class="bi bi-hand-index-thumb"></i></button>
-                                    {% endif %}
-                                    <button type="button" class="btn btn-sm btn-outline-warning py-0 px-1" onclick="event.stopPropagation(); openEditBatchModal({{ batch.id }}, '{{ batch.batch_label|e if batch.batch_label else '' }}', {{ batch.quantity }}, {{ batch.price_per_unit }}, '{{ batch.purchase_date.strftime('%Y-%m-%d') if batch.purchase_date else '' }}', '{{ batch.note|e if batch.note else '' }}', {{ 'true' if batch.sn_tracking_enabled else 'false' }}, {{ 'true' if (batch.follow_main_location if batch.follow_main_location is not none else true) else 'false' }}, {{ batch.location_id or 'null' }}, {{ batch.rack_id or 'null' }}, '{{ batch.drawer|e if batch.drawer else '' }}')" title="Edit"><i class="bi bi-pencil"></i></button>
-                                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="event.stopPropagation(); deleteBatchJS({{ batch.id }}, '{{ batch.get_display_label()|e }}')" title="Delete"><i class="bi bi-trash"></i></button>
-                                    {% endif %}
                                 </div>
                             </div>
                             <div class="collapse" id="batchBody{{ batch.id }}">
@@ -327,6 +347,17 @@
                                         <div class="col-md-3"><strong>Date of Purchase:</strong> {{ batch.purchase_date.strftime('%d/%m/%Y') if batch.purchase_date else 'N/A' }}</div>
                                         <div class="col-md-3"><strong>Note:</strong> {{ batch.note or 'N/A' }}</div>
                                     </div>
+                                    <div class="row mb-1 small">
+                                        <div class="col-12">
+                                            <strong>Batch UID:</strong>
+                                            <code class="user-select-all">{{ batch.get_batch_uid() }}</code>
+                                        </div>
+                                    </div>
+                                    {% if batch.manufacturer %}
+                                    <div class="row mb-1 small">
+                                        <div class="col-12"><strong>Manufacturer:</strong> {{ batch.manufacturer }}</div>
+                                    </div>
+                                    {% endif %}
                                     <div class="row mb-2 small">
                                         <div class="col-12">
                                             <strong>Location:</strong>
@@ -359,15 +390,16 @@
                                         {% if batch.lend_records %}
                                         <table class="table table-sm table-bordered mt-1 mb-0" style="font-size:0.8rem;">
                                             <thead class="table-light">
-                                                <tr><th>Lend To</th><th style="width:80px">Qty</th><th style="width:90px">Start</th><th style="width:90px">Due Date</th><th style="width:30px"><i class="bi bi-bell" title="Notify"></i></th></tr>
+                                                <tr><th>Lend To</th><th style="width:80px">Qty</th><th style="width:90px">Start</th><th style="width:90px">Due Date</th><th>Notes</th><th style="width:30px"><i class="bi bi-bell" title="Notify"></i></th></tr>
                                             </thead>
                                             <tbody>
                                                 {% for r in batch.lend_records %}
                                                 <tr>
                                                     <td>{{ r.get_lend_to_display() or '(not set)' }}</td>
                                                     <td>{{ r.quantity }}</td>
-                                                    <td>{{ r.lend_start.strftime('%d/%m/%Y') if r.lend_start else '—' }}</td>
-                                                    <td>{{ r.lend_end.strftime('%d/%m/%Y') if r.lend_end else '—' }}</td>
+                                                    <td>{% if r.lend_start %}{{ r.lend_start.strftime('%d/%m/%Y') }}{% if r.lend_start.hour or r.lend_start.minute %} {{ r.lend_start.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
+                                                    <td>{% if r.lend_end %}{{ r.lend_end.strftime('%d/%m/%Y') }}{% if r.lend_end.hour or r.lend_end.minute %} {{ r.lend_end.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
+                                                    <td><small class="text-muted">{{ r.lend_note or '—' }}</small></td>
                                                     <td class="text-center">{% if r.lend_notify_enabled %}<i class="bi bi-bell-fill text-warning"></i>{% else %}—{% endif %}</td>
                                                 </tr>
                                                 {% endfor %}
@@ -384,17 +416,12 @@
                                     {% if item_perms and item_perms.can_edit_batch %}
                                     <div class="d-flex gap-1 mb-2 flex-wrap">
                                         <button type="button" class="btn btn-sm btn-outline-primary" onclick="openEditDetailsModal({{ batch.id }})"><i class="bi bi-pencil-square"></i> Edit Selected</button>
-                                        <button type="button" class="btn btn-sm btn-outline-info" onclick="openTransferSnModal({{ batch.id }})"><i class="bi bi-arrow-left-right"></i> Transfer Selected</button>
-                                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteSelectedSn({{ batch.id }})"><i class="bi bi-trash"></i> Delete Selected</button>
                                         <div class="input-group input-group-sm" style="width:auto;">
                                             <span class="input-group-text">Add</span>
                                             <input type="number" class="form-control" id="addSnQty{{ batch.id }}" min="1" max="100" value="1" style="width:55px">
-                                            <button class="btn btn-outline-success" type="button" onclick="addSnToBatch({{ batch.id }}, {{ batch.quantity }})"><i class="bi bi-plus"></i></button>
+                                            <button class="btn btn-outline-success" type="button" onclick="addSnToBatch({{ batch.id }})"><i class="bi bi-plus"></i></button>
                                         </div>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="remapIsn({{ batch.id }})"><i class="bi bi-arrow-repeat"></i> Remap ISN</button>
-                                        {% if item_perms and item_perms.can_edit_lending %}
-                                        <button type="button" class="btn btn-sm btn-outline-warning" onclick="openSnBulkLendModal({{ batch.id }})"><i class="bi bi-hand-index-thumb"></i> Manage Lending</button>
-                                        {% endif %}
+                                        <span id="snUnsavedBadge_{{ batch.id }}" class="d-none badge bg-warning text-dark align-self-center">Pending</span>
                                     </div>
                                     {% endif %}
 
@@ -409,42 +436,13 @@
                                                     <th>Info</th>
                                                     <th>Project</th>
                                                     <th>Lend to</th>
+                                                    <th>Status</th>
                                                 </tr>
                                             </thead>
-                                            <tbody>
-                                                {% for sn in batch.serial_numbers %}
-                                                {% set sn_project_used = sn.id in batch.get_project_used_sn_ids() %}
-                                                <tr>
-                                                    <td><input type="checkbox" class="form-check-input sn-check-{{ batch.id }}" value="{{ sn.id }}"></td>
-                                                    <td>{{ sn.sequence_number }}</td>
-                                                    <td>
-                                                        <span id="snVal{{ sn.id }}" ondblclick="inlineEdit(this, {{ sn.id }}, 'sn', '{{ sn.serial_number|e if sn.serial_number else '-' }}', {{ batch.id }})">{{ sn.serial_number or '-' }}</span>
-                                                    </td>
-                                                    <td><code style="font-size:0.78rem">{{ sn.internal_serial_number }}</code></td>
-                                                    <td>
-                                                        <span id="infoVal{{ sn.id }}" ondblclick="inlineEdit(this, {{ sn.id }}, 'info', '{{ sn.info|e if sn.info else '-' }}', {{ batch.id }})">{{ sn.info or '-' }}</span>
-                                                    </td>
-                                                    <td>
-                                                        {% if sn_project_used %}
-                                                        {% for bom in batch.bom_uses if bom.used_quantity > 0 and bom.serial_numbers %}
-                                                            {% set sn_ids = bom.serial_numbers | from_json %}
-                                                            {% if sn.id in sn_ids %}<a href="{{ url_for('project.project_detail', project_id=bom.project.project_id) }}" target="_blank" class="badge bg-info text-decoration-none">{{ bom.project.name }}</a>{% endif %}
-                                                        {% endfor %}
-                                                        {% else %}-{% endif %}
-                                                    </td>
-                                                    <td>
-                                                        {% if sn_project_used %}
-                                                        <span class="text-muted" style="opacity:0.5">{{ sn.get_lend_to_display() or '-' }}</span>
-                                                        {% else %}
-                                                        <span id="lendVal{{ sn.id }}" class="small">{{ sn.get_lend_to_display() or '-' }}</span>
-                                                        {% endif %}
-                                                    </td>
-                                                </tr>
-                                                {% endfor %}
-                                            </tbody>
+                                            <tbody id="snTableBody_{{ batch.id }}"></tbody>
                                         </table>
                                     </div>
-                                    <small class="text-muted">Double-click SN or Info to edit inline. Use <strong>Manage Lending</strong> to set lending.</small>
+                                    <small class="text-muted">Double-click SN or Info to edit inline. Removed entries kept for record.</small>
                                     {% elif batch.sn_tracking_enabled and batch.serial_numbers|length == 0 and item_perms and item_perms.can_edit_batch %}
                                     <hr class="my-2">
                                     <div class="d-flex align-items-center gap-2">
@@ -452,7 +450,7 @@
                                         <div class="input-group input-group-sm" style="width:auto;">
                                             <span class="input-group-text">Add</span>
                                             <input type="number" class="form-control" id="addSnQty{{ batch.id }}" min="1" max="100" value="1" style="width:55px">
-                                            <button class="btn btn-outline-success" type="button" onclick="addSnToBatch({{ batch.id }}, 0)"><i class="bi bi-plus"></i></button>
+                                            <button class="btn btn-outline-success" type="button" onclick="addSnToBatch({{ batch.id }})"><i class="bi bi-plus"></i></button>
                                         </div>
                                     </div>
                                     {% endif %}
@@ -483,6 +481,10 @@
                     {% endif %}
                     <input type="hidden" name="quantity" id="quantity" value="{{ item.quantity if item else 0 }}">
                     <input type="hidden" name="price" value="{{ item.price if item else 0 }}">
+                    {% if item %}
+                    <input type="hidden" name="pending_sn_changes"   id="pending_sn_changes"   value="{}">
+                    <input type="hidden" name="pending_lend_changes" id="pending_lend_changes" value="{}">
+                    {% endif %}
                 </div>
             </div>
 
@@ -500,7 +502,7 @@
                 <div class="card-body">
                     <div class="mb-3">
                         <label class="form-label form-label-sm">Description</label>
-                        {{ form.description(class="form-control form-control-sm", placeholder="Support Markdown format", rows=4, disabled=(item_perms and not item_perms.can_edit_advance)) }}
+                        {{ form.description(class="form-control form-control-sm", placeholder="Support Markdown format", rows=6, disabled=(item_perms and not item_perms.can_edit_advance), id="itemDescription") }}
                     </div>
 
                     <div class="mb-3">
@@ -911,6 +913,13 @@
                 </div>
             </div>
 
+            {% if item %}
+            <div id="pendingChangesBanner" class="alert alert-warning d-none py-2 px-3 mb-2">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <strong>Pending Changes</strong> — Click <strong>Update Item</strong> to save all changes.
+                <span class="text-muted small ms-2">Back or Refresh to discard.</span>
+            </div>
+            {% endif %}
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <a href="{{ url_for('item.items') }}" class="btn btn-secondary">
                     <i class="bi bi-x-circle"></i> Cancel
@@ -1283,6 +1292,32 @@
         border-style: solid !important;
         opacity: 1 !important;
     }
+
+    /* Same-item batch highlight: warm yellow */
+    .drawer-cell-picker.same-item-drawer {
+        background: rgba(255, 193, 7, 0.22) !important;
+        border-color: #e6a817 !important;
+        border-style: solid !important;
+    }
+    .drawer-cell-picker.same-item-drawer .drawer-label,
+    .drawer-cell-picker.same-item-drawer {
+        color: #7a5700 !important;
+    }
+    .drawer-cell-picker.same-item-drawer::after {
+        content: '';
+        display: block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #e6a817;
+        position: absolute;
+        top: 3px;
+        right: 3px;
+    }
+    .drawer-cell-picker.same-item-drawer.selected {
+        background: rgba(255, 193, 7, 0.55) !important;
+        border-color: #c97d00 !important;
+    }
 </style>
 
 <script>
@@ -1336,6 +1371,13 @@
         const rackData = racksData.find(r => r.id === rackId);
         const unavailableDrawers = rackData ? rackData.unavailable_drawers : [];
         const mergedGroups = rackData ? (rackData.merged_cells || []) : [];
+        // Same-item drawer map: drawerId → batch label
+        const sameItemList = rackData ? (rackData.same_item_drawers || []) : [];
+        const sameItemMap = {};
+        sameItemList.forEach(d => { sameItemMap[d.drawer] = d.label; });
+        // Drawer short-info map: drawerId → info text
+        const drawerInfoMap = rackData ? (rackData.drawer_info || {}) : {};
+        const hintEl = document.getElementById('drawer_short_info_hint');
 
         // Build skip / span / group maps from merged cells
         const skipCells = new Set();
@@ -1366,10 +1408,12 @@
             grid.querySelectorAll('.drawer-cell-picker').forEach(d => d.classList.remove('selected'));
             if (drawerInput.value === targetId) {
                 drawerInput.value = '';
+                if (hintEl) hintEl.textContent = '';
             } else {
                 const targetEl = grid.querySelector(`[data-drawer="${targetId}"]`);
                 if (targetEl) targetEl.classList.add('selected');
                 drawerInput.value = targetId;
+                if (hintEl) hintEl.textContent = drawerInfoMap[targetId] ? `📝 ${drawerInfoMap[targetId]}` : '';
             }
         }
 
@@ -1420,10 +1464,28 @@
                     }
                 }
 
+                // Highlight drawers used by other batches/main location of this item
+                if (sameItemMap[drawerId]) {
+                    cell.classList.add('same-item-drawer');
+                    const prev = cell.title ? cell.title + ' | ' : '';
+                    cell.title = prev + 'This item: ' + sameItemMap[drawerId];
+                }
+
                 // Unified click handler: all selectable cell types use pickDrawer
                 const isSelectable = canEditLocation && !(!groupInfo && !span && isUnavailable);
                 if (isSelectable) {
                     cell.addEventListener('click', () => pickDrawer(targetId));
+                }
+
+                // Show drawer short info on hover (restores selected-drawer info on leave)
+                if (drawerInfoMap[targetId]) {
+                    cell.addEventListener('mouseenter', () => {
+                        if (hintEl) hintEl.textContent = `📝 ${drawerInfoMap[targetId]}`;
+                    });
+                    cell.addEventListener('mouseleave', () => {
+                        if (hintEl) hintEl.textContent = drawerInput.value && drawerInfoMap[drawerInput.value]
+                            ? `📝 ${drawerInfoMap[drawerInput.value]}` : '';
+                    });
                 }
 
                 // Restore selected state (only show on the master/direct cell, not on slaves)
@@ -2316,45 +2378,42 @@
 </div>
 
 <script>
-    // Load templates when modal opens
+    var _templateDataMap = {};
     document.getElementById('useTemplateModal').addEventListener('show.bs.modal', function () {
         fetch('/api/parameter-templates')
             .then(response => response.json())
             .then(data => {
+                _templateDataMap = {};
                 const select = document.getElementById('template_select');
                 select.innerHTML = '<option value="">-- Select Template --</option>';
                 data.forEach(template => {
-                    const option = new Option(template.name, template.id);
-                    option.dataset.description = template.description || 'No description';
-                    option.dataset.parameters = JSON.stringify(template.parameters);
-                    select.add(option);
+                    _templateDataMap[template.id] = template;
+                    select.add(new Option(template.name, template.id));
                 });
             });
     });
 
     function showTemplateDetails() {
         const select = document.getElementById('template_select');
-        const selectedOption = select.options[select.selectedIndex];
-
-        if (selectedOption.value) {
-            document.getElementById('template_details').style.display = 'block';
-            document.getElementById('template_description').textContent = selectedOption.dataset.description;
-
-            const parameters = JSON.parse(selectedOption.dataset.parameters || '[]');
-            const paramList = document.getElementById('template_parameters');
-            paramList.innerHTML = '';
-
-            if (parameters.length > 0) {
-                parameters.forEach(param => {
-                    const li = document.createElement('li');
-                    li.innerHTML = '<small class="text-muted">• ' + param.display_text + '</small>';
-                    paramList.appendChild(li);
-                });
-            } else {
-                paramList.innerHTML = '<li class="text-muted">No parameters in this template</li>';
-            }
-        } else {
+        const templateId = select.value;
+        if (!templateId) {
             document.getElementById('template_details').style.display = 'none';
+            return;
+        }
+        const template = _templateDataMap[templateId];
+        if (!template) return;
+        document.getElementById('template_details').style.display = 'block';
+        document.getElementById('template_description').textContent = template.description || 'No description';
+        const paramList = document.getElementById('template_parameters');
+        paramList.innerHTML = '';
+        if (template.parameters && template.parameters.length > 0) {
+            template.parameters.forEach(param => {
+                const li = document.createElement('li');
+                li.innerHTML = '<small class="text-muted">• ' + (param.display_text || param.operation || '') + '</small>';
+                paramList.appendChild(li);
+            });
+        } else {
+            paramList.innerHTML = '<li class="text-muted">No parameters in this template</li>';
         }
     }
 </script>
@@ -2365,9 +2424,10 @@
 <script>
 /* ── Batch drawer grid picker (shared across Add / Edit / Pending modals) ── */
 var BATCH_LOC_IDS = {
-    ab: { rack: 'ab_rack_id', drawer: 'ab_drawer', picker: 'ab_drawer_picker', grid: 'ab_drawer_grid', locFilter: 'ab_storage_location_select' },
-    eb: { rack: 'eb_rack_id', drawer: 'eb_drawer', picker: 'eb_drawer_picker', grid: 'eb_drawer_grid', locFilter: 'eb_storage_location_select' },
-    pb: { rack: 'pbRackId',   drawer: 'pbDrawer',   picker: 'pb_drawer_picker', grid: 'pb_drawer_grid', locFilter: 'pb_storage_location_select' }
+    ab: { rack: 'ab_rack_id', drawer: 'ab_drawer', picker: 'ab_drawer_picker', grid: 'ab_drawer_grid', locFilter: 'ab_storage_location_select', hint: 'ab_drawer_short_info_hint' },
+    eb: { rack: 'eb_rack_id', drawer: 'eb_drawer', picker: 'eb_drawer_picker', grid: 'eb_drawer_grid', locFilter: 'eb_storage_location_select', hint: 'eb_drawer_short_info_hint' },
+    pb: { rack: 'pbRackId',   drawer: 'pbDrawer',   picker: 'pb_drawer_picker', grid: 'pb_drawer_grid', locFilter: 'pb_storage_location_select', hint: 'pb_drawer_short_info_hint' },
+    el: { rack: 'el_rack_id', drawer: 'el_drawer',  picker: 'el_drawer_picker', grid: 'el_drawer_grid', locFilter: 'el_storage_location_select', hint: 'el_drawer_short_info_hint' }
 };
 function batchUpdateStorageRackSelect(prefix) {
     var ids = BATCH_LOC_IDS[prefix];
@@ -2413,6 +2473,11 @@ function batchUpdateDrawerGrid(prefix) {
     var rackData = (typeof racksData !== 'undefined') ? racksData.find(function(r) { return r.id === rackId; }) : null;
     var unavailable = rackData ? rackData.unavailable_drawers : [];
     var mergedGroups = rackData ? (rackData.merged_cells || []) : [];
+    var sameItemList = rackData ? (rackData.same_item_drawers || []) : [];
+    var sameItemMap = {};
+    sameItemList.forEach(function(d) { sameItemMap[d.drawer] = d.label; });
+    var drawerInfoMap = rackData ? (rackData.drawer_info || {}) : {};
+    var hintEl = document.getElementById(ids.hint || null);
 
     var skipCells = {};
     var cellSpans = {};
@@ -2447,10 +2512,12 @@ function batchUpdateDrawerGrid(prefix) {
         grid.querySelectorAll('.drawer-cell-picker').forEach(function(d) { d.classList.remove('selected'); });
         if (drawerInput.value === targetId) {
             drawerInput.value = '';
+            if (hintEl) hintEl.textContent = '';
         } else {
             var targetEl = grid.querySelector('[data-drawer="' + targetId + '"]');
             if (targetEl) targetEl.classList.add('selected');
             drawerInput.value = targetId;
+            if (hintEl) hintEl.textContent = drawerInfoMap[targetId] ? '📝 ' + drawerInfoMap[targetId] : '';
         }
     }
 
@@ -2496,11 +2563,31 @@ function batchUpdateDrawerGrid(prefix) {
                     }
                 }
 
+                // Highlight drawers used by other batches/main location of this item
+                if (sameItemMap[drawerId]) {
+                    cell.classList.add('same-item-drawer');
+                    var prevTitle = cell.title ? cell.title + ' | ' : '';
+                    cell.title = prevTitle + 'This item: ' + sameItemMap[drawerId];
+                }
+
                 // Unified click handler for all selectable cells
                 var isSelectable = !(!groupInfo && !span && isUnavailable);
                 if (isSelectable) {
                     (function(tid) {
                         cell.addEventListener('click', function() { batchPickDrawer(tid); });
+                    })(targetId);
+                }
+
+                // Show drawer short info on hover
+                if (drawerInfoMap[targetId]) {
+                    (function(tid) {
+                        cell.addEventListener('mouseenter', function() {
+                            if (hintEl) hintEl.textContent = '📝 ' + drawerInfoMap[tid];
+                        });
+                        cell.addEventListener('mouseleave', function() {
+                            if (hintEl) hintEl.textContent = drawerInput.value && drawerInfoMap[drawerInput.value]
+                                ? '📝 ' + drawerInfoMap[drawerInput.value] : '';
+                        });
                     })(targetId);
                 }
 
@@ -2517,6 +2604,86 @@ function batchUpdateDrawerGrid(prefix) {
 </script>
 
 {% if item %}
+<!-- Edit Batch Location Modal -->
+<div class="modal fade" id="editBatchLocationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-geo-alt"></i> Edit Batch Location</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="el_batch_id" value="">
+                <input type="hidden" id="el_item_uuid" value="">
+                <div class="border rounded p-2">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="el_follow_main" onchange="elToggleLocation()">
+                        <label class="form-check-label" for="el_follow_main">
+                            <strong>Follow Main Location</strong>
+                            <small class="text-muted d-block">Use the item's main physical storage location for this batch.</small>
+                        </label>
+                    </div>
+                    <div id="el_batchLocSection" style="display:none;">
+                        <div class="btn-group btn-group-sm w-100 mb-2" role="group">
+                            <input type="radio" class="btn-check" name="el_loc_type" id="el_type_general" value="general" checked onchange="elSwitchLocType()">
+                            <label class="btn btn-outline-primary btn-sm" for="el_type_general"><i class="bi bi-geo-alt"></i> General Location</label>
+                            <input type="radio" class="btn-check" name="el_loc_type" id="el_type_drawer" value="drawer" onchange="elSwitchLocType()">
+                            <label class="btn btn-outline-primary btn-sm" for="el_type_drawer"><i class="bi bi-grid-3x3-gap"></i> Drawer Storage</label>
+                        </div>
+                        <div id="el_generalSection">
+                            <label class="form-label form-label-sm">Location</label>
+                            <select class="form-select form-select-sm" id="el_location_id">
+                                <option value="">— None —</option>
+                                {% for loc in locations %}
+                                <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div id="el_drawerSection" style="display:none;">
+                            <div class="row g-2 mb-2" style="position: relative;">
+                                <div class="col-4" style="overflow: visible;">
+                                    <label class="form-label form-label-sm">Location</label>
+                                    <select class="form-select form-select-sm" id="el_storage_location_select" onchange="batchUpdateStorageRackSelect('el')">
+                                        <option value="">All</option>
+                                        {% for loc in locations %}
+                                        <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-4" style="overflow: visible;">
+                                    <label class="form-label form-label-sm">Rack</label>
+                                    <select class="form-select form-select-sm" id="el_rack_id" onchange="batchUpdateDrawerGrid('el')">
+                                        <option value="">Select</option>
+                                        {% for rack in racks %}
+                                        <option value="{{ rack.id }}" data-rows="{{ rack.rows }}" data-cols="{{ rack.cols }}" data-location="{{ rack.physical_location.id if rack.physical_location else '' }}">{{ rack.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-4" style="overflow: visible;">
+                                    <label class="form-label form-label-sm">Drawer</label>
+                                    <input type="text" class="form-control form-control-sm" id="el_drawer" maxlength="50" readonly placeholder="Select">
+                                </div>
+                            </div>
+                            <div id="el_drawer_picker" style="display:none;">
+                                <div class="p-2 border rounded drawer-grid-container">
+                                    <small class="text-muted d-block mb-2">Click to select:</small>
+                                    <div id="el_drawer_short_info_hint" class="text-info" style="font-size:0.75rem;min-height:1.1em;margin-bottom:4px;"></div>
+                                    <div id="el_drawer_grid" style="display:inline-grid; gap:4px; background: transparent;"></div>
+                                </div>
+                            </div>
+                            <small class="text-muted d-block">Precise cell-level organization</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitEditLocation()"><i class="bi bi-save"></i> Save Location</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="addBatchModalDialog" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -2530,12 +2697,17 @@ function batchUpdateDrawerGrid(prefix) {
                         <input class="form-check-input" type="checkbox" id="addBatchSnTracking" onchange="toggleAddBatchTracking()">
                         <label class="form-check-label" for="addBatchSnTracking"><strong><i class="bi bi-upc-scan"></i> Enable Serial Number Tracking</strong></label>
                     </div>
-                    <small class="text-muted d-block mt-1" id="addBatchTrackingInfo"><strong>OFF:</strong> Simple batch — unlimited quantity, manual lending.</small>
-                    <small class="text-danger d-block mt-1"><i class="bi bi-exclamation-triangle"></i> <strong>Warning:</strong> This setting cannot be changed after the batch is created. Choose carefully.</small>
+                    <small class="text-muted d-block mt-1" id="addBatchTrackingInfo"><strong>OFF:</strong> Simple batch — unlimited quantity, quantity based lending.</small>
+                    <small class="text-muted d-block mt-1"><i class="bi bi-info-circle"></i> To change the batch information and lending is on In-Out page</small>
+                    <small class="text-danger d-block mt-1"><i class="bi bi-exclamation-triangle"></i> <strong>Warning:</strong> This setting cannot be changed after the batch is created. Batch information also fixed after Save Batch. Choose carefully.</small>
                 </div>
                 <div class="mb-2">
                     <label class="form-label form-label-sm">Batch Label <small class="text-muted">(optional, max 32)</small></label>
                     <input type="text" class="form-control form-control-sm" id="ab_label" maxlength="32">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Manufacturer <small class="text-muted">(optional, max 128)</small></label>
+                    <input type="text" class="form-control form-control-sm" id="ab_manufacturer" maxlength="128">
                 </div>
                 <div class="row mb-2">
                     <div class="col-4">
@@ -2614,6 +2786,7 @@ function batchUpdateDrawerGrid(prefix) {
                             <div id="ab_drawer_picker" style="display:none;">
                                 <div class="p-2 border rounded drawer-grid-container">
                                     <small class="text-muted d-block mb-2">Click to select:</small>
+                                    <div id="ab_drawer_short_info_hint" class="text-info" style="font-size:0.75rem;min-height:1.1em;margin-bottom:4px;"></div>
                                     <div id="ab_drawer_grid" style="display:inline-grid; gap:4px; background: transparent;"></div>
                                 </div>
                             </div>
@@ -2625,125 +2798,6 @@ function batchUpdateDrawerGrid(prefix) {
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="submitAddBatch()"><i class="bi bi-plus-circle"></i> Add Batch</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="editBatchModalDialog" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Batch</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="eb_id">
-                <div class="mb-2">
-                    <label class="form-label form-label-sm">Batch Label</label>
-                    <input type="text" class="form-control form-control-sm" id="eb_label" maxlength="32">
-                </div>
-                <div id="eb_snInfo" class="mb-2 p-2 bg-light rounded small"></div>
-                <div id="eb_qtySection">
-                    <div class="row mb-2">
-                        <div class="col-4">
-                            <label class="form-label form-label-sm">Quantity</label>
-                            <input type="number" class="form-control form-control-sm" id="eb_qty" min="0" max="99999" oninput="ebCalcFromQtyPrice()">
-                        </div>
-                        <div class="col-4">
-                            <label class="form-label form-label-sm">Price / Unit</label>
-                            <input type="number" class="form-control form-control-sm" id="eb_price" min="0" step="0.0001" oninput="ebCalcFromQtyPrice()">
-                        </div>
-                        <div class="col-4">
-                            <label class="form-label form-label-sm">Total Price <small class="text-muted">(auto)</small></label>
-                            <input type="number" class="form-control form-control-sm" id="eb_total" min="0" step="0.01" oninput="ebCalcFromTotal()">
-                        </div>
-                    </div>
-                    <div class="mb-2"><small class="text-muted"><i class="bi bi-info-circle"></i> Fill any two — third auto-calculates. Qty=0 treated as 1.</small></div>
-                </div>
-                <div id="eb_priceOnlySection" style="display:none;">
-                    <div class="row mb-2">
-                        <div class="col-6">
-                            <label class="form-label form-label-sm">Price / Unit</label>
-                            <input type="number" class="form-control form-control-sm" id="eb_price2" min="0" step="0.0001" oninput="ebCalcFromPrice2()">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label form-label-sm">Total Price <small class="text-muted">(auto)</small></label>
-                            <input type="number" class="form-control form-control-sm" id="eb_total2" min="0" step="0.01" oninput="ebCalcFromTotal2()">
-                        </div>
-                    </div>
-                </div>
-                <div class="mb-2">
-                    <label class="form-label form-label-sm">Date of Purchase</label>
-                    <input type="date" class="form-control form-control-sm" id="eb_date">
-                </div>
-                <div class="mb-2">
-                    <label class="form-label form-label-sm">Note</label>
-                    <input type="text" class="form-control form-control-sm" id="eb_note" maxlength="128">
-                </div>
-                <div class="border rounded p-2 mb-2">
-                    <div class="form-check mb-2">
-                        <input class="form-check-input" type="checkbox" id="eb_follow_main" onchange="ebToggleLocation()">
-                        <label class="form-check-label" for="eb_follow_main">
-                            <strong>Follow Main Location</strong>
-                            <small class="text-muted d-block">Use the item's main physical storage location for this batch.</small>
-                        </label>
-                    </div>
-                    <div id="eb_batchLocSection" style="display:none;">
-                        <div class="btn-group btn-group-sm w-100 mb-2" role="group">
-                            <input type="radio" class="btn-check" name="eb_loc_type" id="eb_type_general" value="general" checked onchange="ebSwitchLocType()">
-                            <label class="btn btn-outline-primary btn-sm" for="eb_type_general"><i class="bi bi-geo-alt"></i> General Location</label>
-                            <input type="radio" class="btn-check" name="eb_loc_type" id="eb_type_drawer" value="drawer" onchange="ebSwitchLocType()">
-                            <label class="btn btn-outline-primary btn-sm" for="eb_type_drawer"><i class="bi bi-grid-3x3-gap"></i> Drawer Storage</label>
-                        </div>
-                        <div id="eb_generalSection">
-                            <label class="form-label form-label-sm">Location</label>
-                            <select class="form-select form-select-sm" id="eb_location_id">
-                                <option value="">— None —</option>
-                                {% for loc in locations %}
-                                <option value="{{ loc.id }}">{{ loc.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div id="eb_drawerSection" style="display:none;">
-                            <div class="row g-2 mb-2" style="position: relative;">
-                                <div class="col-4" style="overflow: visible;">
-                                    <label class="form-label form-label-sm">Location</label>
-                                    <select class="form-select form-select-sm" id="eb_storage_location_select" onchange="batchUpdateStorageRackSelect('eb')">
-                                        <option value="">All</option>
-                                        {% for loc in locations %}
-                                        <option value="{{ loc.id }}">{{ loc.name }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="col-4" style="overflow: visible;">
-                                    <label class="form-label form-label-sm">Rack</label>
-                                    <select class="form-select form-select-sm" id="eb_rack_id" onchange="batchUpdateDrawerGrid('eb')">
-                                        <option value="">Select</option>
-                                        {% for rack in racks %}
-                                        <option value="{{ rack.id }}" data-rows="{{ rack.rows }}" data-cols="{{ rack.cols }}" data-location="{{ rack.physical_location.id if rack.physical_location else '' }}">{{ rack.name }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="col-4" style="overflow: visible;">
-                                    <label class="form-label form-label-sm">Drawer</label>
-                                    <input type="text" class="form-control form-control-sm" id="eb_drawer" maxlength="50" readonly placeholder="Select">
-                                </div>
-                            </div>
-                            <div id="eb_drawer_picker" style="display:none;">
-                                <div class="p-2 border rounded drawer-grid-container">
-                                    <small class="text-muted d-block mb-2">Click to select:</small>
-                                    <div id="eb_drawer_grid" style="display:inline-grid; gap:4px; background: transparent;"></div>
-                                </div>
-                            </div>
-                            <small class="text-muted d-block">Precise cell-level organization</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="submitEditBatch()"><i class="bi bi-save"></i> Save Changes</button>
             </div>
         </div>
     </div>
@@ -2779,6 +2833,7 @@ function reloadKeepBatch() {
 function openAddBatchModal() {
     document.getElementById('addBatchSnTracking').checked = false;
     document.getElementById('ab_label').value = '';
+    document.getElementById('ab_manufacturer').value = '';
     document.getElementById('ab_qty').value = '1';
     document.getElementById('ab_price').value = '0';
     document.getElementById('ab_total').value = '0';
@@ -2814,6 +2869,80 @@ function abSwitchLocType() {
         document.getElementById('ab_drawer_picker').style.display = 'none';
     }
 }
+/* ── Edit Location Modal ── */
+function elToggleLocation() {
+    var follow = document.getElementById('el_follow_main').checked;
+    document.getElementById('el_batchLocSection').style.display = follow ? 'none' : 'block';
+}
+function elSwitchLocType() {
+    var isDrawer = document.getElementById('el_type_drawer').checked;
+    document.getElementById('el_generalSection').style.display = isDrawer ? 'none' : 'block';
+    document.getElementById('el_drawerSection').style.display = isDrawer ? 'block' : 'none';
+    if (isDrawer) {
+        document.getElementById('el_location_id').value = '';
+        batchUpdateDrawerGrid('el');
+    } else {
+        document.getElementById('el_rack_id').value = '';
+        document.getElementById('el_drawer').value = '';
+        document.getElementById('el_drawer_picker').style.display = 'none';
+    }
+}
+function openEditLocationModal(evt, btn) {
+    evt.stopPropagation();
+    var batchId  = btn.dataset.elBatchId;
+    var followMain = btn.dataset.elFollowMain === 'true';
+    var locationId = btn.dataset.elLocationId;
+    var rackId   = btn.dataset.elRackId;
+    var drawer   = btn.dataset.elDrawer;
+    var itemUuid = btn.dataset.elItemUuid;
+    document.getElementById('el_batch_id').value = batchId;
+    document.getElementById('el_item_uuid').value = itemUuid;
+    document.getElementById('el_follow_main').checked = followMain;
+    elToggleLocation();
+    if (!followMain) {
+        if (rackId) {
+            document.getElementById('el_type_drawer').checked = true;
+            document.getElementById('el_type_general').checked = false;
+            elSwitchLocType();
+            // Select matching rack
+            var rackSel = document.getElementById('el_rack_id');
+            rackSel.value = String(rackId);
+            if (drawer) document.getElementById('el_drawer').value = drawer;
+            batchUpdateDrawerGrid('el');
+        } else {
+            document.getElementById('el_type_general').checked = true;
+            document.getElementById('el_type_drawer').checked = false;
+            elSwitchLocType();
+            if (locationId) document.getElementById('el_location_id').value = String(locationId);
+        }
+    }
+    new bootstrap.Modal(document.getElementById('editBatchLocationModal')).show();
+}
+function submitEditLocation() {
+    var batchId  = document.getElementById('el_batch_id').value;
+    var itemUuid = document.getElementById('el_item_uuid').value;
+    var fd = new FormData();
+    if (document.getElementById('el_follow_main').checked) {
+        fd.append('follow_main_location', 'on');
+    } else if (document.getElementById('el_type_drawer').checked) {
+        fd.append('batch_rack_id', document.getElementById('el_rack_id').value);
+        fd.append('batch_drawer', document.getElementById('el_drawer').value);
+    } else {
+        fd.append('batch_location_id', document.getElementById('el_location_id').value);
+    }
+    fetch('/item/' + itemUuid + '/batch/' + batchId + '/edit-location', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) {
+                bootstrap.Modal.getInstance(document.getElementById('editBatchLocationModal')).hide();
+                reloadKeepBatch();
+            } else {
+                alert(d.message || 'Failed to save location.');
+            }
+        })
+        .catch(function(e) { alert('Error: ' + e); });
+}
+
 /* Auto-calc helpers for Add Batch */
 function abCalcFromQtyPrice() {
     var qty = parseFloat(document.getElementById('ab_qty').value) || 0;
@@ -2832,16 +2961,17 @@ function toggleAddBatchTracking() {
     if (on) {
         qi.max = 100; if (parseInt(qi.value) > 100) qi.value = 100;
         document.getElementById('ab_qtyHint').textContent = '(max 100)';
-        document.getElementById('addBatchTrackingInfo').innerHTML = '<strong>ON:</strong> Each unit gets SN/ISN. Max 100 per batch.';
+        document.getElementById('addBatchTrackingInfo').innerHTML = '<strong>ON:</strong> Serial number tracking — max 100 per batch, individual item management, all things is recorded.';
     } else {
         qi.max = 99999;
         document.getElementById('ab_qtyHint').textContent = '(no limit)';
-        document.getElementById('addBatchTrackingInfo').innerHTML = '<strong>OFF:</strong> Simple batch — unlimited quantity, manual lending.';
+        document.getElementById('addBatchTrackingInfo').innerHTML = '<strong>OFF:</strong> Simple batch — unlimited quantity, quantity based lending.';
     }
 }
 function submitAddBatch() {
     var fd = new FormData();
     fd.append('batch_label', document.getElementById('ab_label').value);
+    fd.append('manufacturer', document.getElementById('ab_manufacturer').value);
     fd.append('quantity', document.getElementById('ab_qty').value);
     fd.append('price_per_unit', document.getElementById('ab_price').value);
     fd.append('purchase_date', document.getElementById('ab_date').value);
@@ -2860,297 +2990,74 @@ function submitAddBatch() {
         .catch(function(e) { alert('Error: ' + e); });
 }
 
-/* ── Edit Batch ── */
-function openEditBatchModal(batchId, label, qty, price, date, note, snTracking, followMain, batchLocId, batchRackId, batchDrawer) {
-    document.getElementById('eb_id').value = batchId;
-    document.getElementById('eb_label').value = label;
-    document.getElementById('eb_qty').value = qty;
-    document.getElementById('eb_price').value = price;
-    document.getElementById('eb_price2').value = price;
-    document.getElementById('eb_date').value = date;
-    document.getElementById('eb_note').value = note;
-    // Per-batch location
-    document.getElementById('eb_follow_main').checked = followMain !== false;
-    document.getElementById('eb_location_id').value = batchLocId || '';
-    document.getElementById('eb_storage_location_select').value = '';
-    batchUpdateStorageRackSelect('eb');
-    document.getElementById('eb_rack_id').value = batchRackId || '';
-    document.getElementById('eb_drawer').value = batchDrawer || '';
-    var ebIsDrawer = !!batchRackId;
-    document.getElementById('eb_type_drawer').checked = ebIsDrawer;
-    document.getElementById('eb_type_general').checked = !ebIsDrawer;
-    document.getElementById('eb_generalSection').style.display = ebIsDrawer ? 'none' : 'block';
-    document.getElementById('eb_drawerSection').style.display = ebIsDrawer ? 'block' : 'none';
-    batchUpdateDrawerGrid('eb');
-    ebToggleLocation();
-    // Pre-fill total fields
-    var displayQty = Math.max(1, parseFloat(qty) || 0);
-    var p = parseFloat(price) || 0;
-    document.getElementById('eb_total').value = (p * displayQty).toFixed(2);
-    document.getElementById('eb_total2').value = (p * displayQty).toFixed(2);
-    if (snTracking) {
-        document.getElementById('eb_qtySection').style.display = 'none';
-        document.getElementById('eb_priceOnlySection').style.display = 'block';
-        document.getElementById('eb_snInfo').innerHTML = '<i class="bi bi-upc-scan"></i> <strong>Tracking Enabled</strong> — Qty: ' + qty + '. Use Add/Delete in SN table to change quantity.';
-        document.getElementById('eb_snInfo').style.display = 'block';
-    } else {
-        document.getElementById('eb_qtySection').style.display = 'block';
-        document.getElementById('eb_priceOnlySection').style.display = 'none';
-        document.getElementById('eb_snInfo').innerHTML = '<i class="bi bi-upc-scan"></i> Tracking: <span class="badge bg-secondary">Disabled</span>';
-        document.getElementById('eb_snInfo').style.display = 'block';
-    }
-    new bootstrap.Modal(document.getElementById('editBatchModalDialog')).show();
-}
-function ebToggleLocation() {
-    var follow = document.getElementById('eb_follow_main').checked;
-    document.getElementById('eb_batchLocSection').style.display = follow ? 'none' : 'block';
-}
-function ebSwitchLocType() {
-    var isDrawer = document.getElementById('eb_type_drawer').checked;
-    document.getElementById('eb_generalSection').style.display = isDrawer ? 'none' : 'block';
-    document.getElementById('eb_drawerSection').style.display = isDrawer ? 'block' : 'none';
-    if (isDrawer) {
-        document.getElementById('eb_location_id').value = '';
-        batchUpdateDrawerGrid('eb');
-    } else {
-        document.getElementById('eb_rack_id').value = '';
-        document.getElementById('eb_drawer').value = '';
-        document.getElementById('eb_drawer_picker').style.display = 'none';
-    }
-}
-/* Auto-calc helpers for Edit Batch (non-SN) */
-function ebCalcFromQtyPrice() {
-    var qty = parseFloat(document.getElementById('eb_qty').value) || 0;
-    var price = parseFloat(document.getElementById('eb_price').value) || 0;
-    document.getElementById('eb_total').value = (price * Math.max(1, qty)).toFixed(2);
-}
-function ebCalcFromTotal() {
-    var qty = parseFloat(document.getElementById('eb_qty').value) || 0;
-    var total = parseFloat(document.getElementById('eb_total').value) || 0;
-    document.getElementById('eb_price').value = (total / Math.max(1, qty)).toFixed(4);
-}
-/* Auto-calc helpers for Edit Batch (SN-tracking, price-only) */
-function ebCalcFromPrice2() {
-    var price = parseFloat(document.getElementById('eb_price2').value) || 0;
-    document.getElementById('eb_total2').value = price.toFixed(2);
-}
-function ebCalcFromTotal2() {
-    var total = parseFloat(document.getElementById('eb_total2').value) || 0;
-    document.getElementById('eb_price2').value = total.toFixed(4);
-}
-function submitEditBatch() {
-    var batchId = document.getElementById('eb_id').value;
-    var fd = new FormData();
-    fd.append('batch_label', document.getElementById('eb_label').value);
-    var snTracking = document.getElementById('eb_qtySection').style.display === 'none';
-    if (snTracking) {
-        fd.append('quantity', document.getElementById('eb_qty').value);
-        fd.append('price_per_unit', document.getElementById('eb_price2').value);
-    } else {
-        fd.append('quantity', document.getElementById('eb_qty').value);
-        fd.append('price_per_unit', document.getElementById('eb_price').value);
-    }
-    fd.append('purchase_date', document.getElementById('eb_date').value);
-    fd.append('note', document.getElementById('eb_note').value);
-    if (document.getElementById('eb_follow_main').checked) {
-        fd.append('follow_main_location', 'on');
-    } else if (document.getElementById('eb_type_drawer').checked) {
-        fd.append('batch_rack_id', document.getElementById('eb_rack_id').value);
-        fd.append('batch_drawer', document.getElementById('eb_drawer').value);
-    } else {
-        fd.append('batch_location_id', document.getElementById('eb_location_id').value);
-    }
-    fetch('/item/{{ item.uuid }}/batch/' + batchId + '/edit', { method: 'POST', body: fd })
-        .then(function(r) {
-            if (r.ok || r.redirected) {
-                bootstrap.Modal.getInstance(document.getElementById('editBatchModalDialog')).hide();
-                lastOpenBatchId = batchId;
-                reloadKeepBatch();
-            } else {
-                alert('Error saving batch changes.');
-            }
-        })
-        .catch(function(e) { alert('Error: ' + e); });
-}
-
-/* ── Delete Batch ── */
-function deleteBatchJS(batchId, label) {
-    if (!confirm('Delete batch "' + label + '"?')) return;
-    fetch('/item/{{ item.uuid }}/batch/' + batchId + '/delete', { method: 'POST' })
-        .then(function(r) { if (r.redirected) { window.location.href = r.url; } else { reloadKeepBatch(); } })
-        .catch(function(e) { alert('Error: ' + e); });
-}
-
-/* ── Qty Transfer Modal ── */
-var currentTransferFromBatchId = null;
-function openTransferModal(batchId, availableQty) {
-    if (availableQty <= 0) {
-        alert('No available quantity to transfer. Please ensure items are not fully lent or used in a project.');
-        return;
-    }
-    currentTransferFromBatchId = batchId;
-    document.getElementById('transfer_from_batch_id').value = batchId;
-    var qtyInput = document.getElementById('transfer_qty_input');
-    qtyInput.max = availableQty;
-    qtyInput.value = 1;
-    document.getElementById('transfer_max_hint').textContent = '(Max available: ' + availableQty + ')';
-
-    var sel = document.getElementById('transfer_to_batch_id');
-    for (var i = 0; i < sel.options.length; i++) {
-        var opt = sel.options[i];
-        if (opt.value === "") continue;
-        var optId = parseInt(opt.value);
-        if (optId === batchId) {
-            opt.style.display = 'none';
-        } else {
-            opt.style.display = '';
-        }
-    }
-    sel.value = '';
-    new bootstrap.Modal(document.getElementById('transferModalDialog')).show();
-}
-
-function submitTransferBatch() {
-    var fromId = currentTransferFromBatchId;
-    var toId = document.getElementById('transfer_to_batch_id').value;
-    var qty = parseInt(document.getElementById('transfer_qty_input').value);
-    var maxQty = parseInt(document.getElementById('transfer_qty_input').max);
-
-    if (!toId) { alert('Select a destination batch.'); return; }
-    if (!qty || qty <= 0) { alert('Enter a valid quantity.'); return; }
-    if (qty > maxQty) { alert('Cannot transfer more than available quantity (' + maxQty + ').'); return; }
-
-    var fd = new FormData();
-    fd.append('from_batch_id', fromId);
-    fd.append('to_batch_id', toId);
-    fd.append('transfer_quantity', qty);
-
-    fetch('/item/{{ item.uuid }}/batch/transfer', { method: 'POST', body: fd })
-        .then(function(r) { reloadKeepBatch(); })
-        .catch(function(e) { alert('Error: ' + e); });
-}
-
-
 /* ── SN: Select all checkbox ── */
 function toggleAllSn(source, batchId) {
-    document.querySelectorAll('.sn-check-' + batchId).forEach(function(cb) { cb.checked = source.checked; });
+    document.querySelectorAll('.sn-check-' + batchId).forEach(function(cb) {
+        if (!cb.disabled) cb.checked = source.checked;
+    });
 }
 
-/* ── SN: Inline edit (double-click) ── */
-function inlineEdit(span, snId, field, currentVal, batchId) {
-    var td = span.parentElement;
-    var val = currentVal === '-' ? '' : currentVal;
+/* ── SN: Inline edit (double-click) — local state ── */
+function inlineEdit(batchId, snId, field) {
+    var s = _snState[batchId];
+    if (!s) return;
+    var row = s.rows.find(function(r) { return r.id === snId; });
+    if (!row) return;
+    var currentVal = field === 'sn' ? (row._editSn !== null ? row._editSn : row.sn)
+                                    : (row._editInfo !== null ? row._editInfo : row.info);
     var maxLen = field === 'info' ? 32 : 200;
+    var cellId = (field === 'sn' ? 'snVal' : 'infoVal') + snId;
+    var span = document.getElementById(cellId);
+    if (!span) return;
+    var td = span.parentElement;
     td.innerHTML = '<div class="d-flex align-items-center gap-1">' +
-        '<input type="text" class="form-control form-control-sm" id="inlineInput' + field + snId + '" value="' + val.replace(/"/g,'&quot;') + '" maxlength="' + maxLen + '" style="min-width:70px">' +
-        '<button class="btn btn-success btn-sm px-1 py-0" onclick="saveInlineEdit(' + snId + ',\'' + field + '\')" title="Save"><i class="bi bi-check-lg"></i></button>' +
-        '<button class="btn btn-secondary btn-sm px-1 py-0" onclick="reloadKeepBatch()" title="Cancel"><i class="bi bi-x-lg"></i></button>' +
+        '<input type="text" class="form-control form-control-sm" id="inlineInp_' + snId + '_' + field + '" value="' + _esc(currentVal === '-' ? '' : currentVal) + '" maxlength="' + maxLen + '" style="min-width:70px">' +
+        '<button class="btn btn-success btn-sm px-1 py-0" onclick="saveInlineEdit(' + batchId + ',' + snId + ',\'' + field + '\')" title="Save"><i class="bi bi-check-lg"></i></button>' +
+        '<button class="btn btn-secondary btn-sm px-1 py-0" onclick="_snRender(' + batchId + ')" title="Cancel"><i class="bi bi-x-lg"></i></button>' +
         '</div>';
-    document.getElementById('inlineInput' + field + snId).focus();
+    document.getElementById('inlineInp_' + snId + '_' + field).focus();
 }
-function saveInlineEdit(snId, field) {
-    var input = document.getElementById('inlineInput' + field + snId);
-    if (!input) return;
-    fetch('{{ url_for("batch.inline_update_sn", uuid=item.uuid) }}', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sn_id: snId, field: field, value: input.value.trim() })
-    }).then(function(r) { return r.json(); }).then(function(d) {
-        if (d.success) reloadKeepBatch(); else alert(d.message || 'Error');
-    }).catch(function(e) { alert('Error: ' + e); });
-}
-
-/* ── SN: Delete selected ── */
-function deleteSelectedSn(batchId) {
-    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
-    if (checked.length === 0) { alert('Select at least one serial number.'); return; }
-    if (!confirm('Delete ' + checked.length + ' selected serial number(s)?')) return;
-    var ids = [];
-    checked.forEach(function(cb) { ids.push(parseInt(cb.value)); });
-    fetch('{{ url_for("batch.delete_selected_sn", uuid=item.uuid) }}', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sn_ids: ids, batch_id: batchId })
-    }).then(function(r) { return r.json(); }).then(function(d) {
-        if (d.success) reloadKeepBatch(); else alert(d.message || 'Error');
-    }).catch(function(e) { alert('Error: ' + e); });
+function saveInlineEdit(batchId, snId, field) {
+    var inp = document.getElementById('inlineInp_' + snId + '_' + field);
+    if (!inp) return;
+    var val = field === 'info' ? inp.value.trim().slice(0,32) : inp.value.trim().slice(0,200);
+    var s = _snState[batchId];
+    var row = s ? s.rows.find(function(r) { return r.id === snId; }) : null;
+    if (!row) return;
+    if (field === 'sn') row._editSn = val;
+    else row._editInfo = val;
+    row._dirty = true;
+    _snRender(batchId);
 }
 
-/* ── SN: Add to batch ── */
-function addSnToBatch(batchId, currentQty) {
+
+/* ── SN: Add to batch — local state ── */
+function addSnToBatch(batchId) {
     var input = document.getElementById('addSnQty' + batchId);
-    var qty = parseInt(input.value) || 0;
+    var qty = parseInt(input ? input.value : 1) || 0;
     if (qty < 1) { alert('Enter at least 1.'); return; }
-    if (currentQty + qty > 100) { alert('Max 100 per batch. Can add up to ' + (100 - currentQty) + '.'); return; }
-    fetch('{{ url_for("batch.add_sn_to_batch", uuid=item.uuid) }}', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ batch_id: batchId, quantity: qty })
-    }).then(function(r) { return r.json(); }).then(function(d) {
-        if (d.success) reloadKeepBatch(); else alert(d.message || 'Error');
-    }).catch(function(e) { alert('Error: ' + e); });
-}
-
-/* ── SN: Remap ISN ── */
-function remapIsn(batchId) {
-    if (!confirm('Regenerate ISN sequence for this batch? Existing ISN values will be replaced. SN, Info, Lend to will be kept.')) return;
-    fetch('{{ url_for("batch.remap_isn", uuid=item.uuid) }}', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ batch_id: batchId })
-    }).then(function(r) { return r.json(); }).then(function(d) {
-        if (d.success) reloadKeepBatch(); else alert(d.message || 'Error');
-    }).catch(function(e) { alert('Error: ' + e); });
-}
-
-/* ── SN: Transfer Selected SNs Modal ── */
-var transferSnFromBatchId = null;
-var transferSnIds = [];
-function openTransferSnModal(batchId) {
-    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
-    if (checked.length === 0) { alert('Please select at least one serial number.'); return; }
-    transferSnFromBatchId = batchId;
-    transferSnIds = [];
-    checked.forEach(function(cb) { transferSnIds.push(parseInt(cb.value)); });
-    document.getElementById('transferSnCount').textContent = transferSnIds.length;
-
-    var sel = document.getElementById('transferSnTarget');
-    for (var i = 0; i < sel.options.length; i++) {
-        var opt = sel.options[i];
-        if (opt.value === "") continue;
-        var optId = parseInt(opt.value);
-        var isTracking = opt.dataset.tracking === '1';
-        // Hide self, AND hide non-tracking targets! Tracking Enable to Non Tracking blocked.
-        if (optId === batchId || !isTracking) {
-            opt.style.display = 'none';
-        } else {
-            opt.style.display = '';
-        }
+    var s = _snState[batchId];
+    if (!s) return;
+    var activeCount = s.rows.filter(function(r) { return !r.is_deleted && !r._del; }).length;
+    if (activeCount + qty > 100) { alert('Max 100 active per batch. Can add up to ' + (100 - activeCount) + '.'); return; }
+    for (var i = 0; i < qty; i++) {
+        var tid = s._nextTempId--;
+        s.rows.push({ id: tid, seq: null, isn: '', sn: '', info: '',
+            lend_to_id: null, lend_to_type: '', lend_display: '', lend_start: '', lend_end: '',
+            lend_notify: false, lend_days: 3, lend_note: '',
+            is_deleted: false, deleted_reason: '', deleted_by: '', deleted_at: '',
+            _add: true, _del: false, _del_reason: '', _dirty: false, _lend_dirty: false,
+            _editSn: null, _editInfo: null });
     }
-    sel.value = '';
-    new bootstrap.Modal(document.getElementById('transferSnModalDialog')).show();
+    _snRender(batchId);
 }
-
-function doTransferSn() {
-    var targetId = parseInt(document.getElementById('transferSnTarget').value);
-    if (!targetId) { alert('Select a destination batch.'); return; }
-    if (targetId === transferSnFromBatchId) { alert('Cannot transfer to same batch.'); return; }
-
-    fetch('{{ url_for("batch.transfer_selected_sn", uuid=item.uuid) }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sn_ids: transferSnIds, from_batch_id: transferSnFromBatchId, to_batch_id: targetId })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (data.success) reloadKeepBatch();
-        else alert(data.message || 'Error');
-    })
-    .catch(function(e) { alert('Error: ' + e); });
-}
-
 
 /* ── SN: Bulk Edit Details modal ── */
 var editDetailsSelectedIds = [];
 function openEditDetailsModal(batchId) {
-    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
+    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked:not([disabled])');
     if (checked.length === 0) { alert('Select at least one serial number.'); return; }
+    _snBulkEditBatchId = batchId;
     editDetailsSelectedIds = [];
     checked.forEach(function(cb) { editDetailsSelectedIds.push(parseInt(cb.value)); });
     document.getElementById('editDetailsCount').textContent = editDetailsSelectedIds.length;
@@ -3166,222 +3073,25 @@ function clearBulkField(inputId) {
     inp.value = ''; inp.dataset.cleared = 'true'; inp.placeholder = '(will be cleared)'; inp.classList.add('border-danger');
 }
 function saveEditDetails() {
-    var payload = { sn_ids: editDetailsSelectedIds, fields: {} };
     var snVal = document.getElementById('bulkSnEdit');
     var infoVal = document.getElementById('bulkInfoEdit');
-    if (snVal.value.trim() !== '' || snVal.dataset.cleared === 'true') payload.fields.sn = snVal.value.trim();
-    if (infoVal.value.trim() !== '' || infoVal.dataset.cleared === 'true') payload.fields.info = infoVal.value.trim();
-    if (Object.keys(payload.fields).length === 0) { alert('No changes. Enter a value or use Clear.'); return; }
-    fetch('{{ url_for("batch.bulk_update_sn", uuid=item.uuid) }}', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    }).then(function(r) { return r.json(); }).then(function(d) {
-        if (d.success) reloadKeepBatch(); else alert(d.message || 'Error');
-    }).catch(function(e) { alert('Error: ' + e); });
+    var hasSn   = snVal.value.trim() !== '' || snVal.dataset.cleared === 'true';
+    var hasInfo = infoVal.value.trim() !== '' || infoVal.dataset.cleared === 'true';
+    if (!hasSn && !hasInfo) { alert('No changes. Enter a value or use Clear.'); return; }
+    var batchId = _snBulkEditBatchId;
+    var s = _snState[batchId];
+    if (!s) return;
+    var ids = editDetailsSelectedIds;
+    s.rows.forEach(function(row) {
+        if (ids.indexOf(row.id) === -1 || row.is_deleted || row._del) return;
+        if (hasSn)   { row._editSn   = snVal.dataset.cleared === 'true'   ? '' : snVal.value.trim().slice(0,200); row._dirty = true; }
+        if (hasInfo) { row._editInfo = infoVal.dataset.cleared === 'true' ? '' : infoVal.value.trim().slice(0,32); row._dirty = true; }
+    });
+    bootstrap.Modal.getInstance(document.getElementById('editDetailsModalDialog')).hide();
+    _snRender(batchId);
 }
+var _snBulkEditBatchId = null;
 
-
-/* ── Lending Management Modal ── */
-{% if item is defined %}
-var _batchLendData = {{ batch_lend_data|tojson if batch_lend_data is defined else '{}'|safe }};
-{% else %}
-var _batchLendData = {};
-{% endif %}
-var _lmBatchId = null;
-var _lmBatchQty = 0;
-var _lmLendRecords = [];
-var _lrMode = 'add';
-var _lrEditIdx = -1;
-var _lrSearchTimer = null;
-
-function openLendManageModal(batchId, batchQty) {
-    _lmBatchId = batchId;
-    _lmBatchQty = batchQty;
-    _lmLendRecords = JSON.parse(JSON.stringify(_batchLendData[batchId] || []));
-    renderLendRecordsTable();
-    cancelLrForm();
-    new bootstrap.Modal(document.getElementById('lendManageModal')).show();
-}
-
-function submitLendManage() {
-    var fd = new FormData();
-    fd.append('lend_records', JSON.stringify(_lmLendRecords));
-    fetch('/item/{{ item.uuid if item is defined else "" }}/batch/' + _lmBatchId + '/manage_lend', {
-        method: 'POST', body: fd
-    }).then(function(r) { return r.json(); })
-    .then(function(d) {
-        if (d.success) {
-            _batchLendData[_lmBatchId] = JSON.parse(JSON.stringify(_lmLendRecords));
-            bootstrap.Modal.getInstance(document.getElementById('lendManageModal')).hide();
-            reloadKeepBatch();
-        } else { alert(d.message || 'Error saving lending records.'); }
-    }).catch(function(e) { alert('Error: ' + e); });
-}
-
-function renderLendRecordsTable() {
-    var el = document.getElementById('lm_lend_records_table');
-    if (!el) return;
-    if (!_lmLendRecords.length) {
-        el.innerHTML = '<div class="text-muted small p-1">No lending records yet.</div>';
-        return;
-    }
-    var rows = _lmLendRecords.map(function(r, i) {
-        var label = (r.label || '—').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        var notify = r.notify ? '<i class="bi bi-bell-fill text-warning" title="Remind ' + (r.days||3) + ' days before"></i>' : '—';
-        return '<tr>' +
-            '<td class="small">' + label + '</td>' +
-            '<td class="small text-center">' + (r.qty||1) + '</td>' +
-            '<td class="small">' + (r.start||'—') + '</td>' +
-            '<td class="small">' + (r.end||'—') + '</td>' +
-            '<td class="text-center">' + notify + '</td>' +
-            '<td class="text-end text-nowrap">' +
-            '<button type="button" class="btn btn-link btn-sm p-0 me-1 text-primary" onclick="editLendRecord(' + i + ')"><i class="bi bi-pencil"></i></button>' +
-            '<button type="button" class="btn btn-link btn-sm p-0 text-danger" onclick="deleteLendRecord(' + i + ')"><i class="bi bi-trash"></i></button>' +
-            '</td></tr>';
-    }).join('');
-    el.innerHTML = '<table class="table table-sm table-bordered mb-0 small">' +
-        '<thead class="table-light"><tr><th>Lend To</th><th class="text-center">Qty</th><th>Start</th><th>End</th><th class="text-center"><i class="bi bi-bell" title="Notify"></i></th><th></th></tr></thead>' +
-        '<tbody>' + rows + '</tbody></table>';
-}
-
-function showLrForm(mode) {
-    _lrMode = mode;
-    if (mode === 'add') {
-        _lrEditIdx = -1;
-        document.getElementById('lr_to_type').value = '';
-        document.getElementById('lr_to_id').value = '';
-        document.getElementById('lr_to_label').textContent = 'Click to search contact...';
-        document.getElementById('lr_to_label').className = 'small text-muted';
-        document.getElementById('lr_to_clear').style.display = 'none';
-        document.getElementById('lr_qty').value = 1;
-        document.getElementById('lr_start').value = '';
-        document.getElementById('lr_end').value = '';
-        document.getElementById('lr_notify').checked = false;
-        document.getElementById('lr_notify_days').value = 3;
-        document.getElementById('lr_notify_days_section').style.display = 'none';
-        document.getElementById('lr_search_panel').style.display = 'none';
-        document.getElementById('lr_save_btn').innerHTML = '<i class="bi bi-plus"></i> Add';
-    }
-    var slot = document.getElementById('lm_lr_form_slot');
-    var form = document.getElementById('lr_shared_form');
-    slot.appendChild(form);
-    form.style.display = '';
-}
-
-function editLendRecord(idx) {
-    var r = _lmLendRecords[idx];
-    if (!r) return;
-    _lrMode = 'edit';
-    _lrEditIdx = idx;
-    document.getElementById('lr_to_type').value = r.type || '';
-    document.getElementById('lr_to_id').value = r.contact_id || '';
-    var lbl = document.getElementById('lr_to_label');
-    if (r.label) { lbl.textContent = r.label; lbl.className = 'small'; document.getElementById('lr_to_clear').style.display = ''; }
-    else { lbl.textContent = 'Click to search contact...'; lbl.className = 'small text-muted'; document.getElementById('lr_to_clear').style.display = 'none'; }
-    document.getElementById('lr_qty').value = r.qty || 1;
-    document.getElementById('lr_start').value = r.start || '';
-    document.getElementById('lr_end').value = r.end || '';
-    document.getElementById('lr_notify').checked = !!r.notify;
-    document.getElementById('lr_notify_days').value = r.days || 3;
-    document.getElementById('lr_notify_days_section').style.display = r.notify ? '' : 'none';
-    document.getElementById('lr_search_panel').style.display = 'none';
-    document.getElementById('lr_save_btn').innerHTML = '<i class="bi bi-save"></i> Update';
-    var slot = document.getElementById('lm_lr_form_slot');
-    var form = document.getElementById('lr_shared_form');
-    slot.appendChild(form);
-    form.style.display = '';
-}
-
-function deleteLendRecord(idx) {
-    _lmLendRecords.splice(idx, 1);
-    renderLendRecordsTable();
-}
-
-function cancelLrForm() {
-    document.getElementById('lr_shared_form').style.display = 'none';
-    document.getElementById('lr_search_panel').style.display = 'none';
-}
-
-function saveLrForm() {
-    var lbl = document.getElementById('lr_to_label');
-    var label = (lbl.className.indexOf('text-muted') !== -1) ? '' : lbl.textContent;
-    var record = {
-        type: document.getElementById('lr_to_type').value,
-        contact_id: document.getElementById('lr_to_id').value ? parseInt(document.getElementById('lr_to_id').value) : null,
-        label: label,
-        qty: parseInt(document.getElementById('lr_qty').value) || 1,
-        start: document.getElementById('lr_start').value,
-        end: document.getElementById('lr_end').value,
-        notify: document.getElementById('lr_notify').checked,
-        days: parseInt(document.getElementById('lr_notify_days').value) || 3
-    };
-    if (_lrMode === 'edit' && _lrEditIdx >= 0) _lmLendRecords[_lrEditIdx] = record;
-    else _lmLendRecords.push(record);
-    cancelLrForm();
-    renderLendRecordsTable();
-}
-
-function toggleLrSearch() {
-    var panel = document.getElementById('lr_search_panel');
-    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
-    panel.style.display = '';
-    document.getElementById('lr_search_input').value = '';
-    document.getElementById('lr_search_input').focus();
-    doLrSearch();
-}
-
-function doLrSearch() {
-    clearTimeout(_lrSearchTimer);
-    _lrSearchTimer = setTimeout(function() {
-        var q = document.getElementById('lr_search_input').value.trim();
-        var resultsDiv = document.getElementById('lr_search_results');
-        resultsDiv.innerHTML = '<div class="text-muted small p-1">Loading...</div>';
-        fetch('/api/contacts/all?q=' + encodeURIComponent(q))
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (!data.length) { resultsDiv.innerHTML = '<div class="text-muted small p-1">No contacts found.</div>'; return; }
-                var icons = {user:'bi-person-circle', person:'bi-person', organization:'bi-building', group:'bi-people'};
-                var badges = {user:'bg-primary', person:'bg-secondary', organization:'bg-success', group:'bg-info'};
-                resultsDiv.innerHTML = data.map(function(c) {
-                    var icon = icons[c.type] || 'bi-person';
-                    var badge = badges[c.type] || 'bg-secondary';
-                    var lbl = (c.label||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-                    var extra = c.extra ? '<small class="text-muted d-block">' + c.extra.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</small>' : '';
-                    var rawLabel = (c.label||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-                    return '<div class="d-flex align-items-center gap-2 p-1 border-bottom" style="cursor:pointer;" ' +
-                        'onclick="selectLrContact(\'' + c.type + '\',' + c.id + ',\'' + rawLabel + '\')">' +
-                        '<i class="bi ' + icon + ' text-muted small"></i>' +
-                        '<div class="flex-grow-1"><div class="small">' + lbl + '</div>' + extra + '</div>' +
-                        '<span class="badge ' + badge + '" style="font-size:0.65rem">' + c.type + '</span></div>';
-                }).join('');
-            })
-            .catch(function() { resultsDiv.innerHTML = '<div class="text-danger small p-1">Search failed.</div>'; });
-    }, 300);
-}
-
-function selectLrContact(type, id, label) {
-    document.getElementById('lr_to_type').value = type;
-    document.getElementById('lr_to_id').value = id;
-    var lbl = document.getElementById('lr_to_label');
-    lbl.textContent = label;
-    lbl.className = 'small';
-    document.getElementById('lr_to_clear').style.display = '';
-    document.getElementById('lr_search_panel').style.display = 'none';
-}
-
-function clearLrContact() {
-    document.getElementById('lr_to_type').value = '';
-    document.getElementById('lr_to_id').value = '';
-    var lbl = document.getElementById('lr_to_label');
-    lbl.textContent = 'Click to search contact...';
-    lbl.className = 'small text-muted';
-    document.getElementById('lr_to_clear').style.display = 'none';
-}
-
-function toggleLrNotify() {
-    document.getElementById('lr_notify_days_section').style.display =
-        document.getElementById('lr_notify').checked ? '' : 'none';
-}
 
 /* ── SN Lend Shared Form (snlend + snbulk) ── */
 var _snlActiveBatchId = null;
@@ -3393,7 +3103,7 @@ function _snlMoveForm(slotId) {
     slot.appendChild(form);
     form.style.display = '';
 }
-function _snlResetForm(lendType, lendId, lendLabel, lendStart, lendEnd, lendNotify, lendDays) {
+function _snlResetForm(lendType, lendId, lendLabel, lendStart, lendEnd, lendNotify, lendDays, lendNote) {
     document.getElementById('snl_to_type').value = lendType || '';
     document.getElementById('snl_to_id').value = lendId || '';
     var lbl = document.getElementById('snl_to_label');
@@ -3406,6 +3116,7 @@ function _snlResetForm(lendType, lendId, lendLabel, lendStart, lendEnd, lendNoti
     }
     document.getElementById('snl_start').value = lendStart || '';
     document.getElementById('snl_end').value = lendEnd || '';
+    document.getElementById('snl_note').value = lendNote || '';
     document.getElementById('snl_notify').checked = !!lendNotify;
     document.getElementById('snl_notify_days').value = lendDays || 3;
     document.getElementById('snl_notify_days_section').style.display = lendNotify ? '' : 'none';
@@ -3468,80 +3179,179 @@ function toggleSnlNotify() {
 }
 
 /* ── Per-SN Lend Modal ── */
-function openSnLendModal(snId, lendType, lendId, lendLabel, lendStart, lendEnd, lendNotify, lendDays) {
+function openSnLendModal(batchId, snId) {
+    _snlActiveBatchId = batchId;
     document.getElementById('snLend_sn_id').value = snId;
-    document.getElementById('snLend_sn_ref').textContent = 'SN #' + snId;
+    var s = _snState[batchId];
+    var row = s ? s.rows.find(function(r) { return r.id === snId; }) : null;
+    var ref = row ? (row.sn || ('ISN: ' + (row.isn || '#' + snId))) : ('#' + snId);
+    document.getElementById('snLend_sn_ref').textContent = ref;
     _snlMoveForm('snlend_form_slot');
-    _snlResetForm(lendType, lendId, lendLabel, lendStart, lendEnd, lendNotify, lendDays);
+    if (row) {
+        _snlResetForm(row.lend_to_type, row.lend_to_id, row.lend_display,
+                      row.lend_start, row.lend_end, row.lend_notify, row.lend_days, row.lend_note);
+    } else {
+        _snlResetForm('', '', '', '', '', false, 3, '');
+    }
     new bootstrap.Modal(document.getElementById('snLendModal')).show();
 }
 function clearSnlModal() {
-    _snlResetForm('', '', '', '', '', false, 3);
+    _snlResetForm('', '', '', '', '', false, 3, '');
 }
 function submitSnLend() {
     var snId = parseInt(document.getElementById('snLend_sn_id').value);
     var lendIdRaw = document.getElementById('snl_to_id').value;
-    var payload = {
-        sn_id: snId, field: 'lend',
-        lend_to_type: document.getElementById('snl_to_type').value,
-        lend_to_id: lendIdRaw ? parseInt(lendIdRaw) : null,
-        lend_start: document.getElementById('snl_start').value,
-        lend_end: document.getElementById('snl_end').value,
-        lend_notify_enabled: document.getElementById('snl_notify').checked,
-        lend_notify_before_days: parseInt(document.getElementById('snl_notify_days').value) || 3
-    };
-    fetch('{{ url_for("batch.inline_update_sn", uuid=item.uuid) }}', {
-        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
-    }).then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (data.success) {
-            var lendVal = document.getElementById('lendVal' + snId);
-            if (lendVal) lendVal.textContent = data.display || '-';
-            bootstrap.Modal.getInstance(document.getElementById('snLendModal')).hide();
-        } else { alert('Error: ' + data.message); }
-    }).catch(function(e) { alert('Error: ' + e); });
+    var lendId = lendIdRaw ? parseInt(lendIdRaw) : null;
+    if (!lendId) {
+        document.getElementById('snl_to_label').style.outline = '2px solid red';
+        setTimeout(function() { document.getElementById('snl_to_label').style.outline = ''; }, 1800);
+        alert('Lend to contact is required.');
+        return;
+    }
+    var batchId = _snlActiveBatchId;
+    var s = _snState[batchId];
+    var row = s ? s.rows.find(function(r) { return r.id === snId; }) : null;
+    if (row) {
+        row.lend_to_type   = document.getElementById('snl_to_type').value;
+        row.lend_to_id     = lendId;
+        row.lend_display   = document.getElementById('snl_to_label').textContent.trim();
+        row.lend_start     = document.getElementById('snl_start').value;
+        row.lend_end       = document.getElementById('snl_end').value;
+        row.lend_note      = document.getElementById('snl_note').value.trim().slice(0,128);
+        row.lend_notify    = document.getElementById('snl_notify').checked;
+        row.lend_days      = parseInt(document.getElementById('snl_notify_days').value) || 3;
+        row._lend_dirty    = true;
+    }
+    bootstrap.Modal.getInstance(document.getElementById('snLendModal')).hide();
+    _snRender(batchId);
 }
 
-/* ── Bulk SN Lend Modal ── */
-var _snBulkBatchId = null;
-function openSnBulkLendModal(batchId) {
-    _snBulkBatchId = batchId;
-    var checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
-    if (!checked.length) { alert('Select at least one serial number first.'); return; }
-    document.getElementById('snBulkLend_info').textContent = checked.length + ' SN(s) selected';
-    _snlMoveForm('snbulk_form_slot');
-    _snlResetForm('', '', '', '', '', false, 3);
-    new bootstrap.Modal(document.getElementById('snBulkLendModal')).show();
+/* ══════════════════════════════════════════════════════════
+   SN STATE MANAGER — all changes local until Save SN Changes
+   ══════════════════════════════════════════════════════════ */
+{% if item is defined %}
+var _snAllData = {{ sn_all_data|tojson if sn_all_data is defined else '{}'|safe }};
+{% else %}
+var _snAllData = {};
+{% endif %}
+var _snState = {};   // batchId -> { rows: [...], _nextTempId: -1 }
+
+function _esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-function submitSnBulkLend(clearMode) {
-    var checked = document.querySelectorAll('.sn-check-' + _snBulkBatchId + ':checked');
-    if (!checked.length) { alert('No SNs selected.'); return; }
-    var snIds = Array.from(checked).map(function(cb) { return parseInt(cb.value); });
-    var lendData;
-    if (clearMode) {
-        lendData = null;
-    } else {
-        var lendIdRaw = document.getElementById('snl_to_id').value;
-        lendData = {
-            type: document.getElementById('snl_to_type').value,
-            id: lendIdRaw ? parseInt(lendIdRaw) : null,
-            start: document.getElementById('snl_start').value || '',
-            end: document.getElementById('snl_end').value || '',
-            notify: document.getElementById('snl_notify').checked,
-            days: parseInt(document.getElementById('snl_notify_days').value) || 3
-        };
+
+function _snInit(batchId) {
+    var rows = JSON.parse(JSON.stringify(_snAllData[batchId] || []));
+    rows.forEach(function(r) {
+        r._add=false; r._del=false; r._del_reason=''; r._dirty=false;
+        r._lend_dirty=false; r._editSn=null; r._editInfo=null;
+    });
+    _snState[batchId] = { rows: rows, _nextTempId: -1 };
+    _snRender(batchId);
+}
+
+function _snHasChanges(batchId) {
+    var s = _snState[batchId]; if (!s) return false;
+    return s.rows.some(function(r) { return r._add||r._del||r._dirty||r._lend_dirty; });
+}
+
+function _updatePendingBanner() {
+    var banner = document.getElementById('pendingChangesBanner');
+    if (!banner) return;
+    var hasSnChanges = Object.keys(_snState||{}).some(function(bid){ return _snHasChanges(parseInt(bid)); });
+    banner.classList.toggle('d-none', !hasSnChanges);
+}
+
+function _snUpdateSaveBtn(batchId) {
+    var has = _snHasChanges(batchId);
+    var badge = document.getElementById('snUnsavedBadge_' + batchId);
+    if (badge) badge.classList.toggle('d-none', !has);
+    _updatePendingBanner();
+}
+
+function _snRender(batchId) {
+    var s = _snState[batchId];
+    var tbody = document.getElementById('snTableBody_' + batchId);
+    if (!s || !tbody) return;
+    var html = '';
+    s.rows.forEach(function(r) {
+        var rowCls = '', rowStyle = '', cbDisabled = '', statusBadge = '';
+        if (r.is_deleted) {
+            rowCls = 'table-secondary'; rowStyle = 'opacity:0.55;text-decoration:line-through'; cbDisabled = '';
+            var title = 'Removed by ' + _esc(r.deleted_by||'unknown') + ' on ' + _esc(r.deleted_at||'?');
+            if (r.deleted_reason) title += ' — ' + _esc(r.deleted_reason);
+            statusBadge = '<span class="badge bg-danger" title="' + title + '">Removed</span>';
+            if (r.deleted_reason) statusBadge += '<div class="text-muted" style="font-size:0.72rem;text-decoration:none">' + _esc(r.deleted_reason.slice(0,40)) + (r.deleted_reason.length>40?'…':'') + '</div>';
+        } else if (r._del) {
+            rowCls = 'table-danger'; rowStyle = 'opacity:0.7;text-decoration:line-through'; cbDisabled = 'disabled';
+            statusBadge = '<span class="badge bg-danger">Pending Remove</span>';
+            if (r._del_reason) statusBadge += '<div class="text-muted" style="font-size:0.72rem;text-decoration:none">' + _esc(r._del_reason.slice(0,40)) + '…' + '</div>';
+        } else if (r._add) {
+            rowCls = 'table-info'; rowStyle = ''; cbDisabled = 'disabled';
+            statusBadge = '<span class="badge bg-info text-dark">Pending Add</span>';
+        } else if (r.lend_to_id) {
+            statusBadge = '<span class="badge bg-warning text-dark">Lending</span>';
+        } else {
+            statusBadge = '<span class="badge bg-success">Active</span>';
+        }
+        var snDisplay  = r._editSn  !== null ? r._editSn  : (r.sn  || '-');
+        var infoDisplay= r._editInfo!== null ? r._editInfo: (r.info || '-');
+        var lendDisplay= r.lend_display || '-';
+        var seqDisplay = r.seq !== null ? r.seq : '—';
+        var isnDisplay = r.isn ? r.isn : '(assigned on save)';
+        var canEdit = !r.is_deleted && !r._del && !r._add;
+        var snCell   = canEdit ? '<span id="snVal'  +r.id+'" ondblclick="inlineEdit('+batchId+','+r.id+',\'sn\')">'  +_esc(snDisplay)  +'</span>' : _esc(snDisplay);
+        var infoCell = canEdit ? '<span id="infoVal'+r.id+'" ondblclick="inlineEdit('+batchId+','+r.id+',\'info\')">' +_esc(infoDisplay)+'</span>' : _esc(infoDisplay);
+        var lendCell = (canEdit && r.lend_to_id) ? '<span id="lendVal'+r.id+'" style="cursor:pointer" onclick="openSnLendModal('+batchId+','+r.id+')">' +_esc(lendDisplay)+'</span>'
+                     : (canEdit ? '<span id="lendVal'+r.id+'" class="text-muted" style="cursor:pointer" onclick="openSnLendModal('+batchId+','+r.id+')">(click to lend)</span>' : '-');
+        html += '<tr class="'+rowCls+'" style="'+rowStyle+'">' +
+            '<td><input type="checkbox" class="form-check-input sn-check-'+batchId+'" value="'+r.id+'"'+(cbDisabled?' '+cbDisabled:'')+('></td>') +
+            '<td>' + seqDisplay + '</td>' +
+            '<td>' + snCell + '</td>' +
+            '<td><code style="font-size:0.78rem">'+_esc(isnDisplay)+'</code></td>' +
+            '<td>' + infoCell + '</td>' +
+            '<td>-</td>' +
+            '<td>' + lendCell + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '</tr>';
+    });
+    tbody.innerHTML = html;
+    _snUpdateSaveBtn(batchId);
+}
+
+
+document.addEventListener('DOMContentLoaded', function() {
+    Object.keys(_snAllData).forEach(function(batchId) {
+        _snInit(parseInt(batchId));
+    });
+
+    var form = document.getElementById('itemForm');
+    if (form) {
+        form.addEventListener('submit', function() {
+            // Serialize all pending SN changes into hidden field
+            var snChanges = {};
+            Object.keys(_snState).forEach(function(bid) {
+                var batchId = parseInt(bid);
+                if (!_snHasChanges(batchId)) return;
+                var s = _snState[batchId];
+                snChanges[batchId] = {
+                    adds: s.rows.filter(function(r){ return r._add; }).length,
+                    deletes: s.rows.filter(function(r){ return r._del; }).map(function(r){ return {sn_id:r.id, reason:r._del_reason}; }),
+                    edits: s.rows.filter(function(r){ return r._dirty && !r._add && !r._del; }).map(function(r){
+                        return {sn_id:r.id, sn:r._editSn !== null ? r._editSn : r.sn, info:r._editInfo !== null ? r._editInfo : r.info};
+                    }),
+                    lend_changes: s.rows.filter(function(r){ return r._lend_dirty && !r._add && !r._del; }).map(function(r){
+                        return {sn_id:r.id, lend_to_type:r.lend_to_type, lend_to_id:r.lend_to_id,
+                                lend_start:r.lend_start, lend_end:r.lend_end, lend_note:r.lend_note,
+                                lend_notify:r.lend_notify, lend_days:r.lend_days};
+                    })
+                };
+            });
+            var snField = document.getElementById('pending_sn_changes');
+            if (snField) snField.value = JSON.stringify(snChanges);
+        });
     }
-    var payload = { sn_ids: snIds, fields: { lend: lendData } };
-    fetch('{{ url_for("batch.bulk_update_sn", uuid=item.uuid) }}', {
-        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
-    }).then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (data.success) {
-            bootstrap.Modal.getInstance(document.getElementById('snBulkLendModal')).hide();
-            reloadKeepBatch();
-        } else { alert(data.message || 'Error'); }
-    }).catch(function(e) { alert('Error: ' + e); });
-}
+});
 </script>
 
 <div class="modal fade" id="editDetailsModalDialog" tabindex="-1">
@@ -3567,9 +3377,6 @@ function submitSnBulkLend(clearMode) {
                         <button class="btn btn-outline-danger" type="button" onclick="clearBulkField('bulkInfoEdit')"><i class="bi bi-x-circle"></i> Clear</button>
                     </div>
                 </div>
-                <div class="alert alert-info py-1 px-2 small mb-0">
-                    <i class="bi bi-info-circle"></i> To set lending, use the <strong>Manage Lending</strong> button in the batch toolbar.
-                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -3579,71 +3386,7 @@ function submitSnBulkLend(clearMode) {
     </div>
 </div>
 
-<div class="modal fade" id="transferModalDialog" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Transfer Between Batches</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="transfer_from_batch_id">
-                <div class="alert alert-info p-2 small">
-                    <i class="bi bi-info-circle"></i> Transfer non-tracked batch quantities. Max qty restricted to actual available components.
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">To Batch</label>
-                    <select class="form-select" id="transfer_to_batch_id">
-                        <option value="">-- Select Destination Batch --</option>
-                        {% for b in item.batches %}
-                        <option value="{{ b.id }}">{{ b.get_display_label() }} (Qty: {{ b.quantity }}){% if b.sn_tracking_enabled %} [Tracking]{% endif %}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Transfer Quantity <span id="transfer_max_hint" class="text-muted"></span></label>
-                    <input type="number" class="form-control" id="transfer_qty_input" min="1" value="1">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-info" onclick="submitTransferBatch()"><i class="bi bi-arrow-left-right"></i> Transfer</button>
-            </div>
-        </div>
-    </div>
-</div>
 
-<div class="modal fade" id="transferSnModalDialog" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Transfer Selected Serial Numbers</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p class="text-muted small mb-2">Moving <strong><span id="transferSnCount">0</span></strong> selected item(s). ISN kept as-is (renamed only if collision detected).</p>
-                <div class="alert alert-info p-2 small">
-                    <i class="bi bi-info-circle"></i> Serial numbers can only be transferred to batches with tracking enabled.
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Transfer to Batch</label>
-                    <select class="form-select" id="transferSnTarget">
-                        <option value="">-- Select Destination Batch --</option>
-                        {% for b in item.batches %}
-                        <option value="{{ b.id }}" data-tracking="{{ '1' if b.sn_tracking_enabled else '0' }}">
-                            {{ b.get_display_label() }} (Qty: {{ b.quantity }}) {% if b.sn_tracking_enabled %}[Tracking]{% endif %}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-info" onclick="doTransferSn()"><i class="bi bi-arrow-left-right"></i> Transfer</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 {% endif %}
 
@@ -3658,17 +3401,22 @@ function submitSnBulkLend(clearMode) {
             </div>
             <div class="modal-body">
                 <input type="hidden" id="pendingBatchEditIndex" value="">
-                <div class="mb-2">
-                    <label class="form-label form-label-sm">Batch Name / Label</label>
-                    <input type="text" class="form-control form-control-sm" id="pbLabel" maxlength="32" placeholder="Optional label">
-                </div>
-                <div class="mb-2 p-2 border rounded">
+                <div class="mb-3 p-2 border rounded">
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" id="pbTrackingCheck" onchange="togglePbTracking()">
                         <label class="form-check-label" for="pbTrackingCheck"><strong><i class="bi bi-upc-scan"></i> Enable Serial Number Tracking</strong></label>
                     </div>
-                    <small class="text-muted d-block mt-1" id="pbTrackingInfo"><strong>OFF:</strong> Simple batch — unlimited quantity, manual lending.</small>
-                    <small class="text-danger d-block mt-1"><i class="bi bi-exclamation-triangle"></i> <strong>Warning:</strong> This setting cannot be changed after the batch is created. Choose carefully.</small>
+                    <small class="text-muted d-block mt-1" id="pbTrackingInfo"><strong>OFF:</strong> Simple batch — unlimited quantity, quantity based lending.</small>
+                    <small class="text-muted d-block mt-1"><i class="bi bi-info-circle"></i> To change the batch information and lending is on In-Out page</small>
+                    <small class="text-danger d-block mt-1"><i class="bi bi-exclamation-triangle"></i> <strong>Warning:</strong> This setting cannot be changed after the batch is created. Batch information also fixed after Save Batch. Choose carefully.</small>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Batch Name / Label</label>
+                    <input type="text" class="form-control form-control-sm" id="pbLabel" maxlength="32" placeholder="Optional label">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Manufacturer <small class="text-muted">(optional, max 128)</small></label>
+                    <input type="text" class="form-control form-control-sm" id="pbManufacturer" maxlength="128">
                 </div>
                 <div class="mb-2">
                     <label class="form-label form-label-sm">Quantity</label>
@@ -3689,8 +3437,12 @@ function submitSnBulkLend(clearMode) {
                     <small class="text-muted"><i class="bi bi-info-circle"></i> Fill any two fields — the third auto-calculates. Qty=0 treated as 1 for price calculation.</small>
                 </div>
                 <div class="mb-2">
-                    <label class="form-label form-label-sm">Date</label>
+                    <label class="form-label form-label-sm">Date of Purchase</label>
                     <input type="date" class="form-control form-control-sm" id="pbDate">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Note <small class="text-muted">(max 128)</small></label>
+                    <input type="text" class="form-control form-control-sm" id="pbNote" maxlength="128" placeholder="Optional note for this batch">
                 </div>
                 <div class="border rounded p-2 mb-2">
                     <div class="form-check mb-2">
@@ -3744,6 +3496,7 @@ function submitSnBulkLend(clearMode) {
                             <div id="pb_drawer_picker" style="display:none;">
                                 <div class="p-2 border rounded drawer-grid-container">
                                     <small class="text-muted d-block mb-2">Click to select:</small>
+                                    <div id="pb_drawer_short_info_hint" class="text-info" style="font-size:0.75rem;min-height:1.1em;margin-bottom:4px;"></div>
                                     <div id="pb_drawer_grid" style="display:inline-grid; gap:4px; background: transparent;"></div>
                                 </div>
                             </div>
@@ -3779,7 +3532,7 @@ function submitSnBulkLend(clearMode) {
         }
 
         var html = '<table class="table table-sm table-bordered mb-0" style="font-size:0.83rem;">';
-        html += '<thead class="table-light"><tr><th>#</th><th>Label</th><th>Type</th><th>Qty</th><th>Price/Unit</th><th>Total Price</th><th>Date</th><th></th></tr></thead><tbody>';
+        html += '<thead class="table-light"><tr><th>#</th><th>Label</th><th>Type</th><th>Qty</th><th>Price/Unit</th><th>Total Price</th><th>Date</th><th>Note</th><th></th></tr></thead><tbody>';
         pendingBatches.forEach(function(b, i) {
             html += '<tr>';
             html += '<td>' + (i + 1) + '</td>';
@@ -3789,6 +3542,7 @@ function submitSnBulkLend(clearMode) {
             html += '<td>' + (b.price > 0 ? b.price.toFixed(4) : '<span class="text-muted">—</span>') + '</td>';
             html += '<td>' + (b.total > 0 ? b.total.toFixed(2) : '<span class="text-muted">—</span>') + '</td>';
             html += '<td>' + (b.date ? escHtml(b.date) : '<span class="text-muted">—</span>') + '</td>';
+            html += '<td>' + (b.note ? escHtml(b.note) : '<span class="text-muted">—</span>') + '</td>';
             html += '<td class="text-nowrap">';
             html += '<button type="button" class="btn btn-sm btn-outline-warning py-0 px-1 me-1" onclick="pendingBatchEdit(' + i + ')"><i class="bi bi-pencil"></i></button>';
             html += '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="pendingBatchDelete(' + i + ')"><i class="bi bi-trash"></i></button>';
@@ -3829,6 +3583,8 @@ function submitSnBulkLend(clearMode) {
         document.getElementById('pendingBatchModalTitle').innerHTML = '<i class="bi bi-collection"></i> Add Batch';
         document.getElementById('pendingBatchEditIndex').value = '';
         document.getElementById('pbLabel').value = '';
+        document.getElementById('pbManufacturer').value = '';
+        document.getElementById('pbNote').value = '';
         document.getElementById('pbTrackingCheck').checked = false;
         togglePbTracking();
         document.getElementById('pbQty').value = '0';
@@ -3857,6 +3613,8 @@ function submitSnBulkLend(clearMode) {
         document.getElementById('pendingBatchModalTitle').innerHTML = '<i class="bi bi-pencil"></i> Edit Batch';
         document.getElementById('pendingBatchEditIndex').value = idx;
         document.getElementById('pbLabel').value = b.label || '';
+        document.getElementById('pbManufacturer').value = b.manufacturer || '';
+        document.getElementById('pbNote').value = b.note || '';
         document.getElementById('pbTrackingCheck').checked = !!b.sn_tracking;
         togglePbTracking();
         document.getElementById('pbQty').value = b.quantity;
@@ -3900,6 +3658,8 @@ function submitSnBulkLend(clearMode) {
 
     window.pendingBatchSave = function() {
         var label = document.getElementById('pbLabel').value.trim().slice(0, 32);
+        var manufacturer = document.getElementById('pbManufacturer').value.trim().slice(0, 128);
+        var note = document.getElementById('pbNote').value.trim().slice(0, 128);
         var tracking = document.getElementById('pbTrackingCheck').checked;
         var qty = parseInt(document.getElementById('pbQty').value, 10) || 0;
         var maxQty = tracking ? 100 : 99999;
@@ -3917,7 +3677,7 @@ function submitSnBulkLend(clearMode) {
         var drawer = document.getElementById('pbDrawer').value.trim().slice(0, 50);
 
         var batch = {
-            label: label, sn_tracking: tracking, quantity: qty, price: price, total: total, date: date,
+            label: label, manufacturer: manufacturer, note: note, sn_tracking: tracking, quantity: qty, price: price, total: total, date: date,
             follow_main_location: followMain,
             location_id: (followMain || isDrawer) ? null : (locationId ? parseInt(locationId, 10) : null),
             rack_id: (followMain || !isDrawer) ? null : (rackId ? parseInt(rackId, 10) : null),
@@ -3939,7 +3699,7 @@ function submitSnBulkLend(clearMode) {
         var infoEl = document.getElementById('pbTrackingInfo');
         var qtyInput = document.getElementById('pbQty');
         var note = document.getElementById('pbQtyNote');
-        if (infoEl) infoEl.innerHTML = tracking ? '<strong>ON:</strong> Serial number tracking — max 100 per batch, individual item management.' : '<strong>OFF:</strong> Simple batch — unlimited quantity, manual lending.';
+        if (infoEl) infoEl.innerHTML = tracking ? '<strong>ON:</strong> Serial number tracking — max 100 per batch, individual item management, all things is recorded.' : '<strong>OFF:</strong> Simple batch — unlimited quantity, quantity based lending.';
         if (tracking) {
             qtyInput.max = '100';
             note.textContent = 'Max 100 for tracking batches.';
@@ -3962,174 +3722,6 @@ function submitSnBulkLend(clearMode) {
 })();
 </script>
 {% endif %}
-
-<!-- Manage Lending Modal -->
-<div class="modal fade" id="lendManageModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header py-2">
-                <h5 class="modal-title"><i class="bi bi-hand-index-thumb text-warning"></i> Manage Lending</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-3">
-                <div id="lm_lend_records_table" class="mb-2"></div>
-                <div id="lm_lr_form_slot"></div>
-                <button type="button" class="btn btn-outline-warning btn-sm mt-1" onclick="showLrForm('add')"><i class="bi bi-plus"></i> Add Lending Record</button>
-            </div>
-            <div class="modal-footer py-2">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="submitLendManage()"><i class="bi bi-save"></i> Save</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Shared Lend Record Sub-form (moved dynamically into active modal slot) -->
-<div id="lr_shared_form" style="display:none;" class="border rounded p-2 bg-light">
-    <div class="mb-2">
-        <label class="form-label form-label-sm mb-1">Contact</label>
-        <input type="hidden" id="lr_to_type">
-        <input type="hidden" id="lr_to_id">
-        <div class="border rounded px-2 py-1 d-flex align-items-center justify-content-between"
-             style="cursor:pointer; background:var(--bs-body-bg); min-height:31px;"
-             onclick="toggleLrSearch()">
-            <span id="lr_to_label" class="small text-muted">Click to search contact...</span>
-            <i class="bi bi-x text-danger" id="lr_to_clear" style="display:none;"
-               onclick="event.stopPropagation(); clearLrContact()"></i>
-        </div>
-        <div id="lr_search_panel" style="display:none;" class="mt-1">
-            <input type="text" class="form-control form-control-sm" id="lr_search_input"
-                   placeholder="Search by name, email..." oninput="doLrSearch()">
-            <div id="lr_search_results" class="border rounded"
-                 style="max-height:180px; overflow-y:auto; background:var(--bs-body-bg);"></div>
-        </div>
-    </div>
-    <div class="row g-2 mb-2">
-        <div class="col-4">
-            <label class="form-label form-label-sm mb-1">Quantity</label>
-            <input type="number" class="form-control form-control-sm" id="lr_qty" min="1" value="1">
-        </div>
-        <div class="col-4">
-            <label class="form-label form-label-sm mb-1">Start</label>
-            <input type="date" class="form-control form-control-sm" id="lr_start">
-        </div>
-        <div class="col-4">
-            <label class="form-label form-label-sm mb-1">End</label>
-            <input type="date" class="form-control form-control-sm" id="lr_end">
-        </div>
-    </div>
-    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-        <div class="form-check form-switch mb-0">
-            <input class="form-check-input" type="checkbox" id="lr_notify" onchange="toggleLrNotify()">
-            <label class="form-check-label small" for="lr_notify">Notify</label>
-        </div>
-        <div id="lr_notify_days_section" style="display:none;">
-            <div class="input-group input-group-sm">
-                <span class="input-group-text">Remind</span>
-                <input type="number" class="form-control" id="lr_notify_days" min="1" value="3" style="width:50px">
-                <span class="input-group-text">days before</span>
-            </div>
-        </div>
-    </div>
-    <div class="d-flex gap-2">
-        <button type="button" class="btn btn-sm btn-primary" id="lr_save_btn" onclick="saveLrForm()"><i class="bi bi-plus"></i> Add</button>
-        <button type="button" class="btn btn-sm btn-secondary" onclick="cancelLrForm()">Cancel</button>
-    </div>
-</div>
-
-<!-- Lend Contact Picker Modal -->
-<!-- Shared SN Lend Form (moved dynamically into active SN modal slot) -->
-<div id="snl_shared_form" style="display:none;">
-    <div class="mb-2">
-        <label class="form-label form-label-sm mb-1">Contact</label>
-        <input type="hidden" id="snl_to_type">
-        <input type="hidden" id="snl_to_id">
-        <div class="border rounded px-2 py-1 d-flex align-items-center justify-content-between"
-             style="cursor:pointer; background:var(--bs-body-bg); min-height:31px;"
-             onclick="toggleSnlSearch()">
-            <span id="snl_to_label" class="small text-muted">Click to search contact...</span>
-            <i class="bi bi-x text-danger" id="snl_to_clear" style="display:none;"
-               onclick="event.stopPropagation(); clearSnlContact()"></i>
-        </div>
-        <div id="snl_search_panel" style="display:none;" class="mt-1">
-            <input type="text" class="form-control form-control-sm" id="snl_search_input"
-                   placeholder="Search by name, email..." oninput="doSnlSearch()">
-            <div id="snl_search_results" class="border rounded"
-                 style="max-height:200px; overflow-y:auto; background:var(--bs-body-bg);"></div>
-        </div>
-    </div>
-    <div class="row g-2 mb-2">
-        <div class="col-6">
-            <label class="form-label form-label-sm mb-1">Start Date</label>
-            <input type="date" class="form-control form-control-sm" id="snl_start">
-        </div>
-        <div class="col-6">
-            <label class="form-label form-label-sm mb-1">End Date</label>
-            <input type="date" class="form-control form-control-sm" id="snl_end">
-        </div>
-    </div>
-    <div class="d-flex flex-wrap align-items-center gap-2">
-        <div class="form-check form-switch mb-0">
-            <input class="form-check-input" type="checkbox" id="snl_notify" onchange="toggleSnlNotify()">
-            <label class="form-check-label small" for="snl_notify">Enable notification</label>
-        </div>
-        <div id="snl_notify_days_section" style="display:none;">
-            <div class="input-group input-group-sm">
-                <span class="input-group-text">Remind</span>
-                <input type="number" class="form-control" id="snl_notify_days" min="1" value="3" style="width:55px">
-                <span class="input-group-text">days before end</span>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Per-SN Lending Modal -->
-<div class="modal fade" id="snLendModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header py-2">
-                <h6 class="modal-title"><i class="bi bi-hand-index-thumb text-warning"></i> Set Lending — <span id="snLend_sn_ref" class="text-muted small"></span></h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="snLend_sn_id">
-                <div id="snlend_form_slot" class="mb-2"></div>
-            </div>
-            <div class="modal-footer py-2">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-outline-warning btn-sm" onclick="clearSnlModal()">
-                    <i class="bi bi-x"></i> Clear
-                </button>
-                <button type="button" class="btn btn-primary" onclick="submitSnLend()">
-                    <i class="bi bi-save"></i> Save
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Bulk SN Lending Modal -->
-<div class="modal fade" id="snBulkLendModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header py-2">
-                <h6 class="modal-title"><i class="bi bi-hand-index-thumb text-warning"></i> Manage Lending — <span id="snBulkLend_info" class="text-muted small"></span></h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p class="text-muted small mb-2">Apply lending info to all <strong>selected</strong> serial numbers. Leave contact blank to only update dates/notify.</p>
-                <div id="snbulk_form_slot" class="mb-2"></div>
-                <button type="button" class="btn btn-outline-danger btn-sm mt-1" onclick="submitSnBulkLend(true)">
-                    <i class="bi bi-x-circle"></i> Clear Lending for Selected
-                </button>
-            </div>
-            <div class="modal-footer py-2">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="submitSnBulkLend(false)"><i class="bi bi-save"></i> Save to Selected</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- ===== Thumbnail Picker Modal ===== -->
 {% if item %}
@@ -4168,11 +3760,11 @@ function submitSnBulkLend(clearMode) {
                         {% for att in item_images %}
                         <div class="col">
                             <div class="thumb-option border rounded overflow-hidden"
-                                 data-value="{{ att.file_path }}"
-                                 data-url="{{ url_for('uploaded_file', filename=att.file_path) }}"
+                                 data-value="{{ att.filename }}"
+                                 data-url="{{ url_for('uploaded_file', filename=att.filename) }}"
                                  style="cursor:pointer; aspect-ratio:1/1;"
                                  onclick="selectThumbnail(this)">
-                                <img src="{{ url_for('uploaded_file', filename=att.file_path) }}"
+                                <img src="{{ url_for('uploaded_file', filename=att.filename) }}"
                                      alt="{{ att.original_filename }}"
                                      style="width:100%;height:100%;object-fit:cover;">
                             </div>
@@ -4563,5 +4155,14 @@ function setSfView(view) {
 }
 </script>
 {% endif %}
+
+<script src="{{ url_for('static', filename='js/marked.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/md-editor.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var ta = document.getElementById('itemDescription');
+    if (ta) initMdEditor(ta);
+});
+</script>
 
 {% endblock %}

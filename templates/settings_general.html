@@ -154,96 +154,89 @@
             </div>
         </div>
 
-        <!-- Account Management -->
-        {% if current_user.allow_password_reset or current_user.allow_profile_picture_change %}
+        <!-- Account Management - always show since Name is required -->
         <div class="card mt-3">
             <div class="card-header">
                 <h5><i class="bi bi-shield-check"></i> Account Management</h5>
             </div>
             <div class="card-body">
-                <!-- Profile Picture Section -->
-                {% if current_user.allow_profile_picture_change %}
-                {% set pps = current_user.profile_picture_source or 'share' %}
+                <!-- Profile Info Form (with optional picture upload) -->
                 <div class="mb-4">
                     <h6 class="text-muted border-bottom pb-2 mb-3">
-                        <i class="bi bi-image"></i> Profile Picture
+                        <i class="bi bi-person-badge"></i> Profile Info
                     </h6>
 
-                    {% if current_user.profile_photo %}
-                    {% if current_user.profile_photo.startswith('share/') %}
-                        {% set _profile_img_url = url_for('share.share_serve', category='profile', filename=current_user.profile_photo[6:]) %}
-                    {% else %}
-                        {% set _profile_img_url = url_for('user_role.serve_user_picture', filename=current_user.profile_photo) %}
-                    {% endif %}
-                    <div class="mb-3 text-center">
-                        <img id="settingsPhotoPreview" src="{{ _profile_img_url }}" alt="{{ current_user.username }}" style="max-width: 150px; max-height: 150px; border-radius: 8px; border: 2px solid #dee2e6; cursor: pointer;" data-bs-toggle="modal" data-bs-target="#settingsPhotoModal" title="Click to view full size">
-
-                        <!-- Full Size Photo Modal -->
-                        <div class="modal fade" id="settingsPhotoModal" tabindex="-1">
-                            <div class="modal-dialog modal-dialog-centered modal-lg">
-                                <div class="modal-content">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title">Profile Photo</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <div class="modal-body text-center">
-                                        <img id="settingsFullSizePhoto" src="{{ _profile_img_url }}" alt="{{ current_user.username }}" style="max-width: 100%; height: auto; border-radius: 8px;">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    {% if pps in ('upload', 'both') %}
+                    <!-- Profile Picture (if allowed) -->
+                    {% if current_user.allow_profile_picture_change %}
+                    {% set pps = current_user.profile_picture_source or 'share' %}
                     <div class="mb-3">
-                        <label class="form-label small text-muted fw-semibold">Custom Upload</label>
-                        <form method="POST" action="{{ url_for('settings.upload_profile_photo') }}" enctype="multipart/form-data">
-                            <div class="input-group">
-                                <span class="input-group-text"><i class="bi bi-image"></i></span>
-                                <input type="file" class="form-control" id="profilePhoto" name="profile_photo" accept=".jpg,.jpeg,.png">
+                        {% if current_user.profile_photo %}
+                        {% if current_user.profile_photo.startswith('share/') %}
+                            {% set _profile_img_url = url_for('share.share_serve', category='profile', filename=current_user.profile_photo[6:]) %}
+                        {% else %}
+                            {% set _profile_img_url = url_for('user_role.serve_user_picture', filename=current_user.profile_photo) %}
+                        {% endif %}
+                        <div class="mb-2 text-center">
+                            <img src="{{ _profile_img_url }}" alt="{{ current_user.username }}" style="max-width:130px;max-height:130px;border-radius:8px;border:2px solid #dee2e6;">
+                        </div>
+                        {% endif %}
+
+                        {% if pps in ('upload', 'both') and not demo_mode %}
+                        <label class="form-label small text-muted fw-semibold">Upload Picture</label>
+                        <form method="POST" action="{{ url_for('settings.upload_profile_photo') }}" enctype="multipart/form-data" class="mb-2">
+                            <div class="d-flex gap-2 align-items-center flex-wrap">
+                                <div class="input-group" style="max-width:280px;">
+                                    <span class="input-group-text"><i class="bi bi-image"></i></span>
+                                    <input type="file" class="form-control" name="profile_photo" accept=".jpg,.jpeg,.png">
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-upload"></i> Upload</button>
+                                {% if current_user.profile_photo %}
+                                <a href="#" class="btn btn-outline-danger btn-sm" onclick="event.preventDefault(); document.getElementById('deletePhotoForm').submit();">
+                                    <i class="bi bi-trash"></i> Delete
+                                </a>
+                                {% endif %}
                             </div>
                             <small class="text-muted d-block mt-1">Max 1MB, JPEG/PNG</small>
-                            <button type="submit" class="btn btn-primary mt-2">
-                                <i class="bi bi-upload"></i> Upload
-                            </button>
-                            {% if current_user.profile_photo %}
-                            <a href="#" class="btn btn-outline-danger mt-2 ms-2"
-                               onclick="event.preventDefault(); document.getElementById('deletePhotoForm').submit();">
-                                <i class="bi bi-trash"></i> Delete
-                            </a>
-                            {% endif %}
                         </form>
                         {% if current_user.profile_photo %}
                         <form id="deletePhotoForm" method="POST" action="{{ url_for('settings.delete_profile_photo') }}" style="display:none;"></form>
                         {% endif %}
+                        {% endif %}
+
+                        {% if pps in ('share', 'both') or demo_mode %}
+                        <div class="mb-2">
+                            <a href="{{ url_for('settings.choose_profile_photo') }}" class="btn btn-outline-secondary btn-sm">
+                                <i class="bi bi-folder2-open"></i> Choose from Share Files
+                            </a>
+                        </div>
+                        {% endif %}
+
+                        {% if demo_mode %}
+                        <div class="alert alert-info py-2 mb-0 small"><i class="bi bi-info-circle"></i> In Demo Mode, profile pictures can only be selected from Share Files.</div>
+                        {% endif %}
                     </div>
                     {% endif %}
 
-                    {% if pps in ('share', 'both') %}
-                    <div class="mb-3">
-                        <label class="form-label small text-muted fw-semibold">Choose from Share Files</label>
-                        <a href="{{ url_for('settings.choose_profile_photo') }}" class="btn btn-outline-primary d-block">
-                            <i class="bi bi-folder2-open"></i> Browse Share Files
-                        </a>
-                    </div>
-                    {% endif %}
-
-                    {% if pps not in ('upload', 'share', 'both') or (pps not in ('upload', 'both') and pps not in ('share', 'both')) %}
-                    {# fallback: just show upload #}
-                    <div class="mb-3">
-                        <form method="POST" action="{{ url_for('settings.upload_profile_photo') }}" enctype="multipart/form-data">
-                            <div class="input-group">
-                                <span class="input-group-text"><i class="bi bi-image"></i></span>
-                                <input type="file" class="form-control" name="profile_photo" accept=".jpg,.jpeg,.png">
-                            </div>
-                            <small class="text-muted d-block mt-1">Max 1MB, JPEG/PNG</small>
-                            <button type="submit" class="btn btn-primary mt-2"><i class="bi bi-upload"></i> Upload</button>
-                        </form>
-                    </div>
-                    {% endif %}
+                    <!-- Name + Short Info form -->
+                    <form method="POST" action="{{ url_for('settings.save_account_info') }}">
+                        <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
+                        <div class="mb-3">
+                            <label for="accountName" class="form-label required">Name <small class="text-muted">(required, not unique, max 64 chars)</small></label>
+                            <input type="text" class="form-control" id="accountName" name="name" maxlength="64" required
+                                   value="{{ current_user.name or '' }}" placeholder="e.g. Jane Doe">
+                        </div>
+                        {% if current_user.allow_change_short_info %}
+                        <div class="mb-3">
+                            <label for="accountShortInfo" class="form-label">Short Info <small class="text-muted">(optional, max 128 chars)</small></label>
+                            <input type="text" class="form-control" id="accountShortInfo" name="short_info" maxlength="128"
+                                   value="{{ current_user.short_info or '' }}" placeholder="e.g. Lab Technician">
+                        </div>
+                        {% endif %}
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Save Profile
+                        </button>
+                    </form>
                 </div>
-                {% endif %}
 
                 <!-- Change Password Section -->
                 {% if current_user.allow_password_reset %}
@@ -251,24 +244,20 @@
                     <h6 class="text-muted border-bottom pb-2 mb-3">
                         <i class="bi bi-lock"></i> Change Password
                     </h6>
-
                     <form method="POST" action="{{ url_for('user_role.change_password') }}">
                         <div class="mb-3">
-                            <label for="oldPassword" class="form-label">Old Password</label>
-                            <input type="password" class="form-control" id="oldPassword" name="old_password" autocomplete="current-password" required>
+                            <label for="currentPassword" class="form-label">Old Password</label>
+                            <input type="password" class="form-control" id="currentPassword" name="current_password" autocomplete="current-password" required>
                         </div>
-
                         <div class="mb-3">
                             <label for="newPassword" class="form-label">New Password</label>
-                            <input type="password" class="form-control" id="newPassword" name="new_password" autocomplete="new-password" required minlength="6">
-                            <small class="text-muted">Minimum 6 characters</small>
+                            <input type="password" class="form-control" id="newPassword" name="new_password" autocomplete="new-password" required minlength="8">
+                            <small class="text-muted">Minimum 8 characters with letters and numbers</small>
                         </div>
-
                         <div class="mb-3">
                             <label for="confirmPassword" class="form-label">Confirm New Password</label>
-                            <input type="password" class="form-control" id="confirmPassword" name="confirm_password" autocomplete="new-password" required minlength="6">
+                            <input type="password" class="form-control" id="confirmPassword" name="confirm_password" autocomplete="new-password" required minlength="8">
                         </div>
-
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check"></i> Update Password
                         </button>
@@ -277,7 +266,6 @@
                 {% endif %}
             </div>
         </div>
-        {% endif %}
 
         <!-- Table Columns View Customization -->
         <div class="card mt-3">

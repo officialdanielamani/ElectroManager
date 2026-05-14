@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}System Settings - Inventory Manager{% endblock %}
+{% block title %}System Settings - Electro Manager{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
@@ -12,30 +12,167 @@
 
 <div class="row">
     <div class="col-md-8">
-        <form method="POST" action="{{ url_for('settings.settings_system') }}">
-            
+        <form method="POST" action="{{ url_for('settings.settings_system') }}" enctype="multipart/form-data">
+
             <!-- System Customization Card -->
             <div class="card mb-4">
                 <div class="card-header">
                     <h5 class="mb-0"><i class="bi bi-palette"></i> System Customization</h5>
                 </div>
                 <div class="card-body">
+
+                    <!-- System Name -->
                     <div class="mb-3">
-                        <label for="banner_timeout" class="form-label">Banner Timeout (seconds) <span class="text-danger">*</span></label>
-                        <input type="number" 
-                               class="form-control" 
-                               id="banner_timeout" 
-                               name="banner_timeout" 
-                               value="{{ banner_timeout }}" 
-                               min="0" 
-                               max="60" 
-                               required>
-                        <div class="form-text">
-                            <i class="bi bi-info-circle"></i> Set to 0 for permanent banner (closes only with X button), or 1-60 seconds for auto-dismiss
+                        <label for="system_name" class="form-label fw-semibold">System Name</label>
+                        <input type="text" class="form-control" id="system_name" name="system_name"
+                               value="{{ system_name }}" maxlength="64"
+                               placeholder="e.g. My Inventory System">
+                        <div class="form-text">Displayed on the login page (max 64 characters).</div>
+                    </div>
+
+                    <!-- System Logo -->
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">System Logo</label>
+                        {% if system_logo_url %}
+                        <div class="mb-2 d-flex align-items-center gap-3">
+                            <img src="{{ system_logo_url }}" alt="System Logo" style="max-height:80px; max-width:200px; border-radius:6px; border:1px solid #dee2e6;">
+                            <button type="submit" form="delete-system-logo-form" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete system logo?')">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                        </div>
+                        {% endif %}
+                        <input type="file" class="form-control" name="system_logo" accept=".jpg,.jpeg,.png">
+                        <div class="form-text">JPG or PNG, max 1 MB. Shown on the login page. Replaces existing logo on upload.</div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Banner Timeout -->
+                    <div class="mb-3">
+                        <label for="banner_timeout" class="form-label fw-semibold">Banner Timeout (seconds) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="banner_timeout" name="banner_timeout"
+                               value="{{ banner_timeout }}" min="0" max="60" required>
+                        <div class="form-text"><i class="bi bi-info-circle"></i> 0 = permanent (closes only with ✕), 1–60 = auto-dismiss.</div>
+                    </div>
+
+                    <!-- User Signup -->
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="signup_enabled" name="signup_enabled" {% if signup_enabled %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="signup_enabled">Enable User Signup Form</label>
+                        </div>
+                        <div class="form-text"><i class="bi bi-info-circle"></i> When enabled, users can self-register at <code>/register</code>. When disabled, only admins can create accounts.</div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Default Theme -->
+                    <div class="mb-3">
+                        <label for="default_theme" class="form-label fw-semibold">Default Theme</label>
+                        <select class="form-select" id="default_theme" name="default_theme">
+                            {% for theme in available_themes %}
+                            <option value="{{ theme.id }}" {% if default_theme == theme.id %}selected{% endif %}>
+                                {{ theme.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Applied for anonymous users and as the fallback when a user's chosen theme is unavailable. Each user can override this in their own settings.</div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Download All Toggles -->
+                    <label class="form-label fw-semibold"><i class="bi bi-download"></i> Download All (ZIP)</label>
+                    <div class="form-text mb-2">Enable or disable the Download All button. When disabled the button is hidden and the backend endpoint returns 403.</div>
+
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" name="download_all_item_attachments" id="dl_item_att"
+                               {% if download_all_item_attachments %}checked{% endif %}>
+                        <label class="form-check-label" for="dl_item_att">Item — Attachments</label>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" name="download_all_item_share_files" id="dl_item_sf"
+                               {% if download_all_item_share_files %}checked{% endif %}>
+                        <label class="form-check-label" for="dl_item_sf">Item — Share Files</label>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" name="download_all_project_attachments" id="dl_proj_att"
+                               {% if download_all_project_attachments %}checked{% endif %}>
+                        <label class="form-check-label" for="dl_proj_att">Project — Attachments</label>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" name="download_all_project_share_files" id="dl_proj_sf"
+                               {% if download_all_project_share_files %}checked{% endif %}>
+                        <label class="form-check-label" for="dl_proj_sf">Project — Share Files</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="download_all_share_files_page" id="dl_sf_page"
+                               {% if download_all_share_files_page %}checked{% endif %}>
+                        <label class="form-check-label" for="dl_sf_page">Share Files page (<code>/settings/share-files</code>)</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Company Detail Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-building"></i> Company Detail</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Company Name</label>
+                            <input type="text" class="form-control" name="company_name" value="{{ company_name }}" maxlength="128" placeholder="Acme Corp">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Telephone</label>
+                            <input type="text" class="form-control" name="company_tel" value="{{ company_tel }}" maxlength="20" placeholder="+1234567890">
+                            <div class="form-text">Digits and + only.</div>
                         </div>
                     </div>
-                    <div class="alert alert-info mb-0">
-                        <i class="bi bi-lightbulb"></i> <strong>Note:</strong> This affects info/alert banners displayed throughout the system.
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Email</label>
+                            <input type="text" class="form-control" name="company_email" value="{{ company_email }}" maxlength="128" placeholder="info@company.com">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Website URL</label>
+                            <input type="text" class="form-control" name="company_url" value="{{ company_url }}" maxlength="256" placeholder="https://company.com">
+                            <div class="form-text">Must start with http:// or https://</div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Address</label>
+                        <textarea class="form-control" name="company_address" rows="3" placeholder="123 Main St...">{{ company_address }}</textarea>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Zip / Postal Code</label>
+                            <input type="text" class="form-control" name="company_zip" value="{{ company_zip }}" maxlength="12" placeholder="12345">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">State / Region</label>
+                            <input type="text" class="form-control" name="company_state" value="{{ company_state }}" maxlength="64" placeholder="California">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Country</label>
+                            <input type="text" class="form-control" name="company_country" value="{{ company_country }}" maxlength="64" placeholder="United States">
+                        </div>
+                    </div>
+
+                    <!-- Company Logo -->
+                    <div class="mb-2">
+                        <label class="form-label fw-semibold">Company Logo</label>
+                        {% if company_logo_url %}
+                        <div class="mb-2 d-flex align-items-center gap-3">
+                            <img src="{{ company_logo_url }}" alt="Company Logo" style="max-height:80px; max-width:200px; border-radius:6px; border:1px solid #dee2e6;">
+                            <button type="submit" form="delete-company-logo-form" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete company logo?')">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                        </div>
+                        {% endif %}
+                        <input type="file" class="form-control" name="company_logo" accept=".jpg,.jpeg,.png">
+                        <div class="form-text">JPG or PNG, max 1 MB. Replaces existing logo on upload.</div>
                     </div>
                 </div>
             </div>
@@ -140,50 +277,54 @@
                 </div>
                 <div class="card-body">
                     {% if demo_mode %}
-                    <div class="alert alert-warning">
-                        <i class="bi bi-lock"></i> <strong>File size and type cannot be changed for security purpose. Disable Demo Mode to enable this feature.</strong>
+                    <div class="alert alert-warning mb-3">
+                        <i class="bi bi-lock"></i> <strong>Demo Mode:</strong> File type and size settings are fixed for security. Disable Demo Mode to change them.
                     </div>
-                    {% else %}
+                    {% endif %}
 
                     <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-box"></i> Item Uploads</h6>
                     <div class="row mb-4">
                         <div class="col-md-6">
-                            <label for="allowed_extensions" class="form-label">Allowed File Types <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="allowed_extensions" name="allowed_extensions" value="{{ allowed_extensions }}" required placeholder="pdf,png,jpg,jpeg,gif,txt,doc,docx">
+                            <label for="allowed_extensions" class="form-label">Allowed File Types {% if not demo_mode %}<span class="text-danger">*</span>{% endif %}</label>
+                            <input type="text" class="form-control" id="allowed_extensions" name="allowed_extensions"
+                                   value="{% if demo_mode %}jpg,jpeg,png,txt{% else %}{{ allowed_extensions }}{% endif %}"
+                                   {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}
+                                   placeholder="pdf,png,jpg,jpeg,gif,txt,doc,docx">
                         </div>
                         <div class="col-md-6">
-                            <label for="max_file_size" class="form-label">Max File Size (MB) <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" id="max_file_size" name="max_file_size" value="{{ max_file_size }}" min="1" max="100" required>
-                        </div>
-                    </div>
-
-                    <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-geo-alt"></i> Location / Rack Uploads</h6>
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                            <label class="form-label">Allowed File Types <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="location_upload_extensions" value="{{ location_upload_extensions }}" required placeholder="webp,png,svg,jpeg,jpg">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Max File Size (MB) <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" name="location_upload_max_size" value="{{ location_upload_max_size }}" min="1" max="100" required>
+                            <label for="max_file_size" class="form-label">Max File Size (MB) {% if not demo_mode %}<span class="text-danger">*</span>{% endif %}</label>
+                            <input type="number" class="form-control" id="max_file_size" name="max_file_size"
+                                   value="{% if demo_mode %}1{% else %}{{ max_file_size }}{% endif %}"
+                                   min="1" max="100" {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}>
                         </div>
                     </div>
 
                     <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-kanban"></i> Project Uploads</h6>
+                    {% if demo_mode %}
+                    {% set proj_types_demo = [('picture', 'Pictures', 'jpg,jpeg,png', '1'), ('document', 'Documents', 'txt', '1'), ('schematic', 'Schematics', 'jpg,jpeg,png,txt', '1'), ('2d_design', '2D Design', 'jpg,jpeg,png', '1'), ('3d_design', '3D Design', 'jpg,jpeg,png', '1'), ('program', 'Programs', 'txt', '1')] %}
+                    {% else %}
+                    {% set proj_types_demo = [] %}
+                    {% endif %}
                     {% set proj_types = [('picture', 'Pictures', 'webp,png,svg,jpeg,jpg'), ('document', 'Documents', 'txt,doc,docx,pdf'), ('schematic', 'Schematics', 'pdf,zip'), ('2d_design', '2D Design', 'pdf,zip'), ('3d_design', '3D Design', 'pdf,zip,stl,step'), ('program', 'Programs', 'zip,txt,cpp,py')] %}
                     <div class="row mb-1">
                         <div class="col-md-3"></div>
                         <div class="col-md-5"><small class="text-muted fw-bold">Allowed Types</small></div>
                         <div class="col-md-4"><small class="text-muted fw-bold">Max Size (MB)</small></div>
                     </div>
+                    {% set demo_proj = {'picture': ('jpg,jpeg,png','1'), 'document': ('txt','1'), 'schematic': ('jpg,jpeg,png,txt','1'), '2d_design': ('jpg,jpeg,png','1'), '3d_design': ('jpg,jpeg,png','1'), 'program': ('txt','1')} %}
                     {% for ptype, plabel, pdefault in proj_types %}
                     <div class="row mb-2">
                         <div class="col-md-3"><label class="form-label small fw-bold">{{ plabel }}</label></div>
                         <div class="col-md-5">
-                            <input type="text" class="form-control form-control-sm" name="project_upload_{{ ptype }}_extensions" value="{{ project_upload_settings.get(ptype, {}).get('extensions', pdefault) }}" required placeholder="{{ pdefault }}">
+                            <input type="text" class="form-control form-control-sm" name="project_upload_{{ ptype }}_extensions"
+                                   value="{% if demo_mode %}{{ demo_proj[ptype][0] }}{% else %}{{ project_upload_settings.get(ptype, {}).get('extensions', pdefault) }}{% endif %}"
+                                   {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}
+                                   placeholder="{{ pdefault }}">
                         </div>
                         <div class="col-md-4">
-                            <input type="number" class="form-control form-control-sm" name="project_upload_{{ ptype }}_max_size" value="{{ project_upload_settings.get(ptype, {}).get('max_size', '10') }}" min="1" max="200" required>
+                            <input type="number" class="form-control form-control-sm" name="project_upload_{{ ptype }}_max_size"
+                                   value="{% if demo_mode %}{{ demo_proj[ptype][1] }}{% else %}{{ project_upload_settings.get(ptype, {}).get('max_size', '10') }}{% endif %}"
+                                   min="1" max="200" {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}>
                         </div>
                     </div>
                     {% endfor %}
@@ -193,7 +334,9 @@
                         ('item',    'Item Files',    'pdf,png,jpg,jpeg,gif,txt,doc,docx', '10'),
                         ('project', 'Project Files', 'pdf,png,jpg,jpeg,gif,txt,doc,docx', '10'),
                         ('sticker', 'Sticker Files', 'png,jpg,jpeg',                      '1'),
+                        ('icon',    'Icon Files',    'png,jpg,jpeg',                      '5'),
                     ] %}
+                    {% set demo_share = {'item': ('jpg,jpeg,png,txt','1'), 'project': ('jpg,jpeg,png,txt','1'), 'sticker': ('jpg,jpeg,png','1'), 'icon': ('jpg,jpeg,png','1')} %}
                     <div class="row mb-1">
                         <div class="col-md-3"></div>
                         <div class="col-md-5"><small class="text-muted fw-bold">Allowed Types</small></div>
@@ -203,10 +346,15 @@
                     <div class="row mb-2">
                         <div class="col-md-3"><label class="form-label small fw-bold">{{ slabel }}</label></div>
                         <div class="col-md-5">
-                            <input type="text" class="form-control form-control-sm" name="share_{{ stype }}_extensions" value="{{ share_upload_settings.get(stype, {}).get('extensions', sdefault_ext) }}" required placeholder="{{ sdefault_ext }}">
+                            <input type="text" class="form-control form-control-sm" name="share_{{ stype }}_extensions"
+                                   value="{% if demo_mode %}{{ demo_share[stype][0] }}{% else %}{{ share_upload_settings.get(stype, {}).get('extensions', sdefault_ext) }}{% endif %}"
+                                   {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}
+                                   placeholder="{{ sdefault_ext }}">
                         </div>
                         <div class="col-md-4">
-                            <input type="number" class="form-control form-control-sm" name="share_{{ stype }}_max_size" value="{{ share_upload_settings.get(stype, {}).get('max_size', sdefault_size) }}" min="1" max="100" required>
+                            <input type="number" class="form-control form-control-sm" name="share_{{ stype }}_max_size"
+                                   value="{% if demo_mode %}{{ demo_share[stype][1] }}{% else %}{{ share_upload_settings.get(stype, {}).get('max_size', sdefault_size) }}{% endif %}"
+                                   min="1" max="100" {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}>
                         </div>
                     </div>
                     {% endfor %}
@@ -216,12 +364,93 @@
                         <div class="col-md-4"><input type="number" class="form-control form-control-sm" value="1" disabled></div>
                     </div>
                     <small class="text-muted"><i class="bi bi-lock"></i> Profile uploads are fixed to JPEG/PNG, max 1 MB.</small>
-
-                    {% endif %}
                 </div>
             </div>
 
 
+
+            <!-- Lending & Return Settings -->
+            {% if current_user.has_permission('settings_sections.system_settings', 'edit') %}
+            <div class="card mb-4" id="lending-return-settings">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-arrow-left-right"></i> Lending &amp; Return Settings</h6>
+                </div>
+                <div class="card-body">
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="lr_scan_enabled" name="lr_scan_enabled"
+                               {% if Setting.get('lr_scan_enabled', false) %}checked{% endif %}>
+                        <label class="form-check-label" for="lr_scan_enabled">
+                            <strong>Enable using camera to scan item QR/Barcode</strong>
+                            <small class="text-muted d-block">When disabled, the scan area on In/Out page shows "Admin Disabled Scan QR/Barcode"</small>
+                        </label>
+                    </div>
+                    <hr class="my-2">
+                    <h6 class="text-primary">Lending Options</h6>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="lr_lend_start_date_required" name="lr_lend_start_date_required"
+                                       {% if Setting.get('lr_lend_start_date_required', false) %}checked{% endif %}
+                                       onchange="document.getElementById('lr_lend_start_time_required').disabled = !this.checked">
+                                <label class="form-check-label" for="lr_lend_start_date_required"><strong>Start Date required</strong></label>
+                            </div>
+                            <div class="form-check ms-3">
+                                <input class="form-check-input" type="checkbox" id="lr_lend_start_time_required" name="lr_lend_start_time_required"
+                                       {% if Setting.get('lr_lend_start_time_required', false) %}checked{% endif %}
+                                       {% if not Setting.get('lr_lend_start_date_required', false) %}disabled{% endif %}>
+                                <label class="form-check-label" for="lr_lend_start_time_required">Start Time required <small class="text-muted">(only if Start Date required)</small></label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="lr_lend_end_date_required" name="lr_lend_end_date_required"
+                                       {% if Setting.get('lr_lend_end_date_required', false) %}checked{% endif %}
+                                       onchange="document.getElementById('lr_lend_end_time_required').disabled = !this.checked">
+                                <label class="form-check-label" for="lr_lend_end_date_required"><strong>End Date required</strong></label>
+                            </div>
+                            <div class="form-check ms-3">
+                                <input class="form-check-input" type="checkbox" id="lr_lend_end_time_required" name="lr_lend_end_time_required"
+                                       {% if Setting.get('lr_lend_end_time_required', false) %}checked{% endif %}
+                                       {% if not Setting.get('lr_lend_end_date_required', false) %}disabled{% endif %}>
+                                <label class="form-check-label" for="lr_lend_end_time_required">End Time required <small class="text-muted">(only if End Date required)</small></label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="lr_lend_self_use_now" name="lr_lend_self_use_now"
+                                       {% if Setting.get('lr_lend_self_use_now', false) %}checked{% endif %}>
+                                <label class="form-check-label" for="lr_lend_self_use_now">Only Self Lending must use current date/time for Start <small class="text-muted">(cannot manually set start date)</small></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h6 class="text-primary mt-3">Return Options</h6>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="lr_return_date_required" name="lr_return_date_required"
+                                       {% if Setting.get('lr_return_date_required', false) %}checked{% endif %}
+                                       onchange="document.getElementById('lr_return_time_required').disabled = !this.checked">
+                                <label class="form-check-label" for="lr_return_date_required"><strong>Return Date required</strong></label>
+                            </div>
+                            <div class="form-check ms-3">
+                                <input class="form-check-input" type="checkbox" id="lr_return_time_required" name="lr_return_time_required"
+                                       {% if Setting.get('lr_return_time_required', false) %}checked{% endif %}
+                                       {% if not Setting.get('lr_return_date_required', false) %}disabled{% endif %}>
+                                <label class="form-check-label" for="lr_return_time_required">Return Time required <small class="text-muted">(only if Return Date required)</small></label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="lr_return_self_use_now" name="lr_return_self_use_now"
+                                       {% if Setting.get('lr_return_self_use_now', false) %}checked{% endif %}>
+                                <label class="form-check-label" for="lr_return_self_use_now">Only Self Lending must use current date/time for Return <small class="text-muted">(cannot manually set return date)</small></label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
 
             <!-- Action Buttons -->
             <div class="card">
@@ -235,6 +464,10 @@
                 </div>
             </div>
         </form>
+
+        <!-- Standalone delete forms — must be outside the main form to avoid HTML nesting issues -->
+        <form id="delete-system-logo-form" method="POST" action="{{ url_for('settings.delete_system_logo') }}"></form>
+        <form id="delete-company-logo-form" method="POST" action="{{ url_for('settings.delete_company_logo') }}"></form>
 
         <!-- System Information Card -->
         {% if verinfo_content %}
@@ -258,23 +491,34 @@
                 <h5 class="mb-0"><i class="bi bi-question-circle"></i> Help</h5>
             </div>
             <div class="card-body">
-                <h6 class="mt-3">System Customization</h6>
-                <p class="small">Control how banners are displayed. Set timeout to 0 for persistent banners that only close with the X button.</p>
+                <h6><i class="bi bi-palette"></i> System Customization</h6>
+                <ul class="small ps-3 mb-2">
+                    <li><strong>System Name</strong> — Shown on the login page (max 64 chars).</li>
+                    <li><strong>System Logo</strong> — Displayed on the login screen. JPG/PNG, max 1 MB.</li>
+                    <li><strong>Banner Timeout</strong> — 0 = permanent banner (closes with ✕); 1–60 = auto-dismiss after N seconds.</li>
+                    <li><strong>User Signup</strong> — Allow self-registration at <code>/register</code>. Disable to require admin-created accounts only.</li>
+                    <li><strong>Default Theme</strong> — Fallback theme for anonymous users and new accounts.</li>
+                    <li><strong>Download All (ZIP)</strong> — Control which sections expose a bulk download button.</li>
+                </ul>
 
-                <h6 class="mt-3">Currency Settings</h6>
-                <p class="small">You can use standard symbols ($, €, £) or currency codes (USD, RM, MYR). Decimal place depending on your set currency</p>
+                <h6 class="mt-3"><i class="bi bi-building"></i> Company Details</h6>
+                <p class="small mb-2">Company name, contact info, address, and logo used in printed documents and QR sticker headers.</p>
 
-                <h6 class="mt-3">Drawer Size Limits</h6>
-                <p class="small">Set maximum rows and columns for rack drawers. This prevents users from creating excessively large grids that could impact performance.</p>
-                
-                <h6 class="mt-3">File Size Limits</h6>
-                <p class="small">Setting a lower file size limit helps conserve server storage space and improves upload performance.</p>
-               
-                <h6 class="mt-3">File Type Restrictions</h6>
-                <p class="small">Restricting file types helps maintain security and organization. Only allow file types you actually need.</p>
+                <h6 class="mt-3"><i class="bi bi-currency-dollar"></i> Currency Settings</h6>
+                <p class="small mb-2">Use standard symbols ($, €, £) or currency codes (USD, RM, MYR, SGD). Choose decimal places to match your currency (e.g. 0 for JPY, 2 for USD).</p>
+
+                <h6 class="mt-3"><i class="bi bi-grid-3x3"></i> Drawer Size Limits</h6>
+                <p class="small mb-2">Sets the maximum rows and columns allowed when creating or editing racks. Prevents excessively large grids (max 32×32).</p>
+
+                <h6 class="mt-3"><i class="bi bi-cloud-upload"></i> File Upload Settings</h6>
+                <ul class="small ps-3 mb-2">
+                    <li><strong>Item Uploads</strong> — Controls attachments on item pages.</li>
+                    <li><strong>Project Uploads</strong> — Per-type limits for pictures, documents, schematics, designs, and programs.</li>
+                    <li><strong>Share Files</strong> — Files accessible via shared links and sticker/icon libraries.</li>
+                </ul>
 
                 <div class="alert alert-info small mb-0 mt-3">
-                    <i class="bi bi-shield-check"></i> <strong>Security Tip:</strong> Avoid allowing executable file types (.exe, .bat, .sh) for security reasons.
+                    <i class="bi bi-shield-check"></i> <strong>Security Tip:</strong> Never allow executable types (.exe, .bat, .sh, .ps1). Settings are saved only when you click <strong>Save All Settings</strong>.
                 </div>
             </div>
         </div>

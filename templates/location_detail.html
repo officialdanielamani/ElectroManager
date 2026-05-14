@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ location.name }} - Inventory Manager{% endblock %}
+{% block title %}{{ location.name }} - Electro Manager{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
@@ -26,9 +26,15 @@
                 <h5 class="mb-0">Location Information</h5>
             </div>
             <div class="card-body">
+                <div class="mb-3 d-flex align-items-flex-start gap-3">
+                    <div style="flex-shrink:0; background:white; padding:6px; border-radius:4px; display:inline-block;">
+                        <img src="{{ url_for('location_rack.location_qr_svg', uuid=location.uuid) }}" alt="QR Code" width="120" height="120" style="border:2px solid #ddd; padding:4px; border-radius:4px; display:block;">
+                        <div class="text-center mt-1" style="font-size:0.7em; color:#777;">{{ location.uuid }}</div>
+                    </div>
+                </div>
                 <p><strong>UUID:</strong> <code class="font-monospace">{{ location.uuid }}</code></p>
                 <p><strong>Name:</strong> {{ location.name }}</p>
-                <p><strong>Info:</strong> {{ location.info or 'N/A' }}</p>
+                <p><strong>Short Info:</strong> {{ location.info or 'N/A' }}</p>
                 <p><strong>Description:</strong> {{ location.description or 'N/A' }}</p>
                 <p><strong>Color:</strong> 
                     <span style="display: inline-block; width: 20px; height: 20px; background-color: {{ location.color }}; border: 1px solid #dee2e6; border-radius: 4px; vertical-align: middle;"></span>

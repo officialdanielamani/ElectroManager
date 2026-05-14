@@ -116,6 +116,8 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
+    name = db.Column(db.String(64))
+    short_info = db.Column(db.String(128))
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'), nullable=False)
     theme = db.Column(db.String(20), default='light')
     user_font = db.Column(db.String(50), default='system')
@@ -128,6 +130,7 @@ class User(UserMixin, db.Model):
     allow_password_reset = db.Column(db.Boolean, default=True)
     profile_photo = db.Column(db.String(255))
     allow_profile_picture_change = db.Column(db.Boolean, default=True)
+    allow_change_short_info = db.Column(db.Boolean, default=True)
     profile_picture_source = db.Column(db.String(10), default='share')  # 'upload', 'share', 'both'
     failed_login_attempts = db.Column(db.Integer, default=0)
     account_locked_until = db.Column(db.DateTime)
@@ -149,11 +152,9 @@ class User(UserMixin, db.Model):
         return self.has_permission('items', 'view') and (
             self.has_permission('items', 'create') or
             self.has_permission('items', 'edit_info') or
-            self.has_permission('items', 'edit_batch') or
-            self.has_permission('items', 'edit_quantity') or
-            self.has_permission('items', 'edit_price') or
-            self.has_permission('items', 'edit_sn') or
-            self.has_permission('items', 'edit_lending') or
+            self.has_permission('items', 'create_batch') or
+            self.has_permission('lending_return', 'edit_batch') or
+            self.has_permission('lending_return', 'edit_lending') or
             self.has_permission('items', 'edit_advance')
         )
     
@@ -228,6 +229,7 @@ class Rack(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     uuid = db.Column(db.String(12), unique=True, nullable=False)
     name = db.Column(db.String(100), nullable=False)
+    short_info = db.Column(db.String(128))
     description = db.Column(db.Text)
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
     picture = db.Column(db.String(200))
@@ -236,6 +238,7 @@ class Rack(db.Model):
     cols = db.Column(db.Integer, default=5)
     unavailable_drawers = db.Column(db.Text)
     merged_cells = db.Column(db.Text, default='[]')
+    drawer_info = db.Column(db.Text)  # JSON dict: {drawer_id: short_info_text}
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     items = db.relationship('Item', backref='rack', lazy=True)
@@ -262,6 +265,25 @@ class Rack(db.Model):
             return json.loads(self.merged_cells or '[]')
         except (json.JSONDecodeError, TypeError):
             return []
+
+    def get_drawer_info(self):
+        if not self.drawer_info:
+            return {}
+        try:
+            return json.loads(self.drawer_info)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+
+    def get_drawer_short_info(self, drawer_id):
+        return self.get_drawer_info().get(drawer_id, '')
+
+    def set_drawer_short_info(self, drawer_id, text):
+        info = self.get_drawer_info()
+        if text:
+            info[drawer_id] = text[:128]
+        elif drawer_id in info:
+            del info[drawer_id]
+        self.drawer_info = json.dumps(info) if info else None
 
     def get_merge_group(self, cell_id):
         for group in self.get_merged_cells():
@@ -345,6 +367,7 @@ class Item(db.Model):
     uuid = db.Column(db.String(16), unique=True, nullable=False)
     name = db.Column(db.String(200), nullable=False)
     sku = db.Column(db.String(100))
+    short_info = db.Column(db.String(128))
     info = db.Column(db.String(500))
     description = db.Column(db.Text)
 
@@ -496,6 +519,7 @@ class ItemBatch(db.Model):
     item_id = db.Column(db.Integer, db.ForeignKey('items.id'), nullable=False)
     batch_number = db.Column(db.Integer, nullable=False)
     batch_label = db.Column(db.String(32))
+    manufacturer = db.Column(db.String(128))
     quantity = db.Column(db.Integer, default=0)
     price_per_unit = db.Column(db.Float, default=0.0)
     purchase_date = db.Column(db.Date)
@@ -557,11 +581,15 @@ class ItemBatch(db.Model):
         if self.batch_label:
             return self.batch_label
         return f"Batch {self.batch_number}"
+
+    def get_batch_uid(self):
+        """Return a stable unique identifier: {item_uuid}-B{batch_number:02d}."""
+        return f"{self.item.uuid}-B{self.batch_number:02d}"
     
     def get_lend_quantity(self):
         """Total lend quantity across all lend records (or per-SN count for tracked batches)."""
         if self.sn_tracking_enabled:
-            return sum(1 for sn in self.serial_numbers if sn.lend_to_id)
+            return sum(1 for sn in self.serial_numbers if sn.lend_to_id and not sn.is_deleted)
         return sum(r.quantity for r in self.lend_records)
 
     def get_lend_records_data(self):
@@ -574,10 +602,36 @@ class ItemBatch(db.Model):
                 'contact_id': r.lend_to_id,
                 'label': r.get_lend_to_display(),
                 'qty': r.quantity,
-                'start': r.lend_start.strftime('%Y-%m-%d') if r.lend_start else '',
-                'end': r.lend_end.strftime('%Y-%m-%d') if r.lend_end else '',
+                'start': r.lend_start.strftime('%Y-%m-%dT%H:%M') if r.lend_start else '',
+                'end': r.lend_end.strftime('%Y-%m-%dT%H:%M') if r.lend_end else '',
                 'notify': r.lend_notify_enabled or False,
                 'days': r.lend_notify_before_days or 3,
+                'lend_note': r.lend_note or '',
+            })
+        return result
+
+    def get_serial_numbers_data(self):
+        """Serialise all SN rows to a list of dicts for JS state manager."""
+        result = []
+        for sn in self.serial_numbers:
+            result.append({
+                'id': sn.id,
+                'seq': sn.sequence_number,
+                'isn': sn.internal_serial_number or '',
+                'sn': sn.serial_number or '',
+                'info': sn.info or '',
+                'lend_to_id': sn.lend_to_id,
+                'lend_to_type': sn.lend_to_type or '',
+                'lend_display': sn.get_lend_to_display() or '',
+                'lend_start': sn.lend_start.strftime('%Y-%m-%dT%H:%M') if sn.lend_start else '',
+                'lend_end': sn.lend_end.strftime('%Y-%m-%dT%H:%M') if sn.lend_end else '',
+                'lend_notify': bool(sn.lend_notify_enabled),
+                'lend_days': sn.lend_notify_before_days or 3,
+                'lend_note': sn.lend_note or '',
+                'is_deleted': bool(sn.is_deleted),
+                'deleted_reason': sn.deleted_reason or '',
+                'deleted_by': sn.deleted_by.username if sn.deleted_by else '',
+                'deleted_at': sn.deleted_at.strftime('%Y-%m-%d %H:%M') if sn.deleted_at else '',
             })
         return result
 
@@ -638,13 +692,14 @@ class ItemBatch(db.Model):
                 'lend_end': sn.lend_end,
                 'lend_notify_enabled': sn.lend_notify_enabled or False,
                 'lend_notify_before_days': sn.lend_notify_before_days or 3,
+                'lend_note': sn.lend_note or '',
             }
         BatchSerialNumber.query.filter_by(batch_id=self.id).delete()
         qty = min(self.quantity, 100)
         date_str = self.purchase_date.strftime('%Y%m%d') if self.purchase_date else '00000000'
-        label = self.batch_label or f"B{self.batch_number}"
+        batch_id_str = f"B{self.batch_number:02d}"
         for i in range(1, qty + 1):
-            isn = f"{item.uuid}-{date_str}-{label}-{i:03d}"
+            isn = f"{item.uuid}-{date_str}-{batch_id_str}-{i:03d}"
             old = existing_data.get(i, {})
             sn = BatchSerialNumber(
                 batch_id=self.id,
@@ -658,6 +713,7 @@ class ItemBatch(db.Model):
                 lend_end=old.get('lend_end'),
                 lend_notify_enabled=old.get('lend_notify_enabled', False),
                 lend_notify_before_days=old.get('lend_notify_before_days', 3),
+                lend_note=old.get('lend_note', '') or None,
             )
             db.session.add(sn)
     
@@ -681,11 +737,18 @@ class BatchSerialNumber(db.Model):
     info = db.Column(db.String(32), default='')
     lend_to_type = db.Column(db.String(20), default='')
     lend_to_id = db.Column(db.Integer, nullable=True)
-    lend_start = db.Column(db.Date, nullable=True)
-    lend_end = db.Column(db.Date, nullable=True)
+    lend_start = db.Column(db.DateTime, nullable=True)
+    lend_end = db.Column(db.DateTime, nullable=True)
     lend_notify_enabled = db.Column(db.Boolean, default=False)
     lend_notify_before_days = db.Column(db.Integer, default=3)
+    lend_note = db.Column(db.String(128), nullable=True)
+    is_deleted = db.Column(db.Boolean, default=False)
+    deleted_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    deleted_at = db.Column(db.DateTime, nullable=True)
+    deleted_reason = db.Column(db.String(256), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    deleted_by = db.relationship('User', foreign_keys=[deleted_by_id])
 
     def get_lend_to_display(self):
         if not self.lend_to_id or not self.lend_to_type:
@@ -720,10 +783,11 @@ class BatchLendRecord(db.Model):
     lend_to_type = db.Column(db.String(20), default='')
     lend_to_id = db.Column(db.Integer, nullable=True)
     quantity = db.Column(db.Integer, default=1)
-    lend_start = db.Column(db.Date, nullable=True)
-    lend_end = db.Column(db.Date, nullable=True)
+    lend_start = db.Column(db.DateTime, nullable=True)
+    lend_end = db.Column(db.DateTime, nullable=True)
     lend_notify_enabled = db.Column(db.Boolean, default=False)
     lend_notify_before_days = db.Column(db.Integer, default=3)
+    lend_note = db.Column(db.String(128), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def get_lend_to_display(self):
@@ -803,6 +867,7 @@ class MagicParameter(db.Model):
     units = db.relationship('ParameterUnit', backref='parameter', lazy=True, cascade='all, delete-orphan')
     string_options = db.relationship('ParameterStringOption', backref='parameter', lazy=True, cascade='all, delete-orphan')
     item_parameters = db.relationship('ItemParameter', backref='parameter', lazy=True, cascade='all, delete-orphan')
+    project_parameters = db.relationship('ProjectParameter', lazy=True, cascade='all, delete-orphan')
     
     def get_units_list(self):
         if self.param_type == 'number':
@@ -992,6 +1057,77 @@ class ItemParameter(db.Model):
         return f'<ItemParameter {self.id} for Item {self.item_id}>'
 
 
+class ProjectParameterStringValue(db.Model):
+    """Stores selected/custom string values for a ProjectParameter (supports multi-select)."""
+    __tablename__ = 'project_parameter_string_values'
+    id = db.Column(db.Integer, primary_key=True)
+    project_parameter_id = db.Column(db.Integer, db.ForeignKey('project_parameters.id'), nullable=False)
+    value = db.Column(db.String(128), nullable=False)
+    is_custom = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    def __repr__(self):
+        return f'<ProjectParameterStringValue {self.value} custom={self.is_custom}>'
+
+
+class ProjectParameter(db.Model):
+    __tablename__ = 'project_parameters'
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    parameter_id = db.Column(db.Integer, db.ForeignKey('magic_parameters.id'), nullable=False)
+    operation = db.Column(db.String(50))
+    value = db.Column(db.String(200))
+    value2 = db.Column(db.String(200))
+    unit = db.Column(db.String(50))
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    project = db.relationship('Project', backref=db.backref('magic_parameters', cascade='all, delete-orphan', lazy=True))
+    parameter = db.relationship('MagicParameter')
+    string_values = db.relationship('ProjectParameterStringValue', backref='project_parameter', lazy=True, cascade='all, delete-orphan')
+
+    def get_selected_string_values(self):
+        predefined = [sv.value for sv in self.string_values if not sv.is_custom]
+        custom = [sv.value for sv in self.string_values if sv.is_custom]
+        return predefined, custom
+
+    def get_display_text(self):
+        param = self.parameter
+        if not param:
+            return "Unknown Parameter"
+        if param.param_type == 'number':
+            if self.operation == 'min':
+                return f"MIN: {param.name} {self.value} {self.unit or ''} {self.description or ''}".strip()
+            elif self.operation == 'max':
+                return f"MAX: {param.name} {self.value} {self.unit or ''} {self.description or ''}".strip()
+            elif self.operation == 'range':
+                return f"RANGE: {param.name} {self.value} {self.unit or ''} - {self.value2} {self.unit or ''} {self.description or ''}".strip()
+            else:
+                return f"VALUE: {param.name} {self.value} {self.unit or ''} {self.description or ''}".strip()
+        elif param.param_type == 'date':
+            if self.operation == 'start':
+                return f"START: {param.name} on {self.value} {self.description or ''}".strip()
+            elif self.operation == 'end':
+                return f"END: {param.name} on {self.value} {self.description or ''}".strip()
+            elif self.operation == 'duration':
+                return f"DURATION: {param.name} {self.value} to {self.value2} {self.description or ''}".strip()
+            else:
+                return f"{param.name} on {self.value} {self.description or ''}".strip()
+        elif param.param_type == 'string':
+            predefined, custom = self.get_selected_string_values()
+            parts = []
+            if predefined:
+                parts.append(', '.join(predefined))
+            if custom:
+                parts.append(f"Custom: {', '.join(custom)}")
+            if parts:
+                return f"{param.name}: {' | '.join(parts)} {self.description or ''}".strip()
+            return f"{param.name}: (none selected) {self.description or ''}".strip()
+        return "Invalid Parameter"
+
+    def __repr__(self):
+        return f'<ProjectParameter {self.id} for Project {self.project_id}>'
+
+
 class ParameterTemplate(db.Model):
     __tablename__ = 'parameter_templates'
     id = db.Column(db.Integer, primary_key=True)
@@ -1108,7 +1244,7 @@ class ProjectStatus(db.Model):
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 class ProjectPerson(db.Model):
-    __tablename__ = 'project_persons'
+    __tablename__ = 'persons'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     email = db.Column(db.String(200))
@@ -1118,7 +1254,7 @@ class ProjectPerson(db.Model):
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 class ProjectGroup(db.Model):
-    __tablename__ = 'project_groups'
+    __tablename__ = 'groups'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), unique=True, nullable=False)
     description = db.Column(db.Text)
@@ -1132,11 +1268,11 @@ class ProjectGroup(db.Model):
         return [m for m in self.members if m.person_id is not None]
 
 class ProjectGroupMember(db.Model):
-    __tablename__ = 'project_group_members'
+    __tablename__ = 'group_members'
     id = db.Column(db.Integer, primary_key=True)
-    group_id = db.Column(db.Integer, db.ForeignKey('project_groups.id'), nullable=False)
+    group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    person_id = db.Column(db.Integer, db.ForeignKey('project_persons.id'), nullable=True)
+    person_id = db.Column(db.Integer, db.ForeignKey('persons.id'), nullable=True)
     user = db.relationship('User', backref='project_group_memberships')
     person = db.relationship('ProjectPerson', backref='group_memberships')
 
