@@ -217,20 +217,7 @@
                 <i class="bi bi-trash"></i> Remove Selected
               </button>
             </div>
-            <div class="table-responsive">
-              <table class="table table-sm table-hover mb-0" style="font-size:0.83rem;">
-                <thead class="table-light">
-                  <tr>
-                    <th style="width:30px"><input type="checkbox" id="cartNormalChkAll" onchange="cartToggleAll('normal',this)"></th>
-                    <th>Item</th>
-                    <th style="width:110px">Qty</th>
-                    <th>Notes</th>
-                    <th style="width:30px"></th>
-                  </tr>
-                </thead>
-                <tbody id="cartNormalBody"></tbody>
-              </table>
-            </div>
+            <div id="cartNormalTableWrap" class="table-responsive"></div>
           </div>
 
           <!-- SN Tracking Table (for both lend and return) -->
@@ -241,20 +228,7 @@
                 <i class="bi bi-trash"></i> Remove Selected
               </button>
             </div>
-            <div class="table-responsive">
-              <table class="table table-sm table-hover mb-0" style="font-size:0.83rem;">
-                <thead class="table-light">
-                  <tr>
-                    <th style="width:30px"><input type="checkbox" id="cartSnChkAll" onchange="cartToggleAll('sn',this)"></th>
-                    <th>Item</th>
-                    <th>ISN</th>
-                    <th>Notes</th>
-                    <th style="width:30px"></th>
-                  </tr>
-                </thead>
-                <tbody id="cartSnBody"></tbody>
-              </table>
-            </div>
+            <div id="cartSnTableWrap" class="table-responsive"></div>
           </div>
 
           <div class="text-end mb-2">
@@ -316,58 +290,47 @@
 
     <!-- ── Log Card ── -->
     <div class="card flex-grow-1">
-      <div class="card-header d-flex align-items-center justify-content-between py-2">
+      <div class="card-header py-2 px-3">
         <h6 class="mb-0"><i class="bi bi-journal-text"></i> Lending &amp; Return Log</h6>
-        {% if can_view_log and log_total_pages > 1 %}
-        <small class="text-muted">Page {{ log_page }}/{{ log_total_pages }}</small>
-        {% endif %}
       </div>
-      <div class="card-body p-2" style="max-height:75vh;overflow-y:auto;">
-        {% if not can_view_log %}
-        <div class="text-muted small p-2">No permission to view log.</div>
-        {% elif not logs %}
-        <div class="text-muted small p-2">No log entries yet.</div>
-        {% else %}
-        {% for entry in logs %}
-        {% set log = entry.log %}
-        <div class="border-bottom pb-2 mb-2 small">
-          {% if log.action == 'return' %}
-            {% if '"on_time": false' in (log.details or '') %}
-            <span class="badge bg-warning text-dark">Return Late</span>
-            {% else %}
-            <span class="badge bg-success">Return</span>
-            {% endif %}
-          {% elif log.action in ['lend', 'lend_update'] %}
-            <span class="badge bg-primary">Lend</span>
-          {% elif log.action in ['delete', 'batch_sn_purge'] %}
-            <span class="badge bg-danger">Delete</span>
-          {% elif log.action == 'update' %}
-            <span class="badge bg-secondary">Edit</span>
-          {% elif log.action == 'sn_batch_save' %}
-            <span class="badge bg-info text-dark">SN Edit</span>
+      {% if can_view_log %}
+      <div class="card-body p-2">
+        <!-- Log filter row -->
+        <div class="row g-1 mb-2 align-items-center flex-nowrap">
+          <div class="col">
+            <input type="date" class="form-control form-control-sm" id="logFilterStart"
+                   onchange="loadLog()" title="Log entries on/after this date">
+          </div>
+          {% if not can_only_self %}
+          <div class="col position-relative">
+            <input type="hidden" id="logFilterContactId">
+            <input type="hidden" id="logFilterContactType">
+            <input type="text" class="form-control form-control-sm" id="logFilterContactInput"
+                   placeholder="Contact…" oninput="debounceLogContact()" autocomplete="off"
+                   title="Filter by borrower">
+            <div id="logFilterContactDrop" class="border rounded shadow-sm position-absolute"
+                 style="top:100%;left:0;right:0;z-index:200;max-height:160px;overflow-y:auto;
+                        background:var(--bs-body-bg);display:none;font-size:0.82rem;"></div>
+          </div>
           {% endif %}
-          <span class="ms-1 fw-semibold">{{ entry.username }}</span>
-          <span class="text-muted ms-1">{{ entry.timestamp }}</span>
-          <div class="text-muted mt-1" style="font-size:0.78rem;word-break:break-word;">{{ entry.display }}</div>
+          <div class="col">
+            <input type="date" class="form-control form-control-sm" id="logFilterEnd"
+                   onchange="loadLog()" title="Log entries on/before this date">
+          </div>
         </div>
-        {% endfor %}
-        {% endif %}
+        <!-- Log results -->
+        <div id="logResults" style="max-height:60vh;overflow-y:auto;font-size:0.83rem;">
+          <div class="text-muted small text-center py-2"><i class="bi bi-hourglass-split"></i> Loading…</div>
+        </div>
+        <div class="text-center mt-1" id="logLoadMoreWrap" style="display:none;">
+          <button class="btn btn-sm btn-outline-secondary py-0" onclick="loadLogMore()">
+            <i class="bi bi-chevron-down"></i> Load more
+          </button>
+        </div>
       </div>
-      {% if can_view_log and log_total_pages > 1 %}
-      <div class="card-footer py-1 px-2">
-        <div class="d-flex justify-content-between align-items-center">
-          {% if log_page > 1 %}
-          <a href="{{ url_for('in_out.in_out', log_page=log_page-1) }}" class="btn btn-sm btn-outline-secondary py-0">
-            <i class="bi bi-chevron-left"></i> Newer
-          </a>
-          {% else %}<span></span>{% endif %}
-          <small class="text-muted">{{ log_page }}/{{ log_total_pages }}</small>
-          {% if log_page < log_total_pages %}
-          <a href="{{ url_for('in_out.in_out', log_page=log_page+1) }}" class="btn btn-sm btn-outline-secondary py-0">
-            Older <i class="bi bi-chevron-right"></i>
-          </a>
-          {% else %}<span></span>{% endif %}
-        </div>
+      {% else %}
+      <div class="card-body p-2">
+        <div class="text-muted small p-2">No permission to view log.</div>
       </div>
       {% endif %}
     </div>
@@ -402,9 +365,16 @@ var _canEditBatch   = {{ can_edit_batch | tojson }};
 var _canDeleteBatch = {{ can_delete_batch | tojson }};
 var _canOnlySelf    = {{ can_only_self | tojson }};
 var _currentUserId  = {{ current_user_id }};
+var _currentUserLabel = {{ current_user_label | tojson }};
 var _ebCurrency     = {{ currency | tojson }};
 var _lrSettings     = {{ lr_settings | tojson }};
 var _scanEnabled    = {{ scan_enabled | tojson }};
+
+/* Log panel state */
+var _logPage            = 1;
+var _logContactId       = '';
+var _logContactType     = '';
+var _logContactTimer    = null;
 
 /* Advanced options — persisted per-user in localStorage */
 var _ADV_KEY = 'lr_adv_{{ current_user_id }}';
@@ -431,13 +401,19 @@ var _ebSnState = null;
 document.addEventListener('DOMContentLoaded', function() {
     loadAdvOpts();
     _sessInitDefaults();
+    _logInitDefaults();
 
-    /* Click outside closes sessions contact dropdown */
+    /* Click outside closes contact dropdowns */
     document.addEventListener('click', function(e) {
         var drop = document.getElementById('sessFilterContactDrop');
         var inp  = document.getElementById('sessFilterContactInput');
         if (drop && inp && !inp.contains(e.target) && !drop.contains(e.target)) {
             drop.style.display = 'none';
+        }
+        var ldrop = document.getElementById('logFilterContactDrop');
+        var linp  = document.getElementById('logFilterContactInput');
+        if (ldrop && linp && !linp.contains(e.target) && !ldrop.contains(e.target)) {
+            ldrop.style.display = 'none';
         }
     });
 
@@ -455,6 +431,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     if (_scanEnabled) { _initCameraState(); }
     if (_canLend) { searchSessions(); }
+    loadLog();
 });
 
 /* ════════════════════════════════════════════════════════
@@ -870,7 +847,9 @@ function _tryAddSnToCart(batchData, preselectedSnId) {
         _cartAdd({ type: 'sn', batch_id: batchData.id,
                    sn_id: target.id, isn: target.isn,
                    item_name: batchData.item_name, batch_label: batchData.display_label,
-                   lend_display: target.lend_display, note: '' });
+                   lend_display: target.lend_display || '',
+                   lend_end: target.lend_end || '',
+                   note: '' });
         showToast('Added to return cart: ' + target.isn, 'success');
         _playSound('scanner');
     } else {
@@ -963,6 +942,8 @@ function addSessionToCart(sessionOrId) {
                 _cart.push({ _key: ++_cartKey, type: 'sn', batch_id: it.batch_id,
                              sn_id: it.sn_id, isn: it.isn,
                              item_name: it.item_name, batch_label: it.batch_label,
+                             lend_display: it.lend_display || '',
+                             lend_end: it.lend_end || '',
                              note: it.lend_note || '' });
             }
         } else if (it.type === 'lend_record') {
@@ -986,68 +967,88 @@ function addSessionToCart(sessionOrId) {
 }
 
 function _renderCart() {
-    var normals = _cart.filter(function(c){ return c.type === 'normal' || c.type === 'lend_record'; });
-    var sns     = _cart.filter(function(c){ return c.type === 'sn'; });
-    var total   = _cart.length;
+    var isReturn = (_mode === 'return');
+    var normals  = _cart.filter(function(c){ return c.type === 'normal' || c.type === 'lend_record'; });
+    var sns      = _cart.filter(function(c){ return c.type === 'sn'; });
+    var total    = _cart.length;
 
-    var sec  = document.getElementById('cartSection');
-    var norm = document.getElementById('cartNormalSection');
-    var snSec= document.getElementById('cartSnSection');
+    var sec   = document.getElementById('cartSection');
+    var norm  = document.getElementById('cartNormalSection');
+    var snSec = document.getElementById('cartSnSection');
     if (!sec) return;
 
     document.getElementById('cartBadge').textContent = total;
     sec.classList.toggle('d-none', total === 0);
 
-    /* Normal batch rows */
+    /* ── Normal batch table (dynamic header) ── */
     norm.classList.toggle('d-none', normals.length === 0);
-    var tbody = document.getElementById('cartNormalBody');
-    if (tbody) {
-        tbody.innerHTML = normals.map(function(it) {
-            var itemCell = _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span>';
-            if (it.type === 'lend_record') {
-                if (it.lend_display) {
-                    itemCell += '<br><small><i class="bi bi-person me-1 text-muted"></i>' + _esc(it.lend_display) + '</small>';
-                }
-                if (it.lend_end) {
-                    itemCell += ' <small class="text-muted">· due ' + _esc(it.lend_end.slice(0, 10)) + '</small>';
-                }
+    var nWrap = document.getElementById('cartNormalTableWrap');
+    if (nWrap) {
+        var nHdr = '<thead class="table-light"><tr>' +
+            '<th style="width:28px"><input type="checkbox" id="cartNormalChkAll" onchange="cartToggleAll(\'normal\',this)"></th>' +
+            '<th>Item</th>' +
+            '<th style="width:95px">Qty</th>' +
+            (isReturn ? '<th>Contact</th><th>Due</th>' : '') +
+            '<th>Notes</th>' +
+            '<th style="width:28px"></th>' +
+            '</tr></thead>';
+        var nRows = normals.map(function(it) {
+            var itemCell = _esc(it.item_name) + ' <span class="text-muted small">(' + _esc(it.batch_label) + ')</span>';
+            var contactCell = '';
+            var dueCell = '';
+            if (isReturn && it.type === 'lend_record') {
+                contactCell = it.lend_display ? _esc(it.lend_display) : '<span class="text-muted">—</span>';
+                dueCell     = it.lend_end ? _esc(it.lend_end.slice(0, 10)) : '<span class="text-muted">—</span>';
             }
             return '<tr>' +
                 '<td><input type="checkbox" class="cart-chk-normal" value="' + it._key + '"></td>' +
                 '<td class="small">' + itemCell + '</td>' +
                 '<td>' +
-                  '<div class="input-group input-group-sm" style="width:90px;">' +
+                  '<div class="input-group input-group-sm" style="width:88px;">' +
                   '<button class="btn btn-outline-secondary py-0 px-1" type="button" onclick="_cartUpdateQty(' + it._key + ', -1)">−</button>' +
-                  '<input type="number" class="form-control text-center py-0 px-1" value="' + (it.qty || 1) + '" min="1"' +
+                  '<input type="number" class="form-control text-center py-0 px-0" value="' + (it.qty || 1) + '" min="1"' +
                   (it.max_qty ? ' max="' + it.max_qty + '"' : '') +
-                  ' onchange="_cartSetQty(' + it._key + ', parseInt(this.value))" style="width:38px;">' +
+                  ' onchange="_cartSetQty(' + it._key + ', parseInt(this.value))" style="width:34px;">' +
                   '<button class="btn btn-outline-secondary py-0 px-1" type="button" onclick="_cartUpdateQty(' + it._key + ', 1)">+</button>' +
                   '</div>' +
-                  (it.max_qty ? '<div class="text-muted" style="font-size:0.7rem;">max ' + it.max_qty + '</div>' : '') +
+                  (it.max_qty ? '<div class="text-muted" style="font-size:0.68rem;">max ' + it.max_qty + '</div>' : '') +
                 '</td>' +
-                '<td><input type="text" class="form-control form-control-sm py-0" value="' + _esc(it.note || '') + '" maxlength="128" placeholder="Item note" oninput="_cartUpdateNote(' + it._key + ', this.value)"></td>' +
+                (isReturn ? '<td class="small">' + contactCell + '</td><td class="small">' + dueCell + '</td>' : '') +
+                '<td><input type="text" class="form-control form-control-sm py-0" value="' + _esc(it.note || '') + '" maxlength="128" placeholder="Note" oninput="_cartUpdateNote(' + it._key + ', this.value)" style="min-width:70px;"></td>' +
                 '<td><button class="btn btn-link btn-sm text-danger p-0" onclick="_cartRemove(' + it._key + ')" title="Remove"><i class="bi bi-x-lg"></i></button></td>' +
                 '</tr>';
         }).join('');
+        nWrap.innerHTML = '<table class="table table-sm table-hover mb-0" style="font-size:0.83rem;">' +
+            nHdr + '<tbody id="cartNormalBody">' + nRows + '</tbody></table>';
     }
 
-    /* SN rows (serial-tracked items only) */
+    /* ── SN table (dynamic header) ── */
     snSec.classList.toggle('d-none', sns.length === 0);
-    var snBody = document.getElementById('cartSnBody');
-    if (snBody) {
-        snBody.innerHTML = sns.map(function(it) {
-            var snInfo = '<code style="font-size:0.78rem;">' + _esc(it.isn || '') + '</code>';
-            if (it.lend_display) {
-                snInfo += '<br><small><i class="bi bi-person me-1 text-muted"></i>' + _esc(it.lend_display) + '</small>';
-            }
+    var sWrap = document.getElementById('cartSnTableWrap');
+    if (sWrap) {
+        var sHdr = '<thead class="table-light"><tr>' +
+            '<th style="width:28px"><input type="checkbox" id="cartSnChkAll" onchange="cartToggleAll(\'sn\',this)"></th>' +
+            '<th>Item</th>' +
+            '<th>ISN</th>' +
+            (isReturn ? '<th>Contact</th><th>Due</th>' : '') +
+            '<th>Notes</th>' +
+            '<th style="width:28px"></th>' +
+            '</tr></thead>';
+        var sRows = sns.map(function(it) {
+            var snCode = '<code style="font-size:0.78rem;">' + _esc(it.isn || '') + '</code>';
+            var contactCell = isReturn ? (it.lend_display ? _esc(it.lend_display) : '<span class="text-muted">—</span>') : '';
+            var dueCell     = isReturn ? (it.lend_end ? _esc(it.lend_end.slice(0, 10)) : '<span class="text-muted">—</span>') : '';
             return '<tr>' +
                 '<td><input type="checkbox" class="cart-chk-sn" value="' + it._key + '"></td>' +
                 '<td class="small">' + _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span></td>' +
-                '<td class="small">' + snInfo + '</td>' +
-                '<td><input type="text" class="form-control form-control-sm py-0" value="' + _esc(it.note || '') + '" maxlength="128" placeholder="Item note" oninput="_cartUpdateNote(' + it._key + ', this.value)"></td>' +
+                '<td class="small">' + snCode + '</td>' +
+                (isReturn ? '<td class="small">' + contactCell + '</td><td class="small">' + dueCell + '</td>' : '') +
+                '<td><input type="text" class="form-control form-control-sm py-0" value="' + _esc(it.note || '') + '" maxlength="128" placeholder="Note" oninput="_cartUpdateNote(' + it._key + ', this.value)" style="min-width:70px;"></td>' +
                 '<td><button class="btn btn-link btn-sm text-danger p-0" onclick="_cartRemove(' + it._key + ')" title="Remove"><i class="bi bi-x-lg"></i></button></td>' +
                 '</tr>';
         }).join('');
+        sWrap.innerHTML = '<table class="table table-sm table-hover mb-0" style="font-size:0.83rem;">' +
+            sHdr + '<tbody id="cartSnBody">' + sRows + '</tbody></table>';
     }
 }
 
@@ -1087,16 +1088,56 @@ function _buildCartDetailForm() {
     var endReq   = _lrSettings.lend_end_date_required;
     var retReq   = _lrSettings.return_date_required;
 
-    var cartSummary = _cart.map(function(it) {
-        if (it.type === 'sn') return '<li class="small"><code>' + _esc(it.isn) + '</code> — ' + _esc(it.item_name) + '</li>';
-        if (it.type === 'lend_record') return '<li class="small">Return record #' + it.lend_record_id + ' (' + _esc(it.item_name) + ')</li>';
-        return '<li class="small">' + _esc(it.item_name) + ' &times;' + (it.qty || 1) + '</li>';
-    }).join('');
+    /* ── Cart summary ── */
+    var summaryHtml = '';
+    if (isReturn) {
+        var normalItems = _cart.filter(function(c){ return c.type === 'normal' || c.type === 'lend_record'; });
+        var snItems     = _cart.filter(function(c){ return c.type === 'sn'; });
+        if (normalItems.length) {
+            summaryHtml += '<div class="fw-semibold small mb-1 mt-1"><i class="bi bi-box-seam me-1"></i>Standard Items</div>' +
+                '<div class="table-responsive mb-2"><table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">' +
+                '<thead class="table-light"><tr><th>Item (Batch)</th><th style="width:50px">Qty</th><th>Contact</th><th>Due</th></tr></thead><tbody>';
+            normalItems.forEach(function(it) {
+                summaryHtml += '<tr>' +
+                    '<td>' + _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span></td>' +
+                    '<td class="text-center">' + (it.qty || 1) + '&times;</td>' +
+                    '<td>' + (it.lend_display ? _esc(it.lend_display) : '<span class="text-muted">—</span>') + '</td>' +
+                    '<td>' + (it.lend_end ? _esc(it.lend_end.slice(0,10)) : '<span class="text-muted">—</span>') + '</td>' +
+                    '</tr>';
+            });
+            summaryHtml += '</tbody></table></div>';
+        }
+        if (snItems.length) {
+            summaryHtml += '<div class="fw-semibold small mb-1"><i class="bi bi-fingerprint me-1"></i>Serial-Tracked Items</div>' +
+                '<div class="table-responsive mb-2"><table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">' +
+                '<thead class="table-light"><tr><th>Item (Batch)</th><th>ISN</th><th>Contact</th><th>Due</th></tr></thead><tbody>';
+            snItems.forEach(function(it) {
+                summaryHtml += '<tr>' +
+                    '<td>' + _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span></td>' +
+                    '<td><code style="font-size:0.78rem;">' + _esc(it.isn || '') + '</code></td>' +
+                    '<td>' + (it.lend_display ? _esc(it.lend_display) : '<span class="text-muted">—</span>') + '</td>' +
+                    '<td>' + (it.lend_end ? _esc(it.lend_end.slice(0,10)) : '<span class="text-muted">—</span>') + '</td>' +
+                    '</tr>';
+            });
+            summaryHtml += '</tbody></table></div>';
+        }
+    } else {
+        var normalItems2 = _cart.filter(function(c){ return c.type === 'normal'; });
+        var snItems2     = _cart.filter(function(c){ return c.type === 'sn'; });
+        summaryHtml = '<ul class="mb-3 ps-3" style="max-height:120px;overflow-y:auto;">';
+        normalItems2.forEach(function(it){
+            summaryHtml += '<li class="small">' + _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span> &times;' + (it.qty||1) + '</li>';
+        });
+        snItems2.forEach(function(it){
+            summaryHtml += '<li class="small"><code style="font-size:0.78rem;">' + _esc(it.isn) + '</code> — ' + _esc(it.item_name) + '</li>';
+        });
+        summaryHtml += '</ul>';
+    }
 
     var html = '<div class="border rounded p-3">' +
-        '<h6 class="mb-3"><i class="bi bi-' + (isReturn ? 'box-arrow-in-left' : 'hand-index-thumb') + '"></i> ' +
+        '<h6 class="mb-2"><i class="bi bi-' + (isReturn ? 'box-arrow-in-left' : 'hand-index-thumb') + '"></i> ' +
         (isReturn ? 'Return' : 'Lending') + ' Details — ' + _cart.length + ' item(s)</h6>' +
-        '<ul class="mb-3 ps-3" style="max-height:120px;overflow-y:auto;">' + cartSummary + '</ul>';
+        summaryHtml;
 
     if (!isReturn) {
         /* Lend To */
@@ -2118,9 +2159,9 @@ function showToast(msg, type) {
 }
 
 function refreshLog() {
-    sessionStorage.setItem('inout_mode', _mode);
-    sessionStorage.setItem('inout_edit_batch', _editBatch ? '1' : '0');
-    setTimeout(function(){ window.location.reload(); }, 900);
+    _logPage = 1;
+    loadLog();
+    if (_canLend) { searchSessions(); }
 }
 
 /* ════════════════════════════════════════════════════════
@@ -2137,6 +2178,12 @@ function _sessInitDefaults() {
     };
     _setVal('sessFilterStart', fmt(past));
     _setVal('sessFilterEnd',   fmt(future));
+    /* Default contact to current user for non-self-only users */
+    if (!_canOnlySelf) {
+        _setVal('sessFilterContactId',    String(_currentUserId));
+        _setVal('sessFilterContactType',  'user');
+        _setVal('sessFilterContactInput', _currentUserLabel);
+    }
 }
 
 function searchSessions() {
@@ -2363,6 +2410,141 @@ function clearAdvContact() {
     if (lbl) { lbl.textContent = 'Click to select default contact…'; lbl.className = 'small text-muted'; }
     if (clr)   clr.style.display = 'none';
     saveAdvOpts();
+}
+
+/* ════════════════════════════════════════════════════════
+   LENDING & RETURN LOG PANEL
+   ════════════════════════════════════════════════════════ */
+function _logInitDefaults() {
+    /* Default log date range: past 7 days to today */
+    var now  = new Date();
+    var past = new Date(now.getTime() - 7 * 86400000);
+    var fmt  = function(d) {
+        return d.getFullYear() + '-' +
+               String(d.getMonth() + 1).padStart(2, '0') + '-' +
+               String(d.getDate()).padStart(2, '0');
+    };
+    _setVal('logFilterStart', fmt(past));
+    _setVal('logFilterEnd',   fmt(now));
+    /* Default contact to current user */
+    if (!_canOnlySelf) {
+        _logContactId   = String(_currentUserId);
+        _logContactType = 'user';
+        _setVal('logFilterContactId',    String(_currentUserId));
+        _setVal('logFilterContactType',  'user');
+        _setVal('logFilterContactInput', _currentUserLabel);
+    }
+}
+
+function loadLog() {
+    _logPage = 1;
+    _doLoadLog(false);
+}
+
+function loadLogMore() {
+    _logPage++;
+    _doLoadLog(true);
+}
+
+function _doLoadLog(append) {
+    var start = _getVal('logFilterStart');
+    var end   = _getVal('logFilterEnd');
+    var cid   = _getVal('logFilterContactId') || _logContactId;
+    var ctype = _getVal('logFilterContactType') || _logContactType;
+    var url   = '/in-out/logs?page=' + _logPage +
+                '&start_date=' + encodeURIComponent(start) +
+                '&end_date='   + encodeURIComponent(end);
+    if (cid && ctype) url += '&contact_id=' + encodeURIComponent(cid) +
+                              '&contact_type=' + encodeURIComponent(ctype);
+
+    var el = document.getElementById('logResults');
+    var lm = document.getElementById('logLoadMoreWrap');
+    if (!el) return;
+    if (!append) el.innerHTML = '<div class="text-muted small text-center py-2"><i class="bi bi-hourglass-split"></i> Loading…</div>';
+
+    fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        var entries = d.entries || [];
+        if (!append) el.innerHTML = '';
+        if (!entries.length && !append) {
+            el.innerHTML = '<div class="text-muted small text-center py-2">No log entries found.</div>';
+        } else {
+            var frag = '';
+            var actionBadge = function(action, details) {
+                if (action === 'return') {
+                    return (details && details.indexOf('"on_time": false') !== -1)
+                        ? '<span class="badge bg-warning text-dark">Return Late</span>'
+                        : '<span class="badge bg-success">Return</span>';
+                }
+                if (action === 'lend' || action === 'lend_update') return '<span class="badge bg-primary">Lend</span>';
+                if (action === 'delete' || action === 'batch_sn_purge') return '<span class="badge bg-danger">Delete</span>';
+                if (action === 'update') return '<span class="badge bg-secondary">Edit</span>';
+                if (action === 'sn_batch_save') return '<span class="badge bg-info text-dark">SN Edit</span>';
+                return '<span class="badge bg-secondary">' + _esc(action) + '</span>';
+            };
+            entries.forEach(function(e) {
+                frag += '<div class="border-bottom pb-2 mb-2 small">' +
+                    actionBadge(e.action, e.display) +
+                    '<span class="ms-1 fw-semibold">' + _esc(e.username) + '</span>' +
+                    '<span class="text-muted ms-1">' + _esc(e.timestamp) + '</span>' +
+                    '<div class="text-muted mt-1" style="font-size:0.78rem;word-break:break-word;">' + _esc(e.display) + '</div>' +
+                    '</div>';
+            });
+            el.insertAdjacentHTML('beforeend', frag);
+        }
+        if (lm) lm.style.display = d.has_more ? '' : 'none';
+    })
+    .catch(function() {
+        if (!append && el) el.innerHTML = '<div class="text-danger small p-1">Failed to load log.</div>';
+    });
+}
+
+/* Log contact filter */
+function debounceLogContact() {
+    clearTimeout(_logContactTimer);
+    _logContactTimer = setTimeout(_doLogContactSearch, 300);
+}
+
+function _doLogContactSearch() {
+    var q    = _getVal('logFilterContactInput');
+    var drop = document.getElementById('logFilterContactDrop');
+    if (!drop) return;
+    if (!q) {
+        _logContactId   = '';
+        _logContactType = '';
+        _setVal('logFilterContactId',   '');
+        _setVal('logFilterContactType', '');
+        drop.style.display = 'none';
+        loadLog();
+        return;
+    }
+    drop.style.display = '';
+    drop.innerHTML = '<div class="text-muted p-1 small">Loading…</div>';
+    fetch('/api/contacts/all?q=' + encodeURIComponent(q))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.length) { drop.innerHTML = '<div class="text-muted p-1 small">No contacts found.</div>'; return; }
+        drop.innerHTML = data.map(function(c) {
+            var rawL = (c.label || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            return '<div class="d-flex align-items-center gap-2 p-1 border-bottom" style="cursor:pointer;"' +
+                ' onclick="selectLogContact(\'' + c.type + '\',' + c.id + ',\'' + rawL + '\')">' +
+                '<span class="small flex-grow-1">' + _esc(c.label || '') + '</span>' +
+                '<span class="badge bg-secondary" style="font-size:0.65rem;">' + c.type + '</span></div>';
+        }).join('');
+    })
+    .catch(function() { if (drop) drop.innerHTML = '<div class="text-danger p-1 small">Error</div>'; });
+}
+
+function selectLogContact(type, id, label) {
+    _logContactId   = String(id);
+    _logContactType = type;
+    _setVal('logFilterContactId',    id);
+    _setVal('logFilterContactType',  type);
+    _setVal('logFilterContactInput', label);
+    var drop = document.getElementById('logFilterContactDrop');
+    if (drop) drop.style.display = 'none';
+    loadLog();
 }
 </script>
 

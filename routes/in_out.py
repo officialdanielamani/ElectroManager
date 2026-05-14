@@ -111,6 +111,7 @@ def in_out():
                            scan_enabled=scan_enabled,
                            lr_settings=lr_settings,
                            current_user_id=current_user.id,
+                           current_user_label=current_user.username,
                            currency=Setting.get('currency', '$'))
 
 
@@ -247,6 +248,8 @@ def _session_json(session):
                 'batch_label': batch.get_display_label(),
                 'isn': sn.internal_serial_number,
                 'lend_note': sn.lend_note or '',
+                'lend_display': sn.get_lend_to_display() if sn.lend_to_id else '',
+                'lend_end': sn.lend_end.strftime('%Y-%m-%dT%H:%M') if sn.lend_end else '',
                 'returnable': bool(sn.lend_to_id),
             })
         except Exception:
@@ -343,6 +346,79 @@ def in_out_sessions_list():
         }
 
     return jsonify({'sessions': [_list_json(s) for s in sessions]})
+
+
+@in_out_bp.route('/in-out/logs')
+@login_required
+def in_out_logs_ajax():
+    """AJAX: return filtered audit log entries as JSON."""
+    can_view_log = current_user.is_admin() or current_user.has_permission('lending_return', 'view_log')
+    if not can_view_log:
+        return jsonify({'entries': [], 'has_more': False})
+
+    can_only_self = (not current_user.is_admin()
+                     and current_user.has_permission('lending_return', 'only_self_lending')
+                     and not current_user.has_permission('lending_return', 'edit_batch'))
+
+    start_str    = request.args.get('start_date',   '').strip()
+    end_str      = request.args.get('end_date',     '').strip()
+    contact_id   = request.args.get('contact_id',   '').strip()
+    contact_type = request.args.get('contact_type', '').strip()
+    page         = request.args.get('page', 1, type=int)
+
+    actions = ['lend', 'return', 'update', 'delete', 'batch_sn_purge', 'lend_update', 'sn_batch_save']
+    q = (AuditLog.query
+         .filter(AuditLog.entity_type.in_(['batch', 'item', 'sn', 'lending_session']))
+         .filter(AuditLog.action.in_(actions)))
+
+    if can_only_self:
+        q = q.filter(AuditLog.user_id == current_user.id)
+
+    if start_str:
+        try:
+            q = q.filter(AuditLog.timestamp >= datetime.strptime(start_str, '%Y-%m-%d'))
+        except ValueError:
+            pass
+
+    if end_str:
+        try:
+            from datetime import timedelta
+            end_dt = datetime.strptime(end_str, '%Y-%m-%d') + timedelta(days=1)
+            q = q.filter(AuditLog.timestamp < end_dt)
+        except ValueError:
+            pass
+
+    if contact_id and contact_type:
+        try:
+            cid = int(contact_id)
+            matching_ids = db.session.query(LendingSession.id).filter_by(
+                lend_to_id=cid, lend_to_type=contact_type
+            ).subquery()
+            q = q.filter(
+                db.and_(
+                    AuditLog.entity_type == 'lending_session',
+                    AuditLog.entity_id.in_(matching_ids)
+                )
+            )
+        except ValueError:
+            pass
+
+    q = q.order_by(AuditLog.timestamp.desc())
+    raw = q.offset((page - 1) * LOG_PAGE_SIZE).limit(LOG_PAGE_SIZE + 1).all()
+    has_more = len(raw) > LOG_PAGE_SIZE
+    raw = raw[:LOG_PAGE_SIZE]
+
+    result = []
+    for log in raw:
+        user = User.query.get(log.user_id)
+        result.append({
+            'action':    log.action,
+            'username':  user.username if user else 'Unknown',
+            'timestamp': log.timestamp.strftime('%d/%m/%Y %H:%M') if log.timestamp else '?',
+            'display':   _format_log_details(log.action, log.details),
+        })
+
+    return jsonify({'entries': result, 'has_more': has_more})
 
 
 @in_out_bp.route('/in-out/submit-cart', methods=['POST'])
