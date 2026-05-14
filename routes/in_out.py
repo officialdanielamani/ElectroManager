@@ -271,9 +271,20 @@ def in_out_lend():
         return jsonify({'success': True, 'updated': updated})
     else:
         records = data.get('lend_records', [])
-        total_qty = sum(max(1, int(r.get('qty', 1))) for r in records if isinstance(r, dict))
-        if total_qty > batch.quantity:
-            return jsonify({'success': False, 'message': f'Lend qty ({total_qty}) exceeds batch qty ({batch.quantity})'}), 400
+        
+        # Calculate current total quantity already lent out
+        current_lent = batch.get_lend_quantity() 
+        
+        # Calculate quantity requested in this new transaction
+        new_request_qty = sum(max(1, int(r.get('qty', 1))) for r in records if isinstance(r, dict))
+        
+        # Validate that the total (old + new) doesn't exceed batch stock
+        if (current_lent + new_request_qty) > batch.quantity:
+            return jsonify({
+                'success': False, 
+                'message': f'Total lend qty ({current_lent + new_request_qty}) exceeds batch qty ({batch.quantity})'
+            }), 400
+            
         if can_only_self:
             for r in records:
                 try:
@@ -282,14 +293,19 @@ def in_out_lend():
                     cid = 0
                 if cid != current_user.id:
                     return jsonify({'success': False, 'message': 'Only self-lending allowed'}), 403
-        BatchLendRecord.query.filter_by(batch_id=batch.id).delete()
+
+        # REMOVED: BatchLendRecord.query.filter_by(batch_id=batch.id).delete()
+        # This allows _save_lend_records to append new records instead of replacing them.
+
         from routes.batch import _save_lend_records
         _save_lend_records(batch, records, batch.quantity)
+        
         item.updated_by = current_user.id
         item.updated_at = now
         db.session.commit()
+        
         log_audit(current_user.id, 'lend', 'batch', batch.id,
-                  f'Updated lending for {batch.get_display_label()} of {item.name} ({len(records)} record(s))')
+                  f'Added lending for {batch.get_display_label()} of {item.name} ({len(records)} new record(s))')
         return jsonify({'success': True})
 
 

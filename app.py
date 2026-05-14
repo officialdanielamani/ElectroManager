@@ -177,8 +177,9 @@ def index():
     return render_template('index.html')
 
 
-
+# Main application routes
 @app.route('/uploads/<path:filename>')
+@login_required  # Protects general uploads (item photos, icons, etc.)
 def uploaded_file(filename):
     """Serve uploaded files"""
     from werkzeug.security import safe_join
@@ -193,6 +194,7 @@ def uploaded_file(filename):
 
 
 @app.route('/uploads/userpicture/<filename>')
+@login_required  # Protects user profile pictures
 def user_picture(filename):
     """Serve user profile pictures"""
     from werkzeug.security import safe_join
