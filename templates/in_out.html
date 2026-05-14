@@ -77,6 +77,31 @@
             <div class="form-text">Pre-fills the due date for every item added to the cart this session.</div>
           </div>
 
+          <!-- Default Contact (auto-fill) -->
+          {% if not can_only_self %}
+          <div class="col-md-6">
+            <label class="form-label fw-semibold mb-1">
+              <i class="bi bi-person-badge"></i> Default Contact
+              <small class="fw-normal text-muted ms-1">auto-fills lending form</small>
+            </label>
+            <input type="hidden" id="advContactId">
+            <input type="hidden" id="advContactType">
+            <div class="border rounded px-2 py-1 d-flex align-items-center justify-content-between"
+                 style="cursor:pointer;background:var(--bs-body-bg);min-height:31px;"
+                 onclick="toggleAdvContactSearch()">
+              <span id="advContactLabel" class="small text-muted">Click to select default contact…</span>
+              <i class="bi bi-x text-danger" id="advContactClear" style="display:none;"
+                 onclick="event.stopPropagation();clearAdvContact()"></i>
+            </div>
+            <div id="advContactPanel" style="display:none;" class="mt-1">
+              <input type="text" class="form-control form-control-sm" id="advContactInput"
+                     placeholder="Search contact…" oninput="doAdvContactSearch()">
+              <div id="advContactResults" class="border rounded"
+                   style="max-height:160px;overflow-y:auto;background:var(--bs-body-bg);"></div>
+            </div>
+          </div>
+          {% endif %}
+
           <!-- Checkboxes grid -->
           <div class="col-md-6">
             <div class="d-flex flex-column gap-2">
@@ -249,9 +274,48 @@
     </div><!-- end card -->
   </div><!-- end col-lg-8 -->
 
-  <!-- RIGHT: Log -->
-  <div class="col-lg-4">
-    <div class="card h-100">
+  <!-- RIGHT: Lending Sessions + Log -->
+  <div class="col-lg-4 d-flex flex-column gap-2">
+
+    <!-- ── Lending Sessions Card ── -->
+    {% if can_lend %}
+    <div class="card">
+      <div class="card-header py-2 px-3">
+        <h6 class="mb-0"><i class="bi bi-receipt"></i> Lending Sessions</h6>
+      </div>
+      <div class="card-body p-2">
+        <!-- Filter row -->
+        <div class="row g-1 mb-2 align-items-center flex-nowrap">
+          <div class="col">
+            <input type="date" class="form-control form-control-sm" id="sessFilterStart"
+                   onchange="searchSessions()" title="Start date (lend_start ≥)">
+          </div>
+          {% if not can_only_self %}
+          <div class="col position-relative">
+            <input type="hidden" id="sessFilterContactId">
+            <input type="hidden" id="sessFilterContactType">
+            <input type="text" class="form-control form-control-sm" id="sessFilterContactInput"
+                   placeholder="All contacts" oninput="debounceSessContact()" autocomplete="off">
+            <div id="sessFilterContactDrop" class="border rounded shadow-sm position-absolute"
+                 style="top:100%;left:0;right:0;z-index:200;max-height:160px;overflow-y:auto;
+                        background:var(--bs-body-bg);display:none;font-size:0.82rem;"></div>
+          </div>
+          {% endif %}
+          <div class="col">
+            <input type="date" class="form-control form-control-sm" id="sessFilterEnd"
+                   onchange="searchSessions()" title="Due date (lend_end ≤)">
+          </div>
+        </div>
+        <!-- Results -->
+        <div id="sessResults" style="max-height:260px;overflow-y:auto;font-size:0.82rem;">
+          <div class="text-muted small text-center py-2"><i class="bi bi-hourglass-split"></i> Loading…</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- ── Log Card ── -->
+    <div class="card flex-grow-1">
       <div class="card-header d-flex align-items-center justify-content-between py-2">
         <h6 class="mb-0"><i class="bi bi-journal-text"></i> Lending &amp; Return Log</h6>
         {% if can_view_log and log_total_pages > 1 %}
@@ -307,7 +371,7 @@
       </div>
       {% endif %}
     </div>
-  </div>
+  </div><!-- end right col -->
 
 </div><!-- end row -->
 </div><!-- end container -->
@@ -327,6 +391,12 @@ var _cart        = [];          // [{_key, type, batch_id, ...}, ...]
 var _batchCache  = {};          // batch summaries keyed by batch id
 var _sessionCache = {};         // session objects keyed by lending_id
 
+/* Sessions panel */
+var _sessSearchTimer  = null;
+var _sessContactTimer = null;
+var _sdmSession       = null;   // session currently shown in detail modal
+var _advContactTimer  = null;
+
 var _canLend        = {{ can_lend | tojson }};
 var _canEditBatch   = {{ can_edit_batch | tojson }};
 var _canDeleteBatch = {{ can_delete_batch | tojson }};
@@ -345,6 +415,9 @@ var _adv = {
     sound:        true,     // sound effects
     startNow:     true,     // auto-fill start datetime with now (lending)
     returnNow:    true,     // auto-fill return datetime with now (return)
+    contactId:    '',       // default contact id (persisted)
+    contactType:  '',       // default contact type
+    contactLabel: '',       // default contact display label
 };
 
 /* Contact selected in the detail form (shared between lend/return) */
@@ -357,6 +430,16 @@ var _ebSnState = null;
    ════════════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', function() {
     loadAdvOpts();
+    _sessInitDefaults();
+
+    /* Click outside closes sessions contact dropdown */
+    document.addEventListener('click', function(e) {
+        var drop = document.getElementById('sessFilterContactDrop');
+        var inp  = document.getElementById('sessFilterContactInput');
+        if (drop && inp && !inp.contains(e.target) && !drop.contains(e.target)) {
+            drop.style.display = 'none';
+        }
+    });
 
     /* Restore toggle state after page reload */
     var savedMode = sessionStorage.getItem('inout_mode');
@@ -371,6 +454,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tog) { tog.checked = true; onModeChange(); }
     }
     if (_scanEnabled) { _initCameraState(); }
+    if (_canLend) { searchSessions(); }
 });
 
 /* ════════════════════════════════════════════════════════
@@ -379,12 +463,15 @@ document.addEventListener('DOMContentLoaded', function() {
 function loadAdvOpts() {
     try {
         var stored = JSON.parse(localStorage.getItem(_ADV_KEY) || '{}');
-        _adv.submitMode  = stored.submitMode  !== undefined ? stored.submitMode  : 'cart';
-        _adv.sessionEnd  = stored.sessionEnd  !== undefined ? stored.sessionEnd  : '';
-        _adv.enterSubmit = stored.enterSubmit !== undefined ? stored.enterSubmit : false;
-        _adv.sound       = stored.sound       !== undefined ? stored.sound       : true;
-        _adv.startNow    = stored.startNow    !== undefined ? stored.startNow    : true;
-        _adv.returnNow   = stored.returnNow   !== undefined ? stored.returnNow   : true;
+        _adv.submitMode   = stored.submitMode  !== undefined ? stored.submitMode  : 'cart';
+        _adv.sessionEnd   = stored.sessionEnd  !== undefined ? stored.sessionEnd  : '';
+        _adv.enterSubmit  = stored.enterSubmit !== undefined ? stored.enterSubmit : false;
+        _adv.sound        = stored.sound       !== undefined ? stored.sound       : true;
+        _adv.startNow     = stored.startNow    !== undefined ? stored.startNow    : true;
+        _adv.returnNow    = stored.returnNow   !== undefined ? stored.returnNow   : true;
+        _adv.contactId    = stored.contactId    || '';
+        _adv.contactType  = stored.contactType  || '';
+        _adv.contactLabel = stored.contactLabel || '';
     } catch(e) {}
     /* Sync UI */
     var smEl = document.querySelector('input[name="submitMode"][value="' + _adv.submitMode + '"]');
@@ -394,6 +481,15 @@ function loadAdvOpts() {
     _setChk('advSound',  _adv.sound);
     _setChk('advStartNow',  _adv.startNow);
     _setChk('advReturnNow', _adv.returnNow);
+    /* Restore saved contact */
+    if (_adv.contactId) {
+        _setVal('advContactId',   _adv.contactId);
+        _setVal('advContactType', _adv.contactType);
+        var lbl = document.getElementById('advContactLabel');
+        if (lbl) { lbl.textContent = _adv.contactLabel; lbl.className = 'small'; }
+        var clr = document.getElementById('advContactClear');
+        if (clr) clr.style.display = '';
+    }
 }
 
 function saveAdvOpts() {
@@ -404,6 +500,9 @@ function saveAdvOpts() {
     _adv.sound       = _getChk('advSound');
     _adv.startNow    = _getChk('advStartNow');
     _adv.returnNow   = _getChk('advReturnNow');
+    _adv.contactId    = _getVal('advContactId');
+    _adv.contactType  = _getVal('advContactType');
+    /* contactLabel stays in _adv directly (updated by selectAdvContact) */
     try { localStorage.setItem(_ADV_KEY, JSON.stringify(_adv)); } catch(e) {}
 }
 
@@ -940,9 +1039,11 @@ function showDetailForm() {
     var el = document.getElementById('actionForm');
     el.innerHTML = _buildCartDetailForm();
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    /* Restore saved contact */
+    /* Restore saved contact (session-level contact, or fall back to adv default) */
     if (_detailContact.id) {
         selectDetailContact(_detailContact.type, _detailContact.id, _detailContact.label);
+    } else if (_adv.contactId) {
+        selectDetailContact(_adv.contactType, _adv.contactId, _adv.contactLabel);
     }
     /* Apply session end date if set */
     if (_adv.sessionEnd) {
@@ -1965,6 +2066,248 @@ function refreshLog() {
     sessionStorage.setItem('inout_edit_batch', _editBatch ? '1' : '0');
     setTimeout(function(){ window.location.reload(); }, 900);
 }
+
+/* ════════════════════════════════════════════════════════
+   LENDING SESSIONS PANEL
+   ════════════════════════════════════════════════════════ */
+function _sessInitDefaults() {
+    var now    = new Date();
+    var past   = new Date(now.getTime() - 7 * 86400000);
+    var future = new Date(now.getTime() + 7 * 86400000);
+    var fmt = function(d) {
+        return d.getFullYear() + '-' +
+               String(d.getMonth() + 1).padStart(2, '0') + '-' +
+               String(d.getDate()).padStart(2, '0');
+    };
+    _setVal('sessFilterStart', fmt(past));
+    _setVal('sessFilterEnd',   fmt(future));
+}
+
+function searchSessions() {
+    clearTimeout(_sessSearchTimer);
+    _sessSearchTimer = setTimeout(_doSearchSessions, 300);
+}
+
+function _doSearchSessions() {
+    var start = _getVal('sessFilterStart');
+    var end   = _getVal('sessFilterEnd');
+    var cid   = _getVal('sessFilterContactId');
+    var ctype = _getVal('sessFilterContactType');
+    var url   = '/in-out/sessions?start_date=' + encodeURIComponent(start) +
+                '&end_date=' + encodeURIComponent(end);
+    if (cid && ctype) url += '&contact_id=' + encodeURIComponent(cid) +
+                              '&contact_type=' + encodeURIComponent(ctype);
+    var el = document.getElementById('sessResults');
+    if (!el) return;
+    el.innerHTML = '<div class="text-muted small text-center py-2"><i class="bi bi-hourglass-split"></i> Loading…</div>';
+    fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(d) { _renderSessions(d.sessions || []); })
+    .catch(function() {
+        if (el) el.innerHTML = '<div class="text-danger small p-1">Failed to load sessions.</div>';
+    });
+}
+
+function _renderSessions(sessions) {
+    var el = document.getElementById('sessResults');
+    if (!el) return;
+    if (!sessions.length) {
+        el.innerHTML = '<div class="text-muted small text-center py-2">No sessions found.</div>';
+        return;
+    }
+    var html = '';
+    sessions.forEach(function(s) {
+        var dateRange = '';
+        if (s.lend_start) dateRange += s.lend_start;
+        if (s.lend_start && s.lend_end) dateRange += ' – ';
+        if (s.lend_end)   dateRange += s.lend_end;
+        html += '<div class="d-flex align-items-center gap-1 border-bottom py-1 px-1" style="min-width:0;">' +
+            '<code class="flex-shrink-0 text-muted" style="font-size:0.72rem;">' + _esc(s.lending_id) + '</code>' +
+            '<div class="flex-grow-1 text-truncate small" style="min-width:0;">' +
+            (s.lend_to_label ? '<span class="fw-semibold">' + _esc(s.lend_to_label) + '</span>' : '') +
+            (dateRange ? ' <span class="text-muted">' + _esc(dateRange) + '</span>' : '') +
+            '</div>' +
+            '<span class="badge bg-secondary flex-shrink-0" style="font-size:0.65rem;">' + (s.item_count || 0) + ' item(s)</span>' +
+            '<button class="btn btn-link btn-sm p-0 ms-1 flex-shrink-0" title="Details"' +
+            ' onclick="showSessionDetailModal(\'' + _esc(s.lending_id) + '\')">' +
+            '<i class="bi bi-info-circle"></i></button>' +
+            '</div>';
+    });
+    el.innerHTML = html;
+}
+
+function showSessionDetailModal(lendingId) {
+    _sdmSession = null;
+    document.getElementById('sdmTitle').textContent = lendingId;
+    document.getElementById('sdmBody').innerHTML =
+        '<div class="text-muted text-center py-3"><i class="bi bi-hourglass-split"></i> Loading…</div>';
+    document.getElementById('sdmReturnBtn').style.display = 'none';
+    new bootstrap.Modal(document.getElementById('sessDetailModal')).show();
+    fetch('/in-out/session/' + encodeURIComponent(lendingId))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        _sdmSession = d;
+        _sessionCache[d.lending_id] = d;
+        _renderSessionDetailModal(d);
+    })
+    .catch(function() {
+        document.getElementById('sdmBody').innerHTML =
+            '<div class="text-danger p-2">Failed to load session details.</div>';
+    });
+}
+
+function _renderSessionDetailModal(s) {
+    var returnable = (s.items || []).filter(function(i) { return i.returnable; });
+    var html = '<div class="row g-2 mb-3 small">';
+    if (s.lend_to_label) html += '<div class="col-auto"><i class="bi bi-person me-1"></i><strong>' + _esc(s.lend_to_label) + '</strong></div>';
+    if (s.lend_start)    html += '<div class="col-auto text-muted"><i class="bi bi-calendar-check me-1"></i>' + _esc(s.lend_start.slice(0, 10)) + '</div>';
+    if (s.lend_end)      html += '<div class="col-auto text-muted"><i class="bi bi-calendar-x me-1"></i>' + _esc(s.lend_end.slice(0, 10)) + '</div>';
+    html += '</div>';
+    if (s.notes) {
+        html += '<div class="alert alert-secondary py-1 mb-3 small fst-italic">' + _esc(s.notes) + '</div>';
+    }
+    if (s.items && s.items.length) {
+        html += '<div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:0.83rem;">' +
+            '<thead class="table-light"><tr><th>Item</th><th>Batch</th><th>ISN / Qty</th><th>Note</th><th>Status</th></tr></thead><tbody>';
+        s.items.forEach(function(it) {
+            var snCell = (it.type === 'sn')
+                ? '<code style="font-size:0.75rem;">' + _esc(it.isn || '') + '</code>'
+                : '\xd7' + (it.qty || 1);
+            var statusBadge = it.returnable
+                ? '<span class="badge bg-warning text-dark">Out</span>'
+                : '<span class="badge bg-secondary">Returned</span>';
+            html += '<tr>' +
+                '<td>' + _esc(it.item_name || '') + '</td>' +
+                '<td class="text-muted">' + _esc(it.batch_label || '') + '</td>' +
+                '<td>' + snCell + '</td>' +
+                '<td class="text-muted fst-italic">' + _esc(it.lend_note || '') + '</td>' +
+                '<td>' + statusBadge + '</td>' +
+                '</tr>';
+        });
+        html += '</tbody></table></div>';
+    } else {
+        html += '<div class="text-muted small">No items recorded in this session.</div>';
+    }
+    document.getElementById('sdmBody').innerHTML = html;
+    if (_mode === 'return' && returnable.length > 0) {
+        document.getElementById('sdmReturnBtn').style.display = '';
+    }
+}
+
+function sdmAddToReturnCart() {
+    if (!_sdmSession) return;
+    addSessionToCart(_sdmSession.lending_id);
+    var m = bootstrap.Modal.getInstance(document.getElementById('sessDetailModal'));
+    if (m) m.hide();
+    showToast('Session items added to return cart.', 'success');
+}
+
+/* ── Sessions contact filter ── */
+function debounceSessContact() {
+    clearTimeout(_sessContactTimer);
+    _sessContactTimer = setTimeout(_doSessContactSearch, 300);
+}
+
+function _doSessContactSearch() {
+    var q    = _getVal('sessFilterContactInput');
+    var drop = document.getElementById('sessFilterContactDrop');
+    if (!drop) return;
+    if (!q) {
+        _setVal('sessFilterContactId', '');
+        _setVal('sessFilterContactType', '');
+        drop.style.display = 'none';
+        searchSessions();
+        return;
+    }
+    drop.style.display = '';
+    drop.innerHTML = '<div class="text-muted p-1 small">Loading…</div>';
+    fetch('/api/contacts/all?q=' + encodeURIComponent(q))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.length) { drop.innerHTML = '<div class="text-muted p-1 small">No contacts found.</div>'; return; }
+        drop.innerHTML = data.map(function(c) {
+            var rawL = (c.label || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            return '<div class="d-flex align-items-center gap-2 p-1 border-bottom" style="cursor:pointer;"' +
+                ' onclick="selectSessContact(\'' + c.type + '\',' + c.id + ',\'' + rawL + '\')">' +
+                '<span class="small flex-grow-1">' + _esc(c.label || '') + '</span>' +
+                '<span class="badge bg-secondary" style="font-size:0.65rem;">' + c.type + '</span></div>';
+        }).join('');
+    })
+    .catch(function() { if (drop) drop.innerHTML = '<div class="text-danger p-1 small">Error</div>'; });
+}
+
+function selectSessContact(type, id, label) {
+    _setVal('sessFilterContactId',   id);
+    _setVal('sessFilterContactType', type);
+    _setVal('sessFilterContactInput', label);
+    var drop = document.getElementById('sessFilterContactDrop');
+    if (drop) drop.style.display = 'none';
+    searchSessions();
+}
+
+/* ── Advanced Options contact ── */
+function toggleAdvContactSearch() {
+    var panel = document.getElementById('advContactPanel');
+    if (!panel) return;
+    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    var inp = document.getElementById('advContactInput');
+    if (inp) { inp.value = ''; inp.focus(); }
+    doAdvContactSearch();
+}
+
+function doAdvContactSearch() {
+    clearTimeout(_advContactTimer);
+    _advContactTimer = setTimeout(function() {
+        var q  = _getVal('advContactInput');
+        var el = document.getElementById('advContactResults');
+        if (!el) return;
+        el.innerHTML = '<div class="text-muted small p-1">Loading…</div>';
+        fetch('/api/contacts/all?q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.length) { el.innerHTML = '<div class="text-muted small p-1">No contacts found.</div>'; return; }
+            var icons  = { user: 'bi-person-circle', person: 'bi-person', organization: 'bi-building', group: 'bi-people' };
+            var badges = { user: 'bg-primary', person: 'bg-secondary', organization: 'bg-success', group: 'bg-info' };
+            el.innerHTML = data.map(function(c) {
+                var rawL = (c.label || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                return '<div class="d-flex align-items-center gap-2 p-1 border-bottom" style="cursor:pointer;"' +
+                    ' onclick="selectAdvContact(\'' + c.type + '\',' + c.id + ',\'' + rawL + '\')">' +
+                    '<i class="bi ' + (icons[c.type] || 'bi-person') + ' text-muted small"></i>' +
+                    '<span class="small flex-grow-1">' + _esc(c.label || '') + '</span>' +
+                    '<span class="badge ' + (badges[c.type] || 'bg-secondary') + '" style="font-size:0.65rem;">' + c.type + '</span>' +
+                    '</div>';
+            }).join('');
+        })
+        .catch(function() { if (el) el.innerHTML = '<div class="text-danger small p-1">Search failed.</div>'; });
+    }, 300);
+}
+
+function selectAdvContact(type, id, label) {
+    _adv.contactId    = String(id);
+    _adv.contactType  = type;
+    _adv.contactLabel = label;
+    _setVal('advContactId',   id);
+    _setVal('advContactType', type);
+    var lbl = document.getElementById('advContactLabel');
+    var clr = document.getElementById('advContactClear');
+    if (lbl) { lbl.textContent = label; lbl.className = 'small'; }
+    if (clr)   clr.style.display = '';
+    var panel = document.getElementById('advContactPanel');
+    if (panel) panel.style.display = 'none';
+    saveAdvOpts();
+}
+
+function clearAdvContact() {
+    _adv.contactId = _adv.contactType = _adv.contactLabel = '';
+    _setVal('advContactId',   '');
+    _setVal('advContactType', '');
+    var lbl = document.getElementById('advContactLabel');
+    var clr = document.getElementById('advContactClear');
+    if (lbl) { lbl.textContent = 'Click to select default contact…'; lbl.className = 'small text-muted'; }
+    if (clr)   clr.style.display = 'none';
+    saveAdvOpts();
+}
 </script>
 
 <!-- SN Edit modal -->
@@ -2047,4 +2390,27 @@ function refreshLog() {
     </div>
   </div>
 </div>
+
+<!-- Session Detail Modal -->
+<div class="modal fade" id="sessDetailModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h5 class="modal-title"><i class="bi bi-receipt me-2"></i><span id="sdmTitle"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-3" id="sdmBody">
+        <div class="text-muted text-center py-3"><i class="bi bi-hourglass-split"></i> Loading…</div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-success btn-sm" id="sdmReturnBtn"
+                onclick="sdmAddToReturnCart()" style="display:none;">
+          <i class="bi bi-cart-plus"></i> Add All to Return Cart
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}

@@ -279,6 +279,70 @@ def in_out_session_detail(lending_id):
     return jsonify(_session_json(session))
 
 
+@in_out_bp.route('/in-out/sessions')
+@login_required
+def in_out_sessions_list():
+    """AJAX: list lending sessions with date / contact filters."""
+    can_lend = (current_user.is_admin()
+                or current_user.has_permission('lending_return', 'edit_lending')
+                or current_user.has_permission('lending_return', 'only_self_lending'))
+    if not can_lend:
+        return jsonify({'sessions': []})
+
+    can_only_self = (not current_user.is_admin()
+                     and current_user.has_permission('lending_return', 'only_self_lending')
+                     and not current_user.has_permission('lending_return', 'edit_batch'))
+
+    start_str  = request.args.get('start_date', '').strip()
+    end_str    = request.args.get('end_date',   '').strip()
+    contact_id = request.args.get('contact_id', '').strip()
+    contact_type = request.args.get('contact_type', '').strip()
+
+    q = LendingSession.query.filter_by(mode='lend').order_by(LendingSession.created_at.desc())
+
+    if can_only_self:
+        q = q.filter_by(created_by_id=current_user.id)
+
+    if start_str:
+        try:
+            q = q.filter(LendingSession.lend_start >= datetime.strptime(start_str, '%Y-%m-%d'))
+        except ValueError:
+            pass
+
+    if end_str:
+        try:
+            from datetime import timedelta
+            end_dt = datetime.strptime(end_str, '%Y-%m-%d') + timedelta(days=1)
+            q = q.filter(db.or_(LendingSession.lend_end == None,
+                                 LendingSession.lend_end <= end_dt))
+        except ValueError:
+            pass
+
+    if contact_id and contact_type:
+        try:
+            q = q.filter_by(lend_to_id=int(contact_id), lend_to_type=contact_type)
+        except ValueError:
+            pass
+
+    sessions = q.limit(80).all()
+
+    def _list_json(s):
+        item_count = (len(s.lend_records) +
+                      sum(1 for sn in s.serial_number_records if not sn.is_deleted))
+        return {
+            'lending_id':   s.lending_id,
+            'lend_to_label': s.get_lend_to_display(),
+            'lend_to_id':   s.lend_to_id,
+            'lend_to_type': s.lend_to_type or '',
+            'lend_start':   s.lend_start.strftime('%d/%m/%y') if s.lend_start else '',
+            'lend_end':     s.lend_end.strftime('%d/%m/%y')   if s.lend_end   else '',
+            'notes':        s.notes or '',
+            'item_count':   item_count,
+        }
+
+    return jsonify({'sessions': [_list_json(s) for s in sessions]})
+
+
 @in_out_bp.route('/in-out/submit-cart', methods=['POST'])
 @login_required
 def in_out_submit_cart():
