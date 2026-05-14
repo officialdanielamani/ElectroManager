@@ -257,6 +257,28 @@ from qr_utils import validate_bootstrap_icons
 with app.app_context():
     validate_bootstrap_icons()
 
+# Apply any pending column migrations to existing databases
+def _apply_column_migrations():
+    """Add new columns to existing tables that predate them."""
+    additions = [
+        ("batch_lend_records",   "lend_note",           "VARCHAR(128)"),
+        ("batch_serial_numbers", "lend_note",           "VARCHAR(128)"),
+        ("batch_serial_numbers", "lending_session_id",  "INTEGER"),
+        ("batch_lend_records",   "lending_session_id",  "INTEGER"),
+    ]
+    with db.engine.connect() as conn:
+        for table, col, col_type in additions:
+            try:
+                conn.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+                conn.commit()
+                logger.info(f"DB migration: added {table}.{col}")
+            except Exception:
+                pass  # column already exists
+
+with app.app_context():
+    db.create_all()          # create any brand-new tables (e.g. lending_sessions)
+    _apply_column_migrations()
+
 
 if __name__ == '__main__':
     with app.app_context():
