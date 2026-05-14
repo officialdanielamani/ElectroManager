@@ -324,6 +324,8 @@ var _searchTimer = null;
 var _lastSearchData = null;     // last raw search response
 var _cartKey     = 0;           // incrementing key for cart items
 var _cart        = [];          // [{_key, type, batch_id, ...}, ...]
+var _batchCache  = {};          // batch summaries keyed by batch id
+var _sessionCache = {};         // session objects keyed by lending_id
 
 var _canLend        = {{ can_lend | tojson }};
 var _canEditBatch   = {{ can_edit_batch | tojson }};
@@ -529,6 +531,7 @@ function renderResults(data) {
 }
 
 function _renderSessionCard(session) {
+    _sessionCache[session.lending_id] = session;
     var returnable = (session.items || []).filter(function(i){ return i.returnable; });
     var html = '<div class="card mb-2 border-info">' +
         '<div class="card-header py-2 px-3 d-flex align-items-center justify-content-between bg-info bg-opacity-10">' +
@@ -559,7 +562,7 @@ function _renderSessionCard(session) {
         });
         html += '</div>';
         if (_mode === 'return') {
-            html += '<button class="btn btn-sm btn-success" onclick="addSessionToCart(' + _escJsonAttr(session) + ')">' +
+            html += '<button class="btn btn-sm btn-success" onclick="addSessionToCart(\'' + _esc(session.lending_id) + '\')">' +
                 '<i class="bi bi-cart-plus"></i> Add All to Return Cart</button>';
         } else {
             html += '<div class="text-muted small">Switch to <strong>Return</strong> mode to process returns from this session.</div>';
@@ -572,8 +575,9 @@ function _renderSessionCard(session) {
 function _renderItemCard(item, expanded) {
     var batchesHtml = '';
     item.batches.forEach(function(b) {
+        _batchCache[b.id] = b;
         batchesHtml += '<div class="px-3 py-2 border-bottom d-flex justify-content-between align-items-center" ' +
-            'style="cursor:pointer;" onclick="onBatchClick(' + b.id + ', null, ' + _escJsonAttr(b) + ')">' +
+            'style="cursor:pointer;" onclick="onBatchClick(' + b.id + ', null)">' +
             '<span><i class="bi bi-box-seam me-1 text-muted"></i>' + _esc(b.display_label) + '</span>' +
             '<span class="text-muted small">Total: ' + b.quantity + ' | Avail: ' + b.available_qty +
             (b.sn_tracking ? ' <span class="badge bg-dark" style="font-size:0.65rem;">SN</span>' : '') + '</span>' +
@@ -590,9 +594,10 @@ function _renderItemCard(item, expanded) {
 }
 
 function _renderBatchCard(b, selected) {
+    _batchCache[b.id] = b;
     return '<div class="card mb-2 border-primary">' +
         '<div class="card-body py-2 px-3 d-flex justify-content-between align-items-center" style="cursor:pointer;"' +
-        ' onclick="onBatchClick(' + b.id + ', ' + (b.preselected_sn_id || 'null') + ', ' + _escJsonAttr(b) + ')">' +
+        ' onclick="onBatchClick(' + b.id + ', ' + (b.preselected_sn_id || 'null') + ')">' +
         '<span><strong>' + _esc(b.item_name || b.display_label) + '</strong>' +
         (b.item_short_info ? ' <span class="text-muted">— ' + _esc(b.item_short_info) + '</span>' : '') +
         ' / ' + _esc(b.display_label) +
@@ -605,7 +610,7 @@ function _renderBatchCard(b, selected) {
 /* ════════════════════════════════════════════════════════
    BATCH CLICK HANDLER (from search results)
    ════════════════════════════════════════════════════════ */
-function onBatchClick(batchId, preselectedSnId, batchSummary) {
+function onBatchClick(batchId, preselectedSnId) {
     if (_mode === 'edit_batch') {
         selectBatch(batchId, preselectedSnId);
         return;
@@ -731,7 +736,9 @@ function cartToggleAll(tableType, master) {
     document.querySelectorAll(selector).forEach(function(c){ c.checked = master.checked; });
 }
 
-function addSessionToCart(session) {
+function addSessionToCart(sessionOrId) {
+    var session = (typeof sessionOrId === 'string') ? _sessionCache[sessionOrId] : sessionOrId;
+    if (!session) { showToast('Session data not found.', 'danger'); return; }
     (session.items || []).forEach(function(it) {
         if (!it.returnable) return;
         if (it.type === 'sn') {
