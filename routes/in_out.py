@@ -32,17 +32,12 @@ def _format_log_details(action, details):
         try:
             d = json.loads(details)
             parts = []
+            sid = d.get('session_id', '')
             cnt = d.get('count') or d.get('qty')
+            if sid:
+                parts.append(sid)
             if cnt is not None:
                 parts.append(f'{cnt} unit(s)')
-            on_time = d.get('on_time')
-            if on_time is True:
-                parts.append('on time')
-            elif on_time is False:
-                parts.append('LATE')
-            ret_dt = d.get('return_dt', '')
-            if ret_dt:
-                parts.append(f'@ {ret_dt}')
             notes = d.get('notes', '')
             if notes:
                 parts.append(f'— {notes}')
@@ -220,20 +215,27 @@ def _session_json(session):
     for rec in lend_recs:
         try:
             batch = rec.batch
-            item = batch.item
+            item  = batch.item
+            if is_return:
+                # on_time relative to lend_end; use returned_at if set, else session created_at
+                ret_dt  = rec.returned_at or session.created_at
+                on_time = (rec.lend_end is None) or (ret_dt.replace(tzinfo=None) <= rec.lend_end)
+            else:
+                on_time = None
             items.append({
-                'type': 'lend_record',
-                'batch_id': batch.id,
+                'type':          'lend_record',
+                'batch_id':      batch.id,
                 'lend_record_id': rec.id,
-                'item_name': item.name,
-                'item_uuid': item.uuid,
+                'item_name':     item.name,
+                'item_uuid':     item.uuid,
                 'item_short_info': item.short_info or '',
-                'batch_label': batch.get_display_label(),
-                'qty': rec.quantity,
-                'lend_note': rec.lend_note or '',
-                'lend_display': rec.get_lend_to_display(),
-                'lend_end': rec.lend_end.strftime('%Y-%m-%dT%H:%M') if rec.lend_end else '',
-                'returnable': rec.returned_at is None,
+                'batch_label':   batch.get_display_label(),
+                'qty':           rec.quantity,
+                'lend_note':     rec.lend_note or '',
+                'lend_display':  rec.get_lend_to_display(),
+                'lend_end':      rec.lend_end.strftime('%Y-%m-%dT%H:%M') if rec.lend_end else '',
+                'returnable':    rec.returned_at is None,
+                'on_time':       on_time,
             })
         except Exception:
             pass
@@ -244,34 +246,44 @@ def _session_json(session):
             if sn.is_deleted:
                 continue
             batch = sn.batch
-            item = batch.item
+            item  = batch.item
+            if is_return:
+                ret_dt  = sn.returned_at or session.created_at
+                on_time = (sn.lend_end is None) or (ret_dt.replace(tzinfo=None) <= sn.lend_end)
+                contact_label = sn.returned_from_label or ''
+            else:
+                on_time       = None
+                contact_label = sn.get_lend_to_display() if sn.lend_to_id else ''
             items.append({
-                'type': 'sn',
-                'batch_id': batch.id,
-                'sn_id': sn.id,
-                'item_name': item.name,
-                'item_uuid': item.uuid,
+                'type':          'sn',
+                'batch_id':      batch.id,
+                'sn_id':         sn.id,
+                'item_name':     item.name,
+                'item_uuid':     item.uuid,
                 'item_short_info': item.short_info or '',
-                'batch_label': batch.get_display_label(),
-                'isn': sn.internal_serial_number,
-                'lend_note': sn.lend_note or '',
-                'lend_display': sn.get_lend_to_display() if sn.lend_to_id else '',
-                'lend_end': sn.lend_end.strftime('%Y-%m-%dT%H:%M') if sn.lend_end else '',
-                'returnable': bool(sn.lend_to_id),
+                'batch_label':   batch.get_display_label(),
+                'isn':           sn.internal_serial_number,
+                'lend_note':     sn.lend_note or '',
+                'lend_display':  contact_label,
+                'lend_end':      sn.lend_end.strftime('%Y-%m-%dT%H:%M') if sn.lend_end else '',
+                'returnable':    bool(sn.lend_to_id),
+                'on_time':       on_time,
             })
         except Exception:
             pass
+
     return {
-        'lending_id': session.lending_id,
-        'mode': session.mode,
-        'lend_to_label': session.get_lend_to_display(),
-        'lend_to_id': session.lend_to_id,
-        'lend_to_type': session.lend_to_type or '',
-        'lend_start': session.lend_start.strftime('%Y-%m-%dT%H:%M') if session.lend_start else '',
-        'lend_end': session.lend_end.strftime('%Y-%m-%dT%H:%M') if session.lend_end else '',
-        'notes': session.notes or '',
-        'created_at': session.created_at.strftime('%d/%m/%Y %H:%M') if session.created_at else '',
-        'items': items,
+        'lending_id':      session.lending_id,
+        'mode':            session.mode,
+        'lend_to_label':   session.get_lend_to_display(),
+        'lend_to_id':      session.lend_to_id,
+        'lend_to_type':    session.lend_to_type or '',
+        'lend_start':      session.lend_start.strftime('%Y-%m-%dT%H:%M') if session.lend_start else '',
+        'lend_end':        session.lend_end.strftime('%Y-%m-%dT%H:%M') if session.lend_end else '',
+        'notes':           session.notes or '',
+        'created_at':      session.created_at.strftime('%d/%m/%Y %H:%M') if session.created_at else '',
+        'created_by_label': session.creator.username if session.creator else 'Unknown',
+        'items':           items,
     }
 
 
@@ -581,10 +593,13 @@ def in_out_submit_cart():
                 on_time  = (lend_end is None) or (return_dt.replace(tzinfo=None) <= lend_end)
                 if not on_time:
                     any_late = True
+                # Snapshot contact before clearing (for return session history)
+                sn.returned_from_label = sn.get_lend_to_display()
+                sn.returned_at         = return_dt.replace(tzinfo=None)
                 sn.lend_to_type        = ''
                 sn.lend_to_id          = None
                 sn.lend_start          = None
-                sn.lend_end            = None
+                # keep sn.lend_end so on_time can be computed from history
                 sn.lend_note           = item_note
                 sn.lend_notify_enabled = False
                 sn.return_session_id   = session_obj.id
@@ -617,7 +632,8 @@ def in_out_submit_cart():
         db.session.commit()
         log_audit(current_user.id, 'return', 'lending_session', session_obj.id,
                   json.dumps({
-                      'count': processed, 'on_time': not any_late,
+                      'session_id': session_obj.lending_id,
+                      'count': processed,
                       'return_dt': return_dt.strftime('%Y-%m-%d %H:%M'),
                       'notes': return_notes or global_notes,
                   }))

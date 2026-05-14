@@ -2225,15 +2225,15 @@ function _renderSessions(sessions) {
         if (s.lend_start && s.lend_end) dateRange += ' – ';
         if (s.lend_end)   dateRange += s.lend_end;
         html += '<div class="d-flex align-items-center gap-1 border-bottom py-1 px-1" style="min-width:0;">' +
+            '<button class="btn btn-link btn-sm p-0 flex-shrink-0" title="Details"' +
+            ' onclick="showSessionDetailModal(\'' + _esc(s.lending_id) + '\')">' +
+            '<i class="bi bi-info-circle text-primary"></i></button>' +
             '<code class="flex-shrink-0 text-muted" style="font-size:0.72rem;">' + _esc(s.lending_id) + '</code>' +
             '<div class="flex-grow-1 text-truncate small" style="min-width:0;">' +
             (s.lend_to_label ? '<span class="fw-semibold">' + _esc(s.lend_to_label) + '</span>' : '') +
             (dateRange ? ' <span class="text-muted">' + _esc(dateRange) + '</span>' : '') +
             '</div>' +
             '<span class="badge bg-secondary flex-shrink-0" style="font-size:0.65rem;">' + (s.item_count || 0) + ' item(s)</span>' +
-            '<button class="btn btn-link btn-sm p-0 ms-1 flex-shrink-0" title="Details"' +
-            ' onclick="showSessionDetailModal(\'' + _esc(s.lending_id) + '\')">' +
-            '<i class="bi bi-info-circle"></i></button>' +
             '</div>';
     });
     el.innerHTML = html;
@@ -2260,39 +2260,100 @@ function showSessionDetailModal(lendingId) {
 }
 
 function _renderSessionDetailModal(s) {
+    var isReturn  = (s.mode === 'return');
     var returnable = (s.items || []).filter(function(i) { return i.returnable; });
-    var html = '<div class="row g-2 mb-3 small">';
-    if (s.lend_to_label) html += '<div class="col-auto"><i class="bi bi-person me-1"></i><strong>' + _esc(s.lend_to_label) + '</strong></div>';
-    if (s.lend_start)    html += '<div class="col-auto text-muted"><i class="bi bi-calendar-check me-1"></i>' + _esc(s.lend_start.slice(0, 10)) + '</div>';
-    if (s.lend_end)      html += '<div class="col-auto text-muted"><i class="bi bi-calendar-x me-1"></i>' + _esc(s.lend_end.slice(0, 10)) + '</div>';
-    html += '</div>';
-    if (s.notes) {
-        html += '<div class="alert alert-secondary py-1 mb-3 small fst-italic">' + _esc(s.notes) + '</div>';
-    }
-    if (s.items && s.items.length) {
-        html += '<div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:0.83rem;">' +
-            '<thead class="table-light"><tr><th>Item</th><th>Batch</th><th>ISN / Qty</th><th>Note</th><th>Status</th></tr></thead><tbody>';
-        s.items.forEach(function(it) {
-            var snCell = (it.type === 'sn')
-                ? '<code style="font-size:0.75rem;">' + _esc(it.isn || '') + '</code>'
-                : '\xd7' + (it.qty || 1);
-            var statusBadge = it.returnable
-                ? '<span class="badge bg-warning text-dark">Out</span>'
-                : '<span class="badge bg-secondary">Returned</span>';
-            html += '<tr>' +
-                '<td>' + _esc(it.item_name || '') + '</td>' +
-                '<td class="text-muted">' + _esc(it.batch_label || '') + '</td>' +
-                '<td>' + snCell + '</td>' +
-                '<td class="text-muted fst-italic">' + _esc(it.lend_note || '') + '</td>' +
-                '<td>' + statusBadge + '</td>' +
-                '</tr>';
-        });
-        html += '</tbody></table></div>';
+    var html = '';
+
+    if (isReturn) {
+        /* ── Return session detail ── */
+        html += '<div class="alert alert-secondary py-2 mb-3 small">' +
+            '<i class="bi bi-box-arrow-in-left me-1"></i>' +
+            'Returned on <strong>' + _esc(s.created_at || '') + '</strong>' +
+            ' by <strong>' + _esc(s.created_by_label || '') + '</strong>' +
+            (s.notes ? ' — <em>' + _esc(s.notes) + '</em>' : '') +
+            '</div>';
+
+        var normals = (s.items || []).filter(function(i){ return i.type === 'lend_record'; });
+        var sns     = (s.items || []).filter(function(i){ return i.type === 'sn'; });
+
+        if (normals.length) {
+            html += '<div class="fw-semibold small mb-1"><i class="bi bi-box-seam me-1"></i>Standard Items</div>' +
+                '<div class="table-responsive mb-3"><table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">' +
+                '<thead class="table-light"><tr><th style="width:80px">Status</th><th>Item (Batch)</th><th style="width:46px">Qty</th><th>Contact</th><th>Note</th></tr></thead><tbody>';
+            normals.forEach(function(it) {
+                var badge = it.on_time === false
+                    ? '<span class="badge bg-warning text-dark">Late</span>'
+                    : '<span class="badge bg-success">On time</span>';
+                html += '<tr>' +
+                    '<td>' + badge + '</td>' +
+                    '<td>' + _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span></td>' +
+                    '<td class="text-center">' + (it.qty || 1) + '&times;</td>' +
+                    '<td>' + _esc(it.lend_display || '—') + '</td>' +
+                    '<td class="text-muted fst-italic">' + _esc(it.lend_note || '') + '</td>' +
+                    '</tr>';
+            });
+            html += '</tbody></table></div>';
+        }
+
+        if (sns.length) {
+            html += '<div class="fw-semibold small mb-1"><i class="bi bi-fingerprint me-1"></i>Serial-Tracked Items</div>' +
+                '<div class="table-responsive mb-3"><table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">' +
+                '<thead class="table-light"><tr><th style="width:80px">Status</th><th>Item (Batch)</th><th>ISN</th><th>Contact</th><th>Note</th></tr></thead><tbody>';
+            sns.forEach(function(it) {
+                var badge = it.on_time === false
+                    ? '<span class="badge bg-warning text-dark">Late</span>'
+                    : '<span class="badge bg-success">On time</span>';
+                html += '<tr>' +
+                    '<td>' + badge + '</td>' +
+                    '<td>' + _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span></td>' +
+                    '<td><code style="font-size:0.75rem;">' + _esc(it.isn || '') + '</code></td>' +
+                    '<td>' + _esc(it.lend_display || '—') + '</td>' +
+                    '<td class="text-muted fst-italic">' + _esc(it.lend_note || '') + '</td>' +
+                    '</tr>';
+            });
+            html += '</tbody></table></div>';
+        }
+
+        if (!normals.length && !sns.length) {
+            html += '<div class="text-muted small">No items recorded in this return session.</div>';
+        }
+
     } else {
-        html += '<div class="text-muted small">No items recorded in this session.</div>';
+        /* ── Lend session detail ── */
+        html += '<div class="row g-2 mb-3 small">';
+        if (s.lend_to_label) html += '<div class="col-auto"><i class="bi bi-person me-1"></i><strong>' + _esc(s.lend_to_label) + '</strong></div>';
+        if (s.lend_start)    html += '<div class="col-auto text-muted"><i class="bi bi-calendar-check me-1"></i>' + _esc(s.lend_start.slice(0, 10)) + '</div>';
+        if (s.lend_end)      html += '<div class="col-auto text-muted"><i class="bi bi-calendar-x me-1"></i>' + _esc(s.lend_end.slice(0, 10)) + '</div>';
+        html += '</div>';
+        if (s.notes) {
+            html += '<div class="alert alert-secondary py-1 mb-3 small fst-italic">' + _esc(s.notes) + '</div>';
+        }
+        if (s.items && s.items.length) {
+            html += '<div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:0.83rem;">' +
+                '<thead class="table-light"><tr><th>Item</th><th>Batch</th><th>ISN / Qty</th><th>Note</th><th>Status</th></tr></thead><tbody>';
+            s.items.forEach(function(it) {
+                var snCell = (it.type === 'sn')
+                    ? '<code style="font-size:0.75rem;">' + _esc(it.isn || '') + '</code>'
+                    : '&times;' + (it.qty || 1);
+                var statusBadge = it.returnable
+                    ? '<span class="badge bg-warning text-dark">Out</span>'
+                    : '<span class="badge bg-secondary">Returned</span>';
+                html += '<tr>' +
+                    '<td>' + _esc(it.item_name || '') + '</td>' +
+                    '<td class="text-muted">' + _esc(it.batch_label || '') + '</td>' +
+                    '<td>' + snCell + '</td>' +
+                    '<td class="text-muted fst-italic">' + _esc(it.lend_note || '') + '</td>' +
+                    '<td>' + statusBadge + '</td>' +
+                    '</tr>';
+            });
+            html += '</tbody></table></div>';
+        } else {
+            html += '<div class="text-muted small">No items recorded in this session.</div>';
+        }
     }
+
     document.getElementById('sdmBody').innerHTML = html;
-    if (_mode === 'return' && returnable.length > 0) {
+    if (!isReturn && _mode === 'return' && returnable.length > 0) {
         document.getElementById('sdmReturnBtn').style.display = '';
     }
 }
@@ -2471,12 +2532,8 @@ function _doLoadLog(append) {
             el.innerHTML = '<div class="text-muted small text-center py-2">No log entries found.</div>';
         } else {
             var frag = '';
-            var actionBadge = function(action, details) {
-                if (action === 'return') {
-                    return (details && details.indexOf('"on_time": false') !== -1)
-                        ? '<span class="badge bg-warning text-dark">Return Late</span>'
-                        : '<span class="badge bg-success">Return</span>';
-                }
+            var actionBadge = function(action) {
+                if (action === 'return') return '<span class="badge bg-success">Return</span>';
                 if (action === 'lend' || action === 'lend_update') return '<span class="badge bg-primary">Lend</span>';
                 if (action === 'delete' || action === 'batch_sn_purge') return '<span class="badge bg-danger">Delete</span>';
                 if (action === 'update') return '<span class="badge bg-secondary">Edit</span>';
@@ -2485,10 +2542,10 @@ function _doLoadLog(append) {
             };
             entries.forEach(function(e) {
                 frag += '<div class="border-bottom pb-2 mb-2 small">' +
-                    actionBadge(e.action, e.display) +
+                    actionBadge(e.action) +
                     '<span class="ms-1 fw-semibold">' + _esc(e.username) + '</span>' +
                     '<span class="text-muted ms-1">' + _esc(e.timestamp) + '</span>' +
-                    '<div class="text-muted mt-1" style="font-size:0.78rem;word-break:break-word;">' + _esc(e.display) + '</div>' +
+                    (e.display ? '<div class="text-muted mt-1" style="font-size:0.78rem;word-break:break-word;">' + _esc(e.display) + '</div>' : '') +
                     '</div>';
             });
             el.insertAdjacentHTML('beforeend', frag);

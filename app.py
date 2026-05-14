@@ -266,8 +266,10 @@ def _apply_column_migrations():
         ("batch_serial_numbers", "lending_session_id",  "INTEGER"),
         ("batch_lend_records",   "lending_session_id",  "INTEGER"),
         ("batch_lend_records",   "returned_at",         "DATETIME"),
-        ("batch_lend_records",   "return_session_id",   "INTEGER"),
-        ("batch_serial_numbers", "return_session_id",   "INTEGER"),
+        ("batch_lend_records",   "return_session_id",    "INTEGER"),
+        ("batch_serial_numbers", "return_session_id",    "INTEGER"),
+        ("batch_serial_numbers", "returned_at",          "DATETIME"),
+        ("batch_serial_numbers", "returned_from_label",  "VARCHAR(128)"),
     ]
     with db.engine.connect() as conn:
         for table, col, col_type in additions:

@@ -746,6 +746,8 @@ class BatchSerialNumber(db.Model):
     lend_note = db.Column(db.String(128), nullable=True)
     lending_session_id = db.Column(db.Integer, db.ForeignKey('lending_sessions.id'), nullable=True)
     return_session_id  = db.Column(db.Integer, db.ForeignKey('lending_sessions.id'), nullable=True)
+    returned_at        = db.Column(db.DateTime, nullable=True)
+    returned_from_label = db.Column(db.String(128), nullable=True)
     is_deleted = db.Column(db.Boolean, default=False)
     deleted_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     deleted_at = db.Column(db.DateTime, nullable=True)
