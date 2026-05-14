@@ -225,6 +225,8 @@ def _session_json(session):
                 'batch_label': batch.get_display_label(),
                 'qty': rec.quantity,
                 'lend_note': rec.lend_note or '',
+                'lend_display': rec.get_lend_to_display(),
+                'lend_end': rec.lend_end.strftime('%Y-%m-%dT%H:%M') if rec.lend_end else '',
                 'returnable': rec.returned_at is None,
             })
         except Exception:

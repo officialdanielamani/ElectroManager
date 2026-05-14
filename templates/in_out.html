@@ -247,8 +247,7 @@
                   <tr>
                     <th style="width:30px"><input type="checkbox" id="cartSnChkAll" onchange="cartToggleAll('sn',this)"></th>
                     <th>Item</th>
-                    <th>ISN / Record</th>
-                    <th style="width:110px">Qty</th>
+                    <th>ISN</th>
                     <th>Notes</th>
                     <th style="width:30px"></th>
                   </tr>
@@ -811,7 +810,9 @@ function _tryAddNormalToCart(batchData) {
                 _cart.push({ _key: ++_cartKey, type: 'lend_record', batch_id: batchData.id,
                              lend_record_id: r.id,
                              item_name: batchData.item_name, batch_label: batchData.display_label,
-                             qty: r.qty || 1, max_qty: r.qty || 1, note: '' });
+                             qty: r.qty || 1, max_qty: r.qty || 1,
+                             lend_display: r.label || '', lend_end: r.end || '',
+                             note: '' });
                 added++;
             }
         });
@@ -970,7 +971,9 @@ function addSessionToCart(sessionOrId) {
                 _cart.push({ _key: ++_cartKey, type: 'lend_record', batch_id: it.batch_id,
                              lend_record_id: it.lend_record_id,
                              item_name: it.item_name, batch_label: it.batch_label,
-                             qty: it.qty, max_qty: it.qty, note: it.lend_note || '' });
+                             qty: it.qty, max_qty: it.qty,
+                             lend_display: it.lend_display || '', lend_end: it.lend_end || '',
+                             note: it.lend_note || '' });
             }
         }
     });
@@ -983,8 +986,8 @@ function addSessionToCart(sessionOrId) {
 }
 
 function _renderCart() {
-    var normals = _cart.filter(function(c){ return c.type === 'normal'; });
-    var sns     = _cart.filter(function(c){ return c.type === 'sn' || c.type === 'lend_record'; });
+    var normals = _cart.filter(function(c){ return c.type === 'normal' || c.type === 'lend_record'; });
+    var sns     = _cart.filter(function(c){ return c.type === 'sn'; });
     var total   = _cart.length;
 
     var sec  = document.getElementById('cartSection');
@@ -1000,9 +1003,18 @@ function _renderCart() {
     var tbody = document.getElementById('cartNormalBody');
     if (tbody) {
         tbody.innerHTML = normals.map(function(it) {
+            var itemCell = _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span>';
+            if (it.type === 'lend_record') {
+                if (it.lend_display) {
+                    itemCell += '<br><small><i class="bi bi-person me-1 text-muted"></i>' + _esc(it.lend_display) + '</small>';
+                }
+                if (it.lend_end) {
+                    itemCell += ' <small class="text-muted">· due ' + _esc(it.lend_end.slice(0, 10)) + '</small>';
+                }
+            }
             return '<tr>' +
                 '<td><input type="checkbox" class="cart-chk-normal" value="' + it._key + '"></td>' +
-                '<td class="small">' + _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span></td>' +
+                '<td class="small">' + itemCell + '</td>' +
                 '<td>' +
                   '<div class="input-group input-group-sm" style="width:90px;">' +
                   '<button class="btn btn-outline-secondary py-0 px-1" type="button" onclick="_cartUpdateQty(' + it._key + ', -1)">−</button>' +
@@ -1011,6 +1023,7 @@ function _renderCart() {
                   ' onchange="_cartSetQty(' + it._key + ', parseInt(this.value))" style="width:38px;">' +
                   '<button class="btn btn-outline-secondary py-0 px-1" type="button" onclick="_cartUpdateQty(' + it._key + ', 1)">+</button>' +
                   '</div>' +
+                  (it.max_qty ? '<div class="text-muted" style="font-size:0.7rem;">max ' + it.max_qty + '</div>' : '') +
                 '</td>' +
                 '<td><input type="text" class="form-control form-control-sm py-0" value="' + _esc(it.note || '') + '" maxlength="128" placeholder="Item note" oninput="_cartUpdateNote(' + it._key + ', this.value)"></td>' +
                 '<td><button class="btn btn-link btn-sm text-danger p-0" onclick="_cartRemove(' + it._key + ')" title="Remove"><i class="bi bi-x-lg"></i></button></td>' +
@@ -1018,30 +1031,19 @@ function _renderCart() {
         }).join('');
     }
 
-    /* SN / lend-record rows */
+    /* SN rows (serial-tracked items only) */
     snSec.classList.toggle('d-none', sns.length === 0);
     var snBody = document.getElementById('cartSnBody');
     if (snBody) {
         snBody.innerHTML = sns.map(function(it) {
-            var isnCell = it.type === 'sn'
-                ? '<code style="font-size:0.78rem;">' + _esc(it.isn || '') + '</code>'
-                : '<span class="text-muted" style="font-size:0.78rem;">Record #' + it.lend_record_id + '</span>' +
-                  (it.lend_display ? ' <em class="text-muted">' + _esc(it.lend_display) + '</em>' : '');
-            var qtyCell = (it.type === 'lend_record')
-                ? '<div class="input-group input-group-sm" style="width:90px;">' +
-                  '<button class="btn btn-outline-secondary py-0 px-1" type="button" onclick="_cartUpdateQty(' + it._key + ', -1)">−</button>' +
-                  '<input type="number" class="form-control text-center py-0 px-1" value="' + (it.qty || 1) + '" min="1"' +
-                  (it.max_qty ? ' max="' + it.max_qty + '"' : '') +
-                  ' onchange="_cartSetQty(' + it._key + ', parseInt(this.value))" style="width:38px;">' +
-                  '<button class="btn btn-outline-secondary py-0 px-1" type="button" onclick="_cartUpdateQty(' + it._key + ', 1)">+</button>' +
-                  '</div>' +
-                  (it.max_qty ? '<div class="text-muted" style="font-size:0.7rem;">max ' + it.max_qty + '</div>' : '')
-                : '<span class="text-muted small">—</span>';
+            var snInfo = '<code style="font-size:0.78rem;">' + _esc(it.isn || '') + '</code>';
+            if (it.lend_display) {
+                snInfo += '<br><small><i class="bi bi-person me-1 text-muted"></i>' + _esc(it.lend_display) + '</small>';
+            }
             return '<tr>' +
                 '<td><input type="checkbox" class="cart-chk-sn" value="' + it._key + '"></td>' +
                 '<td class="small">' + _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span></td>' +
-                '<td class="small">' + isnCell + '</td>' +
-                '<td>' + qtyCell + '</td>' +
+                '<td class="small">' + snInfo + '</td>' +
                 '<td><input type="text" class="form-control form-control-sm py-0" value="' + _esc(it.note || '') + '" maxlength="128" placeholder="Item note" oninput="_cartUpdateNote(' + it._key + ', this.value)"></td>' +
                 '<td><button class="btn btn-link btn-sm text-danger p-0" onclick="_cartRemove(' + it._key + ')" title="Remove"><i class="bi bi-x-lg"></i></button></td>' +
                 '</tr>';
@@ -1363,7 +1365,9 @@ function _tryAutoSubmitSingle(batchData, resultType) {
             cartItem = { _key: ++_cartKey, type: 'lend_record', batch_id: batchData.id,
                          lend_record_id: targetRec.id,
                          item_name: batchData.item_name, batch_label: batchData.display_label,
-                         qty: targetRec.qty, max_qty: targetRec.qty, note: '' };
+                         qty: targetRec.qty, max_qty: targetRec.qty,
+                         lend_display: targetRec.label || '', lend_end: targetRec.end || '',
+                         note: '' };
         } else {
             if (batchData.available_qty < 1) {
                 showToast('No stock available to lend.', 'warning');
