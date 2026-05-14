@@ -74,6 +74,24 @@
             <div class="form-text">Pre-fills the due date for every item added to the cart this session.</div>
           </div>
 
+          <!-- Notification before due date -->
+          <div class="col-md-6" id="advNotifySection">
+            <label class="form-label fw-semibold mb-1">
+              <i class="bi bi-bell"></i> Notify Before Due Date
+            </label>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="advNotifyEnabled" onchange="saveAdvOpts()">
+                <label class="form-check-label" for="advNotifyEnabled">Enable</label>
+              </div>
+              <div class="input-group input-group-sm" id="advNotifyDaysInput" style="display:none;max-width:150px;">
+                <input type="number" class="form-control" id="advNotifyDays" min="1" max="90" value="3" onchange="saveAdvOpts()">
+                <span class="input-group-text">days</span>
+              </div>
+            </div>
+            <div class="form-text">Auto-configure notification for every item added to the lending cart.</div>
+          </div>
+
           <!-- Default Contact (auto-fill) -->
           {% if not can_only_self %}
           <div class="col-md-6">
@@ -376,15 +394,17 @@ var _sessTotalPages = 1;
 /* Advanced options — persisted per-user in localStorage */
 var _ADV_KEY = 'lr_adv_{{ current_user_id }}';
 var _adv = {
-    submitMode:   'cart',   // 'cart' | 'auto'
-    sessionEnd:   '',       // pre-set end date for this session
-    enterSubmit:  false,    // use Enter to add/submit
-    sound:        true,     // sound effects
-    startNow:     true,     // auto-fill start datetime with now (lending)
-    returnNow:    true,     // auto-fill return datetime with now (return)
-    contactId:    '',       // default contact id (persisted)
-    contactType:  '',       // default contact type
-    contactLabel: '',       // default contact display label
+    submitMode:    'cart',  // 'cart' | 'auto'
+    sessionEnd:    '',      // pre-set end date for this session
+    enterSubmit:   false,   // use Enter to add/submit
+    sound:         true,    // sound effects
+    startNow:      true,    // auto-fill start datetime with now (lending)
+    returnNow:     true,    // auto-fill return datetime with now (return)
+    contactId:     '',      // default contact id (persisted)
+    contactType:   '',      // default contact type
+    contactLabel:  '',      // default contact display label
+    notifyEnabled: false,   // default notify before due date
+    notifyDays:    3,       // days before due to notify
 };
 
 /* Contact selected in the detail form (shared between lend/return) */
@@ -443,9 +463,11 @@ function loadAdvOpts() {
         _adv.sound        = stored.sound       !== undefined ? stored.sound       : true;
         _adv.startNow     = stored.startNow    !== undefined ? stored.startNow    : true;
         _adv.returnNow    = stored.returnNow   !== undefined ? stored.returnNow   : true;
-        _adv.contactId    = stored.contactId    || '';
-        _adv.contactType  = stored.contactType  || '';
-        _adv.contactLabel = stored.contactLabel || '';
+        _adv.contactId     = stored.contactId    || '';
+        _adv.contactType   = stored.contactType  || '';
+        _adv.contactLabel  = stored.contactLabel || '';
+        _adv.notifyEnabled = stored.notifyEnabled !== undefined ? stored.notifyEnabled : false;
+        _adv.notifyDays    = stored.notifyDays    !== undefined ? stored.notifyDays    : 3;
     } catch(e) {}
     /* Sync UI */
     var smEl = document.querySelector('input[name="submitMode"][value="' + _adv.submitMode + '"]');
@@ -455,6 +477,10 @@ function loadAdvOpts() {
     _setChk('advSound',  _adv.sound);
     _setChk('advStartNow',  _adv.startNow);
     _setChk('advReturnNow', _adv.returnNow);
+    _setChk('advNotifyEnabled', _adv.notifyEnabled);
+    _setVal('advNotifyDays', _adv.notifyDays);
+    var dw = document.getElementById('advNotifyDaysInput');
+    if (dw) dw.style.display = _adv.notifyEnabled ? '' : 'none';
     /* Restore saved contact */
     if (_adv.contactId) {
         _setVal('advContactId',   _adv.contactId);
@@ -468,14 +494,18 @@ function loadAdvOpts() {
 
 function saveAdvOpts() {
     var smEl = document.querySelector('input[name="submitMode"]:checked');
-    _adv.submitMode  = smEl ? smEl.value : 'cart';
-    _adv.sessionEnd  = _getVal('advSessionEnd');
-    _adv.enterSubmit = _getChk('advEnter');
-    _adv.sound       = _getChk('advSound');
-    _adv.startNow    = _getChk('advStartNow');
-    _adv.returnNow   = _getChk('advReturnNow');
-    _adv.contactId    = _getVal('advContactId');
-    _adv.contactType  = _getVal('advContactType');
+    _adv.submitMode    = smEl ? smEl.value : 'cart';
+    _adv.sessionEnd    = _getVal('advSessionEnd');
+    _adv.enterSubmit   = _getChk('advEnter');
+    _adv.sound         = _getChk('advSound');
+    _adv.startNow      = _getChk('advStartNow');
+    _adv.returnNow     = _getChk('advReturnNow');
+    _adv.contactId     = _getVal('advContactId');
+    _adv.contactType   = _getVal('advContactType');
+    _adv.notifyEnabled = _getChk('advNotifyEnabled');
+    _adv.notifyDays    = parseInt(_getVal('advNotifyDays')) || 3;
+    var dw = document.getElementById('advNotifyDaysInput');
+    if (dw) dw.style.display = _adv.notifyEnabled ? '' : 'none';
     /* contactLabel stays in _adv directly (updated by selectAdvContact) */
     try { localStorage.setItem(_ADV_KEY, JSON.stringify(_adv)); } catch(e) {}
 }
@@ -1249,6 +1279,24 @@ function _buildCartDetailForm() {
             '<input type="datetime-local" class="form-control" id="detailReturnDt"' + (retReq ? ' required' : '') + '></div></div>';
     }
 
+    /* Notification option (lending only) */
+    if (!isReturn) {
+        var notifyChecked = _adv.notifyEnabled ? ' checked' : '';
+        var daysVal = _adv.notifyDays || 3;
+        var daysDisplay = _adv.notifyEnabled ? 'inline-flex' : 'none';
+        html += '<div class="mb-3"><div class="d-flex align-items-center gap-2 flex-wrap">' +
+            '<div class="form-check form-switch mb-0">' +
+            '<input class="form-check-input" type="checkbox" id="detailNotifyEnabled"' + notifyChecked +
+            ' onchange="var w=document.getElementById(\'detailNotifyDaysWrap\');if(w)w.style.display=this.checked?\'inline-flex\':\'none\'">' +
+            '<label class="form-check-label" for="detailNotifyEnabled"><i class="bi bi-bell me-1"></i>Enable Notification</label>' +
+            '</div>' +
+            '<div id="detailNotifyDaysWrap" class="input-group input-group-sm align-items-center" style="display:' + daysDisplay + ';max-width:180px;">' +
+            '<input type="number" class="form-control form-control-sm" id="detailNotifyDays" min="1" max="90" value="' + daysVal + '" style="max-width:70px;">' +
+            '<span class="input-group-text">days before due date</span>' +
+            '</div>' +
+            '</div></div>';
+    }
+
     /* Global notes */
     html += '<div class="mb-3"><label class="form-label form-label-sm">Notes <small class="text-muted">(applies to all items unless overridden per-item in the cart above)</small></label>' +
         '<input type="text" class="form-control form-control-sm" id="detailNotes" maxlength="256" placeholder="e.g. FYP, Lab assignment..."></div>';
@@ -1367,9 +1415,11 @@ function submitCart() {
             detail.lend_to_id   = parseInt(cid);
             detail.lend_to_type = ctype;
         }
-        detail.lend_start = startVal;
-        detail.lend_end   = endVal;
-        detail.notes      = _getVal('detailNotes');
+        detail.lend_start    = startVal;
+        detail.lend_end      = endVal;
+        detail.notes         = _getVal('detailNotes');
+        detail.lend_notify   = _getChk('detailNotifyEnabled');
+        detail.lend_days     = parseInt(_getVal('detailNotifyDays')) || 3;
     }
 
     var payload = { mode: isReturn ? 'return' : 'lend', cart: _cart, detail: detail };

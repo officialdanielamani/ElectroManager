@@ -486,6 +486,11 @@ def in_out_submit_cart():
 
         lend_start = _parse_dt(detail.get('lend_start', ''))
         lend_end   = _parse_dt(detail.get('lend_end', ''))
+        lend_notify = bool(detail.get('lend_notify', False))
+        try:
+            lend_notify_days = int(detail.get('lend_days', 3))
+        except (ValueError, TypeError):
+            lend_notify_days = 3
 
         session_obj = LendingSession(
             lending_id=_generate_lending_id(),
@@ -519,13 +524,14 @@ def in_out_submit_cart():
                 if not sn or sn.batch_id != batch.id or sn.is_deleted or sn.lend_to_id:
                     errors.append(f'Serial number {sn_id} not available for lending')
                     continue
-                sn.lend_to_type           = lend_to_type
-                sn.lend_to_id             = lend_to_id
-                sn.lend_start             = lend_start
-                sn.lend_end               = lend_end
-                sn.lend_note              = item_note
-                sn.lend_notify_enabled    = False
-                sn.lending_session_id     = session_obj.id
+                sn.lend_to_type              = lend_to_type
+                sn.lend_to_id               = lend_to_id
+                sn.lend_start               = lend_start
+                sn.lend_end                 = lend_end
+                sn.lend_note                = item_note
+                sn.lend_notify_enabled      = lend_notify
+                sn.lend_notify_before_days  = lend_notify_days
+                sn.lending_session_id       = session_obj.id
                 batch.item.updated_by     = current_user.id
                 batch.item.updated_at     = now
                 processed += 1
@@ -537,14 +543,16 @@ def in_out_submit_cart():
                     errors.append(f'Qty {qty} exceeds available for "{batch.get_display_label()}" (avail: {batch.get_available_quantity()})')
                     continue
                 rec = BatchLendRecord(
-                    batch_id           = batch.id,
-                    lend_to_type       = lend_to_type,
-                    lend_to_id         = lend_to_id,
-                    quantity           = qty,
-                    lend_start         = lend_start,
-                    lend_end           = lend_end,
-                    lend_note          = item_note,
-                    lending_session_id = session_obj.id,
+                    batch_id               = batch.id,
+                    lend_to_type           = lend_to_type,
+                    lend_to_id             = lend_to_id,
+                    quantity               = qty,
+                    lend_start             = lend_start,
+                    lend_end               = lend_end,
+                    lend_note              = item_note,
+                    lending_session_id     = session_obj.id,
+                    lend_notify_enabled    = lend_notify,
+                    lend_notify_before_days = lend_notify_days,
                 )
                 db.session.add(rec)
                 batch.item.updated_by = current_user.id

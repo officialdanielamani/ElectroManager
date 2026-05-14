@@ -68,7 +68,7 @@
 
                             <!-- Current picture preview -->
                             {% if location and location.picture %}
-                            <div class="mb-2 position-relative d-inline-block" id="locPicPreviewWrap">
+                            <div class="mb-2 position-relative" id="locPicPreviewWrap" style="display:inline-block">
                                 <img id="locPicPreview"
                                      src="{{ url_for('location_rack.location_picture', filepath=location.picture) }}"
                                      alt="{{ location.name }}"
@@ -82,7 +82,7 @@
                             </div>
                             <input type="hidden" id="deletePicFlag" name="delete_picture" value="">
                             {% else %}
-                            <div class="mb-2 position-relative d-inline-block" id="locPicPreviewWrap" style="display:none!important;">
+                            <div class="mb-2 position-relative" id="locPicPreviewWrap" style="display:none">
                                 <img id="locPicPreview" src="" alt="Preview"
                                      style="width:150px;height:150px;object-fit:cover;border-radius:8px;border:2px solid #dee2e6;">
                                 <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 p-0 lh-1"
@@ -217,7 +217,7 @@ function showLocPicPreview(src) {
     const wrap = document.getElementById('locPicPreviewWrap');
     const img  = document.getElementById('locPicPreview');
     if (img)  img.src = src;
-    if (wrap) wrap.style.display = '';
+    if (wrap) wrap.style.display = 'inline-block';
 }
 
 function clearLocPic() {

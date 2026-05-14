@@ -60,7 +60,7 @@
 
                         <!-- Current picture preview -->
                         {% if rack and rack.picture %}
-                        <div class="mb-2 position-relative d-inline-block" id="rackPicPreviewWrap">
+                        <div class="mb-2 position-relative" id="rackPicPreviewWrap" style="display:inline-block">
                             <img id="rackPicPreview"
                                  src="{{ url_for('location_rack.rack_picture', filepath=rack.picture) }}"
                                  alt="{{ rack.name }}"
@@ -73,7 +73,7 @@
                         </div>
                         <input type="hidden" id="deletePicFlag" name="delete_picture" value="">
                         {% else %}
-                        <div class="mb-2 position-relative d-inline-block" id="rackPicPreviewWrap" style="display:none;">
+                        <div class="mb-2 position-relative" id="rackPicPreviewWrap" style="display:none;">
                             <img id="rackPicPreview" src="" alt="Preview"
                                  style="width:150px;height:150px;object-fit:cover;border-radius:8px;border:2px solid #dee2e6;">
                             <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 p-0 lh-1"
@@ -684,7 +684,7 @@ function showRackPicPreview(src) {
     const wrap = document.getElementById('rackPicPreviewWrap');
     const img  = document.getElementById('rackPicPreview');
     if (img)  img.src = src;
-    if (wrap) wrap.style.removeProperty('display');
+    if (wrap) wrap.style.display = 'inline-block';
 }
 
 function clearRackPic() {
