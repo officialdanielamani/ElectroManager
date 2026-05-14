@@ -714,11 +714,24 @@ function _tryAddNormalToCart(batchData) {
             _playSound('error');
             return;
         }
-        _cartAdd({ type: 'normal', batch_id: batchData.id,
-                   item_name: batchData.item_name, batch_label: batchData.display_label,
-                   qty: 1, max_qty: avail, note: '' });
-        showToast('Added to cart: ' + batchData.display_label, 'success');
-        _playSound('scanner');
+        var existing = _cart.find(function(c){ return c.type === 'normal' && c.batch_id === batchData.id; });
+        if (existing) {
+            var newQty = (existing.qty || 1) + 1;
+            if (existing.max_qty && newQty > existing.max_qty) {
+                showToast('Exceeds available quantity (' + existing.max_qty + ').', 'warning');
+                return;
+            }
+            existing.qty = newQty;
+            _renderCart();
+            showToast('Qty increased: ' + batchData.display_label + ' \xd7' + newQty, 'success');
+            _playSound('scanner');
+        } else {
+            _cartAdd({ type: 'normal', batch_id: batchData.id,
+                       item_name: batchData.item_name, batch_label: batchData.display_label,
+                       qty: 1, max_qty: avail, note: '' });
+            showToast('Added to cart: ' + batchData.display_label, 'success');
+            _playSound('scanner');
+        }
     }
 }
 
