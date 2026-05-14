@@ -61,6 +61,7 @@ class UserForm(FlaskForm):
     # --- Security Section ---
     allow_password_reset = BooleanField('Allow User to Reset Password', default=True)
     allow_profile_picture_change = BooleanField('Allow User to change Profile Picture', default=True)
+    allow_change_name       = BooleanField('Allow User to change Name', default=True)
     allow_change_short_info = BooleanField('Allow User to change Short Info', default=True)
     max_login_attempts = IntegerField('Max Login Attempt', validators=[Optional(), NumberRange(min=0)], default=0)
     auto_unlock_enabled = BooleanField('Unlock after Time', default=True)

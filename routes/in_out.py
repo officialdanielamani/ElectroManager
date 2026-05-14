@@ -9,7 +9,8 @@ import re
 
 in_out_bp = Blueprint('in_out', __name__)
 
-LOG_PAGE_SIZE = 25
+LOG_PAGE_SIZE  = 15
+SESS_PAGE_SIZE = 15
 
 _LENDING_ID_RE = re.compile(r'^\d{8}-[A-Z0-9]{6}$')
 
@@ -348,7 +349,10 @@ def in_out_sessions_list():
         except ValueError:
             pass
 
-    sessions = q.limit(80).all()
+    page = request.args.get('page', 1, type=int)
+    total = q.count()
+    total_pages = max(1, (total + SESS_PAGE_SIZE - 1) // SESS_PAGE_SIZE)
+    sessions = q.offset((page - 1) * SESS_PAGE_SIZE).limit(SESS_PAGE_SIZE).all()
 
     def _list_json(s):
         item_count = (len(s.lend_records) +
@@ -364,7 +368,8 @@ def in_out_sessions_list():
             'item_count':   item_count,
         }
 
-    return jsonify({'sessions': [_list_json(s) for s in sessions]})
+    return jsonify({'sessions': [_list_json(s) for s in sessions],
+                    'total_pages': total_pages, 'page': page})
 
 
 @in_out_bp.route('/in-out/logs')
@@ -423,9 +428,9 @@ def in_out_logs_ajax():
             pass
 
     q = q.order_by(AuditLog.timestamp.desc())
-    raw = q.offset((page - 1) * LOG_PAGE_SIZE).limit(LOG_PAGE_SIZE + 1).all()
-    has_more = len(raw) > LOG_PAGE_SIZE
-    raw = raw[:LOG_PAGE_SIZE]
+    total = q.count()
+    total_pages = max(1, (total + LOG_PAGE_SIZE - 1) // LOG_PAGE_SIZE)
+    raw = q.offset((page - 1) * LOG_PAGE_SIZE).limit(LOG_PAGE_SIZE).all()
 
     result = []
     for log in raw:
@@ -437,7 +442,8 @@ def in_out_logs_ajax():
             'display':   _format_log_details(log.action, log.details),
         })
 
-    return jsonify({'entries': result, 'has_more': has_more})
+    return jsonify({'entries': result, 'has_more': page < total_pages,
+                    'total_pages': total_pages, 'page': page})
 
 
 @in_out_bp.route('/in-out/submit-cart', methods=['POST'])

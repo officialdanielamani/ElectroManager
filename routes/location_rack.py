@@ -90,25 +90,24 @@ def location_new():
         db.session.add(location)
         db.session.commit()
         
-        # Handle picture upload with UUID-based path structure
-        if form.picture.data:
+        # Handle share icon file selection (takes priority over upload)
+        share_icon = request.form.get('share_icon_file', '').strip()
+        if share_icon and not form.picture.data:
+            location.picture = f'share/icon/{share_icon}'
+            db.session.commit()
+        elif form.picture.data:
+            # Handle picture upload with UUID-based path structure
             file = form.picture.data
-            
-            # Check file size against system settings
-            max_size_mb = 10  # fixed for location/rack pictures
+            max_size_mb = 10
             max_size_bytes = max_size_mb * 1024 * 1024
-            
             file.seek(0, 2)
             file_size = file.tell()
             file.seek(0)
-            
             if file_size > max_size_bytes:
                 flash('Location/rack pictures must be smaller than 10MB.', 'danger')
                 db.session.delete(location)
                 db.session.commit()
                 return render_template('location_form.html', form=form, location=None)
-            
-            # Only allow PNG and JPEG
             if file.filename and allowed_file(file.filename):
                 ext = file.filename.rsplit('.', 1)[1].lower()
                 if ext not in ['png', 'jpg', 'jpeg', 'webp']:
@@ -116,13 +115,11 @@ def location_new():
                     db.session.delete(location)
                     db.session.commit()
                     return render_template('location_form.html', form=form, location=None)
-                
                 if ext == 'jpg':
                     ext = 'jpeg'
                 filename = f"{location.uuid}.{ext}"
                 location_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations', location.uuid)
                 os.makedirs(location_dir, exist_ok=True)
-                # Remove any old picture with a different extension
                 for old_ext in ['png', 'jpeg', 'webp']:
                     old_f = os.path.join(location_dir, f"{location.uuid}.{old_ext}")
                     if old_f != os.path.join(location_dir, filename) and os.path.exists(old_f):
@@ -130,13 +127,16 @@ def location_new():
                 file.save(os.path.join(location_dir, filename))
                 location.picture = f"{location.uuid}/{filename}"
                 db.session.commit()
-        
+
         log_audit(current_user.id, 'create', 'location', location.id, f'Created location: {location.name}')
         flash(f'Location "{location.name}" created successfully!', 'success')
         return redirect(url_for('location_rack.location_management'))
     
+    from models import SharedFile
     max_file_size_mb = int(Setting.get('max_file_size_mb', '10'))
-    return render_template('location_form.html', form=form, location=None, max_file_size_mb=max_file_size_mb)
+    icon_share_files = SharedFile.query.filter_by(category='icon').order_by(SharedFile.created_at.desc()).all()
+    return render_template('location_form.html', form=form, location=None,
+                           max_file_size_mb=max_file_size_mb, icon_share_files=icon_share_files)
 
 
 
@@ -160,41 +160,35 @@ def location_edit(uuid):
         
         # Handle picture deletion
         if request.form.get('delete_picture'):
-            if location.picture:
-                # Path is {location_uuid}/{picture_uuid}.ext
+            if location.picture and not location.picture.startswith('share/'):
                 old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations', location.picture)
                 if is_safe_file_path(old_path) and os.path.exists(old_path):
                     os.remove(old_path)
-                location.picture = None
-        
-        # Handle new picture upload
-        if form.picture.data:
+            location.picture = None
+
+        # Handle share icon file selection (takes priority over upload)
+        share_icon = request.form.get('share_icon_file', '').strip()
+        if share_icon and not form.picture.data:
+            location.picture = f'share/icon/{share_icon}'
+        elif form.picture.data:
             file = form.picture.data
             if hasattr(file, 'filename') and file.filename and allowed_file(file.filename):
-                # Check file size against system settings
-                max_size_mb = 10  # fixed for location/rack pictures
+                max_size_mb = 10
                 max_size_bytes = max_size_mb * 1024 * 1024
-                
                 file.seek(0, 2)
                 file_size = file.tell()
                 file.seek(0)
-                
                 if file_size > max_size_bytes:
                     flash('Location/rack pictures must be smaller than 10MB.', 'danger')
                     return render_template('location_form.html', form=form, location=location)
-                
-                # Only allow PNG and JPEG
                 ext = file.filename.rsplit('.', 1)[1].lower()
                 if ext not in ['png', 'jpg', 'jpeg', 'webp']:
                     flash('Only PNG, JPEG, and WebP images are allowed.', 'danger')
                     return render_template('location_form.html', form=form, location=location)
-                
-                # Delete old picture if exists
-                if location.picture:
+                if location.picture and not location.picture.startswith('share/'):
                     old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations', location.picture)
                     if is_safe_file_path(old_path) and os.path.exists(old_path):
                         os.remove(old_path)
-                
                 if ext == 'jpg':
                     ext = 'jpeg'
                 filename = f"{location.uuid}.{ext}"
@@ -206,15 +200,18 @@ def location_edit(uuid):
                         os.remove(old_f)
                 file.save(os.path.join(location_dir, filename))
                 location.picture = f"{location.uuid}/{filename}"
-        
+
         db.session.commit()
-        
+
         log_audit(current_user.id, 'update', 'location', location.id, f'Updated location: {location.name}')
         flash(f'Location "{location.name}" updated successfully!', 'success')
         return redirect(url_for('location_rack.location_detail', uuid=location.uuid))
-    
+
+    from models import SharedFile
     max_file_size_mb = int(Setting.get('max_file_size_mb', '10'))
-    return render_template('location_form.html', form=form, location=location, max_file_size_mb=max_file_size_mb)
+    icon_share_files = SharedFile.query.filter_by(category='icon').order_by(SharedFile.created_at.desc()).all()
+    return render_template('location_form.html', form=form, location=location,
+                           max_file_size_mb=max_file_size_mb, icon_share_files=icon_share_files)
 
 
 
@@ -255,26 +252,33 @@ def location_delete(uuid):
 @location_rack_bp.route('/location-picture/<path:filepath>', endpoint='location_picture')
 @login_required
 def location_picture(filepath):
-    """Serve location pictures from UUID-based paths
-    filepath format: {location_uuid}/{picture_uuid}.ext
+    """Serve location pictures.  filepath may be:
+      - {location_uuid}/{filename}.ext  — uploaded file
+      - share/icon/{filename}           — icon from Share Files
     """
+    if filepath.startswith('share/icon/'):
+        from routes.share import share_serve
+        filename = filepath[len('share/icon/'):]
+        return share_serve('icon', filename)
     location_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations')
-    # Prevent path traversal attacks
     safe_path = safe_join(location_dir, filepath)
     if safe_path is None or not os.path.exists(safe_path):
         abort(404)
     return send_from_directory(location_dir, filepath)
 
 
-
 @location_rack_bp.route('/rack-picture/<path:filepath>')
 @login_required
 def rack_picture(filepath):
-    """Serve rack pictures from UUID-based paths
-    filepath format: {rack_uuid}/{picture_uuid}.ext
+    """Serve rack pictures.  filepath may be:
+      - {rack_uuid}/{filename}.ext  — uploaded file
+      - share/icon/{filename}       — icon from Share Files
     """
+    if filepath.startswith('share/icon/'):
+        from routes.share import share_serve
+        filename = filepath[len('share/icon/'):]
+        return share_serve('icon', filename)
     rack_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks')
-    # Prevent path traversal attacks
     safe_path = safe_join(rack_dir, filepath)
     if safe_path is None or not os.path.exists(safe_path):
         abort(404)
@@ -337,28 +341,26 @@ def rack_new():
         db.session.commit()
         
         # Handle picture upload with UUID-based path structure
-        if request.files.get('picture'):
+        # Handle share icon file selection (takes priority over upload)
+        share_icon = request.form.get('share_icon_file', '').strip()
+        if share_icon and not request.files.get('picture'):
+            rack.picture = f'share/icon/{share_icon}'
+            db.session.commit()
+        elif request.files.get('picture'):
             file = request.files['picture']
-            
-            # Check file size against system settings
-            max_size_mb = 10  # fixed for location/rack pictures
+            max_size_mb = 10
             max_size_bytes = max_size_mb * 1024 * 1024
-            
             file.seek(0, 2)
             file_size = file.tell()
             file.seek(0)
-            
             if file_size > max_size_bytes:
                 flash('Location/rack pictures must be smaller than 10MB.', 'danger')
                 return redirect(url_for('location_rack.rack_new'))
-            
-            # Only allow PNG and JPEG
             if file.filename and allowed_file(file.filename):
                 ext = file.filename.rsplit('.', 1)[1].lower()
                 if ext not in ['png', 'jpg', 'jpeg', 'webp']:
                     flash('Only PNG, JPEG, and WebP images are allowed.', 'danger')
                     return redirect(url_for('location_rack.rack_new'))
-                
                 if ext == 'jpg':
                     ext = 'jpeg'
                 filename = f"{rack.uuid}.{ext}"
@@ -371,19 +373,21 @@ def rack_new():
                 file.save(os.path.join(rack_dir, filename))
                 rack.picture = f"{rack.uuid}/{filename}"
                 db.session.commit()
-        
+
         log_audit(current_user.id, 'create', 'rack', rack.id, f'Created rack: {name}')
         flash(f'Rack "{name}" created successfully!', 'success')
         return redirect(url_for('location_rack.location_management'))
-    
+
     # GET - show form
+    from models import SharedFile
     locations = Location.query.order_by(Location.name).all()
     max_drawer_rows = int(Setting.get('max_drawer_rows', '10'))
     max_drawer_cols = int(Setting.get('max_drawer_cols', '10'))
     max_file_size_mb = int(Setting.get('max_file_size_mb', '10'))
-    return render_template('rack_form.html', rack=None, locations=locations, 
+    icon_share_files = SharedFile.query.filter_by(category='icon').order_by(SharedFile.created_at.desc()).all()
+    return render_template('rack_form.html', rack=None, locations=locations,
                          max_drawer_rows=max_drawer_rows, max_drawer_cols=max_drawer_cols,
-                         max_file_size_mb=max_file_size_mb)
+                         max_file_size_mb=max_file_size_mb, icon_share_files=icon_share_files)
 
 
 
@@ -468,40 +472,35 @@ def rack_edit(uuid):
         
         # Handle picture deletion
         if request.form.get('delete_picture'):
-            if rack.picture:
+            if rack.picture and not rack.picture.startswith('share/'):
                 old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks', rack.picture)
                 if is_safe_file_path(old_path) and os.path.exists(old_path):
                     os.remove(old_path)
-                rack.picture = None
-        
-        # Handle new picture upload
-        if request.files.get('picture'):
+            rack.picture = None
+
+        # Handle share icon file selection (takes priority over upload)
+        share_icon = request.form.get('share_icon_file', '').strip()
+        if share_icon and not request.files.get('picture'):
+            rack.picture = f'share/icon/{share_icon}'
+        elif request.files.get('picture'):
             file = request.files['picture']
             if hasattr(file, 'filename') and file.filename and allowed_file(file.filename):
-                # Check file size against system settings
-                max_size_mb = 10  # fixed for location/rack pictures
+                max_size_mb = 10
                 max_size_bytes = max_size_mb * 1024 * 1024
-                
                 file.seek(0, 2)
                 file_size = file.tell()
                 file.seek(0)
-                
                 if file_size > max_size_bytes:
                     flash('Location/rack pictures must be smaller than 10MB.', 'danger')
                     return redirect(url_for('location_rack.rack_edit', uuid=uuid))
-                
-                # Only allow PNG and JPEG
                 ext = file.filename.rsplit('.', 1)[1].lower()
                 if ext not in ['png', 'jpg', 'jpeg', 'webp']:
                     flash('Only PNG, JPEG, and WebP images are allowed.', 'danger')
                     return redirect(url_for('location_rack.rack_edit', uuid=uuid))
-                
-                # Delete old picture if exists
-                if rack.picture:
+                if rack.picture and not rack.picture.startswith('share/'):
                     old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks', rack.picture)
                     if is_safe_file_path(old_path) and os.path.exists(old_path):
                         os.remove(old_path)
-                
                 if ext == 'jpg':
                     ext = 'jpeg'
                 filename = f"{rack.uuid}.{ext}"
@@ -513,21 +512,23 @@ def rack_edit(uuid):
                         os.remove(old_f)
                 file.save(os.path.join(rack_dir, filename))
                 rack.picture = f"{rack.uuid}/{filename}"
-        
+
         db.session.commit()
-        
+
         log_audit(current_user.id, 'update', 'rack', rack.id, f'Updated rack: {rack.name} (size: {rows}x{cols})')
         flash(f'Rack "{rack.name}" updated successfully!', 'success')
         return redirect(url_for('location_rack.rack_detail', uuid=rack.uuid))
-    
+
     # GET - show form
+    from models import SharedFile
     locations = Location.query.order_by(Location.name).all()
     max_drawer_rows = int(Setting.get('max_drawer_rows', '10'))
     max_drawer_cols = int(Setting.get('max_drawer_cols', '10'))
     max_file_size_mb = int(Setting.get('max_file_size_mb', '10'))
+    icon_share_files = SharedFile.query.filter_by(category='icon').order_by(SharedFile.created_at.desc()).all()
     return render_template('rack_form.html', rack=rack, locations=locations,
                          max_drawer_rows=max_drawer_rows, max_drawer_cols=max_drawer_cols,
-                         max_file_size_mb=max_file_size_mb)
+                         max_file_size_mb=max_file_size_mb, icon_share_files=icon_share_files)
 
 
 

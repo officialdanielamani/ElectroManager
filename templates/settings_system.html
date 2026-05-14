@@ -47,6 +47,15 @@
 
                     <hr>
 
+                    <!-- Timezone (placeholder — not yet functional) -->
+                    <div class="mb-3">
+                        <label for="system_timezone" class="form-label fw-semibold">System Timezone</label>
+                        <select class="form-select" id="system_timezone" name="system_timezone" disabled>
+                            <option value="">— Coming soon —</option>
+                        </select>
+                        <div class="form-text"><i class="bi bi-info-circle"></i> Timezone selection is not yet functional. Dates and times currently use the server's local timezone.</div>
+                    </div>
+
                     <!-- Banner Timeout -->
                     <div class="mb-3">
                         <label for="banner_timeout" class="form-label fw-semibold">Banner Timeout (seconds) <span class="text-danger">*</span></label>
@@ -373,19 +382,19 @@
             {% if current_user.has_permission('settings_sections.system_settings', 'edit') %}
             <div class="card mb-4" id="lending-return-settings">
                 <div class="card-header">
-                    <h6 class="mb-0"><i class="bi bi-arrow-left-right"></i> Lending &amp; Return Settings</h6>
+                    <h5 class="mb-0"><i class="bi bi-arrow-left-right"></i> Lending &amp; Return Settings</h5>
                 </div>
                 <div class="card-body">
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="lr_scan_enabled" name="lr_scan_enabled"
-                               {% if Setting.get('lr_scan_enabled', false) %}checked{% endif %}>
-                        <label class="form-check-label" for="lr_scan_enabled">
-                            <strong>Enable using camera to scan item QR/Barcode</strong>
-                            <small class="text-muted d-block">When disabled, the scan area on In/Out page shows "Admin Disabled Scan QR/Barcode"</small>
-                        </label>
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="lr_scan_enabled" name="lr_scan_enabled"
+                                   {% if Setting.get('lr_scan_enabled', false) %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="lr_scan_enabled">Enable Camera QR / Barcode Scanning</label>
+                        </div>
+                        <div class="form-text"><i class="bi bi-info-circle"></i> When disabled, the scan area on the In/Out page shows "Admin Disabled Scan QR/Barcode".</div>
                     </div>
-                    <hr class="my-2">
-                    <h6 class="text-primary">Lending Options</h6>
+                    <hr>
+                    <label class="form-label fw-semibold text-primary"><i class="bi bi-box-arrow-right"></i> Lending Options</label>
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
                             <div class="form-check mb-2">
@@ -424,7 +433,8 @@
                         </div>
                     </div>
 
-                    <h6 class="text-primary mt-3">Return Options</h6>
+                    <hr>
+                    <label class="form-label fw-semibold text-primary"><i class="bi bi-box-arrow-in-left"></i> Return Options</label>
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
                             <div class="form-check mb-2">
@@ -486,11 +496,11 @@
 
     <!-- Help Panel -->
     <div class="col-md-4">
-        <div class="card bg-light sticky-top" style="top: 20px;">
+        <div class="card bg-light">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-question-circle"></i> Help</h5>
             </div>
-            <div class="card-body">
+            <div class="card-body" style="max-height:70vh;overflow-y:auto;">
                 <h6><i class="bi bi-palette"></i> System Customization</h6>
                 <ul class="small ps-3 mb-2">
                     <li><strong>System Name</strong> — Shown on the login page (max 64 chars).</li>

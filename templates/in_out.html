@@ -8,38 +8,35 @@
   <div class="col-lg-8">
     <div class="card">
 
-      <!-- ── Card Header ── -->
-      <div class="card-header py-2 px-3">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-
-          <!-- Mode toggle (Lending ↔ Return) -->
-          <div class="d-flex align-items-center gap-2" id="modeToggleGroup">
-            <div class="form-check form-switch mb-0">
-              <input class="form-check-input" type="checkbox" id="modeToggle" role="switch"
-                     onchange="onModeChange()" {% if not can_lend %}disabled{% endif %} style="cursor:pointer;">
-            </div>
-            <span class="fw-semibold" id="modeLabel">Lending</span>
+      <!-- ── Card Header (bg changes with mode) ── -->
+      <div class="card-header py-2 px-3 transition-bg" id="mainCardHeader"
+           style="background-color:var(--bs-primary-bg-subtle);transition:background-color 0.2s;">
+        <div class="d-flex align-items-center gap-2" id="modeToggleGroup">
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="modeToggle" role="switch"
+                   onchange="onModeChange()" {% if not can_lend %}disabled{% endif %} style="cursor:pointer;">
           </div>
-
-          <!-- Right controls -->
-          <div class="d-flex align-items-center gap-3 flex-wrap">
-            {% if can_edit_batch %}
-            <div class="form-check mb-0">
-              <input class="form-check-input" type="checkbox" id="editBatchCheck" onchange="onEditBatchChange()">
-              <label class="form-check-label small" for="editBatchCheck">Edit Batch</label>
-            </div>
-            {% endif %}
-            {% if can_lend %}
-            <div class="form-check mb-0">
-              <input class="form-check-input" type="checkbox" id="advOptCheck" onchange="toggleAdvPanel()">
-              <label class="form-check-label small" for="advOptCheck">
-                <i class="bi bi-sliders"></i> Advanced Options
-              </label>
-            </div>
-            {% endif %}
-          </div>
+          <h5 class="mb-0 fw-semibold" id="modeLabel">Lending</h5>
         </div>
       </div><!-- end card-header -->
+
+      <!-- ── Controls Bar (Edit Batch + Advanced Options, not affected by mode colour) ── -->
+      {% if can_edit_batch or can_lend %}
+      <div class="border-bottom px-3 py-2 d-flex align-items-center gap-3 flex-wrap bg-body" style="font-size:0.9rem;">
+        {% if can_edit_batch %}
+        <div class="form-check mb-0">
+          <input class="form-check-input" type="checkbox" id="editBatchCheck" onchange="onEditBatchChange()">
+          <label class="form-check-label small" for="editBatchCheck"><i class="bi bi-pencil-square"></i> Edit Batch</label>
+        </div>
+        {% endif %}
+        {% if can_lend %}
+        <button class="btn btn-sm btn-outline-secondary py-0" id="advOptBtn" onclick="toggleAdvPanel()" type="button">
+          <i class="bi bi-sliders"></i> Advanced Options
+          <i class="bi bi-chevron-down ms-1" id="advOptChevron" style="transition:transform 0.15s;"></i>
+        </button>
+        {% endif %}
+      </div>
+      {% endif %}
 
       <!-- ── Advanced Options Panel ── -->
       {% if can_lend %}
@@ -258,32 +255,32 @@
         <h6 class="mb-0"><i class="bi bi-receipt"></i> Lending Sessions</h6>
       </div>
       <div class="card-body p-2">
-        <!-- Filter row -->
-        <div class="row g-1 mb-2 align-items-center flex-nowrap">
-          <div class="col">
-            <input type="date" class="form-control form-control-sm" id="sessFilterStart"
-                   onchange="searchSessions()" title="Start date (lend_start ≥)">
-          </div>
+        <!-- Filter row: Start | End | Contact — stacks vertically on xs screens -->
+        <div class="d-flex flex-wrap gap-1 mb-2 align-items-center">
+          <input type="date" class="form-control form-control-sm" id="sessFilterStart"
+                 style="min-width:120px;flex:1 1 120px;"
+                 onchange="searchSessions()" title="Start date (lend_start ≥)">
+          <input type="date" class="form-control form-control-sm" id="sessFilterEnd"
+                 style="min-width:120px;flex:1 1 120px;"
+                 onchange="searchSessions()" title="Due date (lend_end ≤)">
           {% if not can_only_self %}
-          <div class="col position-relative">
+          <div class="position-relative" style="min-width:130px;flex:2 1 130px;">
             <input type="hidden" id="sessFilterContactId">
             <input type="hidden" id="sessFilterContactType">
             <input type="text" class="form-control form-control-sm" id="sessFilterContactInput"
-                   placeholder="All contacts" oninput="debounceSessContact()" autocomplete="off">
+                   placeholder="Contact…" oninput="debounceSessContact()" autocomplete="off">
             <div id="sessFilterContactDrop" class="border rounded shadow-sm position-absolute"
                  style="top:100%;left:0;right:0;z-index:200;max-height:160px;overflow-y:auto;
                         background:var(--bs-body-bg);display:none;font-size:0.82rem;"></div>
           </div>
           {% endif %}
-          <div class="col">
-            <input type="date" class="form-control form-control-sm" id="sessFilterEnd"
-                   onchange="searchSessions()" title="Due date (lend_end ≤)">
-          </div>
         </div>
         <!-- Results -->
         <div id="sessResults" style="max-height:260px;overflow-y:auto;font-size:0.82rem;">
           <div class="text-muted small text-center py-2"><i class="bi bi-hourglass-split"></i> Loading…</div>
         </div>
+        <!-- Sessions pagination -->
+        <div id="sessPaginationWrap" class="d-flex justify-content-center align-items-center gap-1 mt-1" style="display:none!important;font-size:0.82rem;"></div>
       </div>
     </div>
     {% endif %}
@@ -295,14 +292,16 @@
       </div>
       {% if can_view_log %}
       <div class="card-body p-2">
-        <!-- Log filter row -->
-        <div class="row g-1 mb-2 align-items-center flex-nowrap">
-          <div class="col">
-            <input type="date" class="form-control form-control-sm" id="logFilterStart"
-                   onchange="loadLog()" title="Log entries on/after this date">
-          </div>
+        <!-- Log filter row: Start | End | Contact — stacks vertically on xs screens -->
+        <div class="d-flex flex-wrap gap-1 mb-2 align-items-center">
+          <input type="date" class="form-control form-control-sm" id="logFilterStart"
+                 style="min-width:120px;flex:1 1 120px;"
+                 onchange="loadLog()" title="Log entries on/after this date">
+          <input type="date" class="form-control form-control-sm" id="logFilterEnd"
+                 style="min-width:120px;flex:1 1 120px;"
+                 onchange="loadLog()" title="Log entries on/before this date">
           {% if not can_only_self %}
-          <div class="col position-relative">
+          <div class="position-relative" style="min-width:130px;flex:2 1 130px;">
             <input type="hidden" id="logFilterContactId">
             <input type="hidden" id="logFilterContactType">
             <input type="text" class="form-control form-control-sm" id="logFilterContactInput"
@@ -313,20 +312,13 @@
                         background:var(--bs-body-bg);display:none;font-size:0.82rem;"></div>
           </div>
           {% endif %}
-          <div class="col">
-            <input type="date" class="form-control form-control-sm" id="logFilterEnd"
-                   onchange="loadLog()" title="Log entries on/before this date">
-          </div>
         </div>
         <!-- Log results -->
-        <div id="logResults" style="max-height:60vh;overflow-y:auto;font-size:0.83rem;">
+        <div id="logResults" style="max-height:55vh;overflow-y:auto;font-size:0.83rem;">
           <div class="text-muted small text-center py-2"><i class="bi bi-hourglass-split"></i> Loading…</div>
         </div>
-        <div class="text-center mt-1" id="logLoadMoreWrap" style="display:none;">
-          <button class="btn btn-sm btn-outline-secondary py-0" onclick="loadLogMore()">
-            <i class="bi bi-chevron-down"></i> Load more
-          </button>
-        </div>
+        <!-- Log pagination -->
+        <div id="logPaginationWrap" class="d-flex justify-content-center align-items-center gap-1 mt-1" style="font-size:0.82rem;"></div>
       </div>
       {% else %}
       <div class="card-body p-2">
@@ -372,9 +364,14 @@ var _scanEnabled    = {{ scan_enabled | tojson }};
 
 /* Log panel state */
 var _logPage            = 1;
+var _logTotalPages      = 1;
 var _logContactId       = '';
 var _logContactType     = '';
 var _logContactTimer    = null;
+
+/* Sessions panel state */
+var _sessPage       = 1;
+var _sessTotalPages = 1;
 
 /* Advanced options — persisted per-user in localStorage */
 var _ADV_KEY = 'lr_adv_{{ current_user_id }}';
@@ -484,9 +481,13 @@ function saveAdvOpts() {
 }
 
 function toggleAdvPanel() {
-    var panel = document.getElementById('advOptPanel');
-    var chk   = document.getElementById('advOptCheck');
-    if (panel) panel.classList.toggle('d-none', !chk.checked);
+    var panel   = document.getElementById('advOptPanel');
+    var chevron = document.getElementById('advOptChevron');
+    if (!panel) return;
+    var open = panel.classList.toggle('d-none') === false;
+    // panel.classList.toggle returns true if class was added (i.e., now hidden)
+    open = !panel.classList.contains('d-none');
+    if (chevron) chevron.style.transform = open ? 'rotate(180deg)' : '';
 }
 
 /* ════════════════════════════════════════════════════════
@@ -495,21 +496,32 @@ function toggleAdvPanel() {
 function onModeChange() {
     _mode = document.getElementById('modeToggle').checked ? 'return' : 'lending';
     document.getElementById('modeLabel').textContent = _mode === 'return' ? 'Return' : 'Lending';
+    var hdr = document.getElementById('mainCardHeader');
+    if (hdr) {
+        hdr.style.backgroundColor = _mode === 'return'
+            ? 'var(--bs-success-bg-subtle)'
+            : 'var(--bs-primary-bg-subtle)';
+    }
     clearActionForm();
     _renderCart();
 }
 
 function onEditBatchChange() {
     _editBatch = document.getElementById('editBatchCheck').checked;
-    var tg = document.getElementById('modeToggleGroup');
+    var tg  = document.getElementById('modeToggleGroup');
+    var hdr = document.getElementById('mainCardHeader');
     if (_editBatch) {
         tg.style.opacity = '0.4'; tg.style.pointerEvents = 'none';
         _mode = 'edit_batch';
         document.getElementById('modeLabel').textContent = 'Edit Batch';
+        if (hdr) hdr.style.backgroundColor = 'var(--bs-secondary-bg-subtle)';
     } else {
         tg.style.opacity = ''; tg.style.pointerEvents = '';
         _mode = document.getElementById('modeToggle').checked ? 'return' : 'lending';
         document.getElementById('modeLabel').textContent = _mode === 'return' ? 'Return' : 'Lending';
+        if (hdr) hdr.style.backgroundColor = _mode === 'return'
+            ? 'var(--bs-success-bg-subtle)'
+            : 'var(--bs-primary-bg-subtle)';
     }
     if (_selectedBatch) showActionForm(_selectedBatch);
 }
@@ -2251,6 +2263,7 @@ function _sessInitDefaults() {
 }
 
 function searchSessions() {
+    _sessPage = 1;
     clearTimeout(_sessSearchTimer);
     _sessSearchTimer = setTimeout(_doSearchSessions, 300);
 }
@@ -2260,8 +2273,9 @@ function _doSearchSessions() {
     var end   = _getVal('sessFilterEnd');
     var cid   = _getVal('sessFilterContactId');
     var ctype = _getVal('sessFilterContactType');
-    var url   = '/in-out/sessions?start_date=' + encodeURIComponent(start) +
-                '&end_date=' + encodeURIComponent(end);
+    var url   = '/in-out/sessions?page=' + _sessPage +
+                '&start_date=' + encodeURIComponent(start) +
+                '&end_date='   + encodeURIComponent(end);
     if (cid && ctype) url += '&contact_id=' + encodeURIComponent(cid) +
                               '&contact_type=' + encodeURIComponent(ctype);
     var el = document.getElementById('sessResults');
@@ -2269,10 +2283,35 @@ function _doSearchSessions() {
     el.innerHTML = '<div class="text-muted small text-center py-2"><i class="bi bi-hourglass-split"></i> Loading…</div>';
     fetch(url)
     .then(function(r) { return r.json(); })
-    .then(function(d) { _renderSessions(d.sessions || []); })
+    .then(function(d) {
+        _sessTotalPages = d.total_pages || 1;
+        _sessPage       = d.page       || 1;
+        _renderSessions(d.sessions || []);
+        _renderSessPagination();
+    })
     .catch(function() {
         if (el) el.innerHTML = '<div class="text-danger small p-1">Failed to load sessions.</div>';
     });
+}
+
+function _goSessPage(p) {
+    _sessPage = p;
+    _doSearchSessions();
+}
+
+function _renderSessPagination() {
+    var wrap = document.getElementById('sessPaginationWrap');
+    if (!wrap) return;
+    if (_sessTotalPages <= 1) { wrap.style.display = 'none'; return; }
+    wrap.style.display = '';
+    var html = '<button class="btn btn-sm btn-outline-secondary py-0 px-2" ' +
+        (_sessPage <= 1 ? 'disabled' : 'onclick="_goSessPage(' + (_sessPage - 1) + ')"') +
+        '><i class="bi bi-chevron-left"></i></button>';
+    html += '<span class="px-2 text-muted">' + _sessPage + ' / ' + _sessTotalPages + '</span>';
+    html += '<button class="btn btn-sm btn-outline-secondary py-0 px-2" ' +
+        (_sessPage >= _sessTotalPages ? 'disabled' : 'onclick="_goSessPage(' + (_sessPage + 1) + ')"') +
+        '><i class="bi bi-chevron-right"></i></button>';
+    wrap.innerHTML = html;
 }
 
 function _renderSessions(sessions) {
@@ -2563,15 +2602,29 @@ function _logInitDefaults() {
 
 function loadLog() {
     _logPage = 1;
-    _doLoadLog(false);
+    _doLoadLog();
 }
 
-function loadLogMore() {
-    _logPage++;
-    _doLoadLog(true);
+function _goLogPage(p) {
+    _logPage = p;
+    _doLoadLog();
 }
 
-function _doLoadLog(append) {
+function _renderLogPagination() {
+    var wrap = document.getElementById('logPaginationWrap');
+    if (!wrap) return;
+    if (_logTotalPages <= 1) { wrap.innerHTML = ''; return; }
+    var html = '<button class="btn btn-sm btn-outline-secondary py-0 px-2" ' +
+        (_logPage <= 1 ? 'disabled' : 'onclick="_goLogPage(' + (_logPage - 1) + ')"') +
+        '><i class="bi bi-chevron-left"></i></button>';
+    html += '<span class="px-2 text-muted">' + _logPage + ' / ' + _logTotalPages + '</span>';
+    html += '<button class="btn btn-sm btn-outline-secondary py-0 px-2" ' +
+        (_logPage >= _logTotalPages ? 'disabled' : 'onclick="_goLogPage(' + (_logPage + 1) + ')"') +
+        '><i class="bi bi-chevron-right"></i></button>';
+    wrap.innerHTML = html;
+}
+
+function _doLoadLog() {
     var start = _getVal('logFilterStart');
     var end   = _getVal('logFilterEnd');
     var cid   = _getVal('logFilterContactId') || _logContactId;
@@ -2583,16 +2636,17 @@ function _doLoadLog(append) {
                               '&contact_type=' + encodeURIComponent(ctype);
 
     var el = document.getElementById('logResults');
-    var lm = document.getElementById('logLoadMoreWrap');
     if (!el) return;
-    if (!append) el.innerHTML = '<div class="text-muted small text-center py-2"><i class="bi bi-hourglass-split"></i> Loading…</div>';
+    el.innerHTML = '<div class="text-muted small text-center py-2"><i class="bi bi-hourglass-split"></i> Loading…</div>';
 
     fetch(url)
     .then(function(r) { return r.json(); })
     .then(function(d) {
+        _logTotalPages = d.total_pages || 1;
+        _logPage       = d.page       || _logPage;
         var entries = d.entries || [];
-        if (!append) el.innerHTML = '';
-        if (!entries.length && !append) {
+        el.innerHTML = '';
+        if (!entries.length) {
             el.innerHTML = '<div class="text-muted small text-center py-2">No log entries found.</div>';
         } else {
             var frag = '';
@@ -2612,12 +2666,12 @@ function _doLoadLog(append) {
                     (e.display ? '<div class="text-muted mt-1" style="font-size:0.78rem;word-break:break-word;">' + _esc(e.display) + '</div>' : '') +
                     '</div>';
             });
-            el.insertAdjacentHTML('beforeend', frag);
+            el.innerHTML = frag;
         }
-        if (lm) lm.style.display = d.has_more ? '' : 'none';
+        _renderLogPagination();
     })
     .catch(function() {
-        if (!append && el) el.innerHTML = '<div class="text-danger small p-1">Failed to load log.</div>';
+        if (el) el.innerHTML = '<div class="text-danger small p-1">Failed to load log.</div>';
     });
 }
 
