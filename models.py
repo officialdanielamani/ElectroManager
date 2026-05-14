@@ -590,12 +590,14 @@ class ItemBatch(db.Model):
         """Total lend quantity across all lend records (or per-SN count for tracked batches)."""
         if self.sn_tracking_enabled:
             return sum(1 for sn in self.serial_numbers if sn.lend_to_id and not sn.is_deleted)
-        return sum(r.quantity for r in self.lend_records)
+        return sum(r.quantity for r in self.lend_records if r.returned_at is None)
 
     def get_lend_records_data(self):
-        """Serialise lend records to a list of dicts for JS embedding."""
+        """Serialise active (not yet returned) lend records for JS embedding."""
         result = []
         for r in self.lend_records:
+            if r.returned_at is not None:
+                continue
             result.append({
                 'id': r.id,
                 'type': r.lend_to_type or '',
@@ -791,6 +793,7 @@ class BatchLendRecord(db.Model):
     lend_notify_before_days = db.Column(db.Integer, default=3)
     lend_note = db.Column(db.String(128), nullable=True)
     lending_session_id = db.Column(db.Integer, db.ForeignKey('lending_sessions.id'), nullable=True)
+    returned_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     lending_session = db.relationship('LendingSession', foreign_keys=[lending_session_id], backref=db.backref('lend_records', lazy=True))

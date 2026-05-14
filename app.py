@@ -265,6 +265,7 @@ def _apply_column_migrations():
         ("batch_serial_numbers", "lend_note",           "VARCHAR(128)"),
         ("batch_serial_numbers", "lending_session_id",  "INTEGER"),
         ("batch_lend_records",   "lending_session_id",  "INTEGER"),
+        ("batch_lend_records",   "returned_at",         "DATETIME"),
     ]
     with db.engine.connect() as conn:
         for table, col, col_type in additions:

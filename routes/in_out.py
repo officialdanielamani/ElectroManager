@@ -225,7 +225,7 @@ def _session_json(session):
                 'batch_label': batch.get_display_label(),
                 'qty': rec.quantity,
                 'lend_note': rec.lend_note or '',
-                'returnable': True,
+                'returnable': rec.returned_at is None,
             })
         except Exception:
             pass
@@ -516,7 +516,7 @@ def in_out_submit_cart():
                 on_time  = (lend_end is None) or (return_dt.replace(tzinfo=None) <= lend_end)
                 if not on_time:
                     any_late = True
-                db.session.delete(rec)
+                rec.returned_at = return_dt.replace(tzinfo=None)
                 batch.item.updated_by = current_user.id
                 batch.item.updated_at = now
                 processed += 1
@@ -682,7 +682,7 @@ def in_out_return():
                 any_late = True
             rqty = min(return_qty if return_qty > 0 else rec.quantity, rec.quantity)
             if rqty >= rec.quantity:
-                db.session.delete(rec)
+                rec.returned_at = return_dt.replace(tzinfo=None)
             else:
                 rec.quantity -= rqty
             returned_count += rqty
