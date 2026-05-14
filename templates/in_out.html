@@ -615,24 +615,111 @@ function onBatchClick(batchId, preselectedSnId) {
         selectBatch(batchId, preselectedSnId);
         return;
     }
-    /* Fetch full batch detail then decide what to do */
     fetch('/in-out/batch/' + batchId + '/detail')
     .then(function(r) { return r.json(); })
     .then(function(d) {
         d._preselectedSnId = preselectedSnId;
-        if (_mode === 'edit_batch') {
-            _selectedBatch = d;
-            showActionForm(d);
-            return;
-        }
         if (_adv.submitMode === 'auto') {
             _tryAutoSubmitSingle(d, d.sn_tracking ? 'sn' : 'batch');
         } else {
-            /* Open the single-item form for lending/return */
-            _selectedBatch = d;
-            showActionForm(d);
+            /* Cart mode: add to cart instead of showing single-item form */
+            if (d.sn_tracking) {
+                if (preselectedSnId) {
+                    _tryAddSnToCart(d, preselectedSnId);
+                } else {
+                    _showSnPickerForCart(d);
+                }
+            } else {
+                _tryAddNormalToCart(d);
+            }
         }
     });
+}
+
+function _showSnPickerForCart(batchData) {
+    _batchCache[batchData.id] = batchData;
+    var sns = batchData.serial_numbers || [];
+    var eligible = (_mode === 'return')
+        ? sns.filter(function(s){ return !s.is_deleted && s.lend_to_id; })
+        : sns.filter(function(s){ return !s.is_deleted && !s.lend_to_id; });
+    if (eligible.length === 0) {
+        showToast(_mode === 'return' ? 'No lent units to return.' : 'No available units to lend.', 'warning');
+        _playSound('error');
+        return;
+    }
+    if (eligible.length === 1) {
+        _tryAddSnToCart(batchData, eligible[0].id);
+        return;
+    }
+    var html = '<div class="card mb-2 border-primary">' +
+        '<div class="card-header py-2 px-3 d-flex justify-content-between align-items-center bg-primary bg-opacity-10">' +
+        '<span><strong>' + _esc(batchData.item_name) + '</strong> / ' + _esc(batchData.display_label) + '</span>' +
+        '<span class="badge bg-primary">' + eligible.length + ' unit(s)</span>' +
+        '</div><div class="card-body p-2">' +
+        '<div class="small text-muted mb-2"><i class="bi bi-cart-plus me-1"></i>Select units to add to cart:</div>' +
+        '<div style="max-height:220px;overflow-y:auto;">';
+    eligible.forEach(function(sn) {
+        var inCart = _cart.some(function(c){ return c.type === 'sn' && c.sn_id === sn.id; });
+        var label = '<code>' + _esc(sn.internal_serial_number || sn.isn || '') + '</code>' +
+            (sn.serial_number ? ' <span class="text-muted">' + _esc(sn.serial_number) + '</span>' : '') +
+            (sn.lend_display ? ' <em class="text-muted">→ ' + _esc(sn.lend_display) + '</em>' : '');
+        html += '<div class="d-flex align-items-center justify-content-between py-1 px-1 border-bottom">' +
+            '<span class="small">' + label + '</span>' +
+            '<button class="btn btn-sm btn-outline-primary py-0 ms-2"' +
+            (inCart ? ' disabled' : ' onclick="_addSnPickerItem(' + batchData.id + ',' + sn.id + ')"') + '>' +
+            (inCart ? '<i class="bi bi-check2"></i> In Cart' : '<i class="bi bi-cart-plus"></i> Add') +
+            '</button></div>';
+    });
+    html += '</div></div></div>';
+    document.getElementById('searchResults').innerHTML = html;
+}
+
+function _addSnPickerItem(batchId, snId) {
+    var batchData = _batchCache[batchId];
+    if (!batchData || !batchData.serial_numbers) return;
+    _tryAddSnToCart(batchData, snId);
+    _showSnPickerForCart(batchData);
+}
+
+function _tryAddNormalToCart(batchData) {
+    if (_mode === 'return') {
+        var recs = batchData.lend_records || [];
+        if (!recs.length) {
+            showToast('No lending records to return for "' + batchData.display_label + '".', 'warning');
+            _playSound('error');
+            return;
+        }
+        var added = 0;
+        recs.forEach(function(r) {
+            var dup = _cart.find(function(c){ return c.type === 'lend_record' && c.lend_record_id === r.id; });
+            if (!dup) {
+                _cart.push({ _key: ++_cartKey, type: 'lend_record', batch_id: batchData.id,
+                             lend_record_id: r.id,
+                             item_name: batchData.item_name, batch_label: batchData.display_label,
+                             qty: r.qty || 1, note: '' });
+                added++;
+            }
+        });
+        _renderCart();
+        if (added) {
+            showToast('Added ' + added + ' record(s) to return cart.', 'success');
+            _playSound('scanner');
+        } else {
+            showToast('All records already in cart.', 'warning');
+        }
+    } else {
+        var avail = batchData.available_qty || 0;
+        if (avail < 1) {
+            showToast('No stock available for "' + batchData.display_label + '".', 'warning');
+            _playSound('error');
+            return;
+        }
+        _cartAdd({ type: 'normal', batch_id: batchData.id,
+                   item_name: batchData.item_name, batch_label: batchData.display_label,
+                   qty: 1, max_qty: avail, note: '' });
+        showToast('Added to cart: ' + batchData.display_label, 'success');
+        _playSound('scanner');
+    }
 }
 
 /* ════════════════════════════════════════════════════════
