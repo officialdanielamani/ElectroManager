@@ -58,7 +58,7 @@ def _save_lend_records(batch, records_data, max_qty):
         note = (r.get('lend_note', '') or '').strip()[:128] or None
         rec = BatchLendRecord(
             batch_id=batch.id,
-            lend_to_type=r.get('type', '').strip(),
+            lend_to_type=r.get('type', '').strip()[:32],
             lend_to_id=contact_id,
             quantity=qty,
             lend_start=_parse_datetime(r.get('start', '')),
@@ -604,7 +604,7 @@ def update_serial_lend(uuid, batch_id):
         lend_id_raw = request.form.get(f'lend_id_{sn.id}', '').strip()
         lend_start_str = request.form.get(f'lend_start_{sn.id}', '').strip()
         lend_end_str = request.form.get(f'lend_end_{sn.id}', '').strip()
-        sn.lend_to_type = lend_type
+        sn.lend_to_type = lend_type[:32]
         try:
             sn.lend_to_id = int(lend_id_raw) if lend_id_raw else None
         except (ValueError, TypeError):
@@ -662,7 +662,7 @@ def inline_update_sn(uuid):
             lend_to_id = None
         if not lend_to_id:
             return jsonify({'success': False, 'message': 'Lend to contact is required.'}), 400
-        sn.lend_to_type = data.get('lend_to_type', '').strip()
+        sn.lend_to_type = data.get('lend_to_type', '').strip()[:32]
         sn.lend_to_id = lend_to_id
         sn.lend_start = _parse_datetime(data.get('lend_start', ''))
         sn.lend_end = _parse_datetime(data.get('lend_end', ''))
@@ -733,7 +733,7 @@ def bulk_update_sn(uuid):
                 if not lend_id:
                     count += 1
                     continue  # contact required for non-clear lend
-                sn.lend_to_type = lend_data.get('type', '').strip()
+                sn.lend_to_type = lend_data.get('type', '').strip()[:32]
                 sn.lend_to_id = lend_id
                 sn.lend_start = _parse_datetime(lend_data.get('start', ''))
                 sn.lend_end = _parse_datetime(lend_data.get('end', ''))
@@ -926,7 +926,7 @@ def save_sn_pending(uuid, batch_id):
             except (ValueError, TypeError):
                 lend_id = None
             if lend_id:
-                sn.lend_to_type = lc.get('lend_to_type', '')
+                sn.lend_to_type = lc.get('lend_to_type', '')[:32]
                 sn.lend_to_id = lend_id
                 sn.lend_start = _parse_datetime(lc.get('lend_start', ''))
                 sn.lend_end = _parse_datetime(lc.get('lend_end', ''))

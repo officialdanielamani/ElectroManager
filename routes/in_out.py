@@ -472,7 +472,7 @@ def in_out_submit_cart():
         return jsonify({'success': False, 'message': 'Cart is empty'}), 400
 
     if mode == 'lend':
-        lend_to_type = detail.get('lend_to_type', '')
+        lend_to_type = detail.get('lend_to_type', '')[:32]
         try:
             lend_to_id = int(detail.get('lend_to_id')) if detail.get('lend_to_id') else None
         except (ValueError, TypeError):
@@ -685,7 +685,7 @@ def in_out_lend():
 
     if batch.sn_tracking_enabled:
         sn_ids    = data.get('sn_ids', [])
-        lend_type = data.get('lend_to_type', '')
+        lend_type = data.get('lend_to_type', '')[:32]
         try:
             lend_id = int(data.get('lend_to_id')) if data.get('lend_to_id') else None
         except (ValueError, TypeError):

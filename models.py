@@ -48,14 +48,14 @@ class Location(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     uuid = db.Column(db.String(12), unique=True, nullable=False)
-    name = db.Column(db.String(100), nullable=False)
-    info = db.Column(db.String(500))
-    description = db.Column(db.Text)
+    name = db.Column(db.String(128), nullable=False)
+    info = db.Column(db.String(512))
+    description = db.Column(db.String(512))
     picture = db.Column(db.String(200))
     color = db.Column(db.String(7), default='#6c757d')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    
+
     racks = db.relationship('Rack', backref='physical_location', lazy=True, foreign_keys='Rack.location_id')
     items = db.relationship('Item', backref='general_location', lazy=True, foreign_keys='Item.location_id')
     
@@ -73,8 +73,8 @@ class Role(db.Model):
     __tablename__ = 'roles'
     
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(50), unique=True, nullable=False)
-    description = db.Column(db.Text)
+    name = db.Column(db.String(64), unique=True, nullable=False)
+    description = db.Column(db.String(512))
     is_system_role = db.Column(db.Boolean, default=False)
     permissions = db.Column(db.Text, default='{}', nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -190,8 +190,8 @@ class User(UserMixin, db.Model):
 class Category(db.Model):
     __tablename__ = 'categories'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    description = db.Column(db.Text)
+    name = db.Column(db.String(128), unique=True, nullable=False)
+    description = db.Column(db.String(512))
     color = db.Column(db.String(7), default='#6c757d')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -203,8 +203,8 @@ class Category(db.Model):
 class Footprint(db.Model):
     __tablename__ = 'footprints'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    description = db.Column(db.Text)
+    name = db.Column(db.String(128), unique=True, nullable=False)
+    description = db.Column(db.String(512))
     color = db.Column(db.String(7), default='#6c757d')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -216,8 +216,8 @@ class Footprint(db.Model):
 class Tag(db.Model):
     __tablename__ = 'tags'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    description = db.Column(db.Text)
+    name = db.Column(db.String(128), unique=True, nullable=False)
+    description = db.Column(db.String(512))
     color = db.Column(db.String(7), default='#6c757d')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -231,7 +231,7 @@ class Rack(db.Model):
     uuid = db.Column(db.String(12), unique=True, nullable=False)
     name = db.Column(db.String(128), nullable=False)
     short_info = db.Column(db.String(128))
-    description = db.Column(db.Text)
+    description = db.Column(db.String(512))
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
     picture = db.Column(db.String(200))
     color = db.Column(db.String(7), default='#6c757d')
@@ -384,7 +384,7 @@ class Item(db.Model):
     footprint_id = db.Column(db.Integer, db.ForeignKey('footprints.id'))
     tags = db.Column(db.Text)
     
-    datasheet_urls = db.Column(db.Text)
+    datasheet_urls = db.Column(db.String(2048))
     no_stock_warning = db.Column(db.Boolean, default=True)
     thumbnail = db.Column(db.String(300))
 
@@ -738,7 +738,7 @@ class BatchSerialNumber(db.Model):
     serial_number = db.Column(db.String(200), default='')
     internal_serial_number = db.Column(db.String(200), nullable=False)
     info = db.Column(db.String(32), default='')
-    lend_to_type = db.Column(db.String(20), default='')
+    lend_to_type = db.Column(db.String(32), default='')
     lend_to_id = db.Column(db.Integer, nullable=True)
     lend_start = db.Column(db.DateTime, nullable=True)
     lend_end = db.Column(db.DateTime, nullable=True)
@@ -789,7 +789,7 @@ class BatchLendRecord(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     batch_id = db.Column(db.Integer, db.ForeignKey('item_batches.id'), nullable=False)
-    lend_to_type = db.Column(db.String(20), default='')
+    lend_to_type = db.Column(db.String(32), default='')
     lend_to_id = db.Column(db.Integer, nullable=True)
     quantity = db.Column(db.Integer, default=1)
     lend_start = db.Column(db.DateTime, nullable=True)
@@ -846,10 +846,10 @@ class LendingSession(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     lending_id = db.Column(db.String(20), unique=True, nullable=False)
-    mode = db.Column(db.String(10), nullable=False)  # 'lend' or 'return'
+    mode = db.Column(db.String(16), nullable=False)  # 'lend' or 'return'
     created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    lend_to_type = db.Column(db.String(20), default='')
+    lend_to_type = db.Column(db.String(32), default='')
     lend_to_id = db.Column(db.Integer, nullable=True)
     lend_start = db.Column(db.DateTime, nullable=True)
     lend_end = db.Column(db.DateTime, nullable=True)
@@ -913,9 +913,9 @@ class AuditLog(db.Model):
 class MagicParameter(db.Model):
     __tablename__ = 'magic_parameters'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), unique=True, nullable=False)
+    name = db.Column(db.String(256), unique=True, nullable=False)
     param_type = db.Column(db.String(50), nullable=False)
-    description = db.Column(db.Text)
+    description = db.Column(db.String(512))
     notify_enabled = db.Column(db.Boolean, default=False)
     is_whole_number = db.Column(db.Boolean, default=True)
     number_min = db.Column(db.Float)
@@ -1053,7 +1053,7 @@ class ItemParameter(db.Model):
     value2 = db.Column(db.String(200))
     unit = db.Column(db.String(50))
     string_option = db.Column(db.String(128))
-    description = db.Column(db.Text)
+    description = db.Column(db.String(512))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     item = db.relationship('Item', backref=db.backref('magic_parameters', cascade='all, delete-orphan', lazy=True))
@@ -1145,7 +1145,7 @@ class ProjectParameter(db.Model):
     value = db.Column(db.String(200))
     value2 = db.Column(db.String(200))
     unit = db.Column(db.String(50))
-    description = db.Column(db.Text)
+    description = db.Column(db.String(512))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     project = db.relationship('Project', backref=db.backref('magic_parameters', cascade='all, delete-orphan', lazy=True))
@@ -1198,8 +1198,8 @@ class ProjectParameter(db.Model):
 class ParameterTemplate(db.Model):
     __tablename__ = 'parameter_templates'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), unique=True, nullable=False)
-    description = db.Column(db.Text)
+    name = db.Column(db.String(256), unique=True, nullable=False)
+    description = db.Column(db.String(512))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     template_parameters = db.relationship('TemplateParameter', backref='template', lazy=True, cascade='all, delete-orphan')
@@ -1286,8 +1286,8 @@ class StickerTemplate(db.Model):
 class ProjectCategory(db.Model):
     __tablename__ = 'project_categories'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    description = db.Column(db.Text)
+    name = db.Column(db.String(128), unique=True, nullable=False)
+    description = db.Column(db.String(512))
     color = db.Column(db.String(7), default='#6c757d')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -1295,8 +1295,8 @@ class ProjectCategory(db.Model):
 class ProjectTag(db.Model):
     __tablename__ = 'project_tags'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    description = db.Column(db.Text)
+    name = db.Column(db.String(128), unique=True, nullable=False)
+    description = db.Column(db.String(512))
     color = db.Column(db.String(7), default='#6c757d')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -1304,9 +1304,9 @@ class ProjectTag(db.Model):
 class ProjectStatus(db.Model):
     __tablename__ = 'project_statuses'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
+    name = db.Column(db.String(128), unique=True, nullable=False)
     color = db.Column(db.String(7), default='#6c757d')
-    description = db.Column(db.Text)
+    description = db.Column(db.String(512))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
@@ -1349,13 +1349,13 @@ class ProjectGroupMember(db.Model):
 class ContactOrganization(db.Model):
     __tablename__ = 'contact_organizations'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False)
-    email = db.Column(db.String(200))
-    tel = db.Column(db.String(50))
-    url = db.Column(db.String(500))
+    name = db.Column(db.String(256), nullable=False)
+    email = db.Column(db.String(256))
+    tel = db.Column(db.String(64))
+    url = db.Column(db.String(512))
     address = db.Column(db.String(256))
-    zip_code = db.Column(db.String(20))
-    info = db.Column(db.Text)
+    zip_code = db.Column(db.String(16))
+    info = db.Column(db.String(512))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     persons = db.relationship('ContactPerson', backref='organization', lazy=True)
@@ -1363,9 +1363,9 @@ class ContactOrganization(db.Model):
 class ContactPerson(db.Model):
     __tablename__ = 'contact_persons'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False)
-    email = db.Column(db.String(200))
-    tel = db.Column(db.String(50))
+    name = db.Column(db.String(256), nullable=False)
+    email = db.Column(db.String(256))
+    tel = db.Column(db.String(64))
     organization_id = db.Column(db.Integer, db.ForeignKey('contact_organizations.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -1373,8 +1373,8 @@ class ContactPerson(db.Model):
 class ContactGroup(db.Model):
     __tablename__ = 'contact_groups'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), unique=True, nullable=False)
-    description = db.Column(db.Text)
+    name = db.Column(db.String(256), unique=True, nullable=False)
+    description = db.Column(db.String(512))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     members = db.relationship('ContactGroupMember', backref='group', lazy=True, cascade='all, delete-orphan')
@@ -1400,8 +1400,8 @@ class Project(db.Model):
     __tablename__ = 'projects'
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(db.String(12), unique=True, nullable=False)
-    name = db.Column(db.String(300), nullable=False)
-    info = db.Column(db.String(500))
+    name = db.Column(db.String(512), nullable=False)
+    info = db.Column(db.String(512))
     description = db.Column(db.Text)
     category_id = db.Column(db.Integer, db.ForeignKey('project_categories.id'))
     tags = db.Column(db.Text)

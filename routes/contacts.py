@@ -38,15 +38,15 @@ def contact_person_add():
     if not current_user.has_permission('settings_sections.contacts', 'edit'):
         flash('No permission.', 'danger')
         return redirect(url_for('contacts.contacts_settings'))
-    name = request.form.get('name', '').strip()
+    name = request.form.get('name', '').strip()[:256]
     if not name:
         flash('Name required.', 'danger')
         return redirect(url_for('contacts.contacts_settings'))
     org_id = request.form.get('organization_id', type=int) or None
     person = ContactPerson(
         name=name,
-        email=request.form.get('email', '').strip() or None,
-        tel=request.form.get('tel', '').strip() or None,
+        email=(request.form.get('email', '').strip() or None)[:256] if request.form.get('email', '').strip() else None,
+        tel=(request.form.get('tel', '').strip() or None)[:64] if request.form.get('tel', '').strip() else None,
         organization_id=org_id
     )
     db.session.add(person)
@@ -63,9 +63,11 @@ def contact_person_edit(id):
         flash('No permission.', 'danger')
         return redirect(url_for('contacts.contacts_settings'))
     p = ContactPerson.query.get_or_404(id)
-    p.name = request.form.get('name', p.name).strip()
-    p.email = request.form.get('email', '').strip() or None
-    p.tel = request.form.get('tel', '').strip() or None
+    p.name = (request.form.get('name', p.name).strip() or p.name)[:256]
+    p.email = (request.form.get('email', '').strip() or None)
+    if p.email: p.email = p.email[:256]
+    p.tel = (request.form.get('tel', '').strip() or None)
+    if p.tel: p.tel = p.tel[:64]
     p.organization_id = request.form.get('organization_id', type=int) or None
     db.session.commit()
     log_audit(current_user.id, 'update', 'contact_person', p.id, f'Updated contact person: {p.name}')
@@ -96,18 +98,24 @@ def contact_org_add():
     if not current_user.has_permission('settings_sections.contacts', 'edit'):
         flash('No permission.', 'danger')
         return redirect(url_for('contacts.contacts_settings'))
-    name = request.form.get('name', '').strip()
+    name = request.form.get('name', '').strip()[:256]
     if not name:
         flash('Name required.', 'danger')
         return redirect(url_for('contacts.contacts_settings'))
+    _e = request.form.get('email', '').strip()
+    _t = request.form.get('tel', '').strip()
+    _u = request.form.get('url', '').strip()
+    _a = request.form.get('address', '').strip()
+    _z = request.form.get('zip_code', '').strip()
+    _i = request.form.get('info', '').strip()
     org = ContactOrganization(
         name=name,
-        email=request.form.get('email', '').strip() or None,
-        tel=request.form.get('tel', '').strip() or None,
-        url=request.form.get('url', '').strip() or None,
-        address=request.form.get('address', '').strip() or None,
-        zip_code=request.form.get('zip_code', '').strip() or None,
-        info=request.form.get('info', '').strip() or None
+        email=_e[:256] or None,
+        tel=_t[:64] or None,
+        url=_u[:512] or None,
+        address=_a[:256] or None,
+        zip_code=_z[:16] or None,
+        info=_i[:512] or None
     )
     db.session.add(org)
     db.session.commit()
@@ -123,13 +131,19 @@ def contact_org_edit(id):
         flash('No permission.', 'danger')
         return redirect(url_for('contacts.contacts_settings'))
     org = ContactOrganization.query.get_or_404(id)
-    org.name = request.form.get('name', org.name).strip()
-    org.email = request.form.get('email', '').strip() or None
-    org.tel = request.form.get('tel', '').strip() or None
-    org.url = request.form.get('url', '').strip() or None
-    org.address = request.form.get('address', '').strip() or None
-    org.zip_code = request.form.get('zip_code', '').strip() or None
-    org.info = request.form.get('info', '').strip() or None
+    org.name = (request.form.get('name', org.name).strip() or org.name)[:256]
+    org.email = (request.form.get('email', '').strip() or None)
+    if org.email: org.email = org.email[:256]
+    org.tel = (request.form.get('tel', '').strip() or None)
+    if org.tel: org.tel = org.tel[:64]
+    org.url = (request.form.get('url', '').strip() or None)
+    if org.url: org.url = org.url[:512]
+    org.address = (request.form.get('address', '').strip() or None)
+    if org.address: org.address = org.address[:256]
+    org.zip_code = (request.form.get('zip_code', '').strip() or None)
+    if org.zip_code: org.zip_code = org.zip_code[:16]
+    org.info = (request.form.get('info', '').strip() or None)
+    if org.info: org.info = org.info[:512]
     db.session.commit()
     log_audit(current_user.id, 'update', 'contact_org', org.id, f'Updated organization: {org.name}')
     flash('Organization updated.', 'success')
@@ -159,14 +173,15 @@ def contact_group_add():
     if not current_user.has_permission('settings_sections.contacts', 'edit'):
         flash('No permission.', 'danger')
         return redirect(url_for('contacts.contacts_settings'))
-    name = request.form.get('name', '').strip()
+    name = request.form.get('name', '').strip()[:256]
     if not name:
         flash('Name required.', 'danger')
         return redirect(url_for('contacts.contacts_settings'))
     if ContactGroup.query.filter_by(name=name).first():
         flash('Group name already exists.', 'danger')
         return redirect(url_for('contacts.contacts_settings'))
-    grp = ContactGroup(name=name, description=request.form.get('description', '').strip() or None)
+    _desc = request.form.get('description', '').strip()
+    grp = ContactGroup(name=name, description=_desc[:512] or None)
     db.session.add(grp)
     db.session.commit()
     log_audit(current_user.id, 'create', 'contact_group', grp.id, f'Created contact group: {name}')
@@ -181,13 +196,14 @@ def contact_group_edit(id):
         flash('No permission.', 'danger')
         return redirect(url_for('contacts.contacts_settings'))
     grp = ContactGroup.query.get_or_404(id)
-    new_name = request.form.get('name', grp.name).strip()
+    new_name = (request.form.get('name', grp.name).strip() or grp.name)[:256]
     existing = ContactGroup.query.filter_by(name=new_name).first()
     if existing and existing.id != id:
         flash('Group name already exists.', 'danger')
         return redirect(url_for('contacts.contacts_settings'))
     grp.name = new_name
-    grp.description = request.form.get('description', '').strip() or None
+    _desc = request.form.get('description', '').strip()
+    grp.description = _desc[:512] or None
     db.session.commit()
     log_audit(current_user.id, 'update', 'contact_group', grp.id, f'Updated contact group: {grp.name}')
     flash('Group updated.', 'success')

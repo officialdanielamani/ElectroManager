@@ -181,7 +181,7 @@ def project_new():
     contact_orgs = ContactOrganization.query.order_by(ContactOrganization.name).all()
 
     if request.method == 'POST':
-        name = request.form.get('name', '').strip()
+        name = request.form.get('name', '').strip()[:512]
         if not name:
             flash('Project name is required.', 'danger')
             return render_template('project_form.html', title='New Project', project=None,
@@ -190,7 +190,7 @@ def project_new():
 
         project = Project(
             name=name,
-            info=request.form.get('info', '').strip(),
+            info=request.form.get('info', '').strip()[:512],
             category_id=request.form.get('category_id', type=int) or None,
             status_id=request.form.get('status_id', type=int) or None,
             quantity=request.form.get('quantity', 1, type=int),
@@ -298,13 +298,13 @@ def project_edit(project_id):
     contact_orgs = ContactOrganization.query.order_by(ContactOrganization.name).all()
 
     if request.method == 'POST':
-        name = request.form.get('name', '').strip()
+        name = request.form.get('name', '').strip()[:512]
         if not name:
             flash('Project name is required.', 'danger')
             return redirect(url_for('project.project_edit', project_id=project_id))
 
         project.name = name
-        project.info = request.form.get('info', '').strip()
+        project.info = request.form.get('info', '').strip()[:512]
         project.description = request.form.get('description', '').strip()
         project.category_id = request.form.get('category_id', type=int) or None
         project.status_id = request.form.get('status_id', type=int) or None
@@ -454,7 +454,7 @@ def project_add_parameter(project_id):
         value=value if param_type in ['number', 'date'] else None,
         value2=value2 if operation in ['range', 'duration'] else None,
         unit=unit if param_type == 'number' else None,
-        description=description
+        description=description[:512]
     )
     db.session.add(proj_param)
     db.session.flush()
@@ -555,7 +555,7 @@ def project_edit_parameter(project_id, param_id):
         proj_param.value = value
         proj_param.value2 = value2
         proj_param.unit = request.form.get('unit', '').strip()
-        proj_param.description = request.form.get('description', '').strip()
+        proj_param.description = request.form.get('description', '').strip()[:512]
 
         if param.param_type == 'string':
             ProjectParameterStringValue.query.filter_by(project_parameter_id=proj_param.id).delete()
@@ -947,14 +947,14 @@ def project_category_add():
     if not current_user.has_permission('settings_sections.project_settings', 'edit'):
         flash('No permission.', 'danger')
         return redirect(url_for('project.project_settings'))
-    name = request.form.get('name', '').strip()
+    name = request.form.get('name', '').strip()[:128]
     if not name:
         flash('Name required.', 'danger')
         return redirect(url_for('project.project_settings'))
     if ProjectCategory.query.filter_by(name=name).first():
         flash('Category already exists.', 'danger')
         return redirect(url_for('project.project_settings'))
-    cat = ProjectCategory(name=name, description=request.form.get('description', '').strip(),
+    cat = ProjectCategory(name=name, description=request.form.get('description', '').strip()[:512],
                           color=request.form.get('color', '#6c757d'))
     db.session.add(cat)
     db.session.commit()
@@ -969,8 +969,8 @@ def project_category_edit(id):
         flash('No permission.', 'danger')
         return redirect(url_for('project.project_settings'))
     cat = ProjectCategory.query.get_or_404(id)
-    cat.name = request.form.get('name', cat.name).strip()
-    cat.description = request.form.get('description', '').strip()
+    cat.name = (request.form.get('name', cat.name).strip() or cat.name)[:128]
+    cat.description = request.form.get('description', '').strip()[:512]
     cat.color = request.form.get('color', cat.color)
     db.session.commit()
     flash('Category updated.', 'success')
@@ -997,14 +997,14 @@ def project_tag_add():
     if not current_user.has_permission('settings_sections.project_settings', 'edit'):
         flash('No permission.', 'danger')
         return redirect(url_for('project.project_settings'))
-    name = request.form.get('name', '').strip()
+    name = request.form.get('name', '').strip()[:128]
     if not name:
         flash('Name required.', 'danger')
         return redirect(url_for('project.project_settings'))
     if ProjectTag.query.filter_by(name=name).first():
         flash('Tag already exists.', 'danger')
         return redirect(url_for('project.project_settings'))
-    tag = ProjectTag(name=name, description=request.form.get('description', '').strip(),
+    tag = ProjectTag(name=name, description=request.form.get('description', '').strip()[:512],
                      color=request.form.get('color', '#6c757d'))
     db.session.add(tag)
     db.session.commit()
@@ -1019,8 +1019,8 @@ def project_tag_edit(id):
         flash('No permission.', 'danger')
         return redirect(url_for('project.project_settings'))
     tag = ProjectTag.query.get_or_404(id)
-    tag.name = request.form.get('name', tag.name).strip()
-    tag.description = request.form.get('description', '').strip()
+    tag.name = (request.form.get('name', tag.name).strip() or tag.name)[:128]
+    tag.description = request.form.get('description', '').strip()[:512]
     tag.color = request.form.get('color', tag.color)
     db.session.commit()
     flash('Tag updated.', 'success')
@@ -1047,7 +1047,7 @@ def project_status_add():
     if not current_user.has_permission('settings_sections.project_settings', 'edit'):
         flash('No permission.', 'danger')
         return redirect(url_for('project.project_settings'))
-    name = request.form.get('name', '').strip()
+    name = request.form.get('name', '').strip()[:128]
     if not name:
         flash('Name required.', 'danger')
         return redirect(url_for('project.project_settings'))
@@ -1055,7 +1055,7 @@ def project_status_add():
         flash('Status already exists.', 'danger')
         return redirect(url_for('project.project_settings'))
     st = ProjectStatus(name=name, color=request.form.get('color', '#6c757d'),
-                       description=request.form.get('description', '').strip())
+                       description=request.form.get('description', '').strip()[:512])
     db.session.add(st)
     db.session.commit()
     flash(f'Status "{name}" added.', 'success')
@@ -1069,9 +1069,9 @@ def project_status_edit(id):
         flash('No permission.', 'danger')
         return redirect(url_for('project.project_settings'))
     st = ProjectStatus.query.get_or_404(id)
-    st.name = request.form.get('name', st.name).strip()
+    st.name = (request.form.get('name', st.name).strip() or st.name)[:128]
     st.color = request.form.get('color', st.color)
-    st.description = request.form.get('description', '').strip()
+    st.description = request.form.get('description', '').strip()[:512]
     db.session.commit()
     flash('Status updated.', 'success')
     return redirect(url_for('project.project_settings'))

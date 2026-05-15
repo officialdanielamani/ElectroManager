@@ -625,9 +625,9 @@ def api_add_location():
     """API endpoint to add location from item form"""
     try:
         data = request.get_json()
-        name = data.get('name', '').strip()[:100]
-        info = data.get('info', '').strip()[:128]
-        description = data.get('description', '').strip()
+        name = data.get('name', '').strip()[:128]
+        info = data.get('info', '').strip()[:512]
+        description = data.get('description', '').strip()[:512]
         color = _sanitize_color(data.get('color', ''))
         
         if not name:

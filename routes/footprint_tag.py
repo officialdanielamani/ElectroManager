@@ -36,12 +36,15 @@ def api_add_footprint():
         
         if not name:
             return jsonify({'success': False, 'error': 'Footprint name is required'})
-        
+
+        name = name[:128]
+        description = description[:512]
+
         # Check if exists
         existing = Footprint.query.filter_by(name=name).first()
         if existing:
             return jsonify({'success': False, 'error': 'Footprint already exists'})
-        
+
         footprint = Footprint(name=name, description=description, color=color)
         db.session.add(footprint)
         db.session.commit()
@@ -72,12 +75,15 @@ def api_add_tag():
         
         if not name:
             return jsonify({'success': False, 'error': 'Tag name is required'})
-        
+
+        name = name[:128]
+        description = description[:512]
+
         # Check if exists
         existing = Tag.query.filter_by(name=name).first()
         if existing:
             return jsonify({'success': False, 'error': 'Tag already exists'})
-        
+
         tag = Tag(name=name, description=description, color=color)
         db.session.add(tag)
         db.session.commit()

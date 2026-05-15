@@ -60,9 +60,9 @@ def magic_parameter_new():
     from models import MagicParameter, ParameterUnit, ParameterStringOption
     
     # Get form data directly from request
-    name = request.form.get('name', '').strip()
+    name = request.form.get('name', '').strip()[:256]
     param_type = request.form.get('param_type', '').strip()
-    description = request.form.get('description', '').strip()
+    description = request.form.get('description', '').strip()[:512]
     unit = request.form.get('unit', '').strip()
     notify_enabled = 'notify_enabled' in request.form
     
@@ -190,8 +190,8 @@ def magic_parameter_edit(id):
     from models import MagicParameter, ParameterUnit, ParameterStringOption
     parameter = MagicParameter.query.get_or_404(id)
     
-    parameter.name = request.form.get('name', '').strip()
-    parameter.description = request.form.get('description', '').strip()
+    parameter.name = request.form.get('name', '').strip()[:256]
+    parameter.description = request.form.get('description', '').strip()[:512]
 
     if parameter.param_type == 'date':
         parameter.notify_enabled = 'notify_enabled' in request.form
@@ -503,19 +503,19 @@ def parameter_template_new():
     from models import ParameterTemplate
     
     if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        description = request.form.get('description', '').strip()
-        
+        name = request.form.get('name', '').strip()[:256]
+        description = request.form.get('description', '').strip()[:512]
+
         if not name:
             flash('Template name is required!', 'danger')
             return redirect(url_for('magic_parameter.magic_parameters'))
-        
+
         # Check for duplicate name
         existing = ParameterTemplate.query.filter_by(name=name).first()
         if existing:
             flash(f'Template "{name}" already exists!', 'danger')
             return redirect(url_for('magic_parameter.magic_parameters'))
-        
+
         template = ParameterTemplate(
             name=name,
             description=description
@@ -551,8 +551,8 @@ def parameter_template_edit(id):
     template = ParameterTemplate.query.get_or_404(id)
     
     if request.method == 'POST':
-        template.name = request.form.get('name', '').strip()
-        template.description = request.form.get('description', '').strip()
+        template.name = request.form.get('name', '').strip()[:256]
+        template.description = request.form.get('description', '').strip()[:512]
         
         db.session.commit()
         
@@ -580,8 +580,8 @@ def template_add_parameter(id):
     value2 = request.form.get('value2', '').strip()
     unit = request.form.get('unit', '').strip()
     string_option = request.form.get('string_option', '').strip()
-    description = request.form.get('description', '').strip()
-    
+    description = request.form.get('description', '').strip()[:512]
+
     # Validate parameter exists
     parameter = MagicParameter.query.get(parameter_id)
     if not parameter:

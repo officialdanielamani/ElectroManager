@@ -6,9 +6,9 @@ from models import User, Category
 
 
 class LocationForm(FlaskForm):
-    name = StringField('Location Name', validators=[DataRequired(), Length(max=100)])
-    info = StringField('Short Info', validators=[Optional(), Length(max=128)])
-    description = TextAreaField('Description', validators=[Optional()])
+    name = StringField('Location Name', validators=[DataRequired(), Length(max=128)])
+    info = StringField('Short Info', validators=[Optional(), Length(max=512)])
+    description = TextAreaField('Description', validators=[Optional(), Length(max=512)])
     color = StringField('Color', validators=[Optional(), Regexp(r'^#[0-9A-Fa-f]{6}$', message='Must be a valid hex color (e.g. #1a2b3c)')], default='#6c757d')
     picture = FileField('Picture', validators=[Optional(), FileAllowed(['png', 'jpg', 'jpeg'], 'PNG and JPEG only!')])
     submit = SubmitField('Save Location')
@@ -89,8 +89,8 @@ class UserForm(FlaskForm):
 
 
 class CategoryForm(FlaskForm):
-    name = StringField('Category Name', validators=[DataRequired(), Length(max=100)])
-    description = TextAreaField('Description', validators=[Optional()])
+    name = StringField('Category Name', validators=[DataRequired(), Length(max=128)])
+    description = TextAreaField('Description', validators=[Optional(), Length(max=512)])
     color = StringField('Color', validators=[Optional(), Regexp(r'^#[0-9A-Fa-f]{6}$', message='Must be a valid hex color (e.g. #1a2b3c)')], render_kw={"type": "color", "value": "#6c757d"}, default='#6c757d')
     submit = SubmitField('Save Category')
 
@@ -252,11 +252,11 @@ class SearchForm(FlaskForm):
 
 
 class MagicParameterForm(FlaskForm):
-    name = StringField('Parameter Name', validators=[DataRequired(), Length(max=200)])
-    param_type = SelectField('Parameter Type', 
+    name = StringField('Parameter Name', validators=[DataRequired(), Length(max=256)])
+    param_type = SelectField('Parameter Type',
                             choices=[('number', 'Number'), ('date', 'Date'), ('string', 'String')],
                             validators=[DataRequired()])
-    description = TextAreaField('Description', validators=[Optional()])
+    description = TextAreaField('Description', validators=[Optional(), Length(max=512)])
     notify_enabled = BooleanField('Notify me (for Date type)')
     
     # For Number type
@@ -274,8 +274,8 @@ class ParameterUnitForm(FlaskForm):
 
 
 class RoleForm(FlaskForm):
-    name = StringField('Role Name', validators=[DataRequired(), Length(min=2, max=50)])
-    description = TextAreaField('Description', validators=[Optional()])
+    name = StringField('Role Name', validators=[DataRequired(), Length(min=2, max=64)])
+    description = TextAreaField('Description', validators=[Optional(), Length(max=512)])
     submit = SubmitField('Save Role')
 
 
@@ -315,14 +315,14 @@ class ItemParameterForm(FlaskForm):
 
 
 class TagForm(FlaskForm):
-    name = StringField('Tag Name', validators=[DataRequired(), Length(max=100)])
-    description = TextAreaField('Description', validators=[Optional()])
+    name = StringField('Tag Name', validators=[DataRequired(), Length(max=128)])
+    description = TextAreaField('Description', validators=[Optional(), Length(max=512)])
     color = StringField('Color', validators=[Optional(), Regexp(r'^#[0-9A-Fa-f]{6}$', message='Must be a valid hex color (e.g. #1a2b3c)')], render_kw={"type": "color", "value": "#6c757d"}, default='#6c757d')
     submit = SubmitField('Save Tag')
 
 
 class FootprintForm(FlaskForm):
-    name = StringField('Footprint Name', validators=[DataRequired(), Length(max=100)])
-    description = TextAreaField('Description', validators=[Optional()])
+    name = StringField('Footprint Name', validators=[DataRequired(), Length(max=128)])
+    description = TextAreaField('Description', validators=[Optional(), Length(max=512)])
     color = StringField('Color', validators=[Optional(), Regexp(r'^#[0-9A-Fa-f]{6}$', message='Must be a valid hex color (e.g. #1a2b3c)')], render_kw={"type": "color", "value": "#6c757d"}, default='#6c757d')
     submit = SubmitField('Save Footprint')

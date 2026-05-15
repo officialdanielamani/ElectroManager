@@ -235,7 +235,7 @@ def item_new():
             category_id=form.category_id.data if form.category_id.data and form.category_id.data > 0 else None,
             footprint_id=form.footprint_id.data if form.footprint_id.data and form.footprint_id.data > 0 else None,
             tags=tags_json,
-            datasheet_urls=form.datasheet_urls.data if perms['can_edit_advance'] else None,
+            datasheet_urls=(form.datasheet_urls.data or '')[:2048] or None if perms['can_edit_advance'] else None,
             created_by=current_user.id,
             updated_by=current_user.id
         )
@@ -468,7 +468,7 @@ def _apply_pending_sn_changes(item, perms):
                 except (ValueError, TypeError):
                     lend_id = None
                 if lend_id:
-                    sn_obj.lend_to_type = lc.get('lend_to_type', '')
+                    sn_obj.lend_to_type = lc.get('lend_to_type', '')[:32]
                     sn_obj.lend_to_id = lend_id
                     sn_obj.lend_start = _parse_dt(lc.get('lend_start', ''))
                     sn_obj.lend_end   = _parse_dt(lc.get('lend_end', ''))
@@ -589,7 +589,7 @@ def item_edit(uuid):
         # Advance Info section
         if perms['can_edit_advance']:
             item.description = form.description.data
-            item.datasheet_urls = form.datasheet_urls.data
+            item.datasheet_urls = (form.datasheet_urls.data or '')[:2048] or None
             # Thumbnail
             item.thumbnail = request.form.get('thumbnail', '').strip() or None
             # Linked share files
@@ -953,7 +953,7 @@ def update_datasheets(item_id):
         
         # Save as JSON
         import json
-        item.datasheet_urls = json.dumps(datasheets)
+        item.datasheet_urls = json.dumps(datasheets)[:2048]
         db.session.commit()
         
         log_audit(current_user.id, 'update', 'item', item.id, f'Updated datasheets for item: {item.name}')
@@ -1092,7 +1092,7 @@ def item_add_parameter(id):
         value=value if param_type in ['number', 'date'] else None,
         value2=value2 if operation in ['range', 'duration'] else None,
         unit=unit if param_type == 'number' else None,
-        description=description
+        description=description[:512]
     )
 
     db.session.add(item_param)
@@ -1208,7 +1208,7 @@ def item_edit_parameter(uuid, param_id):
         item_param.value = value
         item_param.value2 = value2
         item_param.unit = request.form.get('unit', '').strip()
-        item_param.description = request.form.get('description', '').strip()
+        item_param.description = request.form.get('description', '').strip()[:512]
 
         if param.param_type == 'string':
             from models import ItemParameterStringValue
