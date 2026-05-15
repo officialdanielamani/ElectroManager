@@ -161,41 +161,40 @@ def render_template_to_svg(template, data):
     layout = template.get_layout()
     
     for idx, element in enumerate(layout):
+        if element.get('visible') is False:
+            continue
+
         x_px = element['x_mm'] * MM_TO_PX
         y_px = element['y_mm'] * MM_TO_PX
         w_px = element.get('width_mm', 10) * MM_TO_PX
         h_px = element.get('height_mm', 10) * MM_TO_PX
-        
+        rot_deg = element.get('rotation_deg', 0) or 0
+        cx_px = x_px + w_px / 2
+        cy_px = y_px + h_px / 2
+
+        # Open rotation wrapper if needed
+        if rot_deg:
+            svg += f'  <g transform="rotate({rot_deg}, {cx_px}, {cy_px})">\n'
+
         if element['type'] == 'text':
             # Get content, handle missing field
             content = element.get('content', '')
             content = replace_placeholders(content, data)
             print(f"[SVG] Element {idx}: TEXT = '{content}' (template: '{element.get('content', '')}')")
-            # Escape XML special characters
-            content = content.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
-            
-            # Use font_size_mm if available, otherwise fallback to old font_size in pixels
+
             font_size_mm = element.get('font_size_mm', 4)
-            if font_size_mm:
-                font_size = font_size_mm * MM_TO_PX  # Convert mm to pixels
-            else:
-                font_size = element.get('font_size', 12)  # Fallback to old px value
-            
+            font_size = (font_size_mm * MM_TO_PX) if font_size_mm else element.get('font_size', 12)
+            line_height = font_size * 1.2
+
             color = element.get('color', '#000000')
             text_align = element.get('text_align', 'left')
-            # Get font family with fallback to Arial if not found or empty
             font_family = element.get('font_family') or 'Arial'
             if not font_family or font_family == 'default':
                 font_family = 'Arial'
-            
-            # For fonts with spaces, ensure they're quoted in CSS/SVG
-            if ' ' in font_family:
-                font_family_quoted = f"'{font_family}'"
-            else:
-                font_family_quoted = font_family
-            
-            print(f"[SVG] Element {idx}: Font = '{font_family}' (quoted: '{font_family_quoted}')")
-            
+            font_family_quoted = f"'{font_family}'" if ' ' in font_family else font_family
+            font_weight = element.get('font_weight', 'normal') or 'normal'
+            font_style = element.get('font_style', 'normal') or 'normal'
+
             anchor = 'start'
             x_text = x_px
             if text_align == 'center':
@@ -204,57 +203,58 @@ def render_template_to_svg(template, data):
             elif text_align == 'right':
                 anchor = 'end'
                 x_text = x_px + w_px
-            
-            # Use inline style for font-family to prevent CSS override from base.html
-            svg += f'  <text x="{x_text}" y="{y_px}" font-size="{font_size}" '
-            svg += f'fill="{color}" text-anchor="{anchor}" '
-            svg += f'dominant-baseline="hanging" word-wrap="break-word" '
-            svg += f'style="font-family: {font_family_quoted};">'
-            svg += f'{content}</text>\n'
-        
+
+            print(f"[SVG] Element {idx}: Font = '{font_family}', weight={font_weight}, style={font_style}")
+
+            # Split on newlines; render each line as a <tspan>
+            lines = content.split('\n') if '\n' in content else [content]
+            # Escape XML in each line
+            escaped = [
+                l.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
+                for l in lines
+            ]
+
+            svg += (
+                f'  <text x="{x_text}" y="{y_px}" font-size="{font_size}" '
+                f'fill="{color}" text-anchor="{anchor}" dominant-baseline="hanging" '
+                f'font-weight="{font_weight}" font-style="{font_style}" '
+                f'style="font-family: {font_family_quoted};">\n'
+            )
+            for i, line in enumerate(escaped):
+                dy = 0 if i == 0 else line_height
+                svg += f'    <tspan x="{x_text}" dy="{dy}">{line}</tspan>\n'
+            svg += '  </text>\n'
+
         elif element['type'] == 'qr':
             source_field = element['source_field']
             qr_data = replace_placeholders(source_field, data)
             print(f"[SVG] Element {idx}: QR = '{qr_data}' (template: '{source_field}')")
-            
-            # Generate QR code SVG
             try:
                 qr_svg = generate_qr_svg(qr_data, int(w_px), int(h_px))
                 svg += f'  <g transform="translate({x_px}, {y_px})">{qr_svg}</g>\n'
             except Exception as e:
                 print(f"[SVG] QR generation error: {e}")
-                # Fallback: just show a placeholder
-                svg += f'  <rect x="{x_px}" y="{y_px}" width="{w_px}" height="{h_px}" '
-                svg += f'fill="lightgray" stroke="red" stroke-width="1"/>\n'
-                svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" '
-                svg += f'text-anchor="middle">QR Error</text>\n'
-        
+                svg += f'  <rect x="{x_px}" y="{y_px}" width="{w_px}" height="{h_px}" fill="lightgray" stroke="red" stroke-width="1"/>\n'
+                svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" text-anchor="middle">QR Error</text>\n'
+
         elif element['type'] == 'barcode':
             source_field = element['source_field']
             barcode_data = replace_placeholders(source_field, data)
             print(f"[SVG] Element {idx}: BARCODE = '{barcode_data}' (template: '{source_field}')")
             barcode_format = element.get('format', 'CODE128')
             show_label = element.get('show_label', False)
-            
-            # Generate barcode SVG
             try:
                 barcode_svg = generate_barcode_svg(barcode_data, barcode_format, int(w_px), int(h_px), show_label=show_label)
                 svg += f'  <g transform="translate({x_px}, {y_px})">{barcode_svg}</g>\n'
             except Exception as e:
                 print(f"[SVG] Barcode generation error: {e}")
-                # Fallback: just show a placeholder
-                svg += f'  <rect x="{x_px}" y="{y_px}" width="{w_px}" height="{h_px}" '
-                svg += f'fill="lightgray" stroke="red" stroke-width="1"/>\n'
-                svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" '
-                svg += f'text-anchor="middle">Barcode Error</text>\n'
-        
+                svg += f'  <rect x="{x_px}" y="{y_px}" width="{w_px}" height="{h_px}" fill="lightgray" stroke="red" stroke-width="1"/>\n'
+                svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" text-anchor="middle">Barcode Error</text>\n'
+
         elif element['type'] == 'icon':
             icon_name = element.get('icon_name', '')
             icon_color = element.get('icon_color', '#000000')
-
-            # Scale icon to fit container (80% of container size)
             icon_size_px = min(w_px, h_px) * 0.8
-
             if icon_name:
                 print(f"[SVG] Element {idx}: ICON = '{icon_name}' (container: {w_px}×{h_px}px, scaled size: {icon_size_px}px, color: {icon_color})")
                 try:
@@ -262,12 +262,46 @@ def render_template_to_svg(template, data):
                     svg += f'  <g transform="translate({x_px}, {y_px})">{icon_svg}</g>\n'
                 except Exception as e:
                     print(f"[SVG] Icon generation error: {e}")
-                    svg += f'  <rect x="{x_px}" y="{y_px}" width="{w_px}" height="{h_px}" '
-                    svg += f'fill="lightgray" stroke="red" stroke-width="1"/>\n'
-                    svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" '
-                    svg += f'text-anchor="middle">Icon Error</text>\n'
+                    svg += f'  <rect x="{x_px}" y="{y_px}" width="{w_px}" height="{h_px}" fill="lightgray" stroke="red" stroke-width="1"/>\n'
+                    svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" text-anchor="middle">Icon Error</text>\n'
             else:
                 print(f"[SVG] Element {idx}: ICON - No icon name specified")
+
+        elif element['type'] == 'picture':
+            picture_url = element.get('picture_url') or ''
+            print(f"[SVG] Element {idx}: PICTURE url='{picture_url}'")
+            img_b64 = None
+            mime = 'image/png'
+            if picture_url:
+                try:
+                    # picture_url is like /uploads/share/<category>/<filename>
+                    parts = picture_url.strip('/').split('/')
+                    # expected: ['uploads', 'share', category, filename]
+                    if len(parts) >= 4 and parts[0] == 'uploads' and parts[1] == 'share':
+                        category = parts[2]
+                        filename = '/'.join(parts[3:])
+                        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', category, filename)
+                        ext = os.path.splitext(filename)[1].lower()
+                        mime_map = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+                                    '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml'}
+                        mime = mime_map.get(ext, 'image/png')
+                        if os.path.exists(file_path):
+                            with open(file_path, 'rb') as f:
+                                img_b64 = base64.b64encode(f.read()).decode('utf-8')
+                            print(f"[SVG] PICTURE loaded {len(img_b64)} b64 chars from {file_path}")
+                        else:
+                            print(f"[SVG] PICTURE file not found: {file_path}")
+                except Exception as e:
+                    print(f"[SVG] PICTURE load error: {e}")
+            if img_b64:
+                svg += f'  <image x="{x_px}" y="{y_px}" width="{w_px}" height="{h_px}" href="data:{mime};base64,{img_b64}" preserveAspectRatio="xMidYMid meet"/>\n'
+            else:
+                svg += f'  <rect x="{x_px}" y="{y_px}" width="{w_px}" height="{h_px}" fill="#f0e8ff" stroke="#6610f2" stroke-width="1" stroke-dasharray="3,2"/>\n'
+                svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" text-anchor="middle" dominant-baseline="middle" fill="#6610f2">Picture</text>\n'
+
+        # Close rotation wrapper
+        if rot_deg:
+            svg += '  </g>\n'
     
     svg += '</svg>\n'
     print(f"[SVG] Complete! SVG size: {len(svg)} bytes")

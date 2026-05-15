@@ -22,7 +22,7 @@
 
       <!-- ── Controls Bar (Edit Batch + Advanced Options, not affected by mode colour) ── -->
       {% if can_edit_batch or can_lend %}
-      <div class="border-bottom px-3 py-2 d-flex align-items-center gap-3 flex-wrap bg-body" style="font-size:0.9rem;">
+      <div class="border-bottom px-3 py-2 d-flex align-items-center gap-3 flex-wrap" style="font-size:0.9rem;">
         {% if can_edit_batch %}
         <div class="form-check mb-0">
           <input class="form-check-input" type="checkbox" id="editBatchCheck" onchange="onEditBatchChange()">
@@ -40,7 +40,7 @@
 
       <!-- ── Advanced Options Panel ── -->
       {% if can_lend %}
-      <div id="advOptPanel" class="d-none border-bottom px-3 py-3 bg-body-secondary" style="font-size:0.9rem;">
+      <div id="advOptPanel" class="d-none border-bottom px-3 py-3" style="font-size:0.9rem;">
         <div class="row g-3">
 
           <!-- Submit behaviour toggle -->
