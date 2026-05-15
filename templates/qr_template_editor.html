@@ -1462,13 +1462,11 @@ function updatePropertiesPanel(index) {
         </div>
     </div>
 
-    <!-- Media Picker -->
+    <!-- Browse button -->
     <div class="mb-2">
-        <label class="form-label" style="font-size: 12px;"><strong>Media Picker</strong></label>
-        <div id="media-picker-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:180px;overflow-y:auto;padding:6px;border:1px solid var(--bs-border-color,#ddd);border-radius:4px;background:var(--bs-secondary-bg,#f9f9f9);">
-            <p class="text-muted mb-0" style="font-size:11px;grid-column:1/-1;text-align:center;padding:10px 0;">Loading…</p>
-        </div>
-        <small class="text-muted" style="font-size:11px;">Sticker &amp; Icon files from Share Files</small>
+        <button type="button" class="btn btn-sm btn-outline-secondary w-100" onclick="openShareFilePicker()">
+            <i class="bi bi-folder2-open"></i> Browse Share Files
+        </button>
     </div>`;
     }
 
@@ -1811,10 +1809,6 @@ function attachPropertyListeners(index) {
     // Load Bootstrap Icons catalogue
     loadBootstrapIcons(el);
 
-    // Picture media picker
-    if (el.type === 'picture') {
-        loadMediaPicker(el);
-    }
 }
 
 // Bootstrap Icons catalogue (cached across calls in this page)
@@ -1883,58 +1877,105 @@ function filterIconGrid(searchText, element) {
     }
 }
 
-let mediaPickerCache = null;
+let _sfPickerCache = null;
+let _sfPickerView = 'card';
 
-async function loadMediaPicker(element) {
-    const grid = document.getElementById('media-picker-grid');
-    if (!grid) return;
+function openShareFilePicker() {
+    const modal = new bootstrap.Modal(document.getElementById('sfPickerModal'));
+    modal.show();
+}
+
+async function _sfLoadFiles() {
+    if (_sfPickerCache) { _sfRender(_sfPickerCache); return; }
+    const cardView = document.getElementById('sfpCardView');
+    const listView = document.getElementById('sfpListView');
+    cardView.innerHTML = '<p class="text-muted text-center py-4">Loading…</p>';
+    listView.querySelector('tbody').innerHTML = '<tr><td colspan="3" class="text-center text-muted py-4">Loading…</td></tr>';
     try {
-        if (!mediaPickerCache) {
-            const resp = await fetch('/api/qr-template/shared-media');
-            mediaPickerCache = await resp.json();
-        }
-        displayMediaGrid(mediaPickerCache, element);
+        const resp = await fetch('/api/qr-template/shared-media');
+        _sfPickerCache = await resp.json();
+        _sfRender(_sfPickerCache);
     } catch (e) {
-        if (grid) grid.innerHTML = '<p class="text-danger mb-0" style="font-size:11px;grid-column:1/-1;">Error loading media</p>';
+        cardView.innerHTML = '<p class="text-danger text-center py-4">Error loading files.</p>';
     }
 }
 
-function displayMediaGrid(files, element) {
-    const grid = document.getElementById('media-picker-grid');
-    if (!grid) return;
-    if (!files || files.length === 0) {
-        grid.innerHTML = '<p class="text-muted mb-0" style="font-size:11px;grid-column:1/-1;text-align:center;padding:10px 0;">No sticker/icon files found.<br>Upload images in Share Files.</p>';
-        return;
+function _sfRender(files) {
+    const currentUrl = (selectedElement !== null && layout[selectedElement]) ? layout[selectedElement].picture_url : null;
+    const query = document.getElementById('sfpSearch').value.toLowerCase();
+    const filtered = query ? files.filter(f => f.name.toLowerCase().includes(query) || f.category.toLowerCase().includes(query)) : files;
+
+    // Card view
+    const cardView = document.getElementById('sfpCardView');
+    if (!filtered.length) {
+        cardView.innerHTML = '<p class="text-muted text-center py-4 col-span-all" style="grid-column:1/-1;">No files found.</p>';
+    } else {
+        cardView.innerHTML = filtered.map(f => {
+            const sel = f.url === currentUrl;
+            return `<div class="col">
+                <div class="card h-100 sfp-item ${sel ? 'border-success border-2' : ''}" style="cursor:pointer;" onclick="_sfSelect(${f.id},'${f.url.replace(/'/g,"\\'")}','${f.category.replace(/'/g,"\\'")}','${f.name.replace(/'/g,"\\'")}')">
+                    <div style="aspect-ratio:1;overflow:hidden;padding:8px;display:flex;align-items:center;justify-content:center;">
+                        <img src="${f.url}" style="max-width:100%;max-height:100%;object-fit:contain;">
+                    </div>
+                    <div class="card-body p-1 text-center">
+                        <small class="text-truncate d-block" style="font-size:11px;" title="${f.name}">${f.name}</small>
+                        <small class="badge bg-secondary" style="font-size:9px;">${f.category}</small>
+                    </div>
+                    ${sel ? '<div class="position-absolute top-0 start-0 m-1"><i class="bi bi-check-circle-fill text-success"></i></div>' : ''}
+                </div>
+            </div>`;
+        }).join('');
     }
-    let html = '';
-    files.forEach(f => {
-        const isSelected = element.picture_url === f.url;
-        html += `<button type="button" data-file-url="${f.url}" data-file-id="${f.id}" data-file-cat="${f.category}"
-            style="border:2px solid ${isSelected ? '#28a745' : 'var(--bs-border-color,#ddd)'};background:${isSelected ? 'rgba(40,167,69,0.1)' : 'var(--bs-body-bg,#fff)'};border-radius:4px;padding:4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;overflow:hidden;" title="${f.name}">
-            <img src="${f.url}" style="max-width:40px;max-height:40px;object-fit:contain;" draggable="false">
-            <span style="font-size:9px;text-align:center;word-break:break-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${f.name}</span>
-        </button>`;
-    });
-    grid.innerHTML = html;
-    grid.querySelectorAll('[data-file-url]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            if (selectedElement === null) return;
-            const el = layout[selectedElement];
-            el.picture_url = btn.dataset.fileUrl;
-            el.share_file_id = parseInt(btn.dataset.fileId);
-            el.share_file_category = btn.dataset.fileCat;
-            // Update preview
-            const preview = document.getElementById('picture-selected-preview');
-            if (preview) {
-                preview.style.display = 'block';
-                const img = document.getElementById('picture-preview-img');
-                if (img) img.src = el.picture_url;
-            }
-            renderCanvas();
-            displayMediaGrid(files, el);
-        });
-    });
+
+    // List view
+    const tbody = document.getElementById('sfpListView').querySelector('tbody');
+    tbody.innerHTML = filtered.map(f => {
+        const sel = f.url === currentUrl;
+        return `<tr class="sfp-item ${sel ? 'table-success' : ''}" style="cursor:pointer;" onclick="_sfSelect(${f.id},'${f.url.replace(/'/g,"\\'")}','${f.category.replace(/'/g,"\\'")}','${f.name.replace(/'/g,"\\'")}')">
+            <td style="width:50px;"><img src="${f.url}" style="width:40px;height:40px;object-fit:contain;"></td>
+            <td>${f.name}</td>
+            <td><span class="badge bg-secondary">${f.category}</span></td>
+        </tr>`;
+    }).join('');
 }
+
+function _sfSelect(id, url, category, name) {
+    if (selectedElement === null) return;
+    const el = layout[selectedElement];
+    el.picture_url = url;
+    el.share_file_id = id;
+    el.share_file_category = category;
+    // Update properties panel preview
+    const preview = document.getElementById('picture-selected-preview');
+    if (preview) {
+        preview.style.display = 'block';
+        const img = document.getElementById('picture-preview-img');
+        if (img) img.src = url;
+    }
+    renderCanvas();
+    debounceAutoSave();
+    bootstrap.Modal.getInstance(document.getElementById('sfPickerModal')).hide();
+}
+
+function _sfSetView(view) {
+    _sfPickerView = view;
+    document.getElementById('sfpCardView').classList.toggle('d-none', view !== 'card');
+    document.getElementById('sfpListView').classList.toggle('d-none', view !== 'list');
+    document.getElementById('sfpBtnCard').classList.toggle('active', view === 'card');
+    document.getElementById('sfpBtnList').classList.toggle('active', view === 'list');
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('sfPickerModal');
+    if (modal) {
+        modal.addEventListener('show.bs.modal', _sfLoadFiles);
+        document.getElementById('sfpSearch').addEventListener('input', function () {
+            if (_sfPickerCache) _sfRender(_sfPickerCache);
+        });
+        document.getElementById('sfpBtnCard').addEventListener('click', () => _sfSetView('card'));
+        document.getElementById('sfpBtnList').addEventListener('click', () => _sfSetView('list'));
+    }
+});
 
 function selectIcon(iconName) {
     if (selectedElement !== null) {
@@ -2549,4 +2590,59 @@ document.getElementById('btnSaveSettings').addEventListener('click', async () =>
 
 loadTemplate();
 </script>
+
+<!-- Share Files Picker Modal -->
+<div class="modal fade" id="sfPickerModal" tabindex="-1" aria-labelledby="sfPickerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="sfPickerModalLabel"><i class="bi bi-images me-2"></i>Select Share File</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Toolbar -->
+                <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                    <div class="input-group input-group-sm flex-grow-1" style="max-width:320px;">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" id="sfpSearch" class="form-control" placeholder="Search files…">
+                        <button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('sfpSearch').value='';_sfPickerCache&&_sfRender(_sfPickerCache);">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button id="sfpBtnCard" type="button" class="btn btn-outline-secondary active" title="Card view">
+                            <i class="bi bi-grid"></i>
+                        </button>
+                        <button id="sfpBtnList" type="button" class="btn btn-outline-secondary" title="List view">
+                            <i class="bi bi-list-ul"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Card View -->
+                <div id="sfpCardView" class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3 position-relative">
+                    <p class="text-muted text-center py-4 w-100">Loading…</p>
+                </div>
+
+                <!-- List View -->
+                <div id="sfpListView" class="d-none">
+                    <table class="table table-sm table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:56px;">Preview</th>
+                                <th>Name</th>
+                                <th style="width:90px;">Category</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
