@@ -5,8 +5,17 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from models import db, User, ContactPerson, ContactOrganization, ContactGroup, ContactGroupMember
 from utils import log_audit
+import re
 
 contacts_bp = Blueprint('contacts', __name__)
+
+_EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+
+def _valid_email(value):
+    return not value or bool(_EMAIL_RE.match(value))
+
+def _valid_url(value):
+    return not value or value.startswith(('http://', 'https://'))
 
 
 @contacts_bp.route('/settings/contacts', endpoint='contacts_settings')
@@ -42,6 +51,10 @@ def contact_person_add():
     if not name:
         flash('Name required.', 'danger')
         return redirect(url_for('contacts.contacts_settings'))
+    _email = request.form.get('email', '').strip()
+    if not _valid_email(_email):
+        flash('Invalid email address.', 'danger')
+        return redirect(url_for('contacts.contacts_settings'))
     org_id = request.form.get('organization_id', type=int) or None
     person = ContactPerson(
         name=name,
@@ -64,8 +77,11 @@ def contact_person_edit(id):
         return redirect(url_for('contacts.contacts_settings'))
     p = ContactPerson.query.get_or_404(id)
     p.name = (request.form.get('name', p.name).strip() or p.name)[:256]
-    p.email = (request.form.get('email', '').strip() or None)
-    if p.email: p.email = p.email[:256]
+    _email = request.form.get('email', '').strip()
+    if not _valid_email(_email):
+        flash('Invalid email address.', 'danger')
+        return redirect(url_for('contacts.contacts_settings'))
+    p.email = _email[:256] or None
     p.tel = (request.form.get('tel', '').strip() or None)
     if p.tel: p.tel = p.tel[:64]
     p.organization_id = request.form.get('organization_id', type=int) or None
@@ -108,6 +124,12 @@ def contact_org_add():
     _a = request.form.get('address', '').strip()
     _z = request.form.get('zip_code', '').strip()
     _i = request.form.get('info', '').strip()
+    if not _valid_email(_e):
+        flash('Invalid email address.', 'danger')
+        return redirect(url_for('contacts.contacts_settings'))
+    if not _valid_url(_u):
+        flash('URL must start with http:// or https://', 'danger')
+        return redirect(url_for('contacts.contacts_settings'))
     org = ContactOrganization(
         name=name,
         email=_e[:256] or None,
@@ -132,12 +154,18 @@ def contact_org_edit(id):
         return redirect(url_for('contacts.contacts_settings'))
     org = ContactOrganization.query.get_or_404(id)
     org.name = (request.form.get('name', org.name).strip() or org.name)[:256]
-    org.email = (request.form.get('email', '').strip() or None)
-    if org.email: org.email = org.email[:256]
+    _email = request.form.get('email', '').strip()
+    _url = request.form.get('url', '').strip()
+    if not _valid_email(_email):
+        flash('Invalid email address.', 'danger')
+        return redirect(url_for('contacts.contacts_settings'))
+    if not _valid_url(_url):
+        flash('URL must start with http:// or https://', 'danger')
+        return redirect(url_for('contacts.contacts_settings'))
+    org.email = _email[:256] or None
     org.tel = (request.form.get('tel', '').strip() or None)
     if org.tel: org.tel = org.tel[:64]
-    org.url = (request.form.get('url', '').strip() or None)
-    if org.url: org.url = org.url[:512]
+    org.url = _url[:512] or None
     org.address = (request.form.get('address', '').strip() or None)
     if org.address: org.address = org.address[:256]
     org.zip_code = (request.form.get('zip_code', '').strip() or None)

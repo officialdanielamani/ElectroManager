@@ -188,49 +188,75 @@ def project_new():
                                    categories=categories, tags=tags, statuses=statuses,
                                    users=users, contact_persons=contact_persons, contact_orgs=contact_orgs)
 
+        cat_id = request.form.get('category_id', type=int) or None
+        stat_id = request.form.get('status_id', type=int) or None
+        if cat_id and not ProjectCategory.query.get(cat_id):
+            flash('Selected category does not exist.', 'danger')
+            return render_template('project_form.html', title='New Project', project=None,
+                                   categories=categories, tags=tags, statuses=statuses,
+                                   users=users, contact_persons=contact_persons, contact_orgs=contact_orgs)
+        if stat_id and not ProjectStatus.query.get(stat_id):
+            flash('Selected status does not exist.', 'danger')
+            return render_template('project_form.html', title='New Project', project=None,
+                                   categories=categories, tags=tags, statuses=statuses,
+                                   users=users, contact_persons=contact_persons, contact_orgs=contact_orgs)
+
         project = Project(
             name=name,
             info=request.form.get('info', '').strip()[:128],
-            category_id=request.form.get('category_id', type=int) or None,
-            status_id=request.form.get('status_id', type=int) or None,
+            category_id=cat_id,
+            status_id=stat_id,
             quantity=request.form.get('quantity', 1, type=int),
             created_by=current_user.id,
             updated_by=current_user.id
         )
 
-        # Tags
+        # Tags — validate each ID exists
         selected_tags = request.form.getlist('tags')
-        if selected_tags:
-            project.tags = json.dumps([int(t) for t in selected_tags])
+        valid_tag_ids = []
+        for t in selected_tags:
+            try:
+                tid = int(t)
+                if ProjectTag.query.get(tid):
+                    valid_tag_ids.append(tid)
+            except (ValueError, TypeError):
+                pass
+        project.tags = json.dumps(valid_tag_ids) if valid_tag_ids else None
 
         # Users
         selected_users = request.form.getlist('users')
         if selected_users:
-            project.users = json.dumps([int(u) for u in selected_users])
+            project.users = json.dumps([int(u) for u in selected_users if u])
 
         # Persons
         selected_persons = request.form.getlist('persons')
         if selected_persons:
-            project.persons = json.dumps([int(p) for p in selected_persons])
+            project.persons = json.dumps([int(p) for p in selected_persons if p])
 
         # Organizations
         selected_orgs = request.form.getlist('organizations')
         if selected_orgs:
-            project.organizations = json.dumps([int(o) for o in selected_orgs])
+            project.organizations = json.dumps([int(o) for o in selected_orgs if o])
 
         # Dates
-        date_start = request.form.get('date_start')
+        date_start = request.form.get('date_start', '').strip()
         if date_start:
             try:
                 project.date_start = datetime.strptime(date_start, '%Y-%m-%d').date()
             except ValueError:
-                pass
-        date_end = request.form.get('date_end')
+                flash(f'Invalid start date format: "{date_start}". Use YYYY-MM-DD.', 'danger')
+                return render_template('project_form.html', title='New Project', project=None,
+                                       categories=categories, tags=tags, statuses=statuses,
+                                       users=users, contact_persons=contact_persons, contact_orgs=contact_orgs)
+        date_end = request.form.get('date_end', '').strip()
         if date_end:
             try:
                 project.date_end = datetime.strptime(date_end, '%Y-%m-%d').date()
             except ValueError:
-                pass
+                flash(f'Invalid end date format: "{date_end}". Use YYYY-MM-DD.', 'danger')
+                return render_template('project_form.html', title='New Project', project=None,
+                                       categories=categories, tags=tags, statuses=statuses,
+                                       users=users, contact_persons=contact_persons, contact_orgs=contact_orgs)
 
         db.session.add(project)
         db.session.commit()
@@ -303,11 +329,20 @@ def project_edit(project_id):
             flash('Project name is required.', 'danger')
             return redirect(url_for('project.project_edit', project_id=project_id))
 
+        cat_id = request.form.get('category_id', type=int) or None
+        stat_id = request.form.get('status_id', type=int) or None
+        if cat_id and not ProjectCategory.query.get(cat_id):
+            flash('Selected category does not exist.', 'danger')
+            return redirect(url_for('project.project_edit', project_id=project_id))
+        if stat_id and not ProjectStatus.query.get(stat_id):
+            flash('Selected status does not exist.', 'danger')
+            return redirect(url_for('project.project_edit', project_id=project_id))
+
         project.name = name
         project.info = request.form.get('info', '').strip()[:128]
         project.description = request.form.get('description', '').strip()
-        project.category_id = request.form.get('category_id', type=int) or None
-        project.status_id = request.form.get('status_id', type=int) or None
+        project.category_id = cat_id
+        project.status_id = stat_id
         project.quantity = request.form.get('quantity', 1, type=int)
         project.updated_by = current_user.id
 
@@ -315,21 +350,43 @@ def project_edit(project_id):
         project.notify_before_days = max(1, min(request.form.get('notify_before_days', 3, type=int), 365))
 
         selected_tags = request.form.getlist('tags')
-        project.tags = json.dumps([int(t) for t in selected_tags]) if selected_tags else None
+        valid_tag_ids = []
+        for t in selected_tags:
+            try:
+                tid = int(t)
+                if ProjectTag.query.get(tid):
+                    valid_tag_ids.append(tid)
+            except (ValueError, TypeError):
+                pass
+        project.tags = json.dumps(valid_tag_ids) if valid_tag_ids else None
 
         selected_users = request.form.getlist('users')
-        project.users = json.dumps([int(u) for u in selected_users]) if selected_users else None
+        project.users = json.dumps([int(u) for u in selected_users if u]) if selected_users else None
 
         selected_persons = request.form.getlist('persons')
-        project.persons = json.dumps([int(p) for p in selected_persons]) if selected_persons else None
+        project.persons = json.dumps([int(p) for p in selected_persons if p]) if selected_persons else None
 
         selected_orgs = request.form.getlist('organizations')
-        project.organizations = json.dumps([int(o) for o in selected_orgs]) if selected_orgs else None
+        project.organizations = json.dumps([int(o) for o in selected_orgs if o]) if selected_orgs else None
 
-        date_start = request.form.get('date_start')
-        project.date_start = datetime.strptime(date_start, '%Y-%m-%d').date() if date_start else None
-        date_end = request.form.get('date_end')
-        project.date_end = datetime.strptime(date_end, '%Y-%m-%d').date() if date_end else None
+        date_start = request.form.get('date_start', '').strip()
+        if date_start:
+            try:
+                project.date_start = datetime.strptime(date_start, '%Y-%m-%d').date()
+            except ValueError:
+                flash(f'Invalid start date format: "{date_start}". Use YYYY-MM-DD.', 'danger')
+                return redirect(url_for('project.project_edit', project_id=project_id))
+        else:
+            project.date_start = None
+        date_end = request.form.get('date_end', '').strip()
+        if date_end:
+            try:
+                project.date_end = datetime.strptime(date_end, '%Y-%m-%d').date()
+            except ValueError:
+                flash(f'Invalid end date format: "{date_end}". Use YYYY-MM-DD.', 'danger')
+                return redirect(url_for('project.project_edit', project_id=project_id))
+        else:
+            project.date_end = None
 
         sf_ids = [int(i) for i in request.form.getlist('share_file_ids[]') if i]
         project.linked_share_files = SharedFile.query.filter(SharedFile.id.in_(sf_ids)).all() if sf_ids else []
@@ -891,6 +948,9 @@ def project_url_add(project_id):
     url_val = request.form.get('url', '').strip()
     if not url_val:
         flash('URL is required.', 'danger')
+        return redirect(url_for('project.project_detail', project_id=project_id))
+    if not url_val.startswith(('http://', 'https://')):
+        flash('URL must start with http:// or https://', 'danger')
         return redirect(url_for('project.project_detail', project_id=project_id))
 
     purl = ProjectURL(
