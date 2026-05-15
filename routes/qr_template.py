@@ -339,6 +339,28 @@ def api_available_fonts():
     """Get list of available fonts (system + project)"""
     return jsonify(get_available_fonts())
 
+@qr_template_bp.route('/api/qr-template/shared-media', methods=['GET'])
+@login_required
+def api_qr_shared_media():
+    """API: List sticker and icon shared files for Picture element media picker."""
+    from models import SharedFile
+    from flask import url_for
+    files = SharedFile.query.filter(
+        SharedFile.category.in_(['sticker', 'icon'])
+    ).order_by(SharedFile.category, SharedFile.name).all()
+    result = []
+    for f in files:
+        if not f.is_image:
+            continue
+        result.append({
+            'id': f.id,
+            'name': f.name,
+            'filename': f.filename,
+            'category': f.category,
+            'url': url_for('share.share_serve', category=f.category, filename=f.filename)
+        })
+    return jsonify(result)
+
 @qr_template_bp.route('/api/icons')
 def api_get_icons():
     """Return the bundled Bootstrap Icons catalogue (name + class)."""
