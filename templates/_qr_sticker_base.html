@@ -164,7 +164,7 @@
                             <div class="col-auto d-flex align-items-end pb-1">
                                 <div class="form-check mb-0">
                                     <input class="form-check-input" type="checkbox" id="ts-border" onchange="_onBorderToggle()">
-                                    <label class="form-check-label fw-semibold" for="ts-border">Border</label>
+                                    <label class="form-check-label fw-semibold" for="ts-border">Cell Border</label>
                                 </div>
                             </div>
                             <div class="col-auto">
@@ -178,6 +178,9 @@
                                     <input type="text" id="ts-bc-hex" class="form-control form-control-sm" style="width:90px;" value="#000000" maxlength="7" placeholder="#000000" disabled oninput="_syncBcFromHex()">
                                     <div id="ts-bc-swatch" style="width:28px;height:28px;border:1px solid #ccc;background:#000;border-radius:3px;flex-shrink:0;"></div>
                                 </div>
+                            </div>
+                            <div class="col-12">
+                                <small class="text-muted"><i class="bi bi-info-circle"></i> Adds an extra border line <em>around each cell slot</em> in the grid. The sticker template's own design (e.g. box, outline) is always shown as-is.</small>
                             </div>
                         </div>
 
@@ -260,12 +263,14 @@ function _updateDimLabel() {
 
 function _updatePagination() {
     if (!_isMultiPage) return;
-    const nav = document.getElementById('page-nav');
-    nav.classList.remove('d-none');
-    nav.classList.add('d-flex');
-    document.getElementById('page-prev').disabled = _currentPage === 0;
-    document.getElementById('page-next').disabled = _currentPage === _pageCount - 1;
-    document.getElementById('page-counter').textContent = `${_currentPage + 1} / ${_pageCount}`;
+    const nav  = document.getElementById('page-nav');
+    const prev = document.getElementById('page-prev');
+    const next = document.getElementById('page-next');
+    const ctr  = document.getElementById('page-counter');
+    if (nav)  { nav.classList.remove('d-none'); nav.classList.add('d-flex'); }
+    if (prev) prev.disabled = _currentPage === 0;
+    if (next) next.disabled = _currentPage === _pageCount - 1;
+    if (ctr)  ctr.textContent = `${_currentPage + 1} / ${_pageCount}`;
 }
 
 async function loadPage(templateId, pageIdx, showLoading) {
@@ -281,13 +286,14 @@ async function loadPage(templateId, pageIdx, showLoading) {
     const loading = document.getElementById('qr-loading');
     const preview = document.getElementById('preview-section');
     const buttons = document.getElementById('action-buttons');
+    const optCard = document.getElementById('print-options-card');
     if (showLoading) {
-        loading.style.display = 'block';
-        preview.style.display = 'none';
-        buttons.style.display = 'none';
-        document.getElementById('print-options-card').style.display = 'none';
+        if (loading) loading.style.display = 'block';
+        if (preview) preview.style.display = 'none';
+        if (buttons) buttons.style.display = 'none';
+        if (optCard) optCard.style.display = 'none';
     } else {
-        loading.style.display = 'block';
+        if (loading) loading.style.display = 'block';
     }
 
     try {
@@ -302,18 +308,18 @@ async function loadPage(templateId, pageIdx, showLoading) {
         currentSvgData     = data.svg;
         _currentPage       = pageIdx;
 
-        preview.style.display = 'block';
-        buttons.style.display = 'flex';
-        if (_isMultiPage) document.getElementById('print-options-card').style.display = 'block';
+        if (preview) preview.style.display = 'block';
+        if (buttons) buttons.style.display = 'flex';
+        if (_isMultiPage && optCard) optCard.style.display = 'block';
         showSvgAsImage(data.svg, data.width_mm, data.height_mm);
         _updateDimLabel();
         _updatePagination();
-        _onTsInput();   /* refresh grid-info if table mode already selected */
+        _onTsInput();
     } catch (e) {
         alert('Error: ' + e.message);
         console.error(e);
     } finally {
-        loading.style.display = 'none';
+        if (loading) loading.style.display = 'none';
     }
 }
 
@@ -389,8 +395,10 @@ document.getElementById('btn-download-png').addEventListener('click', async func
 const _paperPresets = { a4:[210,297], a5:[148,210], letter:[216,279] };
 
 function _onPrintModeChange() {
-    const isTable = document.getElementById('pm-table').checked;
-    document.getElementById('table-opts').style.display = isTable ? '' : 'none';
+    const pmTable  = document.getElementById('pm-table');
+    const tableOpts = document.getElementById('table-opts');
+    const isTable  = pmTable && pmTable.checked;
+    if (tableOpts) tableOpts.style.display = isTable ? '' : 'none';
     if (isTable) _onTsInput();
 }
 
@@ -439,12 +447,14 @@ function _getTsOpts() {
 
 function _onTsInput() {
     if (!currentTemplate) return;
-    if (!document.getElementById('pm-table') || !document.getElementById('pm-table').checked) return;
+    const pmTable = document.getElementById('pm-table');
+    if (!pmTable || !pmTable.checked) return;
     const o  = _getTsOpts();
     const sw = currentTemplate.width_mm, sh = currentTemplate.height_mm;
     const cw = o.paper_w - o.margin_l - o.margin_r;
     const ch = o.paper_h - o.margin_t - o.margin_b;
     const gi = document.getElementById('grid-info');
+    if (!gi) return;
     gi.style.display = '';
     if (cw < sw || ch < sh) {
         gi.className = 'alert alert-danger py-2 small mt-3 mb-0';
