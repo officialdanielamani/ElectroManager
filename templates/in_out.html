@@ -665,6 +665,9 @@ function _renderSessionCard(session) {
         '<span><i class="bi bi-receipt me-1"></i><strong>' + modeLabel + '</strong> ' +
         '<code class="ms-1">' + _esc(session.lending_id) + '</code></span>' +
         '<div class="d-flex align-items-center gap-2">' + modeBadge +
+        (isReturn
+            ? '<button class="btn btn-sm btn-outline-success py-0"><i class="bi bi-qr-code"></i> Print QR Return</button>'
+            : '<button class="btn btn-sm btn-outline-primary py-0"><i class="bi bi-qr-code"></i> Print QR Lending</button>') +
         '<button class="btn btn-sm btn-outline-secondary py-0" onclick="showSessionDetailModal(\'' + _esc(session.lending_id) + '\')">' +
         '<i class="bi bi-info-circle"></i> Detail</button>' +
         '</div></div>' +

@@ -9,7 +9,7 @@
             <h2><i class="bi bi-grid-3x3"></i> {{ rack.name }}</h2>
             <div class="d-flex gap-2 flex-wrap">
                 <a href="{{ url_for('location_rack.rack_qr_sticker', uuid=rack.uuid) }}" class="btn btn-primary">
-                    <i class="bi bi-qr-code"></i> Print QR
+                    <i class="bi bi-qr-code"></i> Print QR Rack
                 </a>
                 <a href="{{ url_for('visual_storage.visual_storage', rack=rack.uuid) }}" class="btn btn-info">
                     <i class="bi bi-eye"></i> Visual View
@@ -95,6 +95,17 @@
                 {% set skip_cells, cell_spans, group_cells = rack.compute_merge_layout() %}
                 {% set unavailable_drawers = rack.get_unavailable_drawers() %}
                 {% set drawer_info_map = rack.get_drawer_info() %}
+
+                <!-- Selection controls (top) -->
+                <div class="d-flex gap-2 mb-2" id="drawerControlsTop">
+                    <button class="btn btn-sm btn-outline-secondary d-none" id="clearSelectionBtnTop" onclick="clearDrawerSelection()">
+                        <i class="bi bi-x-circle"></i> Clear Selection
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" onclick="printQRDrawer()">
+                        <i class="bi bi-qr-code"></i> Print QR Drawer
+                    </button>
+                </div>
+
                 <div class="rack-view-grid"
                      style="display:grid;grid-template-columns:repeat({{ rack.cols }},minmax(0,1fr));gap:4px;max-width:{{ rack.cols * 72 }}px;">
                     {% for row in range(rack.rows) %}
@@ -137,6 +148,16 @@
                     <small><span class="legend-swatch" style="background:var(--dc-merged-bg-1);border:1px solid var(--dc-merged-border);"></span> Merged</small>
                     <small><span class="legend-swatch" style="background:var(--dc-gmaster-bg-1);border:1px solid var(--dc-gmaster-border);"></span> Group</small>
                     <small><span class="legend-swatch" style="background:var(--dc-unavail-bg-1);border:1px solid var(--dc-unavail-border);"></span> Unavailable</small>
+                </div>
+
+                <!-- Selection controls (bottom) -->
+                <div class="d-flex gap-2 mt-2" id="drawerControlsBottom">
+                    <button class="btn btn-sm btn-outline-secondary d-none" id="clearSelectionBtnBottom" onclick="clearDrawerSelection()">
+                        <i class="bi bi-x-circle"></i> Clear Selection
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" onclick="printQRDrawer()">
+                        <i class="bi bi-qr-code"></i> Print QR Drawer
+                    </button>
                 </div>
             </div>
         </div>
