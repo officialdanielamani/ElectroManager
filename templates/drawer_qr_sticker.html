@@ -1,6 +1,6 @@
 {% extends "_qr_sticker_base.html" %}
 
-{% block title %}QR Sticker - {{ rack.name }} / {{ drawer_id }}{% endblock %}
+{% block title %}QR Sticker - {{ rack.name }} / {{ drawer_ids | join(', ') }}{% endblock %}
 
 {% block sticker_header %}
 <div class="card mb-4">
@@ -13,7 +13,13 @@
         </div>
     </div>
     <div class="card-body">
-        <h6 class="text-muted mb-0">{{ rack.name }} — Drawer <strong>{{ drawer_id }}</strong></h6>
+        {% if drawer_ids | length == 1 %}
+        <h6 class="text-muted mb-0">{{ rack.name }} — Drawer <strong>{{ drawer_ids[0] }}</strong></h6>
+        {% else %}
+        <h6 class="text-muted mb-0">{{ rack.name }} — <strong>{{ drawer_ids | length }} drawers</strong>:
+            {% for d in drawer_ids %}<span class="badge bg-secondary me-1">{{ d }}</span>{% endfor %}
+        </h6>
+        {% endif %}
         <small class="text-muted">Rack UUID: <code>{{ rack.uuid }}</code></small>
     </div>
 </div>
@@ -22,8 +28,18 @@
 {% block no_templates_type %}Drawer{% endblock %}
 
 {% block sticker_init_js %}
-const _previewUrl   = id  => `/api/rack/{{ rack.uuid }}/drawer/{{ drawer_id }}/sticker-preview/${id}`;
-const _printUrl     = id  => `/api/rack/{{ rack.uuid }}/drawer/{{ drawer_id }}/sticker-print/${id}`;
-const _downloadName = ext => `{{ rack.name|replace("'", "") }}_{{ drawer_id }}.${ext}`;
-const _entityLabel  = ()  => `Drawer: {{ drawer_id }} ({{ rack.name }})`;
+const _pages          = {{ drawer_ids | tojson }};
+const _pageLabel      = i  => `Drawer: ${_pages[i]} ({{ rack.name }})`;
+const _pagePreviewUrl = (id, i) => `/api/rack/{{ rack.uuid }}/drawer/${_pages[i]}/sticker-preview/${id}`;
+const _pagePrintUrl   = id  => `/api/rack/{{ rack.uuid }}/drawers/sticker-print/${id}?drawers=${encodeURIComponent(_pages.join(','))}`;
+const _pageSvgZipUrl  = id  => `/api/rack/{{ rack.uuid }}/drawers/sticker-svg-zip/${id}?drawers=${encodeURIComponent(_pages.join(','))}`;
+const _pageFilename   = (ext, i) => `{{ rack.name|replace("'", "")|replace(" ", "_") }}_${_pages[i]}.${ext}`;
+
+/* Single-page fallbacks (also used when _pages.length === 1) */
+const _previewUrl   = id  => _pagePreviewUrl(id, 0);
+const _printUrl     = id  => `/api/rack/{{ rack.uuid }}/drawer/${_pages[0]}/sticker-print/${id}`;
+const _downloadName = ext => ext === 'zip'
+    ? `{{ rack.name|replace("'", "")|replace(" ", "_") }}_drawers.zip`
+    : `{{ rack.name|replace("'", "")|replace(" ", "_") }}_${_pages[0]}.${ext}`;
+const _entityLabel  = ()  => `Drawer: ${_pages[0]} ({{ rack.name }})`;
 {% endblock %}

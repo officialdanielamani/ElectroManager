@@ -44,8 +44,17 @@
 
             <!-- Preview Area -->
             <div id="preview-section" class="card mb-4" style="display: none;">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="bi bi-image"></i> Preview</h5>
+                    <div id="page-nav" class="d-none align-items-center gap-2">
+                        <button id="page-prev" class="btn btn-sm btn-outline-secondary" onclick="navigatePage(-1)">
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                        <span id="page-counter" class="small fw-semibold px-1">1 / 1</span>
+                        <button id="page-next" class="btn btn-sm btn-outline-secondary" onclick="navigatePage(1)">
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body text-center">
                     <div class="alert alert-info mb-3">
@@ -63,7 +72,7 @@
                 <div class="spinner-border text-primary mb-3" role="status">
                     <span class="visually-hidden">Loading...</span>
                 </div>
-                <p>Generating sticker preview…</p>
+                <p id="qr-loading-msg">Generating sticker preview…</p>
             </div>
 
             <!-- Action Buttons (hidden until preview loaded) -->
@@ -84,22 +93,29 @@
 </div>
 
 <script>
-/* ── Page-specific: API URLs, entity label, download filename prefix ── */
+/* ── Page-specific init block ──
+   Single-page child defines:  _previewUrl(id), _printUrl(id), _downloadName(ext), _entityLabel()
+   Multi-page child also defines: _pages[], _pagePreviewUrl(id,i), _pagePrintUrl(id),
+                                   _pageSvgZipUrl(id), _pageFilename(ext,i), _pageLabel(i)    */
 {% block sticker_init_js %}{% endblock %}
 
-/* ── Shared sticker logic ── */
-let currentTemplate       = null;
-let currentSvgData        = null;
+/* ── Shared sticker state ── */
+let currentTemplate       = null;   // {id, width_mm, height_mm, name}
+let currentSvgData        = null;   // current page SVG string
 let currentPreviewBlobUrl = null;
+const _svgCache = {};               // pageIdx -> svgString
+let _currentPage = 0;
 
-function showSvgAsImage(svgString, containerId, widthMm, heightMm) {
+const _isMultiPage = (typeof _pages !== 'undefined') && Array.isArray(_pages) && _pages.length > 1;
+const _pageCount   = _isMultiPage ? _pages.length : 1;
+
+function showSvgAsImage(svgString, widthMm, heightMm) {
     if (currentPreviewBlobUrl) URL.revokeObjectURL(currentPreviewBlobUrl);
     const blob = new Blob([svgString], { type: 'image/svg+xml' });
     currentPreviewBlobUrl = URL.createObjectURL(blob);
-    const container = document.getElementById(containerId);
-    const outer     = document.getElementById('preview-container');
-    const availW    = outer.clientWidth - 40;
-    const availH    = Math.max(outer.clientHeight - 40, 360);
+    const container = document.getElementById('preview-container');
+    const availW    = container.clientWidth  - 40;
+    const availH    = Math.max(container.clientHeight - 40, 360);
     const aspect    = widthMm / heightMm;
     let w = availW, h = availW / aspect;
     if (h > availH) { h = availH; w = h * aspect; }
@@ -109,102 +125,280 @@ function showSvgAsImage(svgString, containerId, widthMm, heightMm) {
 }
 
 {% if templates %}
-document.getElementById('btn-load-preview').addEventListener('click', async function () {
-    const templateId = document.getElementById('qr-template-select').value;
-    if (!templateId) { alert('Please select a template first.'); return; }
+
+/* Update button labels for multi-page mode */
+if (_isMultiPage) {
+    document.getElementById('btn-download-svg').innerHTML = '<i class="bi bi-file-zip"></i> Download SVG (ZIP)';
+    document.getElementById('btn-download-png').innerHTML = '<i class="bi bi-file-zip"></i> Download PNG (ZIP)';
+}
+
+function _getPreviewUrl(templateId, pageIdx) {
+    return _isMultiPage ? _pagePreviewUrl(templateId, pageIdx) : _previewUrl(templateId);
+}
+
+function _updateDimLabel() {
+    if (!currentTemplate) return;
+    let label = `Template: ${currentTemplate.name} | Size: ${currentTemplate.width_mm}×${currentTemplate.height_mm}mm`;
+    if (_isMultiPage && typeof _pageLabel !== 'undefined') {
+        label += ` | ${_pageLabel(_currentPage)}`;
+    } else if (typeof _entityLabel !== 'undefined') {
+        label += ` | ${_entityLabel()}`;
+    }
+    document.getElementById('preview-dimensions').textContent = label;
+}
+
+function _updatePagination() {
+    if (!_isMultiPage) return;
+    const nav = document.getElementById('page-nav');
+    nav.classList.remove('d-none');
+    nav.classList.add('d-flex');
+    document.getElementById('page-prev').disabled = _currentPage === 0;
+    document.getElementById('page-next').disabled = _currentPage === _pageCount - 1;
+    document.getElementById('page-counter').textContent = `${_currentPage + 1} / ${_pageCount}`;
+}
+
+async function loadPage(templateId, pageIdx, showLoading) {
+    /* Serve from cache when available */
+    if (_svgCache[pageIdx] && currentTemplate && String(currentTemplate.id) === String(templateId)) {
+        currentSvgData = _svgCache[pageIdx];
+        _currentPage   = pageIdx;
+        showSvgAsImage(currentSvgData, currentTemplate.width_mm, currentTemplate.height_mm);
+        _updateDimLabel();
+        _updatePagination();
+        return;
+    }
 
     const loading = document.getElementById('qr-loading');
     const preview = document.getElementById('preview-section');
     const buttons = document.getElementById('action-buttons');
-    loading.style.display = 'block';
-    preview.style.display = 'none';
-    buttons.style.display = 'none';
+    if (showLoading) {
+        loading.style.display = 'block';
+        preview.style.display = 'none';
+        buttons.style.display = 'none';
+    } else {
+        loading.style.display = 'block';
+    }
 
     try {
-        const response = await fetch(_previewUrl(templateId));
+        const url = _getPreviewUrl(templateId, pageIdx);
+        const response = await fetch(url);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         if (data.error) throw new Error(data.error);
 
-        currentSvgData  = data.svg;
-        currentTemplate = { id: templateId, width_mm: data.width_mm, height_mm: data.height_mm, name: data.template_name };
+        currentTemplate    = { id: templateId, width_mm: data.width_mm, height_mm: data.height_mm, name: data.template_name };
+        _svgCache[pageIdx] = data.svg;
+        currentSvgData     = data.svg;
+        _currentPage       = pageIdx;
 
-        document.getElementById('preview-dimensions').textContent =
-            `Template: ${data.template_name} | Size: ${data.width_mm}×${data.height_mm}mm | ${_entityLabel()}`;
         preview.style.display = 'block';
         buttons.style.display = 'flex';
-        showSvgAsImage(data.svg, 'preview-svg', data.width_mm, data.height_mm);
+        showSvgAsImage(data.svg, data.width_mm, data.height_mm);
+        _updateDimLabel();
+        _updatePagination();
     } catch (e) {
         alert('Error: ' + e.message);
         console.error(e);
     } finally {
         loading.style.display = 'none';
     }
+}
+
+document.getElementById('btn-load-preview').addEventListener('click', async function () {
+    const templateId = document.getElementById('qr-template-select').value;
+    if (!templateId) { alert('Please select a template first.'); return; }
+    _currentPage = 0;
+    Object.keys(_svgCache).forEach(k => delete _svgCache[k]);  // clear on template change
+    await loadPage(templateId, 0, true);
 });
+
+async function navigatePage(delta) {
+    if (!currentTemplate) return;
+    const next = _currentPage + delta;
+    if (next < 0 || next >= _pageCount) return;
+    await loadPage(currentTemplate.id, next, false);
+}
 
 document.getElementById('btn-print-qr').addEventListener('click', function () {
-    if (currentTemplate) window.open(_printUrl(currentTemplate.id), '_blank');
+    if (!currentTemplate) return;
+    const url = _isMultiPage ? _pagePrintUrl(currentTemplate.id) : _printUrl(currentTemplate.id);
+    window.open(url, '_blank');
 });
 
-document.getElementById('btn-download-svg').addEventListener('click', function () {
-    if (!currentSvgData) return;
-    const blob = new Blob([currentSvgData], { type: 'image/svg+xml' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url;
-    a.download = _downloadName('svg');
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+document.getElementById('btn-download-svg').addEventListener('click', async function () {
+    if (!currentTemplate) return;
+    if (_isMultiPage) {
+        await _downloadSvgZip();
+    } else {
+        if (!currentSvgData) return;
+        _downloadBlob(new Blob([currentSvgData], { type: 'image/svg+xml' }), _downloadName('svg'));
+    }
 });
 
 document.getElementById('btn-download-png').addEventListener('click', async function () {
-    if (!currentSvgData) return;
-    const btn = this, orig = btn.innerHTML;
+    if (!currentTemplate) return;
+    if (_isMultiPage) {
+        await _downloadPngZip();
+    } else {
+        if (!currentSvgData) return;
+        const btn = this, orig = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Converting…';
+        try {
+            const pngBlob = await _svgToPng(currentSvgData, currentTemplate.width_mm, currentTemplate.height_mm);
+            _downloadBlob(pngBlob, _downloadName('png'));
+        } catch (e) {
+            alert('Error converting to PNG: ' + e.message);
+            console.error(e);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = orig;
+        }
+    }
+});
+
+async function _downloadSvgZip() {
+    /* Prefer backend zip endpoint if the child template provides one */
+    if (typeof _pageSvgZipUrl !== 'undefined') {
+        window.location.href = _pageSvgZipUrl(currentTemplate.id);
+        return;
+    }
+    /* Fallback: fetch all SVGs and build zip client-side */
+    const btn = document.getElementById('btn-download-svg');
+    const orig = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Converting…';
     try {
-        const { width_mm, height_mm } = currentTemplate;
-        const mmToPx = 96 / 25.4;
-        const canvas = document.createElement('canvas');
-        canvas.width  = Math.round(width_mm  * mmToPx);
-        canvas.height = Math.round(height_mm * mmToPx);
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        const svgBlob = new Blob([currentSvgData], { type: 'image/svg+xml' });
-        const svgUrl  = URL.createObjectURL(svgBlob);
-        await new Promise((resolve, reject) => {
-            const img = new Image();
-            img.onload = () => {
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                URL.revokeObjectURL(svgUrl);
-                canvas.toBlob(blob => {
-                    const url = URL.createObjectURL(blob);
-                    const a   = document.createElement('a');
-                    a.href = url;
-                    a.download = _downloadName('png');
-                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    resolve();
-                }, 'image/png');
-            };
-            img.onerror = () => { URL.revokeObjectURL(svgUrl); reject(new Error('SVG render failed')); };
-            img.src = svgUrl;
-        });
+        const files = [];
+        for (let i = 0; i < _pageCount; i++) {
+            document.getElementById('qr-loading-msg').textContent = `Fetching sticker ${i + 1} of ${_pageCount}…`;
+            document.getElementById('qr-loading').style.display = 'block';
+            if (!_svgCache[i]) {
+                const r = await fetch(_getPreviewUrl(currentTemplate.id, i));
+                const d = await r.json();
+                _svgCache[i] = d.svg;
+            }
+            const fname = typeof _pageFilename !== 'undefined' ? _pageFilename('svg', i) : `page_${i + 1}.svg`;
+            files.push({ name: fname, data: new TextEncoder().encode(_svgCache[i]) });
+        }
+        document.getElementById('qr-loading').style.display = 'none';
+        const zipName = _downloadName('zip');
+        _downloadBlob(new Blob([_buildZip(files)], { type: 'application/zip' }), zipName);
     } catch (e) {
-        alert('Error converting to PNG: ' + e.message);
+        alert('Error building SVG zip: ' + e.message);
         console.error(e);
     } finally {
         btn.disabled = false;
         btn.innerHTML = orig;
+        document.getElementById('qr-loading').style.display = 'none';
+        document.getElementById('qr-loading-msg').textContent = 'Generating sticker preview…';
     }
-});
+}
+
+async function _downloadPngZip() {
+    const btn = document.getElementById('btn-download-png');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    try {
+        const files = [];
+        for (let i = 0; i < _pageCount; i++) {
+            document.getElementById('qr-loading-msg').textContent = `Converting page ${i + 1} of ${_pageCount} to PNG…`;
+            document.getElementById('qr-loading').style.display = 'block';
+            if (!_svgCache[i]) {
+                const r = await fetch(_getPreviewUrl(currentTemplate.id, i));
+                const d = await r.json();
+                _svgCache[i] = d.svg;
+            }
+            const pngBlob = await _svgToPng(_svgCache[i], currentTemplate.width_mm, currentTemplate.height_mm);
+            const arrBuf  = await pngBlob.arrayBuffer();
+            const fname   = typeof _pageFilename !== 'undefined' ? _pageFilename('png', i) : `page_${i + 1}.png`;
+            files.push({ name: fname, data: new Uint8Array(arrBuf) });
+        }
+        document.getElementById('qr-loading').style.display = 'none';
+        const zipName = _downloadName('zip').replace(/\.zip$/, '_png.zip');
+        _downloadBlob(new Blob([_buildZip(files)], { type: 'application/zip' }), zipName);
+    } catch (e) {
+        alert('Error building PNG zip: ' + e.message);
+        console.error(e);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        document.getElementById('qr-loading').style.display = 'none';
+        document.getElementById('qr-loading-msg').textContent = 'Generating sticker preview…';
+    }
+}
+
+function _svgToPng(svgString, widthMm, heightMm) {
+    return new Promise((resolve, reject) => {
+        const mmToPx = 96 / 25.4;
+        const canvas = document.createElement('canvas');
+        canvas.width  = Math.round(widthMm  * mmToPx);
+        canvas.height = Math.round(heightMm * mmToPx);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const blob = new Blob([svgString], { type: 'image/svg+xml' });
+        const url  = URL.createObjectURL(blob);
+        const img  = new Image();
+        img.onload = () => {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            URL.revokeObjectURL(url);
+            canvas.toBlob(resolve, 'image/png');
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('SVG render failed')); };
+        img.src = url;
+    });
+}
+
+function _downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
 {% endif %}
 
 window.addEventListener('resize', () => {
     if (currentTemplate && document.getElementById('preview-section').style.display !== 'none') {
-        setTimeout(() => showSvgAsImage(currentSvgData, 'preview-svg', currentTemplate.width_mm, currentTemplate.height_mm), 100);
+        setTimeout(() => showSvgAsImage(currentSvgData, currentTemplate.width_mm, currentTemplate.height_mm), 100);
     }
 });
+
+/* ── Minimal ZIP builder — uncompressed (stored), no external deps ── */
+function _buildZip(files) {
+    function u16(n) { const b = new Uint8Array(2); new DataView(b.buffer).setUint16(0, n, true); return b; }
+    function u32(n) { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, n, true); return b; }
+    function cat(arrays) {
+        const tot = arrays.reduce((s, a) => s + a.length, 0);
+        const out = new Uint8Array(tot); let off = 0;
+        for (const a of arrays) { out.set(a, off); off += a.length; }
+        return out;
+    }
+    const _tbl = (() => {
+        const t = new Uint32Array(256);
+        for (let i = 0; i < 256; i++) { let c = i; for (let j = 0; j < 8; j++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[i] = c; }
+        return t;
+    })();
+    function crc32(data) { let c = 0xFFFFFFFF; for (const b of data) c = (c >>> 8) ^ _tbl[(c ^ b) & 0xFF]; return (c ^ 0xFFFFFFFF) >>> 0; }
+    const enc  = new TextEncoder();
+    const now  = new Date();
+    const dosT = u16(((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) >>> 0);
+    const dosD = u16(((((now.getFullYear() - 1980) & 0x7F) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) >>> 0);
+    const locals = [], centrals = [];
+    let offset = 0;
+    for (const f of files) {
+        const name = enc.encode(f.name);
+        const crc  = crc32(f.data);
+        const local   = cat([new Uint8Array([0x50,0x4B,0x03,0x04]), u16(20), u16(0), u16(0), dosT, dosD, u32(crc), u32(f.data.length), u32(f.data.length), u16(name.length), u16(0), name]);
+        const central = cat([new Uint8Array([0x50,0x4B,0x01,0x02]), u16(20), u16(20), u16(0), u16(0), dosT, dosD, u32(crc), u32(f.data.length), u32(f.data.length), u16(name.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset), name]);
+        locals.push(local, f.data);
+        centrals.push(central);
+        offset += local.length + f.data.length;
+    }
+    const cdSz = centrals.reduce((s, c) => s + c.length, 0);
+    const eocd = cat([new Uint8Array([0x50,0x4B,0x05,0x06]), u16(0), u16(0), u16(files.length), u16(files.length), u32(cdSz), u32(offset), u16(0)]);
+    return cat([...locals, ...centrals, eocd]);
+}
 </script>
 {% endblock %}

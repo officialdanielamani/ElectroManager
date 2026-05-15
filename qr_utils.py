@@ -910,3 +910,15 @@ def generate_batch_stickers_pdf(template, records, data_getter):
     doc.write_pdf(pdf_output)
     pdf_output.seek(0)
     return pdf_output
+
+
+def generate_svg_zip(template, name_data_pairs):
+    """Generate a zip containing one SVG sticker per (filename, data_dict) pair."""
+    import zipfile
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for fname, data in name_data_pairs:
+            svg = render_template_to_svg(template, data)
+            zf.writestr(f"{fname}.svg", svg)
+    buf.seek(0)
+    return buf

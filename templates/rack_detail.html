@@ -416,12 +416,10 @@ function clearDrawerSelection() {
 function printQRDrawer() {
     if (selectedDrawers.size === 0) {
         alert('Please select a drawer first.');
-    } else if (selectedDrawers.size === 1) {
-        const drawerId = [...selectedDrawers][0];
-        window.location.href = `/rack/${rackUuid}/drawer/${drawerId}/qr-sticker`;
-    } else {
-        alert('Please select only one drawer at a time for QR printing.');
+        return;
     }
+    const ids = [...selectedDrawers].join(',');
+    window.location.href = `/rack/${rackUuid}/drawers/qr-sticker?drawers=${encodeURIComponent(ids)}`;
 }
 
 function showImageModal(imageSrc, rackName) {

@@ -919,14 +919,32 @@ def api_rack_sticker_print(uuid, template_id):
 @location_rack_bp.route('/rack/<string:uuid>/drawer/<string:drawer_id>/qr-sticker', endpoint='drawer_qr_sticker')
 @login_required
 def drawer_qr_sticker(uuid, drawer_id):
-    """Display QR sticker generation page for a specific rack drawer"""
+    """Display QR sticker page for a single rack drawer (backward compat)."""
     if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
         abort(403)
     rack = Rack.query.filter_by(uuid=uuid).first_or_404()
     templates = StickerTemplate.query.filter_by(template_type='Drawer').all()
     return render_template('drawer_qr_sticker.html',
                            rack=rack,
-                           drawer_id=drawer_id,
+                           drawer_ids=[drawer_id],
+                           templates=templates)
+
+
+@location_rack_bp.route('/rack/<string:uuid>/drawers/qr-sticker', endpoint='drawers_qr_sticker')
+@login_required
+def drawers_qr_sticker(uuid):
+    """Display QR sticker page for one or more rack drawers."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        abort(403)
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
+    raw = request.args.get('drawers', '')
+    drawer_ids = [d.strip() for d in raw.split(',') if d.strip()]
+    if not drawer_ids:
+        abort(400)
+    templates = StickerTemplate.query.filter_by(template_type='Drawer').all()
+    return render_template('drawer_qr_sticker.html',
+                           rack=rack,
+                           drawer_ids=drawer_ids,
                            templates=templates)
 
 
@@ -972,3 +990,47 @@ def api_drawer_sticker_print(uuid, drawer_id, template_id):
         as_attachment=True,
         download_name=f'{template.name}_{rack.uuid}_{drawer_id}.pdf'
     )
+
+
+@location_rack_bp.route('/api/rack/<string:uuid>/drawers/sticker-print/<int:template_id>')
+@login_required
+def api_drawers_sticker_print(uuid, template_id):
+    """Generate multi-page PDF for multiple rack drawers."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
+    from qr_utils import get_drawer_data, generate_batch_stickers_pdf
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'Drawer':
+        return jsonify({'error': 'Template must be Drawer type'}), 400
+    raw = request.args.get('drawers', '')
+    drawer_ids = [d.strip() for d in raw.split(',') if d.strip()]
+    if not drawer_ids:
+        return jsonify({'error': 'No drawers specified'}), 400
+    output = generate_batch_stickers_pdf(template, drawer_ids, lambda did: get_drawer_data(rack, did))
+    log_audit(current_user.id, 'print', 'rack', rack.id,
+              f'Printed drawer stickers: {template.name} drawers {",".join(drawer_ids)}')
+    return send_file(output, mimetype='application/pdf', as_attachment=True,
+                     download_name=f'{rack.name}_drawers_{template.name}.pdf')
+
+
+@location_rack_bp.route('/api/rack/<string:uuid>/drawers/sticker-svg-zip/<int:template_id>')
+@login_required
+def api_drawers_sticker_svg_zip(uuid, template_id):
+    """Generate a zip of SVG stickers for multiple rack drawers."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
+    from qr_utils import get_drawer_data, generate_svg_zip
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'Drawer':
+        return jsonify({'error': 'Template must be Drawer type'}), 400
+    raw = request.args.get('drawers', '')
+    drawer_ids = [d.strip() for d in raw.split(',') if d.strip()]
+    if not drawer_ids:
+        return jsonify({'error': 'No drawers specified'}), 400
+    safe_rack = rack.name.replace("'", "").replace(" ", "_")
+    pairs = [(f"{safe_rack}_{did}", get_drawer_data(rack, did)) for did in drawer_ids]
+    zip_buf = generate_svg_zip(template, pairs)
+    return send_file(zip_buf, mimetype='application/zip', as_attachment=True,
+                     download_name=f'{safe_rack}_drawers_svg.zip')
