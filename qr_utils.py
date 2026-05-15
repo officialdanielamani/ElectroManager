@@ -111,16 +111,20 @@ def render_template_to_svg(template, data):
     print(f"[SVG] Layout elements: {len(template.get_layout())}")
     print(f"[SVG] Data keys: {list(data.keys())}")
     
-    # Collect fonts used in this template (for text elements only)
-    # Icon fonts are no longer needed as icons are rendered as SVG paths
+    # Collect fonts used in this template
     text_fonts_used = set()
+    has_icons = False
     layout = template.get_layout()
     for element in layout:
+        if element.get('visible') is False:
+            continue
         if element.get('type') == 'text':
             font = element.get('font_family', 'Arial')
             if font:
                 text_fonts_used.add(font)
-    
+        elif element.get('type') == 'icon' and element.get('icon_name'):
+            has_icons = True
+
     # Build font-face rules for SVG with embedded fonts for project fonts
     font_styles = ''
     fonts_dir = os.path.join(current_app.root_path, 'static', 'fonts')
@@ -153,7 +157,37 @@ def render_template_to_svg(template, data):
                         break
                     except Exception as e:
                         print(f"[SVG] Failed to embed text font {font_name}: {e}")
-    
+
+    # Embed Bootstrap Icons font once at SVG level (must be top-level, not inside <g>)
+    if has_icons:
+        icons_dir = os.path.join(current_app.root_path, 'static', 'icons')
+        fonts_subdir = os.path.join(icons_dir, 'fonts')
+        bi_font_path = None
+        bi_font_ext = None
+        for ext in ['.woff', '.woff2', '.ttf', '.otf']:
+            for search_dir in [fonts_subdir, icons_dir]:
+                candidate = os.path.join(search_dir, 'bootstrap-icons' + ext)
+                if os.path.exists(candidate):
+                    bi_font_path = candidate
+                    bi_font_ext = ext
+                    break
+            if bi_font_path:
+                break
+        if bi_font_path:
+            fmt_map = {'.woff': 'woff', '.woff2': 'woff2', '.ttf': 'truetype', '.otf': 'opentype'}
+            bi_fmt = fmt_map.get(bi_font_ext, 'woff')
+            if bi_font_path not in _icon_font_b64_cache:
+                with open(bi_font_path, 'rb') as f:
+                    _icon_font_b64_cache[bi_font_path] = base64.b64encode(f.read()).decode('utf-8')
+            bi_b64 = _icon_font_b64_cache[bi_font_path]
+            font_styles += (
+                f'<style>@font-face{{font-family:"bootstrap-icons";'
+                f'src:url("data:font/{bi_fmt};base64,{bi_b64}") format("{bi_fmt}");}}</style>\n'
+            )
+            print(f"[SVG] Embedded Bootstrap Icons font ({bi_fmt}) at SVG level")
+        else:
+            print("[SVG] Bootstrap Icons font not found — icons may render as boxes")
+
     svg = f'<svg width="{width_px}" height="{height_px}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width_px} {height_px}">\n'
     svg += font_styles
     svg += f'  <rect width="{width_px}" height="{height_px}" fill="white" stroke="black" stroke-width="0.5"/>\n'
@@ -258,7 +292,7 @@ def render_template_to_svg(template, data):
             if icon_name:
                 print(f"[SVG] Element {idx}: ICON = '{icon_name}' (container: {w_px}×{h_px}px, scaled size: {icon_size_px}px, color: {icon_color})")
                 try:
-                    icon_svg = generate_icon_svg(icon_name, int(icon_size_px), icon_color, int(w_px), int(h_px))
+                    icon_svg = generate_icon_svg(icon_name, int(icon_size_px), icon_color, int(w_px), int(h_px), include_defs=False)
                     svg += f'  <g transform="translate({x_px}, {y_px})">{icon_svg}</g>\n'
                 except Exception as e:
                     print(f"[SVG] Icon generation error: {e}")
@@ -466,10 +500,12 @@ def generate_barcode_svg(data, format_type, width, height, show_label=False):
         print(f"[BARCODE] Returning placeholder")
         return placeholder
 
-def generate_icon_svg(icon_name, icon_size, icon_color, container_width, container_height):
-    """Generate an icon SVG fragment by embedding the Bootstrap Icons font and rendering
-    the glyph as a <text> element.  Works in browser preview, SVG/PNG download, and
-    WeasyPrint PDF without requiring fontTools.
+def generate_icon_svg(icon_name, icon_size, icon_color, container_width, container_height, include_defs=True):
+    """Generate an icon SVG fragment using the Bootstrap Icons font.
+
+    When include_defs=False the @font-face <defs> block is omitted — use this
+    when the caller already embeds the font at the top-level SVG so the font
+    declaration is not buried inside a <g> element (which breaks most renderers).
     """
     import os
     import base64
@@ -517,12 +553,6 @@ def generate_icon_svg(icon_name, icon_size, icon_color, container_width, contain
         codepoint = ord(icon_unicode_char)
         unicode_escape = f'&#x{codepoint:04X};'
 
-        font_face = (
-            f'<defs><style>'
-            f'@font-face{{font-family:"bootstrap-icons";'
-            f'src:url("data:font/{font_format};base64,{font_b64}") format("{font_format}");}}'
-            f'</style></defs>'
-        )
         text_el = (
             f'<text x="{center_x}" y="{center_y}" '
             f'font-family="bootstrap-icons" font-size="{icon_size}" '
@@ -530,8 +560,17 @@ def generate_icon_svg(icon_name, icon_size, icon_color, container_width, contain
             f'{unicode_escape}</text>'
         )
 
-        svg = font_face + text_el
-        print(f"[ICON] Success! Generated embedded-font icon SVG, {len(svg)} bytes")
+        if include_defs:
+            font_face = (
+                f'<defs><style>'
+                f'@font-face{{font-family:"bootstrap-icons";'
+                f'src:url("data:font/{font_format};base64,{font_b64}") format("{font_format}");}}'
+                f'</style></defs>'
+            )
+            svg = font_face + text_el
+        else:
+            svg = text_el
+        print(f"[ICON] Success! Generated icon SVG (include_defs={include_defs}), {len(svg)} bytes")
         return svg
 
     except Exception as e:
