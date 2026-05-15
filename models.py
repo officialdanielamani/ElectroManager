@@ -526,6 +526,7 @@ class ItemBatch(db.Model):
     purchase_date = db.Column(db.Date)
     note = db.Column(db.String(128))
     sn_tracking_enabled = db.Column(db.Boolean, default=False)
+    lend_disabled = db.Column(db.Boolean, default=False)
 
     follow_main_location = db.Column(db.Boolean, default=True)
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)

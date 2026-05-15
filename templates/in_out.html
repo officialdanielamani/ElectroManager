@@ -601,7 +601,7 @@ function _handleEnterOnResult(data) {
 }
 
 function doSearch(q) {
-    fetch('/in-out/search?q=' + encodeURIComponent(q))
+    fetch('/in-out/search?q=' + encodeURIComponent(q) + '&mode=' + encodeURIComponent(_mode))
     .then(function(r) { return r.json(); })
     .then(function(d) {
         _lastSearchData = d;
@@ -613,7 +613,11 @@ function doSearch(q) {
 function renderResults(data) {
     var el = document.getElementById('searchResults');
     if (!data.results || data.results.length === 0) {
-        el.innerHTML = '<div class="alert alert-secondary py-2 small"><i class="bi bi-search"></i> No results found.</div>';
+        if (data.lend_disabled) {
+            el.innerHTML = '<div class="alert alert-warning py-2 small"><i class="bi bi-slash-circle me-1"></i> This batch is <strong>disabled from lending</strong>.</div>';
+        } else {
+            el.innerHTML = '<div class="alert alert-secondary py-2 small"><i class="bi bi-search"></i> No results found.</div>';
+        }
         _playSound('error');
         return;
     }
@@ -760,6 +764,7 @@ function _renderSessionCard(session) {
 function _renderItemCard(item, expanded) {
     var batchesHtml = '';
     item.batches.forEach(function(b) {
+        if (_mode === 'lending' && b.lend_disabled) return;
         _batchCache[b.id] = b;
         batchesHtml += '<div class="px-3 py-2 border-bottom d-flex justify-content-between align-items-center" ' +
             'style="cursor:pointer;" onclick="onBatchClick(' + b.id + ', null)">' +
@@ -1972,7 +1977,11 @@ function buildEditBatchForm(b) {
         '</div>';
 
     var row3 = '<div class="mb-2"><label class="form-label form-label-sm">Note</label>' +
-        '<input type="text" class="form-control form-control-sm" id="eb_note" value="' + _esc(b.note) + '" maxlength="256"></div>';
+        '<input type="text" class="form-control form-control-sm" id="eb_note" value="' + _esc(b.note) + '" maxlength="256"></div>' +
+        '<div class="mb-2 form-check">' +
+        '<input type="checkbox" class="form-check-input" id="eb_lend_disabled"' + (b.lend_disabled ? ' checked' : '') + '>' +
+        '<label class="form-check-label form-label-sm" for="eb_lend_disabled">Disable this batch from lending</label>' +
+        '</div>';
 
     var snTable = '';
     if (isSn) {
@@ -2135,6 +2144,7 @@ function submitEditBatch(batchId, snTracking) {
         price_per_unit: parseFloat(_getValE('eb_price')) || 0,
         purchase_date: _getValE('eb_date')   || '',
         note:          _getValE('eb_note')   || '',
+        lend_disabled: !!(document.getElementById('eb_lend_disabled') && document.getElementById('eb_lend_disabled').checked),
     };
     if (!snTracking) payload.quantity = parseInt(_getValE('eb_qty')) || 0;
 

@@ -262,6 +262,9 @@
                                 {% if batch.get_lend_quantity() > 0 %}
                                 <span class="badge" style="background-color:#c9a227; color:#fff;"><i class="bi bi-hand-index-thumb"></i> On Lend</span>
                                 {% endif %}
+                                {% if batch.lend_disabled %}
+                                <span class="badge bg-danger"><i class="bi bi-slash-circle"></i> Lend Disable</span>
+                                {% endif %}
                                 {% if batch.purchase_date %}
                                 <small class="text-muted"><i class="bi bi-calendar"></i> {{ batch.purchase_date.strftime('%d/%m/%Y') }}</small>
                                 {% endif %}

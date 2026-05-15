@@ -116,6 +116,8 @@ def in_out():
 def in_out_search():
     """AJAX: search by item name, UUID, ISN, batch ID, or lending session ID."""
     q = request.args.get('q', '').strip()
+    mode = request.args.get('mode', 'lending')
+    is_lending = (mode == 'lending')
     if len(q) < 2:
         return jsonify({'results': [], 'type': 'none'})
 
@@ -130,6 +132,8 @@ def in_out_search():
     if sn_row:
         batch = sn_row.batch
         item  = batch.item
+        if is_lending and batch.lend_disabled:
+            return jsonify({'type': 'none', 'results': [], 'lend_disabled': True})
         return jsonify({'type': 'sn', 'results': [_batch_json(batch, item, sn_row)]})
 
     # Try batch ID format {uuid}-B{n}
@@ -143,6 +147,8 @@ def in_out_search():
                 if item:
                     batch = ItemBatch.query.filter_by(item_id=item.id, batch_number=num).first()
                     if batch:
+                        if is_lending and batch.lend_disabled:
+                            return jsonify({'type': 'none', 'results': [], 'lend_disabled': True})
                         return jsonify({'type': 'batch', 'results': [_batch_json(batch, item)]})
             except ValueError:
                 pass
@@ -182,6 +188,7 @@ def _batch_summary(batch):
         'lend_qty': batch.get_lend_quantity(),
         'available_qty': batch.get_available_quantity(),
         'item_uuid': batch.item.uuid,
+        'lend_disabled': bool(batch.lend_disabled),
     }
 
 def _batch_json(batch, item, sn_row=None):
@@ -195,6 +202,7 @@ def _batch_json(batch, item, sn_row=None):
         'price_per_unit': float(batch.price_per_unit or 0),
         'purchase_date': batch.purchase_date.strftime('%Y-%m-%d') if batch.purchase_date else '',
         'note': batch.note or '',
+        'lend_disabled': bool(batch.lend_disabled),
         'location_id': batch.location_id,
         'rack_id': batch.rack_id,
         'drawer': batch.drawer or '',
@@ -516,6 +524,10 @@ def in_out_submit_cart():
             batch = ItemBatch.query.get(batch_id)
             if not batch:
                 errors.append(f'Batch {batch_id} not found')
+                continue
+
+            if batch.lend_disabled:
+                errors.append(f'Batch "{batch.get_display_label()}" is disabled from lending')
                 continue
 
             if item_type == 'sn':
@@ -848,6 +860,7 @@ def in_out_edit_batch(batch_id):
         except ValueError:
             pass
     batch.note = (data.get('note', '') or '').strip()[:256] or None
+    batch.lend_disabled = bool(data.get('lend_disabled', False))
     item.recalculate_from_batches()
     item.updated_by = current_user.id
     item.updated_at = datetime.now(timezone.utc)
