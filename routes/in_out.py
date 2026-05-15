@@ -910,6 +910,8 @@ def in_out_delete_batch(batch_id):
 @login_required
 def session_qr_sticker(lending_id):
     """Show QR sticker page for a lending/return session."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        abort(403)
     from models import StickerTemplate
     session = LendingSession.query.filter_by(lending_id=lending_id).first_or_404()
     templates = StickerTemplate.query.filter_by(template_type='In-Out').order_by(StickerTemplate.name).all()
@@ -920,6 +922,8 @@ def session_qr_sticker(lending_id):
 @login_required
 def api_session_inline_qr(lending_id):
     """Return a simple QR SVG for the session ID (for inline notification display)."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
     from flask import Response
     from qr_utils import generate_session_qr_svg
     LendingSession.query.filter_by(lending_id=lending_id).first_or_404()
@@ -931,6 +935,8 @@ def api_session_inline_qr(lending_id):
 @login_required
 def api_session_sticker_preview(lending_id, template_id):
     """Return JSON with SVG preview for a session sticker."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
     from flask import send_file
     from models import StickerTemplate
     from qr_utils import get_session_data, render_template_to_svg
@@ -952,6 +958,8 @@ def api_session_sticker_preview(lending_id, template_id):
 @login_required
 def api_session_sticker_print(lending_id, template_id):
     """Generate and return a PDF sticker for a session."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
     from flask import send_file
     from models import StickerTemplate
     from qr_utils import get_session_data, generate_single_sticker_pdf

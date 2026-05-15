@@ -460,7 +460,7 @@ def role_new():
                 "item_management": {"view": False, "edit": False, "delete": False},
                 "magic_parameters": {"view": False, "edit": False, "delete": False},
                 "location_management": {"view": False, "edit": False, "delete": False},
-                "qr_templates": {"view": False, "edit": False, "delete": False},
+                "qr_templates": {"print_qr": False, "view": False, "edit": False, "delete": False},
                 "users_roles": {
                     "view": False,
                     "roles_create": False,
@@ -593,6 +593,7 @@ def role_edit(id):
             
             # QR/Barcode Templates
             perms['settings_sections']['qr_templates'] = {
+                'print_qr': 'settings_sections_qr_templates_print_qr' in request.form,
                 'view': 'settings_sections_qr_templates_view' in request.form,
                 'edit': 'settings_sections_qr_templates_edit' in request.form,
                 'delete': 'settings_sections_qr_templates_delete' in request.form

@@ -20,8 +20,13 @@
     }
 
     .toolbar {
-        padding: 1rem;
+        padding: 0.35rem 0.75rem;
+        position: sticky;
+        top: 0;
+        z-index: 1020;
     }
+    nav.navbar { display: none !important; }
+    .container-fluid.mt-4 { margin-top: 0 !important; }
 
     .panel-header-success {
         background-color: var(--editor-panel-bg-success) !important;
@@ -345,7 +350,7 @@
                     <div class="card-header panel-toggle" data-panel="fields" style="cursor: pointer; padding: 10px;">
                         <h6 class="mb-0" style="cursor: pointer;"><i class="bi bi-plus-square"></i> Fields <span class="toggle-icon" style="float: right;">▼</span></h6>
                     </div>
-                    <div id="fields-content" class="panel-content" style="max-height: 200px; overflow-y: auto; padding: 10px; box-sizing: border-box;">
+                    <div id="fields-content" class="panel-content" style="max-height: 250px; overflow-y: auto; padding: 10px; box-sizing: border-box;">
                         <div class="d-grid gap-2">
                             <button id="btn-add-text" class="btn btn-sm btn-outline-primary">
                                 <i class="bi bi-type"></i> Text
@@ -354,7 +359,7 @@
                                 <i class="bi bi-qr-code"></i> QR
                             </button>
                             <button id="btn-add-barcode" class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-barcode"></i> Barcode
+                                <i class="bi bi-upc-scan"></i> Barcode
                             </button>
                             <button id="btn-add-icon" class="btn btn-sm btn-outline-primary">
                                 <i class="bi bi-star"></i> Icon
@@ -1377,17 +1382,20 @@ function updatePropertiesPanel(index) {
         </div>
         <div class="mb-2">
             <label class="form-label" style="font-size: 12px;"><strong>Content</strong></label>
-            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
-                <input type="text" class="form-control form-control-sm" id="prop-source" value="${element.source_field || ''}" placeholder="" style="font-size: 12px; flex: 1;">
-                <button class="btn btn-sm btn-outline-primary" id="btn-add-placeholder" style="font-size: 12px; padding: 4px 10px;">
-                    <i class="bi bi-plus"></i>
+            <textarea class="form-control form-control-sm" rows="2" id="prop-source" style="font-size: 12px; font-family: monospace;">${element.source_field || ''}</textarea>
+            <small class="text-muted" style="font-size: 11px;">Use placeholders from dropdown</small>
+        </div>
+        <div class="mb-2">
+            <label class="form-label" style="font-size: 12px;"><strong>Placeholder</strong></label>
+            <div style="display: flex; gap: 6px;">
+                <select class="form-select form-select-sm" id="prop-placeholder" style="font-size: 12px; flex: 1;">
+                    <option value="">Select placeholder...</option>
+                    ${placeholderOptions}
+                </select>
+                <button class="btn btn-sm btn-outline-primary" id="btn-add-placeholder" style="font-size: 12px; padding: 4px 10px; white-space: nowrap;">
+                    <i class="bi bi-plus"></i> Add
                 </button>
             </div>
-            <select class="form-select form-select-sm" id="prop-placeholder" style="font-size: 12px;">
-                <option value="">Select placeholder to add...</option>
-                ${placeholderOptions}
-            </select>
-            <small class="text-muted" style="font-size: 11px;">Type text or add placeholders</small>
         </div>
         <div class="mb-2">
             <label class="form-label" style="font-size: 12px;"><strong>Error Correction</strong></label>
@@ -1424,17 +1432,20 @@ function updatePropertiesPanel(index) {
         </div>
         <div class="mb-2">
             <label class="form-label" style="font-size: 12px;"><strong>Content</strong></label>
-            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
-                <input type="text" class="form-control form-control-sm" id="prop-source" value="${element.source_field || ''}" placeholder="" style="font-size: 12px; flex: 1;">
-                <button class="btn btn-sm btn-outline-primary" id="btn-add-placeholder" style="font-size: 12px; padding: 4px 10px;">
-                    <i class="bi bi-plus"></i>
+            <textarea class="form-control form-control-sm" rows="2" id="prop-source" style="font-size: 12px; font-family: monospace;">${element.source_field || ''}</textarea>
+            <small class="text-muted" style="font-size: 11px;">Use placeholders from dropdown</small>
+        </div>
+        <div class="mb-2">
+            <label class="form-label" style="font-size: 12px;"><strong>Placeholder</strong></label>
+            <div style="display: flex; gap: 6px;">
+                <select class="form-select form-select-sm" id="prop-placeholder" style="font-size: 12px; flex: 1;">
+                    <option value="">Select placeholder...</option>
+                    ${placeholderOptions}
+                </select>
+                <button class="btn btn-sm btn-outline-primary" id="btn-add-placeholder" style="font-size: 12px; padding: 4px 10px; white-space: nowrap;">
+                    <i class="bi bi-plus"></i> Add
                 </button>
             </div>
-            <select class="form-select form-select-sm" id="prop-placeholder" style="font-size: 12px;">
-                <option value="">Select placeholder to add...</option>
-                ${placeholderOptions}
-            </select>
-            <small class="text-muted" style="font-size: 11px;">Type text or add placeholders</small>
         </div>
         <div class="mb-2">
             <label class="form-label" style="font-size: 12px;"><strong>Format</strong></label>

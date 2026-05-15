@@ -1,7 +1,7 @@
 """
 QR/Barcode Sticker Template Routes - Blueprint
 """
-from flask import Blueprint, render_template, request, jsonify, send_file, redirect, url_for, flash, current_app
+from flask import Blueprint, render_template, request, jsonify, send_file, redirect, url_for, flash, current_app, abort
 from flask_login import login_required, current_user
 from models import db, Item, Location, Rack, StickerTemplate
 from qr_utils import (
@@ -216,6 +216,8 @@ def preview_qr_template(template_id):
 @login_required
 def api_item_sticker_preview(uuid, template_id):
     """Generate sticker preview for an item"""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
     
@@ -236,6 +238,8 @@ def api_item_sticker_preview(uuid, template_id):
 @login_required
 def api_item_sticker_print(uuid, template_id):
     """Generate printable sticker PDF"""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
     
@@ -252,6 +256,8 @@ def api_item_sticker_print(uuid, template_id):
 @login_required
 def item_qr_sticker(uuid):
     """View and print QR stickers for an item"""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        abort(403)
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     templates = StickerTemplate.query.filter_by(template_type='Items').all()
     return render_template('item_qr_sticker.html', item=item, templates=templates)
