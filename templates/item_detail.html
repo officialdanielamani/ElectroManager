@@ -350,8 +350,10 @@
                                 <!-- Serial Numbers Table (if enabled) -->
                                 {% if batch.sn_tracking_enabled and batch.serial_numbers|length > 0 %}
                                 <hr>
-                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                <div class="mb-1">
                                     <strong><i class="bi bi-upc-scan"></i> Serial Numbers</strong>
+                                </div>
+                                <div class="mb-2">
                                     <button class="btn btn-outline-secondary btn-sm" title="Print QR Batch">
                                         <i class="bi bi-qr-code"></i> Print QR Batch
                                     </button>

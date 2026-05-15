@@ -108,7 +108,18 @@ const itemName = '{{ item.name }}';
 let currentTemplate = null;
 let currentSvgData = null;
 
-// Extract @font-face rules from SVG <defs><style> and inject into document.head
+// Strip bootstrap-icons @font-face from SVG style blocks before inline display.
+// The page already loads bootstrap-icons.css which defines the font; re-embedding
+// a data-URI version triggers a new load cycle (font-display:block → blank text).
+// Custom project fonts are kept so they get hoisted to document.head.
+function prepSvgForInline(svgString) {
+    return svgString.replace(/<style([^>]*)>([\s\S]*?)<\/style>/gi, function(m, attrs, css) {
+        const cleaned = css.replace(/@font-face\s*\{[^{}]*font-family\s*:\s*["']?bootstrap-icons["']?[^{}]*\}/gi, '');
+        return `<style${attrs}>${cleaned}</style>`;
+    });
+}
+
+// Extract remaining @font-face rules (project fonts) and inject into document.head
 // so browsers apply them to inline SVG (browsers ignore @font-face inside SVG defs)
 function injectSvgFontFaces(svgString) {
     const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
@@ -117,11 +128,11 @@ function injectSvgFontFaces(svgString) {
     while ((match = styleRegex.exec(svgString)) !== null) {
         if (match[1].includes('@font-face')) fontCss += match[1];
     }
-    if (!fontCss) return;
+    if (!fontCss.trim()) return;
     const id = 'svg-injected-font-faces';
     let el = document.getElementById(id);
     if (!el) { el = document.createElement('style'); el.id = id; document.head.appendChild(el); }
-    el.textContent = fontCss;
+    el.textContent += fontCss;
 }
 
 document.getElementById('btn-load-preview').addEventListener('click', async function() {
@@ -156,9 +167,10 @@ document.getElementById('btn-load-preview').addEventListener('click', async func
             name: data.template_name
         };
         
-        // Insert SVG into preview; also hoist @font-face into <head> so browsers apply it
-        injectSvgFontFaces(data.svg);
-        document.getElementById('preview-svg').innerHTML = data.svg;
+        // Strip embedded bootstrap-icons font (already on page) then hoist project fonts
+        const svgForDisplay = prepSvgForInline(data.svg);
+        injectSvgFontFaces(svgForDisplay);
+        document.getElementById('preview-svg').innerHTML = svgForDisplay;
         document.getElementById('preview-dimensions').textContent = 
             `Template: ${data.template_name} | Size: ${data.width_mm}×${data.height_mm}mm | Item: ${itemName}`;
         
