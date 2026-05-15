@@ -666,8 +666,8 @@ function _renderSessionCard(session) {
         '<code class="ms-1">' + _esc(session.lending_id) + '</code></span>' +
         '<div class="d-flex align-items-center gap-2">' + modeBadge +
         (isReturn
-            ? '<button class="btn btn-sm btn-outline-success py-0"><i class="bi bi-qr-code"></i> Print QR Return</button>'
-            : '<button class="btn btn-sm btn-outline-primary py-0"><i class="bi bi-qr-code"></i> Print QR Lending</button>') +
+            ? '<a href="/in-out/session/' + _esc(session.lending_id) + '/qr-sticker" class="btn btn-sm btn-outline-success py-0"><i class="bi bi-qr-code"></i> Print QR Return</a>'
+            : '<a href="/in-out/session/' + _esc(session.lending_id) + '/qr-sticker" class="btn btn-sm btn-outline-primary py-0"><i class="bi bi-qr-code"></i> Print QR Lending</a>') +
         '<button class="btn btn-sm btn-outline-secondary py-0" onclick="showSessionDetailModal(\'' + _esc(session.lending_id) + '\')">' +
         '<i class="bi bi-info-circle"></i> Detail</button>' +
         '</div></div>' +
@@ -1444,15 +1444,27 @@ function submitCart() {
                 showToast(msg, 'success');
                 _playSound('success');
             }
-            /* Show session ID badge */
+            /* Show session notification with inline QR */
             var af = document.getElementById('actionForm');
             if (af) {
-                af.innerHTML = '<div class="alert alert-success">' +
-                    '<i class="bi bi-check-circle-fill me-2"></i>' +
-                    (isReturn ? 'Return' : 'Lending') + ' processed successfully!<br>' +
-                    '<strong>Session ID: <code>' + _esc(d.lending_id) + '</code></strong>' +
-                    ' <small class="text-muted">(search this ID later to reference this transaction)</small>' +
-                    (d.on_time === false ? '<br><span class="badge bg-warning text-dark mt-1">Some items returned LATE</span>' : '') +
+                var lateNote = d.on_time === false ? '<br><span class="badge bg-warning text-dark mt-1"><i class="bi bi-exclamation-triangle-fill"></i> Some items returned LATE</span>' : '';
+                var qrImgId = 'notif-session-qr-' + Date.now();
+                af.innerHTML = '<div class="alert alert-success p-3">' +
+                    '<div class="d-flex align-items-center gap-3">' +
+                    '<div style="flex-shrink:0;background:white;padding:4px;border-radius:4px;border:1px solid #ccc;">' +
+                    '<img id="' + qrImgId + '" src="/api/in-out/session/' + _esc(d.lending_id) + '/session-qr-svg" width="90" height="90" style="display:block;" alt="Session QR">' +
+                    '</div>' +
+                    '<div>' +
+                    '<div class="fw-bold mb-1"><i class="bi bi-check-circle-fill me-1"></i>' + (isReturn ? 'Return' : 'Lending') + ' processed successfully!</div>' +
+                    '<div class="mb-2">' +
+                    '<a href="/in-out/session/' + _esc(d.lending_id) + '/qr-sticker" class="btn btn-sm ' + (isReturn ? 'btn-outline-success' : 'btn-outline-primary') + '">' +
+                    '<i class="bi bi-qr-code"></i> Print ' + (isReturn ? 'Return' : 'Lending') + ' QR</a>' +
+                    '</div>' +
+                    '<div><strong>Session ID: <code>' + _esc(d.lending_id) + '</code></strong>' +
+                    ' <small class="text-muted">(search this ID later to reference this transaction)</small></div>' +
+                    lateNote +
+                    '</div>' +
+                    '</div>' +
                     '</div>';
             }
             _cart = [];

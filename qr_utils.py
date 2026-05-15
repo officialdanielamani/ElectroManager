@@ -26,6 +26,13 @@ AVAILABLE_PLACEHOLDERS = {
         '{RackCap}', '{RackICount}', '{RackSize}',
         '{DrawInfo}', '{DrawLoc}', '{DrawSize}', '{DrawICount}',
         '{DrawStatus}', '{DrawGroup}'
+    ],
+    'In-Out': [
+        '{SessionID}', '{LendBy}',
+        '{LendStDate}', '{LendStTime}', '{LendEndDate}', '{LendEndTime}',
+        '{LendRealSt}', '{LendUser}',
+        '{ReturnDate}', '{ReturnTime}', '{ReturnStat}',
+        '{ReturnReal}', '{ReturnUser}'
     ]
 }
 
@@ -156,6 +163,93 @@ def get_drawer_data(rack, drawer_id):
         'DrawStatus': draw_status,
         'DrawGroup':  draw_group,
     }
+
+def get_session_data(session):
+    """Extract printable data from a LendingSession for In-Out template type."""
+    def _fmt_date(dt):
+        return dt.strftime('%Y%m%d') if dt else ''
+    def _fmt_time(dt):
+        return dt.strftime('%H:%M') if dt else ''
+    def _fmt_real(dt):
+        return dt.strftime('%Y%m%d-%H:%M:%S') if dt else ''
+
+    is_lend = session.mode == 'lend'
+
+    if is_lend:
+        lend_by   = session.get_lend_to_display()
+        lend_st   = session.lend_start
+        lend_end  = session.lend_end
+        lend_real = session.created_at
+        lend_user = session.creator.username if session.creator else ''
+        ret_date = ret_time = ret_stat = ret_real = ret_user = ''
+    else:
+        lend_by = lend_st = lend_end = lend_real = lend_user = ''
+        ret_real = session.created_at
+        ret_user = session.creator.username if session.creator else ''
+
+        # Determine Late/On Time from associated returned records
+        all_returned = list(session.returned_lend_records) + list(session.returned_sn_records)
+        if all_returned:
+            late = any(
+                r.lend_end and r.returned_at and r.returned_at > r.lend_end
+                for r in all_returned
+            )
+            ret_stat = 'Late' if late else 'On Time'
+        else:
+            ret_stat = ''
+
+        ret_date = _fmt_date(ret_real)
+        ret_time = _fmt_time(ret_real)
+        ret_real = _fmt_real(ret_real)
+
+    return {
+        'SessionID':  session.lending_id,
+        'LendBy':     lend_by if lend_by else '',
+        'LendStDate': _fmt_date(lend_st),
+        'LendStTime': _fmt_time(lend_st),
+        'LendEndDate': _fmt_date(lend_end),
+        'LendEndTime': _fmt_time(lend_end),
+        'LendRealSt': _fmt_real(lend_real),
+        'LendUser':   lend_user,
+        'ReturnDate': ret_date,
+        'ReturnTime': ret_time,
+        'ReturnStat': ret_stat,
+        'ReturnReal': ret_real,
+        'ReturnUser': ret_user,
+    }
+
+
+def generate_session_qr_svg(lending_id, size_px=120):
+    """Generate a compact QR SVG for a session ID (for inline use)."""
+    try:
+        import qrcode
+        from qrcode.image.svg import SvgPathImage
+        qr = qrcode.QRCode(
+            version=None,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=10,
+            border=1,
+        )
+        qr.add_data(lending_id)
+        qr.make(fit=True)
+        img = qr.make_image(image_factory=SvgPathImage)
+        buf = BytesIO()
+        img.save(buf)
+        svg_bytes = buf.getvalue()
+        svg_str = svg_bytes.decode('utf-8')
+        # Set explicit width/height so it renders at size_px
+        import re
+        svg_str = re.sub(
+            r'<svg([^>]*?)width="[^"]*"([^>]*?)height="[^"]*"',
+            f'<svg\\1width="{size_px}"\\2height="{size_px}"',
+            svg_str
+        )
+        if f'width="{size_px}"' not in svg_str:
+            svg_str = svg_str.replace('<svg', f'<svg width="{size_px}" height="{size_px}"', 1)
+        return svg_str
+    except Exception:
+        return f'<svg xmlns="http://www.w3.org/2000/svg" width="{size_px}" height="{size_px}"><rect width="100%" height="100%" fill="#eee"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" font-size="10">QR Error</text></svg>'
+
 
 def replace_placeholders(text, data_dict):
     """Replace {Placeholder} with actual values"""

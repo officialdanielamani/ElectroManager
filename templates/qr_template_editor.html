@@ -1241,6 +1241,21 @@ function updatePropertiesPanel(index) {
             { label: '{DrawICount} - Drawer # of items', value: '{DrawICount}' },
             { label: '{DrawStatus} - Drawer Status', value: '{DrawStatus}' },
             { label: '{DrawGroup} - Drawer Group master', value: '{DrawGroup}' }
+        ],
+        inout: [
+            { label: '{SessionID} - Session ID', value: '{SessionID}' },
+            { label: '{LendBy} - Who is lending (contact)', value: '{LendBy}' },
+            { label: '{LendStDate} - Lend Start Date (YYYYMMDD)', value: '{LendStDate}' },
+            { label: '{LendStTime} - Lend Start Time (HH:mm)', value: '{LendStTime}' },
+            { label: '{LendEndDate} - Lend End Date (YYYYMMDD)', value: '{LendEndDate}' },
+            { label: '{LendEndTime} - Lend End Time (HH:mm)', value: '{LendEndTime}' },
+            { label: '{LendRealSt} - Lending submitted timestamp', value: '{LendRealSt}' },
+            { label: '{LendUser} - Who submitted lending', value: '{LendUser}' },
+            { label: '{ReturnDate} - Return Date (YYYYMMDD)', value: '{ReturnDate}' },
+            { label: '{ReturnTime} - Return Time (HH:mm)', value: '{ReturnTime}' },
+            { label: '{ReturnStat} - Return Status (Late/On Time)', value: '{ReturnStat}' },
+            { label: '{ReturnReal} - Return submitted timestamp', value: '{ReturnReal}' },
+            { label: '{ReturnUser} - Who submitted return', value: '{ReturnUser}' }
         ]
     };
 
@@ -1257,6 +1272,8 @@ function updatePropertiesPanel(index) {
             placeholderOptions += `<optgroup label="Drawer">${placeholders.drawer.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else if (templateType.includes('rack')) {
             placeholderOptions += `<optgroup label="Racks">${placeholders.rack.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else if (templateType.includes('in-out')) {
+            placeholderOptions += `<optgroup label="In-Out">${placeholders.inout.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else {
             // Default to item template
             placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
@@ -1346,6 +1363,8 @@ function updatePropertiesPanel(index) {
             placeholderOptions += `<optgroup label="Drawer">${placeholders.drawer.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else if (templateType.includes('rack')) {
             placeholderOptions += `<optgroup label="Racks">${placeholders.rack.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else if (templateType.includes('in-out')) {
+            placeholderOptions += `<optgroup label="In-Out">${placeholders.inout.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else {
             // Default to item template
             placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
@@ -1391,6 +1410,8 @@ function updatePropertiesPanel(index) {
             placeholderOptions += `<optgroup label="Drawer">${placeholders.drawer.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else if (templateType.includes('rack')) {
             placeholderOptions += `<optgroup label="Racks">${placeholders.rack.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else if (templateType.includes('in-out')) {
+            placeholderOptions += `<optgroup label="In-Out">${placeholders.inout.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else {
             // Default to item template
             placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;

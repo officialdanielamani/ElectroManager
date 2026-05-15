@@ -186,6 +186,23 @@ def preview_qr_template(template_id):
                     data = get_rack_data(sample_rack)
                 else:
                     data = {ph: f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('Racks', [])}
+            elif template.template_type == 'Drawer':
+                from qr_utils import get_drawer_data
+                sample_rack = Rack.query.first()
+                if sample_rack:
+                    # Use the first drawer of the sample rack
+                    first_drawer = f'R1-C1'
+                    data = get_drawer_data(sample_rack, first_drawer)
+                else:
+                    data = {ph.strip('{}') : f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('Drawer', [])}
+            elif template.template_type == 'In-Out':
+                from models import LendingSession
+                from qr_utils import get_session_data
+                sample_session = LendingSession.query.first()
+                if sample_session:
+                    data = get_session_data(sample_session)
+                else:
+                    data = {ph.strip('{}') : f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('In-Out', [])}
             else:
                 data = {}
         

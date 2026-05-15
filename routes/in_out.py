@@ -902,3 +902,70 @@ def in_out_delete_batch(batch_id):
     log_audit(current_user.id, 'delete', 'batch', batch_id,
               f'Deleted batch "{label}" from {item.name} via /in-out')
     return jsonify({'success': True, 'message': f'Batch "{label}" deleted.'})
+
+
+# ─── In-Out Session QR Sticker Routes ────────────────────────────────────────
+
+@in_out_bp.route('/in-out/session/<string:lending_id>/qr-sticker')
+@login_required
+def session_qr_sticker(lending_id):
+    """Show QR sticker page for a lending/return session."""
+    from models import StickerTemplate
+    session = LendingSession.query.filter_by(lending_id=lending_id).first_or_404()
+    templates = StickerTemplate.query.filter_by(template_type='In-Out').order_by(StickerTemplate.name).all()
+    return render_template('in_out_qr_sticker.html', session=session, templates=templates)
+
+
+@in_out_bp.route('/api/in-out/session/<string:lending_id>/session-qr-svg')
+@login_required
+def api_session_inline_qr(lending_id):
+    """Return a simple QR SVG for the session ID (for inline notification display)."""
+    from flask import Response
+    from qr_utils import generate_session_qr_svg
+    LendingSession.query.filter_by(lending_id=lending_id).first_or_404()
+    svg = generate_session_qr_svg(lending_id, size_px=120)
+    return Response(svg, mimetype='image/svg+xml')
+
+
+@in_out_bp.route('/api/in-out/session/<string:lending_id>/sticker-preview/<int:template_id>')
+@login_required
+def api_session_sticker_preview(lending_id, template_id):
+    """Return JSON with SVG preview for a session sticker."""
+    from flask import send_file
+    from models import StickerTemplate
+    from qr_utils import get_session_data, render_template_to_svg
+    session = LendingSession.query.filter_by(lending_id=lending_id).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'In-Out':
+        return jsonify({'error': 'Template must be In-Out type'}), 400
+    data = get_session_data(session)
+    svg = render_template_to_svg(template, data)
+    return jsonify({
+        'svg': svg,
+        'width_mm': template.width_mm,
+        'height_mm': template.height_mm,
+        'template_name': template.name,
+    })
+
+
+@in_out_bp.route('/api/in-out/session/<string:lending_id>/sticker-print/<int:template_id>')
+@login_required
+def api_session_sticker_print(lending_id, template_id):
+    """Generate and return a PDF sticker for a session."""
+    from flask import send_file
+    from models import StickerTemplate
+    from qr_utils import get_session_data, generate_single_sticker_pdf
+    session = LendingSession.query.filter_by(lending_id=lending_id).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'In-Out':
+        return jsonify({'error': 'Template must be In-Out type'}), 400
+    data = get_session_data(session)
+    output = generate_single_sticker_pdf(template, data, lending_id)
+    log_audit(current_user.id, 'print', 'lending_session', session.id,
+              f'Printed In-Out sticker: {template.name} session {lending_id}')
+    return send_file(
+        output,
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f'{template.name}_{lending_id}.pdf'
+    )
