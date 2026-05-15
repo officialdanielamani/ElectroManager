@@ -361,6 +361,7 @@
 </style>
 
 <script>
+const rackUuid = '{{ rack.uuid }}';
 const selectedDrawers = new Set();
 
 function highlightDrawer(drawerId) {
@@ -413,8 +414,14 @@ function clearDrawerSelection() {
 }
 
 function printQRDrawer() {
-    // Placeholder — will be wired up when QR Drawer print is implemented
-    alert('Print QR Drawer: ' + (selectedDrawers.size > 0 ? [...selectedDrawers].join(', ') : '(none selected)'));
+    if (selectedDrawers.size === 0) {
+        alert('Please select a drawer first.');
+    } else if (selectedDrawers.size === 1) {
+        const drawerId = [...selectedDrawers][0];
+        window.location.href = `/rack/${rackUuid}/drawer/${drawerId}/qr-sticker`;
+    } else {
+        alert('Please select only one drawer at a time for QR printing.');
+    }
 }
 
 function showImageModal(imageSrc, rackName) {

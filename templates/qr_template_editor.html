@@ -1226,6 +1226,21 @@ function updatePropertiesPanel(index) {
             { label: '{RackCap} - Total slots', value: '{RackCap}' },
             { label: '{RackICount} - # of items', value: '{RackICount}' },
             { label: '{RackSize} - Size (e.g. 10X05)', value: '{RackSize}' }
+        ],
+        drawer: [
+            { label: '{RackUUID} - Rack UUID', value: '{RackUUID}' },
+            { label: '{RackName} - Rack name', value: '{RackName}' },
+            { label: '{RackInfo} - Rack Short Info', value: '{RackInfo}' },
+            { label: '{RackLoc} - Rack General Location', value: '{RackLoc}' },
+            { label: '{RackCap} - Rack Total slots', value: '{RackCap}' },
+            { label: '{RackICount} - Rack # of items', value: '{RackICount}' },
+            { label: '{RackSize} - Rack Size (e.g. 10X05)', value: '{RackSize}' },
+            { label: '{DrawInfo} - Drawer Short Info', value: '{DrawInfo}' },
+            { label: '{DrawLoc} - Drawer ID (e.g. R2-C3)', value: '{DrawLoc}' },
+            { label: '{DrawSize} - Drawer Size (e.g. 02X01)', value: '{DrawSize}' },
+            { label: '{DrawICount} - Drawer # of items', value: '{DrawICount}' },
+            { label: '{DrawStatus} - Drawer Status', value: '{DrawStatus}' },
+            { label: '{DrawGroup} - Drawer Group master', value: '{DrawGroup}' }
         ]
     };
 
@@ -1238,6 +1253,8 @@ function updatePropertiesPanel(index) {
         console.log(`%c[TEXT FILTER] templateType="${templateType}"`, 'color: #00ff00');
         if (templateType.includes('location')) {
             placeholderOptions += `<optgroup label="Locations">${placeholders.location.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else if (templateType.includes('drawer')) {
+            placeholderOptions += `<optgroup label="Drawer">${placeholders.drawer.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else if (templateType.includes('rack')) {
             placeholderOptions += `<optgroup label="Racks">${placeholders.rack.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else {
@@ -1325,6 +1342,8 @@ function updatePropertiesPanel(index) {
         console.log(`%c[QR FILTER] templateType="${templateType}"`, 'color: #00ff00');
         if (templateType.includes('location')) {
             placeholderOptions += `<optgroup label="Locations">${placeholders.location.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else if (templateType.includes('drawer')) {
+            placeholderOptions += `<optgroup label="Drawer">${placeholders.drawer.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else if (templateType.includes('rack')) {
             placeholderOptions += `<optgroup label="Racks">${placeholders.rack.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else {
@@ -1368,6 +1387,8 @@ function updatePropertiesPanel(index) {
         console.log(`%c[BARCODE FILTER] templateType="${templateType}"`, 'color: #00ff00');
         if (templateType.includes('location')) {
             placeholderOptions += `<optgroup label="Locations">${placeholders.location.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else if (templateType.includes('drawer')) {
+            placeholderOptions += `<optgroup label="Drawer">${placeholders.drawer.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else if (templateType.includes('rack')) {
             placeholderOptions += `<optgroup label="Racks">${placeholders.rack.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else {

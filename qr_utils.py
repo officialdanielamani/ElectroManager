@@ -20,6 +20,12 @@ AVAILABLE_PLACEHOLDERS = {
     'Racks': [
         '{RackUUID}', '{RackName}', '{RackInfo}', '{RackLoc}',
         '{RackCap}', '{RackICount}', '{RackSize}'
+    ],
+    'Drawer': [
+        '{RackUUID}', '{RackName}', '{RackInfo}', '{RackLoc}',
+        '{RackCap}', '{RackICount}', '{RackSize}',
+        '{DrawInfo}', '{DrawLoc}', '{DrawSize}', '{DrawICount}',
+        '{DrawStatus}', '{DrawGroup}'
     ]
 }
 
@@ -105,6 +111,50 @@ def get_rack_data(rack):
         'RackCap':    str(rack.rows * rack.cols),
         'RackICount': str(item_count),
         'RackSize':   rack_size,
+    }
+
+def get_drawer_data(rack, drawer_id):
+    """Extract printable data for a specific drawer in a rack."""
+    from models import Item
+    import re
+
+    rack_data = get_rack_data(rack)
+
+    # Drawer short info
+    draw_info = rack.get_drawer_short_info(drawer_id)
+
+    # Drawer item count — items stored in this exact drawer
+    draw_item_count = Item.query.filter_by(rack_id=rack.id, drawer=drawer_id).count()
+
+    # Drawer status
+    if rack.is_drawer_unavailable(drawer_id):
+        draw_status = 'Unavailable'
+    elif draw_item_count > 0:
+        draw_status = 'Available'
+    else:
+        draw_status = 'Empty'
+
+    # Drawer size — 01X01 for single cell; rowspan×colspan for merged rectangular cells
+    skip_cells, cell_spans, group_cells = rack.compute_merge_layout()
+    master_id = rack.get_master_cell(drawer_id)
+    span = cell_spans.get(master_id)
+    if span:
+        draw_size = f"{span['rowspan']:02d}X{span['colspan']:02d}"
+    else:
+        draw_size = '01X01'
+
+    # Group drawer master (for non-rectangular groups)
+    grp = group_cells.get(drawer_id)
+    draw_group = grp['master'] if grp else ''
+
+    return {
+        **rack_data,
+        'DrawInfo':   draw_info,
+        'DrawLoc':    drawer_id,
+        'DrawSize':   draw_size,
+        'DrawICount': str(draw_item_count),
+        'DrawStatus': draw_status,
+        'DrawGroup':  draw_group,
     }
 
 def replace_placeholders(text, data_dict):

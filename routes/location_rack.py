@@ -903,3 +903,54 @@ def api_rack_sticker_print(uuid, template_id):
         download_name=f'{template.name}_{rack.uuid}.pdf'
     )
 
+
+@location_rack_bp.route('/rack/<string:uuid>/drawer/<string:drawer_id>/qr-sticker', endpoint='drawer_qr_sticker')
+@login_required
+def drawer_qr_sticker(uuid, drawer_id):
+    """Display QR sticker generation page for a specific rack drawer"""
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
+    templates = StickerTemplate.query.filter_by(template_type='Drawer').all()
+    return render_template('drawer_qr_sticker.html',
+                           rack=rack,
+                           drawer_id=drawer_id,
+                           templates=templates)
+
+
+@location_rack_bp.route('/api/rack/<string:uuid>/drawer/<string:drawer_id>/sticker-preview/<int:template_id>')
+@login_required
+def api_drawer_sticker_preview(uuid, drawer_id, template_id):
+    """Generate sticker preview SVG for a rack drawer"""
+    from qr_utils import get_drawer_data, render_template_to_svg
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'Drawer':
+        return jsonify({'error': 'Template must be Drawer type'}), 400
+    data = get_drawer_data(rack, drawer_id)
+    svg_data = render_template_to_svg(template, data)
+    return jsonify({
+        'svg': svg_data,
+        'width_mm': template.width_mm,
+        'height_mm': template.height_mm,
+        'template_name': template.name
+    })
+
+
+@location_rack_bp.route('/api/rack/<string:uuid>/drawer/<string:drawer_id>/sticker-print/<int:template_id>')
+@login_required
+def api_drawer_sticker_print(uuid, drawer_id, template_id):
+    """Generate PDF sticker for a rack drawer"""
+    from qr_utils import get_drawer_data, generate_single_sticker_pdf
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'Drawer':
+        return jsonify({'error': 'Template must be Drawer type'}), 400
+    data = get_drawer_data(rack, drawer_id)
+    output = generate_single_sticker_pdf(template, data, f"{rack.uuid}_{drawer_id}")
+    log_audit(current_user.id, 'print', 'rack', rack.id,
+              f'Printed drawer sticker: {template.name} drawer {drawer_id}')
+    return send_file(
+        output,
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f'{template.name}_{rack.uuid}_{drawer_id}.pdf'
+    )
