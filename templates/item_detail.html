@@ -327,13 +327,13 @@
                                     </table>
                                 </div>
                                 {% endif %}
-                                {% if not batch.sn_tracking_enabled and batch.lend_records %}
+                                {% if not batch.sn_tracking_enabled and batch.get_lend_quantity() > 0 %}
                                 <div class="mb-2">
                                     <strong>Lending <small class="text-muted">({{ batch.get_lend_quantity() }} total)</small></strong>
                                     <table class="table table-sm table-bordered mt-1 mb-0 small">
                                         <thead><tr><th>Lend To</th><th class="text-center">Qty</th><th>Start</th><th>Due Date</th><th class="text-center">Notify</th></tr></thead>
                                         <tbody>
-                                        {% for rec in batch.lend_records %}
+                                        {% for rec in batch.lend_records if rec.returned_at is none %}
                                         <tr>
                                             <td>{{ rec.get_lend_to_display() or '—' }}</td>
                                             <td class="text-center">{{ rec.quantity }}</td>
@@ -392,18 +392,18 @@
                                                     {% else %}-{% endif %}
                                                 </td>
                                                 <td>
-                                                    {% if not sn.is_deleted %}
+                                                    {% if not sn.is_deleted and sn.lend_to_id and sn.returned_at is none %}
                                                         {% if sn_project_used %}<span class="text-muted" style="opacity:0.5">{{ sn.get_lend_to_display() or '-' }}</span>
                                                         {% else %}{{ sn.get_lend_to_display() or '-' }}{% endif %}
                                                     {% else %}-{% endif %}
                                                 </td>
-                                                <td class="small">{% if not sn.is_deleted and sn.lend_start %}{{ sn.lend_start.strftime('%d/%m/%Y') }}{% if sn.lend_start.hour or sn.lend_start.minute %} {{ sn.lend_start.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
-                                                <td class="small">{% if not sn.is_deleted and sn.lend_end %}{{ sn.lend_end.strftime('%d/%m/%Y') }}{% if sn.lend_end.hour or sn.lend_end.minute %} {{ sn.lend_end.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
+                                                <td class="small">{% if not sn.is_deleted and sn.lend_to_id and sn.returned_at is none and sn.lend_start %}{{ sn.lend_start.strftime('%d/%m/%Y') }}{% if sn.lend_start.hour or sn.lend_start.minute %} {{ sn.lend_start.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
+                                                <td class="small">{% if not sn.is_deleted and sn.lend_to_id and sn.returned_at is none and sn.lend_end %}{{ sn.lend_end.strftime('%d/%m/%Y') }}{% if sn.lend_end.hour or sn.lend_end.minute %} {{ sn.lend_end.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
                                                 <td>
                                                     {% if sn.is_deleted %}
                                                     <span class="badge bg-danger" title="Removed by {{ sn.deleted_by.username if sn.deleted_by else 'unknown' }} on {{ sn.deleted_at.strftime('%Y-%m-%d %H:%M') if sn.deleted_at else '?' }}{% if sn.deleted_reason %} — {{ sn.deleted_reason }}{% endif %}">Removed</span>
                                                     {% if sn.deleted_reason %}<div class="text-muted" style="font-size:0.72rem">{{ sn.deleted_reason[:40] }}{% if sn.deleted_reason|length > 40 %}…{% endif %}</div>{% endif %}
-                                                    {% elif sn.lend_to_id %}
+                                                    {% elif sn.lend_to_id and sn.returned_at is none %}
                                                     <span class="badge bg-warning text-dark">Lending</span>
                                                     {% else %}
                                                     <span class="badge bg-success">Active</span>
