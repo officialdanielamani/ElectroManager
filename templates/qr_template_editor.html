@@ -2238,6 +2238,12 @@ document.getElementById('btn-add-picture').addEventListener('click', () => {
     }, 50);
 });
 
+let autoSaveTimer = null;
+function debounceAutoSave() {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(() => saveTemplate(), 2000);
+}
+
 async function saveTemplate() {
     try {
         const response = await fetch(`/api/qr-template/${templateId}`, {
@@ -2349,7 +2355,6 @@ document.querySelectorAll('.panel-toggle').forEach(toggle => {
 // User can click "Fit" button if they want to recalculate after resizing
 // This prevents unwanted recalculations from font loading or layout shifts
 
-loadTemplate();
 function renderGrid() {
     const canvas = document.getElementById('canvas');
     const gridCanvas = document.getElementById('grid-canvas');
