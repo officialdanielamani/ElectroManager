@@ -488,7 +488,7 @@ def in_out_submit_cart():
         lend_end   = _parse_dt(detail.get('lend_end', ''))
         lend_notify = bool(detail.get('lend_notify', False))
         try:
-            lend_notify_days = int(detail.get('lend_days', 3))
+            lend_notify_days = max(1, min(int(detail.get('lend_days', 3)), 365))
         except (ValueError, TypeError):
             lend_notify_days = 3
 
@@ -697,7 +697,7 @@ def in_out_lend():
         lend_note  = (data.get('lend_note', '') or '').strip()[:128] or None
         notify     = bool(data.get('lend_notify', False))
         try:
-            days = int(data.get('lend_days', 3))
+            days = max(1, min(int(data.get('lend_days', 3)), 365))
         except (ValueError, TypeError):
             days = 3
         updated = 0

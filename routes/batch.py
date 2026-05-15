@@ -52,7 +52,7 @@ def _save_lend_records(batch, records_data, max_qty):
         except (ValueError, TypeError):
             qty = 1
         try:
-            days = int(r.get('days', 3))
+            days = max(1, min(int(r.get('days', 3)), 365))
         except (ValueError, TypeError):
             days = 3
         note = (r.get('lend_note', '') or '').strip()[:128] or None
@@ -613,7 +613,7 @@ def update_serial_lend(uuid, batch_id):
         sn.lend_end = _parse_datetime(lend_end_str)
         sn.lend_notify_enabled = request.form.get(f'lend_notify_{sn.id}', '0') == '1'
         try:
-            sn.lend_notify_before_days = int(request.form.get(f'lend_notify_days_{sn.id}', 3))
+            sn.lend_notify_before_days = max(1, min(int(request.form.get(f'lend_notify_days_{sn.id}', 3)), 365))
         except (ValueError, TypeError):
             sn.lend_notify_before_days = 3
         if sn.lend_to_id:
@@ -668,7 +668,7 @@ def inline_update_sn(uuid):
         sn.lend_end = _parse_datetime(data.get('lend_end', ''))
         sn.lend_notify_enabled = bool(data.get('lend_notify_enabled', False))
         try:
-            sn.lend_notify_before_days = int(data.get('lend_notify_before_days', 3))
+            sn.lend_notify_before_days = max(1, min(int(data.get('lend_notify_before_days', 3)), 365))
         except (ValueError, TypeError):
             sn.lend_notify_before_days = 3
         sn.lend_note = (data.get('lend_note', '') or '').strip()[:128] or None
@@ -739,7 +739,7 @@ def bulk_update_sn(uuid):
                 sn.lend_end = _parse_datetime(lend_data.get('end', ''))
                 sn.lend_notify_enabled = bool(lend_data.get('notify', False))
                 try:
-                    sn.lend_notify_before_days = int(lend_data.get('days', 3))
+                    sn.lend_notify_before_days = max(1, min(int(lend_data.get('days', 3)), 365))
                 except (ValueError, TypeError):
                     sn.lend_notify_before_days = 3
                 sn.lend_note = (lend_data.get('lend_note', '') or '').strip()[:128] or None
@@ -933,7 +933,7 @@ def save_sn_pending(uuid, batch_id):
                 sn.lend_note = (lc.get('lend_note', '') or '').strip()[:128] or None
                 sn.lend_notify_enabled = bool(lc.get('lend_notify', False))
                 try:
-                    sn.lend_notify_before_days = int(lc.get('lend_days', 3))
+                    sn.lend_notify_before_days = max(1, min(int(lc.get('lend_days', 3)), 365))
                 except (ValueError, TypeError):
                     sn.lend_notify_before_days = 3
             else:

@@ -312,7 +312,7 @@ def project_edit(project_id):
         project.updated_by = current_user.id
 
         project.enable_dateline_notification = 'enable_dateline_notification' in request.form
-        project.notify_before_days = request.form.get('notify_before_days', 3, type=int)
+        project.notify_before_days = max(1, min(request.form.get('notify_before_days', 3, type=int), 365))
 
         selected_tags = request.form.getlist('tags')
         project.tags = json.dumps([int(t) for t in selected_tags]) if selected_tags else None

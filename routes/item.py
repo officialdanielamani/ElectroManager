@@ -475,7 +475,7 @@ def _apply_pending_sn_changes(item, perms):
                     sn_obj.lend_note  = (lc.get('lend_note', '') or '').strip()[:128] or None
                     sn_obj.lend_notify_enabled    = bool(lc.get('lend_notify', False))
                     try:
-                        sn_obj.lend_notify_before_days = int(lc.get('lend_days', 3))
+                        sn_obj.lend_notify_before_days = max(1, min(int(lc.get('lend_days', 3)), 365))
                     except (ValueError, TypeError):
                         sn_obj.lend_notify_before_days = 3
                 else:

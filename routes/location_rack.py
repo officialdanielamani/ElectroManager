@@ -14,9 +14,21 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
 import os
 import json
+import re
 import secrets
 import string
 import logging
+
+_COLOR_RE = re.compile(r'^#[0-9A-Fa-f]{6}$')
+
+def _sanitize_color(value, default='#6c757d'):
+    """Return value if valid hex color, else default."""
+    v = (value or '').strip()
+    return v if _COLOR_RE.match(v) else default
+
+def _sanitize_name(value, max_len=128):
+    """Strip and truncate a name field."""
+    return (value or '').strip()[:max_len]
 
 logger = logging.getLogger(__name__)
 
@@ -306,13 +318,16 @@ def rack_management():
 def rack_new():
     """Create new rack with form"""
     if request.method == 'POST':
-        name = request.form.get('name')
-        
+        name = _sanitize_name(request.form.get('name', ''))
+        if not name:
+            flash('Rack name is required.', 'danger')
+            return redirect(url_for('location_rack.rack_new'))
+
         # Allow duplicate names - UUID ensures uniqueness
         short_info = request.form.get('short_info', '')[:128] or None
         description = request.form.get('description')
         location_id = request.form.get('location_id')
-        color = request.form.get('color', '#6c757d')
+        color = _sanitize_color(request.form.get('color', ''))
         rows = int(request.form.get('rows', 5))
         cols = int(request.form.get('cols', 5))
 
@@ -399,13 +414,16 @@ def rack_edit(uuid):
     rack = Rack.query.filter_by(uuid=uuid).first_or_404()
     
     if request.method == 'POST':
-        new_name = request.form.get('name')
-        
+        new_name = _sanitize_name(request.form.get('name', ''))
+        if not new_name:
+            flash('Rack name is required.', 'danger')
+            return redirect(url_for('location_rack.rack_edit', uuid=uuid))
+
         # Allow duplicate names - UUID ensures uniqueness
         rack.name = new_name
         rack.short_info = request.form.get('short_info', '')[:128] or None
         rack.description = request.form.get('description')
-        rack.color = request.form.get('color', '#6c757d')
+        rack.color = _sanitize_color(request.form.get('color', ''))
         location_id = request.form.get('location_id')
         rack.location_id = int(location_id) if location_id and location_id != '0' else None
         
@@ -607,10 +625,10 @@ def api_add_location():
     """API endpoint to add location from item form"""
     try:
         data = request.get_json()
-        name = data.get('name', '').strip()
-        info = data.get('info', '').strip()
+        name = data.get('name', '').strip()[:100]
+        info = data.get('info', '').strip()[:128]
         description = data.get('description', '').strip()
-        color = data.get('color', '#6c757d')
+        color = _sanitize_color(data.get('color', ''))
         
         if not name:
             return jsonify({'success': False, 'error': 'Location name is required'})
@@ -638,7 +656,10 @@ def api_add_location():
 @permission_required("settings_sections.location_management", "edit")
 def add_rack():
     """Add a new rack"""
-    name = request.form.get('name')
+    name = _sanitize_name(request.form.get('name', ''))
+    if not name:
+        flash('Rack name is required.', 'danger')
+        return redirect(url_for('location_rack.rack_management'))
     short_info = request.form.get('short_info', '')[:128] or None
     description = request.form.get('description')
     location = request.form.get('location')
@@ -673,7 +694,8 @@ def edit_rack():
         flash('Rack not found', 'danger')
         return redirect(url_for('location_rack.rack_management'))
     
-    rack.name = request.form.get('name', rack.name)
+    new_inline_name = _sanitize_name(request.form.get('name', ''))
+    rack.name = new_inline_name if new_inline_name else rack.name
     rack.short_info = request.form.get('short_info', '')[:128] or None
     rack.description = request.form.get('description', rack.description)
     rack.location_id = request.form.get('location') or None

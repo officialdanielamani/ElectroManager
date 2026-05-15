@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed, FileRequired
 from wtforms import StringField, PasswordField, TextAreaField, IntegerField, FloatField, SelectField, SubmitField, BooleanField, MultipleFileField, HiddenField, DateField
-from wtforms.validators import DataRequired, Email, EqualTo, Length, Optional, ValidationError, NumberRange
+from wtforms.validators import DataRequired, Email, EqualTo, Length, Optional, ValidationError, NumberRange, Regexp
 from models import User, Category
 
 
@@ -9,7 +9,7 @@ class LocationForm(FlaskForm):
     name = StringField('Location Name', validators=[DataRequired(), Length(max=100)])
     info = StringField('Short Info', validators=[Optional(), Length(max=128)])
     description = TextAreaField('Description', validators=[Optional()])
-    color = StringField('Color', validators=[Optional(), Length(max=7)], default='#6c757d')
+    color = StringField('Color', validators=[Optional(), Regexp(r'^#[0-9A-Fa-f]{6}$', message='Must be a valid hex color (e.g. #1a2b3c)')], default='#6c757d')
     picture = FileField('Picture', validators=[Optional(), FileAllowed(['png', 'jpg', 'jpeg'], 'PNG and JPEG only!')])
     submit = SubmitField('Save Location')
 
@@ -91,7 +91,7 @@ class UserForm(FlaskForm):
 class CategoryForm(FlaskForm):
     name = StringField('Category Name', validators=[DataRequired(), Length(max=100)])
     description = TextAreaField('Description', validators=[Optional()])
-    color = StringField('Color', validators=[Optional(), Length(max=7)], render_kw={"type": "color", "value": "#6c757d"}, default='#6c757d')
+    color = StringField('Color', validators=[Optional(), Regexp(r'^#[0-9A-Fa-f]{6}$', message='Must be a valid hex color (e.g. #1a2b3c)')], render_kw={"type": "color", "value": "#6c757d"}, default='#6c757d')
     submit = SubmitField('Save Category')
 
 
@@ -317,12 +317,12 @@ class ItemParameterForm(FlaskForm):
 class TagForm(FlaskForm):
     name = StringField('Tag Name', validators=[DataRequired(), Length(max=100)])
     description = TextAreaField('Description', validators=[Optional()])
-    color = StringField('Color', validators=[Optional(), Length(max=7)], render_kw={"type": "color", "value": "#6c757d"}, default='#6c757d')
+    color = StringField('Color', validators=[Optional(), Regexp(r'^#[0-9A-Fa-f]{6}$', message='Must be a valid hex color (e.g. #1a2b3c)')], render_kw={"type": "color", "value": "#6c757d"}, default='#6c757d')
     submit = SubmitField('Save Tag')
 
 
 class FootprintForm(FlaskForm):
     name = StringField('Footprint Name', validators=[DataRequired(), Length(max=100)])
     description = TextAreaField('Description', validators=[Optional()])
-    color = StringField('Color', validators=[Optional(), Length(max=7)], render_kw={"type": "color", "value": "#6c757d"}, default='#6c757d')
+    color = StringField('Color', validators=[Optional(), Regexp(r'^#[0-9A-Fa-f]{6}$', message='Must be a valid hex color (e.g. #1a2b3c)')], render_kw={"type": "color", "value": "#6c757d"}, default='#6c757d')
     submit = SubmitField('Save Footprint')

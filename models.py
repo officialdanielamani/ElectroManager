@@ -229,7 +229,7 @@ class Rack(db.Model):
     __tablename__ = 'racks'
     id = db.Column(db.Integer, primary_key=True)
     uuid = db.Column(db.String(12), unique=True, nullable=False)
-    name = db.Column(db.String(100), nullable=False)
+    name = db.Column(db.String(128), nullable=False)
     short_info = db.Column(db.String(128))
     description = db.Column(db.Text)
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)

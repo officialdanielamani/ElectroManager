@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
 import os
 import json
+import re
 import secrets
 import string
 import logging
@@ -212,7 +213,14 @@ def magic_parameter_edit(id):
         parameter.string_select_min = string_select_min
         parameter.string_select_max = string_select_max
         parameter.string_allow_custom = 'string_allow_custom' in request.form
-        parameter.string_regex = request.form.get('string_regex', '').strip() or None
+        regex_val = request.form.get('string_regex', '').strip()
+        if regex_val:
+            try:
+                re.compile(regex_val)
+            except re.error as e:
+                flash(f'Invalid regex pattern: {e}', 'danger')
+                return redirect(url_for('magic_parameter.magic_parameter_manage', id=parameter.id))
+        parameter.string_regex = regex_val or None
         parameter.string_regex_info = request.form.get('string_regex_info', '').strip() or None
 
     # Update number validation fields if type is number
