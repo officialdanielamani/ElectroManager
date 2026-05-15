@@ -271,6 +271,7 @@ def _apply_column_migrations():
         ("batch_serial_numbers", "returned_at",          "DATETIME"),
         ("batch_serial_numbers", "returned_from_label",  "VARCHAR(128)"),
         ("users",                "allow_change_name",    "BOOLEAN DEFAULT 1"),
+        ("item_batches",         "lend_disabled",        "BOOLEAN DEFAULT 0"),
     ]
     with db.engine.connect() as conn:
         for table, col, col_type in additions:
