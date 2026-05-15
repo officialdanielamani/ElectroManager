@@ -91,57 +91,24 @@
 </div>
 
 <script>
-// Strip bootstrap-icons @font-face from SVG style blocks before inline display.
-// The page already loads bootstrap-icons.css which defines the font; re-embedding
-// a data-URI version triggers a new load cycle (font-display:block → blank text).
-// Custom project fonts are kept so they get hoisted to document.head.
-function prepSvgForInline(svgString) {
-    return svgString.replace(/<style([^>]*)>([\s\S]*?)<\/style>/gi, function(m, attrs, css) {
-        const cleaned = css.replace(/@font-face\s*\{[^{}]*font-family\s*:\s*["']?bootstrap-icons["']?[^{}]*\}/gi, '');
-        return `<style${attrs}>${cleaned}</style>`;
-    });
-}
-
-// Extract remaining @font-face rules (project fonts) and inject into document.head
-// so browsers apply them to inline SVG (browsers ignore @font-face inside SVG defs)
-function injectSvgFontFaces(svgString) {
-    const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-    let fontCss = '';
-    let match;
-    while ((match = styleRegex.exec(svgString)) !== null) {
-        if (match[1].includes('@font-face')) fontCss += match[1];
-    }
-    if (!fontCss.trim()) return;
-    const id = 'svg-injected-font-faces';
-    let el = document.getElementById(id);
-    if (!el) { el = document.createElement('style'); el.id = id; document.head.appendChild(el); }
-    el.textContent += fontCss;
+// Display SVG via blob URL — the SVG is self-contained with embedded fonts,
+// so it renders correctly as a standalone image without font injection tricks.
+const _previewBlobUrls = {};
+function showSvgAsImage(svgString, container) {
+    if (_previewBlobUrls[container.id]) URL.revokeObjectURL(_previewBlobUrls[container.id]);
+    const blob = new Blob([svgString], {type: 'image/svg+xml'});
+    _previewBlobUrls[container.id] = URL.createObjectURL(blob);
+    container.innerHTML = `<img src="${_previewBlobUrls[container.id]}" style="width:100%;height:100%;object-fit:contain;display:block;">`;
 }
 
 // Render template previews by calling API - show unresolved placeholders like canvas
 document.querySelectorAll('.template-preview').forEach(previewDiv => {
     const templateId = previewDiv.id.replace('preview-', '');
 
-    // Call API to generate preview SVG with unresolved placeholder text
     fetch(`/api/qr-template/${templateId}/preview?unresolved=true`)
         .then(r => r.json())
-        .then(data => {
-            const svgForDisplay = prepSvgForInline(data.svg);
-            // Hoist project @font-face into <head> so browsers apply it to inline SVG
-            injectSvgFontFaces(svgForDisplay);
-            // Replace content with API response
-            previewDiv.innerHTML = svgForDisplay;
-            // Apply sizing to the inserted SVG
-            const insertedSvg = previewDiv.querySelector('svg');
-            if (insertedSvg) {
-                insertedSvg.style.width = '100%';
-                insertedSvg.style.height = '100%';
-                insertedSvg.style.objectFit = 'contain';
-            }
-        })
-        .catch(e => {
-            console.warn('Preview failed:', e);
-        });
+        .then(data => showSvgAsImage(data.svg, previewDiv))
+        .catch(e => console.warn('Preview failed:', e));
 });
 </script>
 {% endblock %}
