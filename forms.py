@@ -7,7 +7,7 @@ from models import User, Category
 
 class LocationForm(FlaskForm):
     name = StringField('Location Name', validators=[DataRequired(), Length(max=128)])
-    info = StringField('Short Info', validators=[Optional(), Length(max=512)])
+    info = StringField('Short Info', validators=[Optional(), Length(max=128)])
     description = TextAreaField('Description', validators=[Optional(), Length(max=512)])
     color = StringField('Color', validators=[Optional(), Regexp(r'^#[0-9A-Fa-f]{6}$', message='Must be a valid hex color (e.g. #1a2b3c)')], default='#6c757d')
     picture = FileField('Picture', validators=[Optional(), FileAllowed(['png', 'jpg', 'jpeg'], 'PNG and JPEG only!')])
@@ -100,22 +100,22 @@ class ItemAddForm(FlaskForm):
     name = StringField('Item Name', validators=[DataRequired(), Length(max=200)], render_kw={"class": "form-control form-control-sm"})
     sku = StringField('SKU', validators=[Optional(), Length(max=100)], render_kw={"class": "form-control form-control-sm"})
     short_info = StringField('Short Info', validators=[Optional(), Length(max=128)], render_kw={"class": "form-control form-control-sm"})
-    info = StringField('Type / Model', validators=[Optional(), Length(max=500)], render_kw={"class": "form-control form-control-sm"})
+    info = StringField('Type / Model', validators=[Optional(), Length(max=128)], render_kw={"class": "form-control form-control-sm"})
     description = TextAreaField('Description', validators=[Optional()], render_kw={"class": "form-control form-control-sm", "rows": "4"})
     quantity = IntegerField('Quantity', validators=[NumberRange(min=0)], default=0, render_kw={"class": "form-control form-control-sm"})
     price = FloatField('Price per Qty', validators=[Optional(), NumberRange(min=0)], render_kw={"class": "form-control form-control-sm", "placeholder": "0.00"})
-    
+
     location_id = SelectField('General Location', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
     rack_id = SelectField('Rack', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
     drawer = StringField('Drawer', validators=[Optional(), Length(max=50)], render_kw={"class": "form-control form-control-sm"})
-    
+
     min_quantity = IntegerField('Minimum Quantity', validators=[Optional(), NumberRange(min=0)], default=0, render_kw={"class": "form-control form-control-sm"})
     category_id = SelectField('Category', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
     footprint_id = SelectField('Footprint', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
-    
+
     no_stock_warning = BooleanField('No Stock Warning', default=True)
     datasheet_urls = TextAreaField('Datasheet URLs', validators=[Optional()], render_kw={"class": "form-control form-control-sm"})
-    
+
     submit = SubmitField('Create Item')
     
     def __init__(self, *args, perms=None, **kwargs):
@@ -176,22 +176,22 @@ class ItemEditForm(FlaskForm):
     name = StringField('Item Name', validators=[DataRequired(), Length(max=200)], render_kw={"class": "form-control form-control-sm"})
     sku = StringField('SKU', validators=[Optional(), Length(max=100)], render_kw={"class": "form-control form-control-sm"})
     short_info = StringField('Short Info', validators=[Optional(), Length(max=128)], render_kw={"class": "form-control form-control-sm"})
-    info = StringField('Type / Model', validators=[Optional(), Length(max=500)], render_kw={"class": "form-control form-control-sm"})
+    info = StringField('Type / Model', validators=[Optional(), Length(max=128)], render_kw={"class": "form-control form-control-sm"})
     description = TextAreaField('Description', validators=[Optional()], render_kw={"class": "form-control form-control-sm", "rows": "4"})
     quantity = IntegerField('Quantity', validators=[NumberRange(min=0)], default=0, render_kw={"class": "form-control form-control-sm"})
     price = FloatField('Price per Qty', validators=[Optional(), NumberRange(min=0)], render_kw={"class": "form-control form-control-sm", "placeholder": "0.00"})
-    
+
     location_id = SelectField('General Location', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
     rack_id = SelectField('Rack', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
     drawer = StringField('Drawer', validators=[Optional(), Length(max=50)], render_kw={"class": "form-control form-control-sm"})
-    
+
     min_quantity = IntegerField('Minimum Quantity', validators=[Optional(), NumberRange(min=0)], default=0, render_kw={"class": "form-control form-control-sm"})
     category_id = SelectField('Category', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
     footprint_id = SelectField('Footprint', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
-    
+
     no_stock_warning = BooleanField('No Stock Warning', default=True)
     datasheet_urls = TextAreaField('Datasheet URLs', validators=[Optional()], render_kw={"class": "form-control form-control-sm"})
-    
+
     submit = SubmitField('Update Item')
     
     def __init__(self, *args, perms=None, **kwargs):

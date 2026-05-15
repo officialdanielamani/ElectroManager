@@ -626,7 +626,7 @@ def api_add_location():
     try:
         data = request.get_json()
         name = data.get('name', '').strip()[:128]
-        info = data.get('info', '').strip()[:512]
+        info = data.get('info', '').strip()[:128]
         description = data.get('description', '').strip()[:512]
         color = _sanitize_color(data.get('color', ''))
         

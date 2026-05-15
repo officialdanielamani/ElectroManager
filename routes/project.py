@@ -190,7 +190,7 @@ def project_new():
 
         project = Project(
             name=name,
-            info=request.form.get('info', '').strip()[:512],
+            info=request.form.get('info', '').strip()[:128],
             category_id=request.form.get('category_id', type=int) or None,
             status_id=request.form.get('status_id', type=int) or None,
             quantity=request.form.get('quantity', 1, type=int),
@@ -304,7 +304,7 @@ def project_edit(project_id):
             return redirect(url_for('project.project_edit', project_id=project_id))
 
         project.name = name
-        project.info = request.form.get('info', '').strip()[:512]
+        project.info = request.form.get('info', '').strip()[:128]
         project.description = request.form.get('description', '').strip()
         project.category_id = request.form.get('category_id', type=int) or None
         project.status_id = request.form.get('status_id', type=int) or None

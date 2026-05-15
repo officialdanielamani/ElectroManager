@@ -115,7 +115,7 @@ def contact_org_add():
         url=_u[:512] or None,
         address=_a[:256] or None,
         zip_code=_z[:16] or None,
-        info=_i[:512] or None
+        info=_i[:128] or None
     )
     db.session.add(org)
     db.session.commit()
@@ -143,7 +143,7 @@ def contact_org_edit(id):
     org.zip_code = (request.form.get('zip_code', '').strip() or None)
     if org.zip_code: org.zip_code = org.zip_code[:16]
     org.info = (request.form.get('info', '').strip() or None)
-    if org.info: org.info = org.info[:512]
+    if org.info: org.info = org.info[:128]
     db.session.commit()
     log_audit(current_user.id, 'update', 'contact_org', org.id, f'Updated organization: {org.name}')
     flash('Organization updated.', 'success')
