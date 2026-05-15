@@ -81,13 +81,13 @@
             </div>
             <div class="card-body">
                 <!-- Header with QR Code and Thumbnail -->
-                <div class="mb-3 d-flex justify-content-start align-items-flex-start gap-4">
+                <div class="mb-3 d-flex justify-content-start align-items-start gap-3 flex-wrap">
                     <div style="flex-shrink:0; background-color:white; padding:8px; border-radius:4px; display:inline-block;">
-                        <img src="{{ url_for('item.item_qr_svg', uuid=item.uuid) }}" alt="QR Code" width="160" height="160" style="border:2px solid #ddd; padding:5px; border-radius:4px; display:block;">
+                        <img src="{{ url_for('item.item_qr_svg', uuid=item.uuid) }}" alt="QR Code" width="140" height="140" style="border:2px solid #ddd; padding:5px; border-radius:4px; display:block; max-width:100%;">
                     </div>
                     {% if item.thumbnail %}
                     <div style="flex-shrink:0; background-color:white; padding:8px; border-radius:4px; display:inline-block;">
-                        <div style="width:160px;height:160px;border:2px solid #ddd;border-radius:4px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#f8f9fa;">
+                        <div style="width:140px;height:140px;border:2px solid #ddd;border-radius:4px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#f8f9fa;">
                             {% if item.thumbnail.startswith('share:') %}
                             <img src="{{ url_for('share.share_serve', category='item', filename=item.thumbnail[6:]) }}"
                                  alt="Thumbnail" style="width:100%;height:100%;object-fit:cover;">
@@ -244,33 +244,33 @@
                     <!-- Batch Cards -->
                     {% for batch in item.batches %}
                     <div class="card batch-card">
-                        <div class="card-header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#batchCollapse{{ batch.id }}">
-                            <div>
+                        <div class="card-header d-flex justify-content-between align-items-start gap-2 flex-wrap" data-bs-toggle="collapse" data-bs-target="#batchCollapse{{ batch.id }}">
+                            <div class="d-flex flex-wrap align-items-center gap-1" style="min-width:0;flex:1;">
                                 <strong><i class="bi bi-box-seam"></i> {{ batch.get_display_label() }}</strong>
-                                <span class="badge bg-primary ms-2">Qty: {{ batch.quantity }}</span>
+                                <span class="badge bg-primary">Qty: {{ batch.quantity }}</span>
                                 {% if batch.sn_tracking_enabled %}
-                                <span class="badge bg-dark ms-1"><i class="bi bi-upc-scan"></i> Tracking</span>
+                                <span class="badge bg-dark"><i class="bi bi-upc-scan"></i> Tracking</span>
                                 {% endif %}
-                                <span class="badge bg-success ms-1">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.price_per_unit) }}/unit</span>
-                                <span class="badge bg-info ms-1">Price: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_price()) }}</span>
-                                <span class="badge bg-secondary ms-1">Value: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_value()) }}</span>
+                                <span class="badge bg-success">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.price_per_unit) }}/unit</span>
+                                <span class="badge bg-info">Price: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_price()) }}</span>
+                                <span class="badge bg-secondary">Value: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_value()) }}</span>
                                 {% if not batch.follow_main_location %}
-                                <span class="badge ms-1" style="background-color: {{ batch.get_effective_location_color() }};"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>
+                                <span class="badge" style="background-color: {{ batch.get_effective_location_color() }};"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>
                                 {% endif %}
                                 {% if batch.get_project_used_quantity() > 0 %}
-                                <span class="badge bg-info ms-1"><i class="bi bi-diagram-3"></i> In Project</span>
+                                <span class="badge bg-info"><i class="bi bi-diagram-3"></i> In Project</span>
                                 {% endif %}
                                 {% if batch.get_lend_quantity() > 0 %}
-                                <span class="badge ms-1" style="background-color:#c9a227; color:#fff;"><i class="bi bi-hand-index-thumb"></i> On Lend</span>
+                                <span class="badge" style="background-color:#c9a227; color:#fff;"><i class="bi bi-hand-index-thumb"></i> On Lend</span>
                                 {% endif %}
                                 {% if batch.purchase_date %}
-                                <small class="text-muted ms-2"><i class="bi bi-calendar"></i> {{ batch.purchase_date.strftime('%d/%m/%Y') }}</small>
+                                <small class="text-muted"><i class="bi bi-calendar"></i> {{ batch.purchase_date.strftime('%d/%m/%Y') }}</small>
                                 {% endif %}
                                 {% if batch.note %}
-                                <small class="text-muted ms-2"><i class="bi bi-sticky"></i> {{ batch.note }}</small>
+                                <small class="text-muted"><i class="bi bi-sticky"></i> {{ batch.note }}</small>
                                 {% endif %}
                             </div>
-                            <div class="d-flex align-items-center gap-2">
+                            <div class="d-flex align-items-center gap-2 flex-shrink-0">
                                 <button class="btn btn-outline-secondary btn-sm" onclick="event.stopPropagation()" title="Print QR Batch">
                                     <i class="bi bi-qr-code"></i> Print QR Batch
                                 </button>

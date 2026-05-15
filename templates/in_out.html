@@ -1283,16 +1283,16 @@ function _buildCartDetailForm() {
     if (!isReturn) {
         var notifyChecked = _adv.notifyEnabled ? ' checked' : '';
         var daysVal = _adv.notifyDays || 3;
-        var daysDisplay = _adv.notifyEnabled ? 'inline-flex' : 'none';
+        var daysDisplay = _adv.notifyEnabled ? 'flex' : 'none';
         html += '<div class="mb-3"><div class="d-flex align-items-center gap-2 flex-wrap">' +
             '<div class="form-check form-switch mb-0">' +
             '<input class="form-check-input" type="checkbox" id="detailNotifyEnabled"' + notifyChecked +
-            ' onchange="var w=document.getElementById(\'detailNotifyDaysWrap\');if(w)w.style.display=this.checked?\'inline-flex\':\'none\'">' +
+            ' onchange="var w=document.getElementById(\'detailNotifyDaysWrap\');if(w)w.style.display=this.checked?\'flex\':\'none\'">' +
             '<label class="form-check-label" for="detailNotifyEnabled"><i class="bi bi-bell me-1"></i>Enable Notification</label>' +
             '</div>' +
-            '<div id="detailNotifyDaysWrap" class="input-group input-group-sm align-items-center" style="display:' + daysDisplay + ';max-width:180px;">' +
-            '<input type="number" class="form-control form-control-sm" id="detailNotifyDays" min="1" max="90" value="' + daysVal + '" style="max-width:70px;">' +
-            '<span class="input-group-text">days before due date</span>' +
+            '<div id="detailNotifyDaysWrap" class="d-flex align-items-center gap-1" style="display:' + daysDisplay + ';">' +
+            '<input type="number" class="form-control form-control-sm" id="detailNotifyDays" min="1" max="90" value="' + daysVal + '" style="width:65px;">' +
+            '<span class="text-muted small">days before due date</span>' +
             '</div>' +
             '</div></div>';
     }
