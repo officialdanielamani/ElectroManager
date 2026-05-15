@@ -113,15 +113,14 @@ function showSvgAsImage(svgString, widthMm, heightMm) {
     if (currentPreviewBlobUrl) URL.revokeObjectURL(currentPreviewBlobUrl);
     const blob = new Blob([svgString], { type: 'image/svg+xml' });
     currentPreviewBlobUrl = URL.createObjectURL(blob);
-    const container = document.getElementById('preview-container');
-    const availW    = container.clientWidth  - 40;
-    const availH    = Math.max(container.clientHeight - 40, 360);
-    const aspect    = widthMm / heightMm;
+    const outer  = document.getElementById('preview-container');
+    const availW = outer.clientWidth  - 40;
+    const availH = Math.max(outer.clientHeight - 40, 360);
+    const aspect = widthMm / heightMm;
     let w = availW, h = availW / aspect;
     if (h > availH) { h = availH; w = h * aspect; }
-    container.style.width  = Math.round(w) + 'px';
-    container.style.height = Math.round(h) + 'px';
-    container.innerHTML = `<img src="${currentPreviewBlobUrl}" style="width:100%;height:100%;display:block;">`;
+    /* Size the img directly — never touch outer container dimensions */
+    outer.innerHTML = `<img src="${currentPreviewBlobUrl}" style="width:${Math.round(w)}px;height:${Math.round(h)}px;display:block;box-shadow:0 2px 8px rgba(0,0,0,0.1);border-radius:2px;">`;
 }
 
 {% if templates %}
