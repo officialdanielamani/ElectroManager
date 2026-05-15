@@ -35,6 +35,19 @@ const _pagePrintUrl   = id  => `/api/rack/{{ rack.uuid }}/drawers/sticker-print/
 const _pageSvgZipUrl  = id  => `/api/rack/{{ rack.uuid }}/drawers/sticker-svg-zip/${id}?drawers=${encodeURIComponent(_pages.join(','))}`;
 const _pageFilename   = (ext, i) => `{{ rack.name|replace("'", "")|replace(" ", "_") }}_${_pages[i]}.${ext}`;
 
+const _pageTablePrintUrl = (id, opts) => {
+    const p = new URLSearchParams({
+        drawers:      _pages.join(','),
+        paper_w:      opts.paper_w,    paper_h:      opts.paper_h,
+        margin_t:     opts.margin_t,   margin_b:     opts.margin_b,
+        margin_l:     opts.margin_l,   margin_r:     opts.margin_r,
+        spacing_v:    opts.spacing_v,  spacing_h:    opts.spacing_h,
+        border:       opts.border ? '1' : '0',
+        border_w:     opts.border_w,   border_color: opts.border_color,
+    });
+    return `/api/rack/{{ rack.uuid }}/drawers/sticker-table-print/${id}?${p}`;
+};
+
 /* Single-page fallbacks (also used when _pages.length === 1) */
 const _previewUrl   = id  => _pagePreviewUrl(id, 0);
 const _printUrl     = id  => `/api/rack/{{ rack.uuid }}/drawer/${_pages[0]}/sticker-print/${id}`;

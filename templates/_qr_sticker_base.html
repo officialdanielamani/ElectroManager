@@ -75,6 +75,118 @@
                 <p id="qr-loading-msg">Generating sticker preview…</p>
             </div>
 
+            <!-- PDF Print Options (shown after preview loaded, multi-page only) -->
+            <div id="print-options-card" class="card mb-4" style="display:none;">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-printer"></i> PDF Options</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Mode -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Print Mode</label>
+                        <div class="d-flex flex-wrap gap-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="printMode" id="pm-normal" value="normal" checked onchange="_onPrintModeChange()">
+                                <label class="form-check-label" for="pm-normal">
+                                    <strong>Normal</strong> <span class="text-muted small">— 1 sticker per page</span>
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="printMode" id="pm-table" value="table" onchange="_onPrintModeChange()">
+                                <label class="form-check-label" for="pm-table">
+                                    <strong>Table Sticker</strong> <span class="text-muted small">— grid layout on custom paper</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Table options (shown only in table mode) -->
+                    <div id="table-opts" style="display:none;">
+                        <hr class="my-2">
+
+                        <!-- Paper size -->
+                        <div class="row g-2 mb-2 align-items-end">
+                            <div class="col-12 col-sm-auto">
+                                <label class="form-label form-label-sm fw-semibold">Paper Size</label>
+                                <select id="ts-preset" class="form-select form-select-sm" onchange="_onPaperPreset()">
+                                    <option value="a4">A4 (210×297 mm)</option>
+                                    <option value="a5">A5 (148×210 mm)</option>
+                                    <option value="letter">Letter (216×279 mm)</option>
+                                    <option value="custom">Custom</option>
+                                </select>
+                            </div>
+                            <div class="col-auto">
+                                <label class="form-label form-label-sm">Width (mm)</label>
+                                <input type="number" id="ts-pw" class="form-control form-control-sm" style="width:80px;" value="210" min="1" step="0.5" oninput="_onTsInput()">
+                            </div>
+                            <div class="col-auto">
+                                <label class="form-label form-label-sm">Height (mm)</label>
+                                <input type="number" id="ts-ph" class="form-control form-control-sm" style="width:80px;" value="297" min="1" step="0.5" oninput="_onTsInput()">
+                            </div>
+                        </div>
+
+                        <!-- Margins -->
+                        <div class="row g-2 mb-2 align-items-end">
+                            <div class="col-12"><label class="form-label form-label-sm fw-semibold mb-0">Margins (mm)</label></div>
+                            <div class="col-auto">
+                                <label class="form-label form-label-sm">Top</label>
+                                <input type="number" id="ts-mt" class="form-control form-control-sm" style="width:70px;" value="10" min="0" step="0.5" oninput="_onTsInput()">
+                            </div>
+                            <div class="col-auto">
+                                <label class="form-label form-label-sm">Bottom</label>
+                                <input type="number" id="ts-mb" class="form-control form-control-sm" style="width:70px;" value="10" min="0" step="0.5" oninput="_onTsInput()">
+                            </div>
+                            <div class="col-auto">
+                                <label class="form-label form-label-sm">Left</label>
+                                <input type="number" id="ts-ml" class="form-control form-control-sm" style="width:70px;" value="10" min="0" step="0.5" oninput="_onTsInput()">
+                            </div>
+                            <div class="col-auto">
+                                <label class="form-label form-label-sm">Right</label>
+                                <input type="number" id="ts-mr" class="form-control form-control-sm" style="width:70px;" value="10" min="0" step="0.5" oninput="_onTsInput()">
+                            </div>
+                        </div>
+
+                        <!-- Spacing -->
+                        <div class="row g-2 mb-2 align-items-end">
+                            <div class="col-12"><label class="form-label form-label-sm fw-semibold mb-0">Spacing (mm)</label></div>
+                            <div class="col-auto">
+                                <label class="form-label form-label-sm">Top &amp; Bottom</label>
+                                <input type="number" id="ts-sv" class="form-control form-control-sm" style="width:70px;" value="3" min="0" step="0.5" oninput="_onTsInput()">
+                            </div>
+                            <div class="col-auto">
+                                <label class="form-label form-label-sm">Left &amp; Right</label>
+                                <input type="number" id="ts-sh" class="form-control form-control-sm" style="width:70px;" value="3" min="0" step="0.5" oninput="_onTsInput()">
+                            </div>
+                        </div>
+
+                        <!-- Border -->
+                        <div class="row g-2 mb-0 align-items-end">
+                            <div class="col-auto d-flex align-items-end pb-1">
+                                <div class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" id="ts-border" onchange="_onBorderToggle()">
+                                    <label class="form-check-label fw-semibold" for="ts-border">Border</label>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <label class="form-label form-label-sm">Weight (mm)</label>
+                                <input type="number" id="ts-bw" class="form-control form-control-sm" style="width:70px;" value="0.3" min="0.05" step="0.05" disabled oninput="_onTsInput()">
+                            </div>
+                            <div class="col-auto">
+                                <label class="form-label form-label-sm">Color</label>
+                                <div class="d-flex gap-2 align-items-center">
+                                    <input type="color" id="ts-bc-picker" value="#000000" disabled style="width:36px;height:31px;padding:2px;cursor:pointer;" oninput="_syncBcFromPicker()">
+                                    <input type="text" id="ts-bc-hex" class="form-control form-control-sm" style="width:90px;" value="#000000" maxlength="7" placeholder="#000000" disabled oninput="_syncBcFromHex()">
+                                    <div id="ts-bc-swatch" style="width:28px;height:28px;border:1px solid #ccc;background:#000;border-radius:3px;flex-shrink:0;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Grid info -->
+                        <div id="grid-info" class="alert py-2 small mt-3 mb-0" style="display:none;"></div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Action Buttons (hidden until preview loaded) -->
             <div id="action-buttons" class="d-grid gap-2 d-sm-flex justify-content-sm-center mb-5" style="display: none;">
                 <button id="btn-print-qr" class="btn btn-success flex-sm-grow-1">
@@ -96,14 +208,15 @@
 /* ── Page-specific init block ──
    Single-page child defines:  _previewUrl(id), _printUrl(id), _downloadName(ext), _entityLabel()
    Multi-page child also defines: _pages[], _pagePreviewUrl(id,i), _pagePrintUrl(id),
-                                   _pageSvgZipUrl(id), _pageFilename(ext,i), _pageLabel(i)    */
+                                   _pageSvgZipUrl(id), _pageTablePrintUrl(id,opts),
+                                   _pageFilename(ext,i), _pageLabel(i)                          */
 {% block sticker_init_js %}{% endblock %}
 
 /* ── Shared sticker state ── */
-let currentTemplate       = null;   // {id, width_mm, height_mm, name}
-let currentSvgData        = null;   // current page SVG string
+let currentTemplate       = null;
+let currentSvgData        = null;
 let currentPreviewBlobUrl = null;
-const _svgCache = {};               // pageIdx -> svgString
+const _svgCache = {};
 let _currentPage = 0;
 
 const _isMultiPage = (typeof _pages !== 'undefined') && Array.isArray(_pages) && _pages.length > 1;
@@ -119,7 +232,6 @@ function showSvgAsImage(svgString, widthMm, heightMm) {
     const aspect = widthMm / heightMm;
     let w = availW, h = availW / aspect;
     if (h > availH) { h = availH; w = h * aspect; }
-    /* Size the img directly — never touch outer container dimensions */
     outer.innerHTML = `<img src="${currentPreviewBlobUrl}" style="width:${Math.round(w)}px;height:${Math.round(h)}px;display:block;box-shadow:0 2px 8px rgba(0,0,0,0.1);border-radius:2px;">`;
 }
 
@@ -157,7 +269,6 @@ function _updatePagination() {
 }
 
 async function loadPage(templateId, pageIdx, showLoading) {
-    /* Serve from cache when available */
     if (_svgCache[pageIdx] && currentTemplate && String(currentTemplate.id) === String(templateId)) {
         currentSvgData = _svgCache[pageIdx];
         _currentPage   = pageIdx;
@@ -174,6 +285,7 @@ async function loadPage(templateId, pageIdx, showLoading) {
         loading.style.display = 'block';
         preview.style.display = 'none';
         buttons.style.display = 'none';
+        document.getElementById('print-options-card').style.display = 'none';
     } else {
         loading.style.display = 'block';
     }
@@ -192,9 +304,11 @@ async function loadPage(templateId, pageIdx, showLoading) {
 
         preview.style.display = 'block';
         buttons.style.display = 'flex';
+        if (_isMultiPage) document.getElementById('print-options-card').style.display = 'block';
         showSvgAsImage(data.svg, data.width_mm, data.height_mm);
         _updateDimLabel();
         _updatePagination();
+        _onTsInput();   /* refresh grid-info if table mode already selected */
     } catch (e) {
         alert('Error: ' + e.message);
         console.error(e);
@@ -207,7 +321,7 @@ document.getElementById('btn-load-preview').addEventListener('click', async func
     const templateId = document.getElementById('qr-template-select').value;
     if (!templateId) { alert('Please select a template first.'); return; }
     _currentPage = 0;
-    Object.keys(_svgCache).forEach(k => delete _svgCache[k]);  // clear on template change
+    Object.keys(_svgCache).forEach(k => delete _svgCache[k]);
     await loadPage(templateId, 0, true);
 });
 
@@ -218,17 +332,38 @@ async function navigatePage(delta) {
     await loadPage(currentTemplate.id, next, false);
 }
 
+/* ── PDF Print button ── */
 document.getElementById('btn-print-qr').addEventListener('click', function () {
     if (!currentTemplate) return;
-    const url = _isMultiPage ? _pagePrintUrl(currentTemplate.id) : _printUrl(currentTemplate.id);
-    window.open(url, '_blank');
+    const isTableMode = _isMultiPage &&
+        document.getElementById('pm-table') &&
+        document.getElementById('pm-table').checked;
+
+    if (isTableMode) {
+        if (typeof _pageTablePrintUrl === 'undefined') {
+            alert('Table sticker print is not supported for this entity type.');
+            return;
+        }
+        const opts = _getTsOpts();
+        const sw = currentTemplate.width_mm, sh = currentTemplate.height_mm;
+        const cw = opts.paper_w - opts.margin_l - opts.margin_r;
+        const ch = opts.paper_h - opts.margin_t - opts.margin_b;
+        if (cw < sw || ch < sh) {
+            alert(`Paper too small. Minimum printable area needed: ${sw}×${sh} mm. Current area: ${cw.toFixed(1)}×${ch.toFixed(1)} mm.`);
+            return;
+        }
+        window.open(_pageTablePrintUrl(currentTemplate.id, opts), '_blank');
+    } else {
+        const url = _isMultiPage ? _pagePrintUrl(currentTemplate.id) : _printUrl(currentTemplate.id);
+        window.open(url, '_blank');
+    }
 });
 
+/* ── SVG / PNG download ── */
 document.getElementById('btn-download-svg').addEventListener('click', async function () {
     if (!currentTemplate) return;
-    if (_isMultiPage) {
-        await _downloadSvgZip();
-    } else {
+    if (_isMultiPage) { await _downloadSvgZip(); }
+    else {
         if (!currentSvgData) return;
         _downloadBlob(new Blob([currentSvgData], { type: 'image/svg+xml' }), _downloadName('svg'));
     }
@@ -236,9 +371,8 @@ document.getElementById('btn-download-svg').addEventListener('click', async func
 
 document.getElementById('btn-download-png').addEventListener('click', async function () {
     if (!currentTemplate) return;
-    if (_isMultiPage) {
-        await _downloadPngZip();
-    } else {
+    if (_isMultiPage) { await _downloadPngZip(); }
+    else {
         if (!currentSvgData) return;
         const btn = this, orig = btn.innerHTML;
         btn.disabled = true;
@@ -246,84 +380,120 @@ document.getElementById('btn-download-png').addEventListener('click', async func
         try {
             const pngBlob = await _svgToPng(currentSvgData, currentTemplate.width_mm, currentTemplate.height_mm);
             _downloadBlob(pngBlob, _downloadName('png'));
-        } catch (e) {
-            alert('Error converting to PNG: ' + e.message);
-            console.error(e);
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = orig;
-        }
+        } catch (e) { alert('Error: ' + e.message); }
+        finally { btn.disabled = false; btn.innerHTML = orig; }
     }
 });
 
-async function _downloadSvgZip() {
-    /* Prefer backend zip endpoint if the child template provides one */
-    if (typeof _pageSvgZipUrl !== 'undefined') {
-        window.location.href = _pageSvgZipUrl(currentTemplate.id);
+/* ── Table sticker options ── */
+const _paperPresets = { a4:[210,297], a5:[148,210], letter:[216,279] };
+
+function _onPrintModeChange() {
+    const isTable = document.getElementById('pm-table').checked;
+    document.getElementById('table-opts').style.display = isTable ? '' : 'none';
+    if (isTable) _onTsInput();
+}
+
+function _onPaperPreset() {
+    const v = document.getElementById('ts-preset').value;
+    if (_paperPresets[v]) {
+        document.getElementById('ts-pw').value = _paperPresets[v][0];
+        document.getElementById('ts-ph').value = _paperPresets[v][1];
+    }
+    _onTsInput();
+}
+
+function _onBorderToggle() {
+    const on = document.getElementById('ts-border').checked;
+    ['ts-bw', 'ts-bc-picker', 'ts-bc-hex'].forEach(id => { document.getElementById(id).disabled = !on; });
+    _onTsInput();
+}
+
+function _syncBcFromPicker() {
+    const v = document.getElementById('ts-bc-picker').value;
+    document.getElementById('ts-bc-hex').value = v;
+    document.getElementById('ts-bc-swatch').style.background = v;
+}
+
+function _syncBcFromHex() {
+    const v = document.getElementById('ts-bc-hex').value.trim();
+    document.getElementById('ts-bc-swatch').style.background = v;
+    if (/^#[0-9A-Fa-f]{6}$/.test(v)) document.getElementById('ts-bc-picker').value = v;
+}
+
+function _getTsOpts() {
+    return {
+        paper_w:      parseFloat(document.getElementById('ts-pw').value)  || 210,
+        paper_h:      parseFloat(document.getElementById('ts-ph').value)  || 297,
+        margin_t:     parseFloat(document.getElementById('ts-mt').value)  || 0,
+        margin_b:     parseFloat(document.getElementById('ts-mb').value)  || 0,
+        margin_l:     parseFloat(document.getElementById('ts-ml').value)  || 0,
+        margin_r:     parseFloat(document.getElementById('ts-mr').value)  || 0,
+        spacing_v:    parseFloat(document.getElementById('ts-sv').value)  || 0,
+        spacing_h:    parseFloat(document.getElementById('ts-sh').value)  || 0,
+        border:       document.getElementById('ts-border').checked,
+        border_w:     parseFloat(document.getElementById('ts-bw').value)  || 0.3,
+        border_color: document.getElementById('ts-bc-hex').value.trim()   || '#000000',
+    };
+}
+
+function _onTsInput() {
+    if (!currentTemplate) return;
+    if (!document.getElementById('pm-table') || !document.getElementById('pm-table').checked) return;
+    const o  = _getTsOpts();
+    const sw = currentTemplate.width_mm, sh = currentTemplate.height_mm;
+    const cw = o.paper_w - o.margin_l - o.margin_r;
+    const ch = o.paper_h - o.margin_t - o.margin_b;
+    const gi = document.getElementById('grid-info');
+    gi.style.display = '';
+    if (cw < sw || ch < sh) {
+        gi.className = 'alert alert-danger py-2 small mt-3 mb-0';
+        gi.textContent = `⚠ Paper too small! Need at least ${(sw + o.margin_l + o.margin_r).toFixed(1)} × ${(sh + o.margin_t + o.margin_b).toFixed(1)} mm paper for 1 sticker with these margins.`;
         return;
     }
-    /* Fallback: fetch all SVGs and build zip client-side */
-    const btn = document.getElementById('btn-download-svg');
-    const orig = btn.innerHTML;
+    const cols     = Math.max(1, Math.floor((cw + o.spacing_h) / (sw + o.spacing_h)));
+    const rows     = Math.max(1, Math.floor((ch + o.spacing_v) / (sh + o.spacing_v)));
+    const perPage  = cols * rows;
+    const total    = _pageCount;
+    const pages    = Math.ceil(total / perPage);
+    gi.className = 'alert alert-info py-2 small mt-3 mb-0';
+    gi.textContent = `${cols} col${cols > 1 ? 's' : ''} × ${rows} row${rows > 1 ? 's' : ''} = ${perPage} sticker${perPage > 1 ? 's' : ''} / page → ${pages} PDF page${pages > 1 ? 's' : ''} for ${total} sticker${total > 1 ? 's' : ''}`;
+}
+
+/* ── ZIP downloads ── */
+async function _downloadSvgZip() {
+    if (typeof _pageSvgZipUrl !== 'undefined') { window.location.href = _pageSvgZipUrl(currentTemplate.id); return; }
+    const btn = document.getElementById('btn-download-svg'), orig = btn.innerHTML;
     btn.disabled = true;
     try {
         const files = [];
         for (let i = 0; i < _pageCount; i++) {
             document.getElementById('qr-loading-msg').textContent = `Fetching sticker ${i + 1} of ${_pageCount}…`;
             document.getElementById('qr-loading').style.display = 'block';
-            if (!_svgCache[i]) {
-                const r = await fetch(_getPreviewUrl(currentTemplate.id, i));
-                const d = await r.json();
-                _svgCache[i] = d.svg;
-            }
-            const fname = typeof _pageFilename !== 'undefined' ? _pageFilename('svg', i) : `page_${i + 1}.svg`;
-            files.push({ name: fname, data: new TextEncoder().encode(_svgCache[i]) });
+            if (!_svgCache[i]) { const r = await fetch(_getPreviewUrl(currentTemplate.id, i)); const d = await r.json(); _svgCache[i] = d.svg; }
+            files.push({ name: typeof _pageFilename !== 'undefined' ? _pageFilename('svg', i) : `page_${i+1}.svg`, data: new TextEncoder().encode(_svgCache[i]) });
         }
-        document.getElementById('qr-loading').style.display = 'none';
-        const zipName = _downloadName('zip');
-        _downloadBlob(new Blob([_buildZip(files)], { type: 'application/zip' }), zipName);
-    } catch (e) {
-        alert('Error building SVG zip: ' + e.message);
-        console.error(e);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = orig;
-        document.getElementById('qr-loading').style.display = 'none';
-        document.getElementById('qr-loading-msg').textContent = 'Generating sticker preview…';
-    }
+        _downloadBlob(new Blob([_buildZip(files)], { type: 'application/zip' }), _downloadName('zip'));
+    } catch (e) { alert('Error building SVG zip: ' + e.message); }
+    finally { btn.disabled = false; btn.innerHTML = orig; document.getElementById('qr-loading').style.display = 'none'; document.getElementById('qr-loading-msg').textContent = 'Generating sticker preview…'; }
 }
 
 async function _downloadPngZip() {
-    const btn = document.getElementById('btn-download-png');
-    const orig = btn.innerHTML;
+    const btn = document.getElementById('btn-download-png'), orig = btn.innerHTML;
     btn.disabled = true;
     try {
         const files = [];
         for (let i = 0; i < _pageCount; i++) {
             document.getElementById('qr-loading-msg').textContent = `Converting page ${i + 1} of ${_pageCount} to PNG…`;
             document.getElementById('qr-loading').style.display = 'block';
-            if (!_svgCache[i]) {
-                const r = await fetch(_getPreviewUrl(currentTemplate.id, i));
-                const d = await r.json();
-                _svgCache[i] = d.svg;
-            }
+            if (!_svgCache[i]) { const r = await fetch(_getPreviewUrl(currentTemplate.id, i)); const d = await r.json(); _svgCache[i] = d.svg; }
             const pngBlob = await _svgToPng(_svgCache[i], currentTemplate.width_mm, currentTemplate.height_mm);
             const arrBuf  = await pngBlob.arrayBuffer();
-            const fname   = typeof _pageFilename !== 'undefined' ? _pageFilename('png', i) : `page_${i + 1}.png`;
-            files.push({ name: fname, data: new Uint8Array(arrBuf) });
+            files.push({ name: typeof _pageFilename !== 'undefined' ? _pageFilename('png', i) : `page_${i+1}.png`, data: new Uint8Array(arrBuf) });
         }
-        document.getElementById('qr-loading').style.display = 'none';
-        const zipName = _downloadName('zip').replace(/\.zip$/, '_png.zip');
-        _downloadBlob(new Blob([_buildZip(files)], { type: 'application/zip' }), zipName);
-    } catch (e) {
-        alert('Error building PNG zip: ' + e.message);
-        console.error(e);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = orig;
-        document.getElementById('qr-loading').style.display = 'none';
-        document.getElementById('qr-loading-msg').textContent = 'Generating sticker preview…';
-    }
+        _downloadBlob(new Blob([_buildZip(files)], { type: 'application/zip' }), _downloadName('zip').replace(/\.zip$/, '_png.zip'));
+    } catch (e) { alert('Error building PNG zip: ' + e.message); }
+    finally { btn.disabled = false; btn.innerHTML = orig; document.getElementById('qr-loading').style.display = 'none'; document.getElementById('qr-loading-msg').textContent = 'Generating sticker preview…'; }
 }
 
 function _svgToPng(svgString, widthMm, heightMm) {
@@ -333,16 +503,11 @@ function _svgToPng(svgString, widthMm, heightMm) {
         canvas.width  = Math.round(widthMm  * mmToPx);
         canvas.height = Math.round(heightMm * mmToPx);
         const ctx = canvas.getContext('2d');
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'white'; ctx.fillRect(0, 0, canvas.width, canvas.height);
         const blob = new Blob([svgString], { type: 'image/svg+xml' });
         const url  = URL.createObjectURL(blob);
         const img  = new Image();
-        img.onload = () => {
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            URL.revokeObjectURL(url);
-            canvas.toBlob(resolve, 'image/png');
-        };
+        img.onload  = () => { ctx.drawImage(img, 0, 0, canvas.width, canvas.height); URL.revokeObjectURL(url); canvas.toBlob(resolve, 'image/png'); };
         img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('SVG render failed')); };
         img.src = url;
     });
@@ -350,7 +515,7 @@ function _svgToPng(svgString, widthMm, heightMm) {
 
 function _downloadBlob(blob, filename) {
     const url = URL.createObjectURL(blob);
-    const a   = document.createElement('a');
+    const a = document.createElement('a');
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
@@ -364,40 +529,26 @@ window.addEventListener('resize', () => {
     }
 });
 
-/* ── Minimal ZIP builder — uncompressed (stored), no external deps ── */
+/* ── Minimal ZIP builder — uncompressed, no external deps ── */
 function _buildZip(files) {
-    function u16(n) { const b = new Uint8Array(2); new DataView(b.buffer).setUint16(0, n, true); return b; }
-    function u32(n) { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, n, true); return b; }
-    function cat(arrays) {
-        const tot = arrays.reduce((s, a) => s + a.length, 0);
-        const out = new Uint8Array(tot); let off = 0;
-        for (const a of arrays) { out.set(a, off); off += a.length; }
-        return out;
+    function u16(n) { const b = new Uint8Array(2); new DataView(b.buffer).setUint16(0,n,true); return b; }
+    function u32(n) { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0,n,true); return b; }
+    function cat(arrays) { const tot=arrays.reduce((s,a)=>s+a.length,0),out=new Uint8Array(tot);let off=0;for(const a of arrays){out.set(a,off);off+=a.length;}return out; }
+    const _tbl=(() => { const t=new Uint32Array(256);for(let i=0;i<256;i++){let c=i;for(let j=0;j<8;j++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[i]=c;}return t; })();
+    function crc32(data){let c=0xFFFFFFFF;for(const b of data)c=(c>>>8)^_tbl[(c^b)&0xFF];return(c^0xFFFFFFFF)>>>0;}
+    const enc=new TextEncoder(),now=new Date();
+    const dosT=u16(((now.getHours()<<11)|(now.getMinutes()<<5)|(now.getSeconds()>>1))>>>0);
+    const dosD=u16(((((now.getFullYear()-1980)&0x7F)<<9)|((now.getMonth()+1)<<5)|now.getDate())>>>0);
+    const locals=[],centrals=[];let offset=0;
+    for(const f of files){
+        const name=enc.encode(f.name),crc=crc32(f.data);
+        const local=cat([new Uint8Array([0x50,0x4B,0x03,0x04]),u16(20),u16(0),u16(0),dosT,dosD,u32(crc),u32(f.data.length),u32(f.data.length),u16(name.length),u16(0),name]);
+        const central=cat([new Uint8Array([0x50,0x4B,0x01,0x02]),u16(20),u16(20),u16(0),u16(0),dosT,dosD,u32(crc),u32(f.data.length),u32(f.data.length),u16(name.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(offset),name]);
+        locals.push(local,f.data);centrals.push(central);offset+=local.length+f.data.length;
     }
-    const _tbl = (() => {
-        const t = new Uint32Array(256);
-        for (let i = 0; i < 256; i++) { let c = i; for (let j = 0; j < 8; j++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[i] = c; }
-        return t;
-    })();
-    function crc32(data) { let c = 0xFFFFFFFF; for (const b of data) c = (c >>> 8) ^ _tbl[(c ^ b) & 0xFF]; return (c ^ 0xFFFFFFFF) >>> 0; }
-    const enc  = new TextEncoder();
-    const now  = new Date();
-    const dosT = u16(((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) >>> 0);
-    const dosD = u16(((((now.getFullYear() - 1980) & 0x7F) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) >>> 0);
-    const locals = [], centrals = [];
-    let offset = 0;
-    for (const f of files) {
-        const name = enc.encode(f.name);
-        const crc  = crc32(f.data);
-        const local   = cat([new Uint8Array([0x50,0x4B,0x03,0x04]), u16(20), u16(0), u16(0), dosT, dosD, u32(crc), u32(f.data.length), u32(f.data.length), u16(name.length), u16(0), name]);
-        const central = cat([new Uint8Array([0x50,0x4B,0x01,0x02]), u16(20), u16(20), u16(0), u16(0), dosT, dosD, u32(crc), u32(f.data.length), u32(f.data.length), u16(name.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset), name]);
-        locals.push(local, f.data);
-        centrals.push(central);
-        offset += local.length + f.data.length;
-    }
-    const cdSz = centrals.reduce((s, c) => s + c.length, 0);
-    const eocd = cat([new Uint8Array([0x50,0x4B,0x05,0x06]), u16(0), u16(0), u16(files.length), u16(files.length), u32(cdSz), u32(offset), u16(0)]);
-    return cat([...locals, ...centrals, eocd]);
+    const cdSz=centrals.reduce((s,c)=>s+c.length,0);
+    const eocd=cat([new Uint8Array([0x50,0x4B,0x05,0x06]),u16(0),u16(0),u16(files.length),u16(files.length),u32(cdSz),u32(offset),u16(0)]);
+    return cat([...locals,...centrals,eocd]);
 }
 </script>
 {% endblock %}

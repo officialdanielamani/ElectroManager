@@ -922,3 +922,89 @@ def generate_svg_zip(template, name_data_pairs):
             zf.writestr(f"{fname}.svg", svg)
     buf.seek(0)
     return buf
+
+
+def generate_table_sticker_pdf(template, records, data_getter, options):
+    """
+    Generate a PDF with stickers arranged in a grid (table layout) on each page.
+    options: dict with paper_w, paper_h, margin_t, margin_b, margin_l, margin_r,
+             spacing_v, spacing_h, border (bool), border_w (mm), border_color (hex)
+    """
+    try:
+        from weasyprint import HTML
+    except ImportError:
+        raise ImportError("WeasyPrint not installed")
+
+    import base64
+    M = 1 / 25.4  # mm → inches
+
+    sw  = float(template.width_mm)
+    sh  = float(template.height_mm)
+    pw  = float(options.get('paper_w',  210))
+    ph  = float(options.get('paper_h',  297))
+    mt  = float(options.get('margin_t',  10))
+    mb  = float(options.get('margin_b',  10))
+    ml  = float(options.get('margin_l',  10))
+    mr  = float(options.get('margin_r',  10))
+    sv  = float(options.get('spacing_v',  3))
+    sph = float(options.get('spacing_h',  3))
+    border      = bool(options.get('border', False))
+    border_w    = float(options.get('border_w', 0.3))
+    border_color = str(options.get('border_color', '#000000'))
+
+    cw = pw - ml - mr   # content width
+    ch = ph - mt - mb   # content height
+
+    cols          = max(1, int((cw + sph) / (sw + sph)))
+    rows_per_page = max(1, int((ch + sv)  / (sh + sv)))
+
+    # Render all stickers to base64 SVGs
+    stickers = []
+    for record in records:
+        data = data_getter(record)
+        svg  = render_template_to_svg(template, data)
+        stickers.append(base64.b64encode(svg.encode()).decode())
+
+    if not stickers:
+        raise ValueError("No stickers to render")
+
+    border_css = f'border:{border_w * M:.5f}in solid {border_color};box-sizing:border-box;' if border else ''
+
+    # Build one <div> per PDF page using absolute positioning
+    pages_html = []
+    idx = 0
+    total = len(stickers)
+    while idx < total:
+        divs = []
+        for row_i in range(rows_per_page):
+            if idx >= total:
+                break
+            for col_i in range(cols):
+                if idx >= total:
+                    break
+                x = col_i * (sw + sph)
+                y = row_i * (sh  + sv)
+                divs.append(
+                    f'<div style="position:absolute;left:{x*M:.5f}in;top:{y*M:.5f}in;'
+                    f'width:{sw*M:.5f}in;height:{sh*M:.5f}in;{border_css}">'
+                    f'<img src="data:image/svg+xml;base64,{stickers[idx]}" style="width:100%;height:100%;display:block;"/>'
+                    f'</div>'
+                )
+                idx += 1
+        pages_html.append(
+            f'<div style="position:relative;width:{cw*M:.5f}in;height:{ch*M:.5f}in;page-break-after:always;">'
+            + ''.join(divs) + '</div>'
+        )
+
+    html = (
+        f'<!DOCTYPE html><html><head><meta charset="UTF-8"><style>'
+        f'@page{{size:{pw*M:.5f}in {ph*M:.5f}in;margin:{mt*M:.5f}in {mr*M:.5f}in {mb*M:.5f}in {ml*M:.5f}in;}}'
+        f'*{{margin:0;padding:0;box-sizing:border-box;}}body{{margin:0;padding:0;}}'
+        f'</style></head><body>' + ''.join(pages_html) + '</body></html>'
+    )
+
+    doc = HTML(string=html)
+    buf = BytesIO()
+    doc.write_pdf(buf)
+    buf.seek(0)
+    return buf

@@ -1034,3 +1034,45 @@ def api_drawers_sticker_svg_zip(uuid, template_id):
     zip_buf = generate_svg_zip(template, pairs)
     return send_file(zip_buf, mimetype='application/zip', as_attachment=True,
                      download_name=f'{safe_rack}_drawers_svg.zip')
+
+
+@location_rack_bp.route('/api/rack/<string:uuid>/drawers/sticker-table-print/<int:template_id>')
+@login_required
+def api_drawers_sticker_table_print(uuid, template_id):
+    """Generate a table-layout PDF (grid of stickers) for multiple rack drawers."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
+    from qr_utils import get_drawer_data, generate_table_sticker_pdf
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'Drawer':
+        return jsonify({'error': 'Template must be Drawer type'}), 400
+    raw = request.args.get('drawers', '')
+    drawer_ids = [d.strip() for d in raw.split(',') if d.strip()]
+    if not drawer_ids:
+        return jsonify({'error': 'No drawers specified'}), 400
+
+    def _f(key, default):
+        try:    return float(request.args.get(key, default))
+        except: return float(default)
+
+    options = {
+        'paper_w':     _f('paper_w',  210),
+        'paper_h':     _f('paper_h',  297),
+        'margin_t':    _f('margin_t',  10),
+        'margin_b':    _f('margin_b',  10),
+        'margin_l':    _f('margin_l',  10),
+        'margin_r':    _f('margin_r',  10),
+        'spacing_v':   _f('spacing_v',  3),
+        'spacing_h':   _f('spacing_h',  3),
+        'border':      request.args.get('border', '0') == '1',
+        'border_w':    _f('border_w',  0.3),
+        'border_color': request.args.get('border_color', '#000000'),
+    }
+
+    output = generate_table_sticker_pdf(template, drawer_ids, lambda did: get_drawer_data(rack, did), options)
+    safe_rack = rack.name.replace("'", "").replace(" ", "_")
+    log_audit(current_user.id, 'print', 'rack', rack.id,
+              f'Printed table sticker PDF: {template.name} drawers {",".join(drawer_ids)}')
+    return send_file(output, mimetype='application/pdf', as_attachment=True,
+                     download_name=f'{safe_rack}_drawers_table.pdf')
