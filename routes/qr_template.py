@@ -174,12 +174,12 @@ def preview_qr_template(template_id):
                     data = get_item_data(sample_item)
                 else:
                     data = {ph: f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('Items', [])}
-            elif template.template_type == 'Locations':
+            elif template.template_type == 'Location':
                 sample_location = Location.query.first()
                 if sample_location:
                     data = get_location_data(sample_location)
                 else:
-                    data = {ph: f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('Locations', [])}
+                    data = {ph: f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('Location', [])}
             elif template.template_type == 'Racks':
                 sample_rack = Rack.query.first()
                 if sample_rack:

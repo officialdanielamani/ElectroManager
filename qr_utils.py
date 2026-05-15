@@ -10,14 +10,16 @@ from datetime import datetime, timezone
 # Available placeholders for each template type
 AVAILABLE_PLACEHOLDERS = {
     'Items': [
-        '{ItemUUID}', '{ItemName}', '{SKU}', '{Price}',
-        '{Quantity}', '{Category}', '{LocationName}', '{RackName}', '{Drawer}'
+        '{ItemUUID}', '{ItemName}', '{ItemType}', '{ItemSKU}', '{ItemInfo}',
+        '{ItemCat}', '{ItemFoot}', '{ItemTPrice}', '{ItemMOvrQty}', '{ItemMinQty}',
+        '{ItemMLocName}', '{ItemMLocUUID}', '{ItemMRackName}', '{ItemMRackUUID}', '{ItemMDrawLoc}'
     ],
     'Location': [
-        '{LocationUUID}', '{LocationName}', '{LocationInfo}', '{ItemCount}'
+        '{LocUUID}', '{LocName}', '{LocInfo}', '{LocICount}'
     ],
     'Racks': [
-        '{RackUUID}', '{RackName}', '{Capacity}', '{ItemCount}'
+        '{RackUUID}', '{RackName}', '{RackInfo}', '{RackLoc}',
+        '{RackCap}', '{RackICount}', '{RackSize}'
     ]
 }
 
@@ -43,16 +45,39 @@ def validate_bootstrap_icons():
 
 def get_item_data(item):
     """Extract printable data from Item"""
+    # Determine main location: rack's physical location takes priority over general location
+    if item.rack_id and item.rack and item.rack.physical_location:
+        main_loc_name = item.rack.physical_location.name
+        main_loc_uuid = item.rack.physical_location.uuid
+    elif item.location_id and item.general_location:
+        main_loc_name = item.general_location.name
+        main_loc_uuid = item.general_location.uuid
+    else:
+        main_loc_name = ''
+        main_loc_uuid = ''
+
+    rack_name = item.rack.name if item.rack else ''
+    rack_uuid = item.rack.uuid if item.rack else ''
+    draw_loc  = item.drawer if (item.rack_id and item.drawer) else ''
+
+    total_price = item.get_overall_total_price()
+
     return {
-        'ItemUUID': item.uuid,
-        'ItemName': item.name,
-        'SKU': item.sku or '',
-        'Price': f"${item.get_average_price():.2f}" if item.get_average_price() else '',
-        'Quantity': str(item.get_overall_quantity()),
-        'Category': item.category.name if item.category else '',
-        'LocationName': item.general_location.name if item.general_location else '',
-        'RackName': item.rack.name if item.rack else '',
-        'Drawer': item.drawer or ''
+        'ItemUUID':     item.uuid,
+        'ItemName':     item.name,
+        'ItemType':     item.info or '',
+        'ItemSKU':      item.sku or '',
+        'ItemInfo':     item.short_info or '',
+        'ItemCat':      item.category.name if item.category else '',
+        'ItemFoot':     item.footprint.name if item.footprint else '',
+        'ItemTPrice':   f"{total_price:.2f}" if total_price else '',
+        'ItemMOvrQty':  str(item.get_overall_quantity()),
+        'ItemMinQty':   str(item.min_quantity or 0),
+        'ItemMLocName': main_loc_name,
+        'ItemMLocUUID': main_loc_uuid,
+        'ItemMRackName': rack_name,
+        'ItemMRackUUID': rack_uuid,
+        'ItemMDrawLoc':  draw_loc,
     }
 
 def get_location_data(location):
@@ -60,21 +85,26 @@ def get_location_data(location):
     from models import Item
     item_count = Item.query.filter_by(location_id=location.id).count()
     return {
-        'LocationUUID': location.uuid,
-        'LocationName': location.name,
-        'LocationInfo': location.info or '',
-        'ItemCount': str(item_count)
+        'LocUUID':   location.uuid,
+        'LocName':   location.name,
+        'LocInfo':   location.info or '',
+        'LocICount': str(item_count),
     }
 
 def get_rack_data(rack):
     """Extract printable data from Rack"""
     from models import Item
     item_count = Item.query.filter_by(rack_id=rack.id).count()
+    loc_name = rack.physical_location.name if rack.physical_location else ''
+    rack_size = f"{rack.rows}X{rack.cols:02d}"
     return {
-        'RackUUID': rack.uuid,
-        'RackName': rack.name,
-        'Capacity': str(rack.rows * rack.cols),
-        'ItemCount': str(item_count)
+        'RackUUID':   rack.uuid,
+        'RackName':   rack.name,
+        'RackInfo':   rack.short_info or '',
+        'RackLoc':    loc_name,
+        'RackCap':    str(rack.rows * rack.cols),
+        'RackICount': str(item_count),
+        'RackSize':   rack_size,
     }
 
 def replace_placeholders(text, data_dict):

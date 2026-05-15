@@ -1196,33 +1196,36 @@ function updatePropertiesPanel(index) {
     // Define placeholders based on template type context
     const placeholders = {
         item: [
-            { label: '{ItemUUID} - Item UUID', value: '{ItemUUID}' },
-            { label: '{ItemName} - Product name', value: '{ItemName}' },
-            { label: '{SKU} - Stock code', value: '{SKU}' },
-            { label: '{Price} - Price', value: '{Price}' },
-            { label: '{Quantity} - Stock quantity', value: '{Quantity}' },
-            { label: '{Category} - Category name', value: '{Category}' },
-            { label: '{LocationName} - Location', value: '{LocationName}' },
-            { label: '{RackName} - Rack name', value: '{RackName}' },
-            { label: '{Drawer} - Drawer cell (e.g. R1-C2)', value: '{Drawer}' },
-            { label: '{Description} - Description', value: '{Description}' },
-            { label: '{MinQuantity} - Min stock', value: '{MinQuantity}' }
+            { label: '{ItemUUID} - UUID', value: '{ItemUUID}' },
+            { label: '{ItemName} - Item name', value: '{ItemName}' },
+            { label: '{ItemType} - Type / Model name', value: '{ItemType}' },
+            { label: '{ItemSKU} - Stock code', value: '{ItemSKU}' },
+            { label: '{ItemInfo} - Short Info', value: '{ItemInfo}' },
+            { label: '{ItemCat} - Category name', value: '{ItemCat}' },
+            { label: '{ItemFoot} - Footprint name', value: '{ItemFoot}' },
+            { label: '{ItemTPrice} - Total Price', value: '{ItemTPrice}' },
+            { label: '{ItemMOvrQty} - Overall Quantity', value: '{ItemMOvrQty}' },
+            { label: '{ItemMinQty} - Min stock', value: '{ItemMinQty}' },
+            { label: '{ItemMLocName} - Main Location name', value: '{ItemMLocName}' },
+            { label: '{ItemMLocUUID} - Main Location UUID', value: '{ItemMLocUUID}' },
+            { label: '{ItemMRackName} - Rack name', value: '{ItemMRackName}' },
+            { label: '{ItemMRackUUID} - Rack UUID', value: '{ItemMRackUUID}' },
+            { label: '{ItemMDrawLoc} - Drawer (RXX-CXX)', value: '{ItemMDrawLoc}' }
         ],
         location: [
-            { label: '{LocationUUID} - Location UUID', value: '{LocationUUID}' },
-            { label: '{LocationName} - Name', value: '{LocationName}' },
-            { label: '{LocationInfo} - Info field', value: '{LocationInfo}' },
-            { label: '{Description} - Description', value: '{Description}' },
-            { label: '{ItemCount} - # of items', value: '{ItemCount}' }
+            { label: '{LocUUID} - UUID', value: '{LocUUID}' },
+            { label: '{LocName} - Location name', value: '{LocName}' },
+            { label: '{LocInfo} - Info field', value: '{LocInfo}' },
+            { label: '{LocICount} - # of items', value: '{LocICount}' }
         ],
         rack: [
-            { label: '{RackUUID} - Rack UUID', value: '{RackUUID}' },
-            { label: '{RackName} - Name', value: '{RackName}' },
-            { label: '{Description} - Description', value: '{Description}' },
-            { label: '{Capacity} - Total slots', value: '{Capacity}' },
-            { label: '{ItemCount} - # of items', value: '{ItemCount}' },
-            { label: '{Rows} - # rows', value: '{Rows}' },
-            { label: '{Cols} - # columns', value: '{Cols}' }
+            { label: '{RackUUID} - UUID', value: '{RackUUID}' },
+            { label: '{RackName} - Rack name', value: '{RackName}' },
+            { label: '{RackInfo} - Short Info', value: '{RackInfo}' },
+            { label: '{RackLoc} - General Location', value: '{RackLoc}' },
+            { label: '{RackCap} - Total slots', value: '{RackCap}' },
+            { label: '{RackICount} - # of items', value: '{RackICount}' },
+            { label: '{RackSize} - Size (e.g. 10X05)', value: '{RackSize}' }
         ]
     };
 
