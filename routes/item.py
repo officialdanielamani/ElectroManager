@@ -640,6 +640,15 @@ def item_delete(uuid):
     
     item_name = item.name
 
+    from models import ItemBatch, BatchLendRecord
+    has_active_loans = db.session.query(BatchLendRecord).join(ItemBatch).filter(
+        ItemBatch.item_id == item.id,
+        BatchLendRecord.returned_at == None
+    ).first() is not None
+    if has_active_loans:
+        flash(f'Cannot delete "{item_name}" — it has outstanding (unreturned) lending records.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=item.uuid))
+
     for attachment in item.attachments:
         try:
             if attachment.file_path and is_safe_file_path(attachment.file_path):
@@ -693,14 +702,26 @@ def bulk_delete_items():
         if not items_to_delete:
             return jsonify({'success': False, 'message': 'No items found to delete.'}), 404
         
+        from models import ItemBatch, BatchLendRecord, ItemParameter, ProjectBOMItem
+
         deleted_items = []
         deleted_count = 0
-        
+        skipped_loan_names = []
+
         # Delete each item
         for item in items_to_delete:
             item_name = item.name
             item_id = item.id
-            
+
+            # Block deletion if any batch has unreturned lending records
+            has_active_loans = db.session.query(BatchLendRecord).join(ItemBatch).filter(
+                ItemBatch.item_id == item.id,
+                BatchLendRecord.returned_at == None
+            ).first() is not None
+            if has_active_loans:
+                skipped_loan_names.append(item_name)
+                continue
+
             # Delete attachments
             for attachment in item.attachments:
                 try:
@@ -711,7 +732,6 @@ def bulk_delete_items():
                     logging.error(f"Error deleting attachment file {attachment.id}: {e}")
             
             # Delete item parameters
-            from models import ItemParameter, ProjectBOMItem
             ItemParameter.query.filter_by(item_id=item.id).delete()
             # Preserve BOM entries: clear item_id so entries remain with snapshot name
             for bom in ProjectBOMItem.query.filter_by(item_id=item.id).all():
@@ -736,11 +756,17 @@ def bulk_delete_items():
             f'Bulk deleted {deleted_count} items: {deleted_items_str}'
         )
         
-        return jsonify({
-            'success': True, 
+        result = {
+            'success': True,
             'deleted_count': deleted_count,
             'message': f'Successfully deleted {deleted_count} item(s).'
-        }), 200
+        }
+        if skipped_loan_names:
+            result['warning'] = (
+                f'{len(skipped_loan_names)} item(s) skipped — outstanding (unreturned) lending records exist: '
+                + ', '.join(skipped_loan_names)
+            )
+        return jsonify(result), 200
         
     except Exception as e:
         db.session.rollback()

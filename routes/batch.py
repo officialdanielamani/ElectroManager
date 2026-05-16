@@ -384,6 +384,11 @@ def delete_batch(uuid, batch_id):
 
     batch_label = batch.get_display_label()
 
+    active_loan = BatchLendRecord.query.filter_by(batch_id=batch.id).filter(BatchLendRecord.returned_at == None).first()
+    if active_loan:
+        flash(f'Cannot delete batch "{batch_label}" — it has outstanding (unreturned) lending records.', 'danger')
+        return redirect(url_for('item.item_edit', uuid=uuid) + '#batches-section')
+
     if batch.sn_tracking_enabled and batch.serial_numbers:
         isn_list = ', '.join(sn.internal_serial_number for sn in batch.serial_numbers)
         log_audit(current_user.id, 'batch_sn_purge', 'batch', batch_id,
@@ -417,9 +422,13 @@ def bulk_delete_batches(uuid):
         return jsonify({'success': False, 'message': 'No batches selected'}), 400
     
     deleted = 0
+    skipped_loan = 0
     for bid in batch_ids:
         batch = ItemBatch.query.get(int(bid))
         if batch and batch.item_id == item.id:
+            if BatchLendRecord.query.filter_by(batch_id=batch.id).filter(BatchLendRecord.returned_at == None).first():
+                skipped_loan += 1
+                continue
             if batch.sn_tracking_enabled and batch.serial_numbers:
                 isn_list = ', '.join(sn.internal_serial_number for sn in batch.serial_numbers)
                 log_audit(current_user.id, 'batch_sn_purge', 'batch', batch.id,
@@ -434,8 +443,11 @@ def bulk_delete_batches(uuid):
 
     log_audit(current_user.id, 'bulk_delete', 'batch', None,
               f'Bulk deleted {deleted} batches from item: {item.name}')
-    
-    return jsonify({'success': True, 'deleted_count': deleted})
+
+    result = {'success': True, 'deleted_count': deleted}
+    if skipped_loan:
+        result['warning'] = f'{skipped_loan} batch(es) skipped — outstanding (unreturned) lending records exist.'
+    return jsonify(result)
 
 
 @batch_bp.route('/item/<string:uuid>/batch/transfer', methods=['POST'])
