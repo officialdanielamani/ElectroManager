@@ -85,7 +85,7 @@
                                     {% elif project.thumbnail.startswith('share:') %}
                                     <img src="{{ url_for('share.share_serve', category='project', filename=project.thumbnail[6:]) }}" style="width:100%;height:100%;object-fit:cover;border-radius:6px;">
                                     {% else %}
-                                    <i class="bi bi-image text-muted" style="font-size:1.5rem;"></i>
+                                    <img src="{{ url_for('project_uploaded_file', filename=project.thumbnail) }}" style="width:100%;height:100%;object-fit:cover;border-radius:6px;">
                                     {% endif %}
                                     <button type="button" onclick="clearProjThumb()" style="position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:none;background:#dc3545;color:white;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;z-index:1;" title="Remove thumbnail"><i class="bi bi-x"></i></button>
                                 {% else %}
@@ -94,6 +94,7 @@
                             </div>
                             <div class="d-flex flex-column gap-1">
                                 <button type="button" class="btn btn-sm btn-outline-primary" onclick="openProjThumbIconPicker()"><i class="bi bi-star"></i> Icon</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="openProjThumbPicturePicker()"><i class="bi bi-image"></i> Picture</button>
                                 <button type="button" class="btn btn-sm btn-outline-info" onclick="openProjThumbSharePicker()"><i class="bi bi-folder"></i> Share</button>
                             </div>
                         </div>
@@ -457,8 +458,33 @@
         </div>
         {% endif %}
 
-        <!-- BOM -->
+        <!-- Costing -->
         <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-coin"></i> Costing</h5>
+            </div>
+            <div class="card-body p-2">
+
+        <!-- Cost Summary -->
+        {% set _cpq = project.get_cost_per_qty_total() %}
+        {% set _ov = project.get_overall_cost_total() %}
+        {% set _qty = project.quantity or 1 %}
+        {% set _est = (project.get_bom_total_cost() + _cpq) * _qty + _ov %}
+        <div class="row g-2 mb-2">
+            <div class="col-6 col-md-2"><div class="card bg-light h-100"><div class="card-body text-center p-2"><small class="text-muted d-block">Quantity</small><strong>{{ _qty }}</strong></div></div></div>
+            <div class="col-6 col-md-2">
+                <div class="card bg-light mb-1"><div class="card-body text-center p-2"><small class="text-muted d-block">Est. BOM</small><span style="font-size:0.85rem;">{{ currency }} {{ '{:,.{}f}'.format(project.get_bom_total_cost(), currency_decimal) }}</span></div></div>
+                <div class="card bg-light"><div class="card-body text-center p-2"><small class="text-muted d-block">Act. BOM</small><span style="font-size:0.85rem;">{{ currency }} {{ '{:,.{}f}'.format(project.get_bom_actual_cost(), currency_decimal) }}</span></div></div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="card bg-light mb-1"><div class="card-body text-center p-2"><small class="text-muted d-block">Cost/Qty</small><span style="font-size:0.85rem;">{{ currency }} {{ '{:,.{}f}'.format(_cpq, currency_decimal) }}</span></div></div>
+                <div class="card bg-light"><div class="card-body text-center p-2"><small class="text-muted d-block">Overall</small><span style="font-size:0.85rem;">{{ currency }} {{ '{:,.{}f}'.format(_ov, currency_decimal) }}</span></div></div>
+            </div>
+            <div class="col-6 col-md-6"><div class="card bg-primary text-white h-100"><div class="card-body text-center p-2 d-flex flex-column justify-content-center"><small class="d-block">Project Total</small><h5 class="mb-1">{{ currency }} {{ '{:,.{}f}'.format(_est, currency_decimal) }}</h5><small class="opacity-75">(BOM+CPQ)×Qty+Overall</small></div></div></div>
+        </div>
+
+        <!-- BOM -->
+        <div class="card mt-2 border-0 shadow-sm">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h5 class="mb-0"><i class="bi bi-list-check"></i> Bill of Materials (BOM)</h5>
                 <div class="text-end">
@@ -568,7 +594,7 @@
         </div>
 
         <!-- Cost per Quantity -->
-        <div class="card mt-3">
+        <div class="card mt-2 border-0 shadow-sm">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h5 class="mb-0"><i class="bi bi-calculator"></i> Cost per Quantity</h5>
                 <button type="button" class="btn btn-sm btn-outline-primary" onclick="openCostModal('per_qty')"><i class="bi bi-plus-lg"></i> Add Item</button>
@@ -619,7 +645,7 @@
         </div>
 
         <!-- Overall Cost -->
-        <div class="card mt-3">
+        <div class="card mt-2 border-0 shadow-sm">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h5 class="mb-0"><i class="bi bi-receipt"></i> Overall Cost</h5>
                 <button type="button" class="btn btn-sm btn-outline-primary" onclick="openCostModal('overall')"><i class="bi bi-plus-lg"></i> Add Item</button>
@@ -668,6 +694,10 @@
                 </div>
             </div>
         </div>
+
+            </div>
+        </div>
+        <!-- end Costing card -->
 
         <!-- Duplicate Save/Back at bottom -->
         <div class="card mt-3">
@@ -724,86 +754,210 @@
     </div>
 </div>
 
-<!-- Project Thumbnail Share Picker Modal -->
-{% if share_files_project is defined %}
-<div class="modal fade" id="projThumbShareModal" tabindex="-1">
+<!-- Project Thumbnail Icon Picker Modal -->
+<div class="modal fade" id="projThumbIconPickerModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-folder"></i> Select from Share Files</h5>
+                <h5 class="modal-title"><i class="bi bi-star me-2"></i>Select Icon for Thumbnail</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="row g-2">
-                {% for sf in share_files_project %}
-                <div class="col-3 col-md-2">
-                    <div class="text-center p-1 border rounded" style="cursor:pointer;" onclick="_applyProjThumb('share:{{ sf.filename }}'); bootstrap.Modal.getInstance(document.getElementById('projThumbShareModal')).hide();">
-                        {% if sf.is_image %}
-                        <img src="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;">
-                        {% else %}
-                        <i class="bi bi-file-earmark" style="font-size:2rem;"></i>
-                        {% endif %}
-                        <small class="d-block text-truncate">{{ sf.name }}</small>
-                    </div>
-                </div>
-                {% else %}
-                <div class="col-12 text-muted">No project share files available.</div>
-                {% endfor %}
+                <input type="text" class="form-control form-control-sm mb-3" id="ptIpSearch" placeholder="Search icons…" oninput="_ptRenderIcons(_ptIconsCache||[])">
+                <div id="ptIpGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:4px;max-height:400px;overflow-y:auto;">
+                    <p class="text-muted text-center py-4">Loading…</p>
                 </div>
             </div>
         </div>
     </div>
 </div>
-{% endif %}
+
+<!-- Project Thumbnail Picture Picker Modal -->
+<div class="modal fade" id="projThumbPicturePickerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-image me-2"></i>Select from Project Pictures</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                {% set proj_images = attachments.get('picture', []) %}
+                {% if proj_images %}
+                <div class="row row-cols-3 row-cols-sm-4 row-cols-md-5 g-2">
+                    {% for att in proj_images %}
+                    <div class="col">
+                        <div class="pt-pic-option border rounded overflow-hidden"
+                             data-value="{{ att.filename }}"
+                             data-url="{{ url_for('uploaded_file', filename=att.file_path) }}"
+                             style="cursor:pointer;aspect-ratio:1/1;"
+                             onclick="ptSelectPicture(this)">
+                            <img src="{{ url_for('uploaded_file', filename=att.file_path) }}"
+                                 alt="{{ att.original_filename }}"
+                                 style="width:100%;height:100%;object-fit:cover;">
+                        </div>
+                        <div class="text-truncate mt-1" style="font-size:0.7rem;">{{ att.original_filename }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">No pictures uploaded for this project yet. Upload them via the Attachments section on the view page.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Project Thumbnail Share Picker Modal (Icon + Project share files) -->
+<div class="modal fade" id="projThumbShareModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-folder me-2"></i>Select Share File for Thumbnail</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" class="form-control form-control-sm mb-3" id="ptSpSearch" placeholder="Search by name or category…" oninput="_ptRenderShare(_ptShareCache||[])">
+                <div id="ptSpGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;max-height:400px;overflow-y:auto;">
+                    <p class="text-muted text-center py-4">Loading…</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
 (function() {
     const _pid = '{{ project.project_id }}';
 
+    /* ---- Project thumbnail helpers ---- */
+    let _ptIconsCache = null;
+    let _ptShareCache = null;
+    const _ptClearBtnHtml = `<button type="button" onclick="clearProjThumb()" style="position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:none;background:#dc3545;color:white;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;z-index:1;" title="Remove thumbnail"><i class="bi bi-x"></i></button>`;
+
     window.clearProjThumb = function() {
         document.getElementById('projThumbnailValue').value = '';
         const p = document.getElementById('projThumbPreview');
-        p.innerHTML = '<i class="bi bi-image text-muted" style="font-size:1.5rem;"></i>';
+        if (p) p.innerHTML = '<i class="bi bi-image text-muted" style="font-size:1.5rem;"></i>';
     };
 
-    window.openProjThumbIconPicker = function() {
-        _projThumbMode = 'icon';
-        // Reuse the item thumb icon picker modal if available, else show a simple prompt
-        const modal = document.getElementById('thumbIconPickerModal');
-        if (modal) {
-            new bootstrap.Modal(modal).show();
-        } else {
-            const icon = prompt('Enter Bootstrap icon name (e.g. kanban, cpu, box):');
-            if (icon) _applyProjThumb('biicon:' + icon.trim());
-        }
-    };
-
-    window.openProjThumbSharePicker = function() {
-        _projThumbMode = 'share';
-        new bootstrap.Modal(document.getElementById('projThumbShareModal')).show();
-    };
-
-    let _projThumbMode = '';
-
-    window._applyProjThumb = function(value) {
-        document.getElementById('projThumbnailValue').value = value;
+    function _ptUpdatePreview(type, value, url) {
         const p = document.getElementById('projThumbPreview');
-        p.innerHTML = '';
-        if (value.startsWith('biicon:')) {
-            const iconName = value.slice(7).replace(/[^a-z0-9-]/gi, '');
-            p.innerHTML = '<i class="bi bi-' + iconName + '" style="font-size:28px;color:#333;"></i>';
-        } else if (value.startsWith('icon:') || value.startsWith('share:')) {
-            const img = document.createElement('img');
-            img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:6px;';
-            p.appendChild(img);
+        if (!p) return;
+        p.replaceChildren();
+        if (type === 'icon') {
+            const i = document.createElement('i');
+            i.className = 'bi bi-' + value.replace(/[^a-z0-9-]/gi, '');
+            i.style.cssText = 'font-size:28px;color:#333;';
+            p.appendChild(i);
+            p.insertAdjacentHTML('beforeend', _ptClearBtnHtml);
+        } else if (url) {
+            const fit = type === 'icon_file' ? 'contain;padding:4px' : 'cover';
+            p.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:${fit};border-radius:6px;">${_ptClearBtnHtml}`;
+        } else {
+            p.innerHTML = '<i class="bi bi-image text-muted" style="font-size:1.5rem;"></i>';
         }
-        const closeBtn = document.createElement('button');
-        closeBtn.type = 'button';
-        closeBtn.onclick = window.clearProjThumb;
-        closeBtn.style.cssText = 'position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:none;background:#dc3545;color:white;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;z-index:1;';
-        closeBtn.title = 'Remove thumbnail';
-        closeBtn.innerHTML = '<i class="bi bi-x"></i>';
-        p.appendChild(closeBtn);
+    }
+
+    /* Icon picker */
+    window.openProjThumbIconPicker = function() {
+        const modal = new bootstrap.Modal(document.getElementById('projThumbIconPickerModal'));
+        modal.show();
+        _ptLoadIcons();
+    };
+
+    async function _ptLoadIcons() {
+        if (_ptIconsCache) { _ptRenderIcons(_ptIconsCache); return; }
+        const grid = document.getElementById('ptIpGrid');
+        if (grid) grid.innerHTML = '<p class="text-muted text-center py-4">Loading…</p>';
+        try {
+            const resp = await fetch('/api/icons');
+            _ptIconsCache = await resp.json();
+            _ptRenderIcons(_ptIconsCache);
+        } catch (e) {
+            if (grid) grid.innerHTML = '<p class="text-danger text-center py-4">Error loading icons.</p>';
+        }
+    }
+
+    window._ptRenderIcons = function(icons) {
+        const current = document.getElementById('projThumbnailValue').value;
+        const curIcon = current.startsWith('biicon:') ? current.slice(7) : '';
+        const query = (document.getElementById('ptIpSearch')?.value || '').toLowerCase();
+        const filtered = query ? icons.filter(ic => ic.name.includes(query)) : icons;
+        const grid = document.getElementById('ptIpGrid');
+        if (!grid) return;
+        grid.innerHTML = filtered.map(ic => {
+            const sel = ic.name === curIcon ? 'background:#0d6efd22;outline:2px solid #0d6efd;border-radius:4px;' : '';
+            return `<button type="button" style="border:1px solid #dee2e6;border-radius:4px;padding:4px 2px;background:white;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:52px;${sel}" title="${ic.name}" onclick="ptSelectIcon('${ic.name}')"><i class="${ic.class}" style="font-size:18px;"></i><span style="font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${ic.name}</span></button>`;
+        }).join('') || '<p class="text-muted text-center py-4" style="grid-column:1/-1;">No icons found.</p>';
+    };
+
+    window.ptSelectIcon = function(iconName) {
+        document.getElementById('projThumbnailValue').value = 'biicon:' + iconName;
+        _ptUpdatePreview('icon', iconName, '');
+        _ptRenderIcons(_ptIconsCache || []);
+        bootstrap.Modal.getInstance(document.getElementById('projThumbIconPickerModal')).hide();
+    };
+
+    /* Picture picker (project uploaded pictures) */
+    window.openProjThumbPicturePicker = function() {
+        const current = document.getElementById('projThumbnailValue').value;
+        document.querySelectorAll('.pt-pic-option').forEach(el => {
+            el.classList.toggle('border-success', el.dataset.value === current);
+            el.classList.toggle('border-3', el.dataset.value === current);
+        });
+        new bootstrap.Modal(document.getElementById('projThumbPicturePickerModal')).show();
+    };
+
+    window.ptSelectPicture = function(el) {
+        document.getElementById('projThumbnailValue').value = el.dataset.value;
+        _ptUpdatePreview('upload', el.dataset.value, el.dataset.url);
+        document.querySelectorAll('.pt-pic-option').forEach(o => o.classList.remove('border-success', 'border-3'));
+        el.classList.add('border-success', 'border-3');
+        bootstrap.Modal.getInstance(document.getElementById('projThumbPicturePickerModal')).hide();
+    };
+
+    /* Share file picker (icon + project categories) */
+    window.openProjThumbSharePicker = function() {
+        new bootstrap.Modal(document.getElementById('projThumbShareModal')).show();
+        _ptLoadShare();
+    };
+
+    async function _ptLoadShare() {
+        if (_ptShareCache) { _ptRenderShare(_ptShareCache); return; }
+        const grid = document.getElementById('ptSpGrid');
+        if (grid) grid.innerHTML = '<p class="text-muted text-center py-4">Loading…</p>';
+        try {
+            const resp = await fetch('/api/project-thumb-media');
+            _ptShareCache = await resp.json();
+            _ptRenderShare(_ptShareCache);
+        } catch (e) {
+            if (grid) grid.innerHTML = '<p class="text-danger text-center py-4">Error loading files.</p>';
+        }
+    }
+
+    window._ptRenderShare = function(files) {
+        const current = document.getElementById('projThumbnailValue').value;
+        const query = (document.getElementById('ptSpSearch')?.value || '').toLowerCase();
+        const filtered = query ? files.filter(f => f.name.toLowerCase().includes(query) || f.category.toLowerCase().includes(query)) : files;
+        const grid = document.getElementById('ptSpGrid');
+        if (!grid) return;
+        const _escSq = s => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const prefix = f => f.category === 'icon' ? 'icon:' : 'share:';
+        grid.innerHTML = filtered.map(f => {
+            const val = prefix(f) + f.filename;
+            const sel = val === current ? 'border:2px solid #0d6efd;' : 'border:1px solid #dee2e6;';
+            return `<div style="cursor:pointer;border-radius:6px;padding:6px;background:white;${sel}display:flex;flex-direction:column;align-items:center;gap:4px;" onclick="ptSelectShare('${_escSq(val)}','${_escSq(f.url)}','${_escSq(f.category)}')">
+                <img src="${f.url}" style="max-width:60px;max-height:60px;object-fit:contain;">
+                <span style="font-size:10px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px;" title="${f.name}">${f.name}</span>
+                <span style="font-size:9px;background:#6c757d;color:white;padding:1px 5px;border-radius:10px;">${f.category}</span>
+            </div>`;
+        }).join('') || '<p class="text-muted text-center py-4" style="grid-column:1/-1;">No files found.</p>';
+    };
+
+    window.ptSelectShare = function(val, url, category) {
+        document.getElementById('projThumbnailValue').value = val;
+        _ptUpdatePreview(category === 'icon' ? 'icon_file' : 'upload', val, url);
+        bootstrap.Modal.getInstance(document.getElementById('projThumbShareModal')).hide();
     };
 
     window.moveBOM = function(id, direction) {

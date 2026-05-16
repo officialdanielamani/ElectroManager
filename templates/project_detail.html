@@ -59,8 +59,6 @@
                         {% if project.enable_dateline_notification %}
                         <div class="mb-2"><strong>Notification:</strong> {{ project.notify_before_days }} days before dateline</div>
                         {% endif %}
-                        <div class="mb-2"><strong>Created:</strong> {{ project.created_at.strftime('%Y-%m-%d %H:%M') if project.created_at else 'N/A' }}{% if project.creator %} by <span class="badge bg-secondary">{{ project.creator.username }}</span>{% endif %}</div>
-                        <div class="mb-2"><strong>Updated:</strong> {{ project.updated_at.strftime('%Y-%m-%d %H:%M') if project.updated_at else 'N/A' }}{% if project.updater %} by <span class="badge bg-secondary">{{ project.updater.username }}</span>{% endif %}</div>
                     </div>
                 </div>
 
@@ -157,8 +155,8 @@
                     <div class="col-6 col-md-3"><div class="card bg-light"><div class="card-body text-center p-2"><small class="text-muted">BOM Est. (per unit)</small><h6 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(bom_est, currency_decimal) }}</h6></div></div></div>
                     <div class="col-6 col-md-3"><div class="card bg-light"><div class="card-body text-center p-2"><small class="text-muted">BOM Actual (per unit)</small><h6 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(bom_act, currency_decimal) }}</h6></div></div></div>
                     <div class="col-6 col-md-2"><div class="card bg-light"><div class="card-body text-center p-2"><small class="text-muted">Qty</small><h6 class="mb-0">{{ proj_qty }}</h6></div></div></div>
-                    <div class="col-6 col-md-2"><div class="card bg-primary text-white"><div class="card-body text-center p-2"><small>Est. Total<br><span style="font-size:0.7rem;">(BOM+CPQ)×Qty+Overall</span></small><h6 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(est_total, currency_decimal) }}</h6></div></div></div>
-                    <div class="col-6 col-md-2"><div class="card bg-success text-white"><div class="card-body text-center p-2"><small>Actual Total<br><span style="font-size:0.7rem;">(BOM+CPQ)×Qty+Overall</span></small><h6 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(act_total, currency_decimal) }}</h6></div></div></div>
+                    <div class="col-6 col-md-2"><div class="card bg-primary text-white"><div class="card-body text-center p-2"><small>Est. Total</small><h6 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(est_total, currency_decimal) }}</h6></div></div></div>
+                    <div class="col-6 col-md-2"><div class="card bg-success text-white"><div class="card-body text-center p-2"><small>Actual Total</small><h6 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(act_total, currency_decimal) }}</h6></div></div></div>
                 </div>
 
                 <!-- Attachments (view only) -->
@@ -422,6 +420,16 @@
                             </tr>
                         </tbody>
                     </table>
+                </div>
+
+                <hr>
+                <div class="row text-muted small">
+                    <div class="col-md-6">
+                        <strong>Created:</strong> {{ project.created_at.strftime('%Y-%m-%d %H:%M') if project.created_at else 'N/A' }}{% if project.creator %} by <span class="badge bg-secondary">{{ project.creator.username }}</span>{% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Updated:</strong> {{ project.updated_at.strftime('%Y-%m-%d %H:%M') if project.updated_at else 'N/A' }}{% if project.updater %} by <span class="badge bg-secondary">{{ project.updater.username }}</span>{% endif %}
+                    </div>
                 </div>
 
             </div>

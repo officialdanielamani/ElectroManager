@@ -1015,6 +1015,29 @@ def project_upload(project_id, attachment_type):
     return redirect(url_for('project.project_edit', project_id=project_id))
 
 
+@project_bp.route('/api/project-thumb-media', endpoint='api_project_thumb_media')
+@login_required
+def api_project_thumb_media():
+    """API: List icon + project share files (images only) for project thumbnail picker."""
+    from models import SharedFile
+    from flask import url_for as _url_for
+    files = SharedFile.query.filter(
+        SharedFile.category.in_(['icon', 'project'])
+    ).order_by(SharedFile.category, SharedFile.name).all()
+    result = []
+    for f in files:
+        if not f.is_image:
+            continue
+        result.append({
+            'id': f.id,
+            'name': f.name,
+            'filename': f.filename,
+            'category': f.category,
+            'url': _url_for('share.share_serve', category=f.category, filename=f.filename),
+        })
+    return jsonify(result)
+
+
 @project_bp.route('/project/attachment/<int:att_id>/delete', endpoint='project_attachment_delete', methods=['POST'])
 @login_required
 def project_attachment_delete(att_id):
