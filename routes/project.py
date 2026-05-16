@@ -406,6 +406,8 @@ def project_edit(project_id):
                            categories=categories, tags=tags, statuses=statuses,
                            users=users, contact_persons=contact_persons, contact_orgs=contact_orgs,
                            bom_items=ProjectBOMItem.query.filter_by(project_id=project.id).all(),
+                           cost_items_per_qty=ProjectCostItem.query.filter_by(project_id=project.id, cost_type='per_qty').order_by(ProjectCostItem.sort_order).all(),
+                           cost_items_overall=ProjectCostItem.query.filter_by(project_id=project.id, cost_type='overall').order_by(ProjectCostItem.sort_order).all(),
                            attachments={atype: ProjectAttachment.query.filter_by(project_id=project.id, attachment_type=atype).all() for atype in ['picture', 'document', 'schematic', '2d_design', '3d_design', 'program']},
                            share_files_project=SharedFile.query.filter_by(category='project').order_by(SharedFile.name).all(),
                            currency=Setting.get('currency', 'USD'),

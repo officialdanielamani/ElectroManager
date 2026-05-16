@@ -552,6 +552,227 @@
 </div>
 
 {% if project %}
+<!-- Cost Items Section -->
+<div class="card mt-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-calculator"></i> Cost per Quantity</h5>
+        <button type="button" class="btn btn-sm btn-outline-primary" onclick="openCostModal('per_qty')"><i class="bi bi-plus-lg"></i> Add Item</button>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" style="font-size:0.88rem;">
+                <thead>
+                    <tr>
+                        <th style="width:64px;"></th>
+                        <th>Item</th>
+                        <th>Description</th>
+                        <th>Price per Qty</th>
+                        <th>Qty</th>
+                        <th>Total</th>
+                        <th style="width:80px;">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="cpq-tbody">
+                {% for ci in cost_items_per_qty %}
+                <tr>
+                    <td>
+                        <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="moveCostItem({{ ci.id }}, 'up', 'per_qty')" title="Move up"><i class="bi bi-arrow-up"></i></button>
+                        <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="moveCostItem({{ ci.id }}, 'down', 'per_qty')" title="Move down"><i class="bi bi-arrow-down"></i></button>
+                    </td>
+                    <td><strong>{{ ci.name }}</strong></td>
+                    <td>{{ ci.description or '-' }}</td>
+                    <td>{{ app_settings.currency }} {{ '{:,.{}f}'.format(ci.price, currency_decimal_places|int) }}{% if ci.unit_label %} /{{ ci.unit_label }}{% endif %}</td>
+                    <td>{{ '{:g}'.format(ci.quantity) }}</td>
+                    <td>{{ app_settings.currency }} {{ '{:,.{}f}'.format(ci.total, currency_decimal_places|int) }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="editCostItem({{ ci.id }}, 'per_qty', {{ ci.name|tojson }}, {{ (ci.description or '')|tojson }}, {{ ci.price }}, {{ (ci.unit_label or '')|tojson }}, {{ ci.quantity }})" title="Edit"><i class="bi bi-pencil"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCostItem({{ ci.id }})" title="Delete"><i class="bi bi-trash"></i></button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr id="cpq-empty"><td colspan="7" class="text-muted text-center py-2">No items yet. Click Add Item to start.</td></tr>
+                {% endfor %}
+                </tbody>
+                {% if cost_items_per_qty %}
+                <tfoot>
+                    <tr class="table-active">
+                        <td colspan="5" class="text-end"><strong>Total/qty:</strong></td>
+                        <td colspan="2"><strong>{{ app_settings.currency }} {{ '{:,.{}f}'.format(project.get_cost_per_qty_total(), currency_decimal_places|int) }}</strong></td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-receipt"></i> Overall Cost</h5>
+        <button type="button" class="btn btn-sm btn-outline-primary" onclick="openCostModal('overall')"><i class="bi bi-plus-lg"></i> Add Item</button>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" style="font-size:0.88rem;">
+                <thead>
+                    <tr>
+                        <th style="width:64px;"></th>
+                        <th>Item</th>
+                        <th>Description</th>
+                        <th>Price per Qty</th>
+                        <th>Qty</th>
+                        <th>Total</th>
+                        <th style="width:80px;">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="ov-tbody">
+                {% for ci in cost_items_overall %}
+                <tr>
+                    <td>
+                        <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="moveCostItem({{ ci.id }}, 'up', 'overall')" title="Move up"><i class="bi bi-arrow-up"></i></button>
+                        <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="moveCostItem({{ ci.id }}, 'down', 'overall')" title="Move down"><i class="bi bi-arrow-down"></i></button>
+                    </td>
+                    <td><strong>{{ ci.name }}</strong></td>
+                    <td>{{ ci.description or '-' }}</td>
+                    <td>{{ app_settings.currency }} {{ '{:,.{}f}'.format(ci.price, currency_decimal_places|int) }}{% if ci.unit_label %} /{{ ci.unit_label }}{% endif %}</td>
+                    <td>{{ '{:g}'.format(ci.quantity) }}</td>
+                    <td>{{ app_settings.currency }} {{ '{:,.{}f}'.format(ci.total, currency_decimal_places|int) }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="editCostItem({{ ci.id }}, 'overall', {{ ci.name|tojson }}, {{ (ci.description or '')|tojson }}, {{ ci.price }}, {{ (ci.unit_label or '')|tojson }}, {{ ci.quantity }})" title="Edit"><i class="bi bi-pencil"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCostItem({{ ci.id }})" title="Delete"><i class="bi bi-trash"></i></button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr id="ov-empty"><td colspan="7" class="text-muted text-center py-2">No items yet. Click Add Item to start.</td></tr>
+                {% endfor %}
+                </tbody>
+                {% if cost_items_overall %}
+                <tfoot>
+                    <tr class="table-active">
+                        <td colspan="5" class="text-end"><strong>Total:</strong></td>
+                        <td colspan="2"><strong>{{ app_settings.currency }} {{ '{:,.{}f}'.format(project.get_overall_cost_total(), currency_decimal_places|int) }}</strong></td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Cost Item Modal -->
+<div class="modal fade" id="costItemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="costItemModalTitle"><i class="bi bi-calculator"></i> Add Cost Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="ci-id" value="">
+                <input type="hidden" id="ci-type" value="per_qty">
+                <div class="mb-3">
+                    <label class="form-label">Item Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="ci-name" placeholder="e.g. Solder Paste">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <input type="text" class="form-control" id="ci-description" placeholder="Optional description">
+                </div>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label">Price per Unit</label>
+                        <input type="number" class="form-control" id="ci-price" value="0" min="0" step="any">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Unit Label</label>
+                        <input type="text" class="form-control" id="ci-unit-label" placeholder="e.g. g, w, unit">
+                    </div>
+                </div>
+                <div class="mb-0 mt-3">
+                    <label class="form-label">Quantity</label>
+                    <input type="number" class="form-control" id="ci-quantity" value="1" min="0" step="any">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveCostItem()"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const _pid = '{{ project.project_id }}';
+
+    window.openCostModal = function(costType) {
+        document.getElementById('ci-id').value = '';
+        document.getElementById('ci-type').value = costType;
+        document.getElementById('ci-name').value = '';
+        document.getElementById('ci-description').value = '';
+        document.getElementById('ci-price').value = '0';
+        document.getElementById('ci-unit-label').value = '';
+        document.getElementById('ci-quantity').value = '1';
+        document.getElementById('costItemModalTitle').innerHTML = '<i class="bi bi-calculator"></i> Add ' + (costType === 'per_qty' ? 'Cost per Quantity' : 'Overall Cost') + ' Item';
+        new bootstrap.Modal(document.getElementById('costItemModal')).show();
+    };
+
+    window.editCostItem = function(id, costType, name, description, price, unitLabel, qty) {
+        document.getElementById('ci-id').value = id;
+        document.getElementById('ci-type').value = costType;
+        document.getElementById('ci-name').value = name;
+        document.getElementById('ci-description').value = description;
+        document.getElementById('ci-price').value = price;
+        document.getElementById('ci-unit-label').value = unitLabel;
+        document.getElementById('ci-quantity').value = qty;
+        document.getElementById('costItemModalTitle').innerHTML = '<i class="bi bi-pencil"></i> Edit Cost Item';
+        new bootstrap.Modal(document.getElementById('costItemModal')).show();
+    };
+
+    window.saveCostItem = function() {
+        const id = document.getElementById('ci-id').value;
+        const costType = document.getElementById('ci-type').value;
+        const name = document.getElementById('ci-name').value.trim();
+        if (!name) { alert('Item name is required.'); return; }
+        const payload = {
+            cost_type: costType,
+            name,
+            description: document.getElementById('ci-description').value.trim(),
+            price: parseFloat(document.getElementById('ci-price').value) || 0,
+            unit_label: document.getElementById('ci-unit-label').value.trim(),
+            quantity: parseFloat(document.getElementById('ci-quantity').value) || 1,
+        };
+        const url = id ? `/project/${_pid}/cost/${id}/edit` : `/project/${_pid}/cost/add`;
+        fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)})
+            .then(r => r.json()).then(d => {
+                if (d.success) location.reload();
+                else alert('Error: ' + (d.error || 'Failed'));
+            }).catch(() => alert('Request failed'));
+    };
+
+    window.deleteCostItem = function(id) {
+        if (!confirm('Delete this cost item?')) return;
+        fetch(`/project/${_pid}/cost/${id}/delete`, {method: 'POST', headers: {'Content-Type': 'application/json'}})
+            .then(r => r.json()).then(d => {
+                if (d.success) location.reload();
+                else alert('Error: ' + (d.error || 'Failed'));
+            }).catch(() => alert('Request failed'));
+    };
+
+    window.moveCostItem = function(id, direction) {
+        fetch(`/project/${_pid}/cost/${id}/move`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({direction})
+        }).then(r => r.json()).then(d => {
+            if (d.success) location.reload();
+            else alert('Error: ' + (d.error || 'Failed'));
+        }).catch(() => alert('Request failed'));
+    };
+})();
+</script>
+{% endif %}
+
+{% if project %}
 <!-- Edit BOM Item Modal -->
 <div class="modal fade" id="editBOMModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
