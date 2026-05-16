@@ -975,6 +975,8 @@ def api_drawer_sticker_print(uuid, drawer_id, template_id):
     """Generate PDF sticker for a rack drawer"""
     if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
         return jsonify({'error': 'Permission denied'}), 403
+    if not re.match(r'^[A-Za-z0-9_-]+$', drawer_id):
+        return jsonify({'error': 'Invalid drawer ID'}), 400
     from qr_utils import get_drawer_data, generate_single_sticker_pdf
     rack = Rack.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
@@ -1007,6 +1009,9 @@ def api_drawers_sticker_print(uuid, template_id):
     drawer_ids = [d.strip() for d in raw.split(',') if d.strip()]
     if not drawer_ids:
         return jsonify({'error': 'No drawers specified'}), 400
+    drawer_ids = [d for d in drawer_ids if re.match(r'^[A-Za-z0-9_-]+$', d)]
+    if not drawer_ids:
+        return jsonify({'error': 'No valid drawer IDs'}), 400
     output = generate_batch_stickers_pdf(template, drawer_ids, lambda did: get_drawer_data(rack, did))
     log_audit(current_user.id, 'print', 'rack', rack.id,
               f'Printed drawer stickers: {template.name} drawers {",".join(drawer_ids)}')
