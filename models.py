@@ -1459,6 +1459,7 @@ class Project(db.Model):
     creator = db.relationship('User', foreign_keys=[created_by], backref='projects_created')
     updater = db.relationship('User', foreign_keys=[updated_by], backref='projects_updated')
     bom_items = db.relationship('ProjectBOMItem', backref='project', lazy=True, cascade='all, delete-orphan')
+    cost_items = db.relationship('ProjectCostItem', backref='project', lazy=True, cascade='all, delete-orphan', order_by='ProjectCostItem.sort_order')
     attachments = db.relationship('ProjectAttachment', backref='project', lazy=True, cascade='all, delete-orphan')
     urls = db.relationship('ProjectURL', backref='project', lazy=True, cascade='all, delete-orphan')
     linked_share_files = db.relationship('SharedFile', secondary=project_share_files, lazy='subquery', backref=db.backref('linked_projects', lazy=True))
@@ -1501,6 +1502,10 @@ class Project(db.Model):
         return self.get_bom_total_cost() * (self.quantity or 1)
     def get_project_actual_cost(self):
         return self.get_bom_actual_cost() * (self.quantity or 1)
+    def get_cost_per_qty_total(self):
+        return sum(i.total for i in self.cost_items if i.cost_type == 'per_qty')
+    def get_overall_cost_total(self):
+        return sum(i.total for i in self.cost_items if i.cost_type == 'overall')
 
 class ProjectBOMItem(db.Model):
     __tablename__ = 'project_bom_items'
@@ -1535,6 +1540,23 @@ class ProjectBOMItem(db.Model):
     def get_actual_cost(self):
         """Actual cost based on used quantity"""
         return self.get_cost_per_unit() * (self.used_quantity or 0)
+
+class ProjectCostItem(db.Model):
+    __tablename__ = 'project_cost_items'
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    cost_type = db.Column(db.String(20), nullable=False)  # 'per_qty' or 'overall'
+    name = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.String(255))
+    price = db.Column(db.Float, default=0.0)
+    unit_label = db.Column(db.String(50))
+    quantity = db.Column(db.Float, default=1.0)
+    sort_order = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    @property
+    def total(self):
+        return (self.price or 0.0) * (self.quantity or 1.0)
 
 class ProjectAttachment(db.Model):
     __tablename__ = 'project_attachments'

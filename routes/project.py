@@ -7,7 +7,7 @@ from models import (db, User, Item, ItemBatch, BatchSerialNumber, Setting,
                     Project, ProjectCategory, ProjectTag, ProjectStatus,
                     ProjectPerson, ProjectGroup, ProjectGroupMember,
                     ContactPerson, ContactOrganization,
-                    ProjectBOMItem, ProjectAttachment, ProjectURL, SharedFile,
+                    ProjectBOMItem, ProjectCostItem, ProjectAttachment, ProjectURL, SharedFile,
                     MagicParameter, ProjectParameter, ProjectParameterStringValue)
 from utils import log_audit, permission_required, allowed_file
 from werkzeug.utils import secure_filename
@@ -286,6 +286,10 @@ def project_detail(project_id):
     # BOM items
     bom_items = ProjectBOMItem.query.filter_by(project_id=project.id).all()
 
+    # Cost items
+    cost_items_per_qty = ProjectCostItem.query.filter_by(project_id=project.id, cost_type='per_qty').order_by(ProjectCostItem.sort_order).all()
+    cost_items_overall = ProjectCostItem.query.filter_by(project_id=project.id, cost_type='overall').order_by(ProjectCostItem.sort_order).all()
+
     # Attachments by type
     attachments = {}
     for atype in ['picture', 'document', 'schematic', '2d_design', '3d_design', 'program']:
@@ -297,6 +301,8 @@ def project_detail(project_id):
     return render_template('project_detail.html',
                            project=project,
                            bom_items=bom_items,
+                           cost_items_per_qty=cost_items_per_qty,
+                           cost_items_overall=cost_items_overall,
                            attachments=attachments,
                            currency=currency,
                            currency_decimal=currency_decimal,
@@ -819,6 +825,118 @@ def bom_delete(project_id, bom_id):
 
     bom = ProjectBOMItem.query.get_or_404(bom_id)
     db.session.delete(bom)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# ==================== PROJECT COST ITEMS ====================
+
+@project_bp.route('/project/<project_id>/cost/add', endpoint='cost_item_add', methods=['POST'])
+@login_required
+def cost_item_add(project_id):
+    if not current_user.has_permission('projects', 'edit'):
+        return jsonify({'error': 'No permission'}), 403
+
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    data = request.get_json()
+    cost_type = data.get('cost_type', 'per_qty')
+    if cost_type not in ('per_qty', 'overall'):
+        return jsonify({'error': 'Invalid cost_type'}), 400
+
+    # Assign sort_order as max + 1 for this type
+    existing = ProjectCostItem.query.filter_by(project_id=project.id, cost_type=cost_type).all()
+    sort_order = max((i.sort_order for i in existing), default=-1) + 1
+
+    try:
+        price = float(data.get('price', 0))
+        qty = float(data.get('quantity', 1))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid price or quantity'}), 400
+
+    item = ProjectCostItem(
+        project_id=project.id,
+        cost_type=cost_type,
+        name=(data.get('name') or '').strip(),
+        description=(data.get('description') or '').strip(),
+        price=price,
+        unit_label=(data.get('unit_label') or '').strip(),
+        quantity=qty,
+        sort_order=sort_order,
+    )
+    if not item.name:
+        return jsonify({'error': 'Name is required'}), 400
+    db.session.add(item)
+    db.session.commit()
+    log_audit(current_user.id, 'create', 'project_cost_item', item.id, f'Added cost item to project {project.project_id}')
+    return jsonify({'success': True, 'id': item.id})
+
+
+@project_bp.route('/project/<project_id>/cost/<int:cost_id>/edit', endpoint='cost_item_edit', methods=['POST'])
+@login_required
+def cost_item_edit(project_id, cost_id):
+    if not current_user.has_permission('projects', 'edit'):
+        return jsonify({'error': 'No permission'}), 403
+
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    item = ProjectCostItem.query.filter_by(id=cost_id, project_id=project.id).first_or_404()
+    data = request.get_json()
+
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'error': 'Name is required'}), 400
+
+    try:
+        price = float(data.get('price', 0))
+        qty = float(data.get('quantity', 1))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid price or quantity'}), 400
+
+    item.name = name
+    item.description = (data.get('description') or '').strip()
+    item.price = price
+    item.unit_label = (data.get('unit_label') or '').strip()
+    item.quantity = qty
+    db.session.commit()
+    log_audit(current_user.id, 'update', 'project_cost_item', item.id, f'Edited cost item in project {project.project_id}')
+    return jsonify({'success': True})
+
+
+@project_bp.route('/project/<project_id>/cost/<int:cost_id>/delete', endpoint='cost_item_delete', methods=['POST'])
+@login_required
+def cost_item_delete(project_id, cost_id):
+    if not current_user.has_permission('projects', 'edit'):
+        return jsonify({'error': 'No permission'}), 403
+
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    item = ProjectCostItem.query.filter_by(id=cost_id, project_id=project.id).first_or_404()
+    db.session.delete(item)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@project_bp.route('/project/<project_id>/cost/<int:cost_id>/move', endpoint='cost_item_move', methods=['POST'])
+@login_required
+def cost_item_move(project_id, cost_id):
+    if not current_user.has_permission('projects', 'edit'):
+        return jsonify({'error': 'No permission'}), 403
+
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    item = ProjectCostItem.query.filter_by(id=cost_id, project_id=project.id).first_or_404()
+    direction = (request.get_json() or {}).get('direction', 'up')
+
+    siblings = ProjectCostItem.query.filter_by(
+        project_id=project.id, cost_type=item.cost_type
+    ).order_by(ProjectCostItem.sort_order).all()
+
+    idx = next((i for i, s in enumerate(siblings) if s.id == item.id), None)
+    if idx is None:
+        return jsonify({'error': 'Item not found'}), 404
+
+    swap_idx = idx - 1 if direction == 'up' else idx + 1
+    if swap_idx < 0 or swap_idx >= len(siblings):
+        return jsonify({'success': True})  # already at boundary
+
+    siblings[idx].sort_order, siblings[swap_idx].sort_order = siblings[swap_idx].sort_order, siblings[idx].sort_order
     db.session.commit()
     return jsonify({'success': True})
 
