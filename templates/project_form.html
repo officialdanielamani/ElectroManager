@@ -553,9 +553,9 @@
                                 <td>{{ currency }} {{ '{:,.{}f}'.format(bom.get_total_cost(), currency_decimal) }}</td>
                                 <td>{{ currency }} {{ '{:,.{}f}'.format(bom.get_actual_cost(), currency_decimal) }}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-warning" onclick="openEditBOMModal({{ bom.id }}, {{ bom.item_id or 'null' }}, {{ bom.batch_id or 'null' }}, {{ bom.quantity }}, this.dataset.itemname)" data-itemname="{{ bom.item_display_name|e }}" title="Edit"><i class="bi bi-pencil"></i></button>
-                                    {% if bom.item %}<a href="{{ url_for('item.item_detail', uuid=bom.item.uuid) }}" target="_blank" class="btn btn-sm btn-outline-info" title="Item Info"><i class="bi bi-info-circle"></i></a>{% endif %}
-                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteBOM({{ bom.id }})" title="Remove"><i class="bi bi-trash"></i></button>
+                                    <button class="btn btn-outline-warning py-0 px-1" style="font-size:0.7rem;" onclick="openEditBOMModal({{ bom.id }}, {{ bom.item_id or 'null' }}, {{ bom.batch_id or 'null' }}, {{ bom.quantity }}, this.dataset.itemname)" data-itemname="{{ bom.item_display_name|e }}" title="Edit"><i class="bi bi-pencil"></i></button>
+                                    {% if bom.item %}<a href="{{ url_for('item.item_detail', uuid=bom.item.uuid) }}" target="_blank" class="btn btn-outline-info py-0 px-1" style="font-size:0.7rem;" title="Item Info"><i class="bi bi-info-circle"></i></a>{% endif %}
+                                    <button class="btn btn-outline-danger py-0 px-1" style="font-size:0.7rem;" onclick="deleteBOM({{ bom.id }})" title="Remove"><i class="bi bi-trash"></i></button>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -621,10 +621,10 @@
                             <td>{{ '{:g}'.format(ci.quantity) }}</td>
                             <td>{{ currency }} {{ '{:,.{}f}'.format(ci.total, currency_decimal) }}</td>
                             <td>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="moveCostItem({{ ci.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="moveCostItem({{ ci.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
-                                <button class="btn btn-sm btn-outline-warning" onclick="editCostItem({{ ci.id }}, 'per_qty', {{ ci.name|tojson|replace('"', '&quot;') }}, {{ (ci.description or '')|tojson|replace('"', '&quot;') }}, {{ ci.price }}, {{ (ci.unit_label or '')|tojson|replace('"', '&quot;') }}, {{ ci.quantity }})" title="Edit"><i class="bi bi-pencil"></i></button>
-                                <button class="btn btn-sm btn-outline-danger" onclick="deleteCostItem({{ ci.id }})" title="Delete"><i class="bi bi-trash"></i></button>
+                                <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
+                                <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
+                                <button class="btn btn-outline-warning py-0 px-1" style="font-size:0.7rem;" onclick="editCostItem({{ ci.id }}, 'per_qty', {{ ci.name|tojson|replace('"', '&quot;') }}, {{ (ci.description or '')|tojson|replace('"', '&quot;') }}, {{ ci.price }}, {{ (ci.unit_label or '')|tojson|replace('"', '&quot;') }}, {{ ci.quantity }})" title="Edit"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-outline-danger py-0 px-1" style="font-size:0.7rem;" onclick="deleteCostItem({{ ci.id }})" title="Delete"><i class="bi bi-trash"></i></button>
                             </td>
                         </tr>
                         {% else %}
@@ -672,10 +672,10 @@
                             <td>{{ '{:g}'.format(ci.quantity) }}</td>
                             <td>{{ currency }} {{ '{:,.{}f}'.format(ci.total, currency_decimal) }}</td>
                             <td>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="moveCostItem({{ ci.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="moveCostItem({{ ci.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
-                                <button class="btn btn-sm btn-outline-warning" onclick="editCostItem({{ ci.id }}, 'overall', {{ ci.name|tojson|replace('"', '&quot;') }}, {{ (ci.description or '')|tojson|replace('"', '&quot;') }}, {{ ci.price }}, {{ (ci.unit_label or '')|tojson|replace('"', '&quot;') }}, {{ ci.quantity }})" title="Edit"><i class="bi bi-pencil"></i></button>
-                                <button class="btn btn-sm btn-outline-danger" onclick="deleteCostItem({{ ci.id }})" title="Delete"><i class="bi bi-trash"></i></button>
+                                <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
+                                <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
+                                <button class="btn btn-outline-warning py-0 px-1" style="font-size:0.7rem;" onclick="editCostItem({{ ci.id }}, 'overall', {{ ci.name|tojson|replace('"', '&quot;') }}, {{ (ci.description or '')|tojson|replace('"', '&quot;') }}, {{ ci.price }}, {{ (ci.unit_label or '')|tojson|replace('"', '&quot;') }}, {{ ci.quantity }})" title="Edit"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-outline-danger py-0 px-1" style="font-size:0.7rem;" onclick="deleteCostItem({{ ci.id }})" title="Delete"><i class="bi bi-trash"></i></button>
                             </td>
                         </tr>
                         {% else %}
