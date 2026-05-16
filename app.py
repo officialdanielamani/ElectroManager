@@ -276,6 +276,7 @@ def _apply_column_migrations():
         ("racks",                "drawer_icons",         "TEXT DEFAULT NULL"),
         ("racks",                "rack_icon",            "TEXT DEFAULT NULL"),
         ("projects",             "thumbnail",            "VARCHAR(300)"),
+        ("project_bom_items",    "sort_order",           "INTEGER DEFAULT 0"),
     ]
     with db.engine.connect() as conn:
         for table, col, col_type in additions:

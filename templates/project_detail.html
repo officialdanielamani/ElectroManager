@@ -29,6 +29,20 @@
                 </div>
             </div>
             <div class="card-body">
+                {% if project.thumbnail %}
+                <div class="mb-3 d-flex align-items-center gap-3">
+                    <div style="width:64px;height:64px;border:1px solid #dee2e6;border-radius:8px;background:#f8f9fa;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        {% if project.thumbnail.startswith('biicon:') %}
+                        <i class="bi bi-{{ project.thumbnail[7:] }}" style="font-size:32px;color:#333;"></i>
+                        {% elif project.thumbnail.startswith('icon:') %}
+                        <img src="{{ url_for('share.share_serve', category='icon', filename=project.thumbnail[5:]) }}" style="width:100%;height:100%;object-fit:contain;padding:4px;">
+                        {% elif project.thumbnail.startswith('share:') %}
+                        <img src="{{ url_for('share.share_serve', category='project', filename=project.thumbnail[6:]) }}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">
+                        {% endif %}
+                    </div>
+                    <strong class="fs-5">{{ project.name }}</strong>
+                </div>
+                {% endif %}
                 <!-- Header Info -->
                 <div class="row mb-3">
                     <div class="col-md-6">
@@ -45,6 +59,8 @@
                         {% if project.enable_dateline_notification %}
                         <div class="mb-2"><strong>Notification:</strong> {{ project.notify_before_days }} days before dateline</div>
                         {% endif %}
+                        <div class="mb-2"><strong>Created:</strong> {{ project.created_at.strftime('%Y-%m-%d %H:%M') if project.created_at else 'N/A' }}{% if project.creator %} by <span class="badge bg-secondary">{{ project.creator.username }}</span>{% endif %}</div>
+                        <div class="mb-2"><strong>Updated:</strong> {{ project.updated_at.strftime('%Y-%m-%d %H:%M') if project.updated_at else 'N/A' }}{% if project.updater %} by <span class="badge bg-secondary">{{ project.updater.username }}</span>{% endif %}</div>
                     </div>
                 </div>
 
@@ -130,12 +146,19 @@
 
                 <!-- Cost Summary -->
                 <hr>
+                {% set bom_est = project.get_bom_total_cost() %}
+                {% set bom_act = project.get_bom_actual_cost() %}
+                {% set cpq_total = project.get_cost_per_qty_total() %}
+                {% set ov_total = project.get_overall_cost_total() %}
+                {% set proj_qty = project.quantity or 1 %}
+                {% set est_total = (bom_est + cpq_total) * proj_qty + ov_total %}
+                {% set act_total = (bom_act + cpq_total) * proj_qty + ov_total %}
                 <div class="row mb-3 g-2">
-                    <div class="col-md-3"><div class="card bg-light"><div class="card-body text-center p-2"><small class="text-muted">Estimated (1×)</small><h5 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(project.get_bom_total_cost(), currency_decimal) }}</h5></div></div></div>
-                    <div class="col-md-3"><div class="card bg-light"><div class="card-body text-center p-2"><small class="text-muted">Actual (1×)</small><h5 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(project.get_bom_actual_cost(), currency_decimal) }}</h5></div></div></div>
-                    <div class="col-md-2"><div class="card bg-light"><div class="card-body text-center p-2"><small class="text-muted">Quantity</small><h5 class="mb-0">{{ project.quantity }}</h5></div></div></div>
-                    <div class="col-md-2"><div class="card bg-primary text-white"><div class="card-body text-center p-2"><small>Est. Total</small><h5 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(project.get_project_total_cost(), currency_decimal) }}</h5></div></div></div>
-                    <div class="col-md-2"><div class="card bg-success text-white"><div class="card-body text-center p-2"><small>Actual Total</small><h5 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(project.get_project_actual_cost(), currency_decimal) }}</h5></div></div></div>
+                    <div class="col-6 col-md-3"><div class="card bg-light"><div class="card-body text-center p-2"><small class="text-muted">BOM Est. (per unit)</small><h6 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(bom_est, currency_decimal) }}</h6></div></div></div>
+                    <div class="col-6 col-md-3"><div class="card bg-light"><div class="card-body text-center p-2"><small class="text-muted">BOM Actual (per unit)</small><h6 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(bom_act, currency_decimal) }}</h6></div></div></div>
+                    <div class="col-6 col-md-2"><div class="card bg-light"><div class="card-body text-center p-2"><small class="text-muted">Qty</small><h6 class="mb-0">{{ proj_qty }}</h6></div></div></div>
+                    <div class="col-6 col-md-2"><div class="card bg-primary text-white"><div class="card-body text-center p-2"><small>Est. Total<br><span style="font-size:0.7rem;">(BOM+CPQ)×Qty+Overall</span></small><h6 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(est_total, currency_decimal) }}</h6></div></div></div>
+                    <div class="col-6 col-md-2"><div class="card bg-success text-white"><div class="card-body text-center p-2"><small>Actual Total<br><span style="font-size:0.7rem;">(BOM+CPQ)×Qty+Overall</span></small><h6 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(act_total, currency_decimal) }}</h6></div></div></div>
                 </div>
 
                 <!-- Attachments (view only) -->
@@ -159,7 +182,7 @@
                         {% if att_type == 'picture' %}
                         <div class="image-grid">
                             {% for att in attachments[att_type] %}
-                            <div class="image-grid-item"><a href="{{ url_for('uploaded_file', filename=att.file_path) }}" target="_blank"><img src="{{ url_for('uploaded_file', filename=att.file_path) }}" alt="{{ att.original_filename }}"></a></div>
+                            <div class="image-grid-item" onclick="openProjLightbox('{{ url_for('uploaded_file', filename=att.file_path) }}', '{{ att.original_filename|e }}')"><img src="{{ url_for('uploaded_file', filename=att.file_path) }}" alt="{{ att.original_filename }}"></div>
                             {% endfor %}
                         </div>
                         {% else %}
@@ -190,10 +213,8 @@
                     {% if sf_images %}
                     <div class="image-grid mb-2">
                         {% for sf in sf_images %}
-                        <div class="image-grid-item">
-                            <a href="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}" target="_blank">
-                                <img src="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}" alt="{{ sf.name }}">
-                            </a>
+                        <div class="image-grid-item" onclick="openProjLightbox('{{ url_for('share.share_serve', category='project', filename=sf.filename) }}', '{{ sf.name|e }}')">
+                            <img src="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}" alt="{{ sf.name }}">
                         </div>
                         {% endfor %}
                     </div>
@@ -403,15 +424,21 @@
                     </table>
                 </div>
 
-                <hr>
-                <div class="mb-1 px-1">
-                    <small class="text-muted">
-                        <i class="bi bi-clock-history"></i>
-                        Created: {{ project.created_at.strftime('%Y-%m-%d %H:%M') if project.created_at else 'N/A' }}
-                        &nbsp;|&nbsp;
-                        Updated: {{ project.updated_at.strftime('%Y-%m-%d %H:%M') if project.updated_at else 'N/A' }}
-                    </small>
-                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lightbox Modal -->
+<div class="modal fade" id="projLightboxModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-0 pb-0">
+                <span class="text-white" id="projLightboxTitle"></span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center p-2">
+                <img id="projLightboxImg" src="" alt="" style="max-width:100%;max-height:80vh;object-fit:contain;">
             </div>
         </div>
     </div>
@@ -477,4 +504,15 @@ function confirmDeleteProject() {
 }
 </script>
 {% endif %}
+
+{% block scripts %}
+<script>
+function openProjLightbox(url, name) {
+    document.getElementById('projLightboxImg').src = url;
+    document.getElementById('projLightboxTitle').textContent = name;
+    new bootstrap.Modal(document.getElementById('projLightboxModal')).show();
+}
+</script>
+{% endblock %}
+
 {% endblock %}

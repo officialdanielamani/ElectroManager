@@ -1518,6 +1518,7 @@ class ProjectBOMItem(db.Model):
     used_quantity = db.Column(db.Integer, default=0)
     serial_numbers = db.Column(db.Text)
     item_name_snapshot = db.Column(db.String(300))
+    sort_order = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     item = db.relationship('Item', backref=db.backref('bom_uses'))

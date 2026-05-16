@@ -833,6 +833,31 @@ def bom_delete(project_id, bom_id):
     return jsonify({'success': True})
 
 
+@project_bp.route('/project/<project_id>/bom/<int:bom_id>/move', endpoint='project_bom_move', methods=['POST'])
+@login_required
+def project_bom_move(project_id, bom_id):
+    if not current_user.has_permission('projects', 'edit'):
+        return jsonify({'error': 'No permission'}), 403
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    data = request.get_json()
+    direction = data.get('direction')
+    bom = ProjectBOMItem.query.get_or_404(bom_id)
+    if bom.project_id != project.id:
+        return jsonify({'error': 'Not found'}), 404
+    items = ProjectBOMItem.query.filter_by(project_id=project.id).order_by(ProjectBOMItem.sort_order, ProjectBOMItem.id).all()
+    idx = next((i for i, b in enumerate(items) if b.id == bom_id), None)
+    if idx is None:
+        return jsonify({'error': 'Not found'}), 404
+    swap_idx = idx - 1 if direction == 'up' else idx + 1
+    if 0 <= swap_idx < len(items):
+        items[idx].sort_order, items[swap_idx].sort_order = items[swap_idx].sort_order, items[idx].sort_order
+        if items[idx].sort_order == items[swap_idx].sort_order:
+            items[idx].sort_order = idx
+            items[swap_idx].sort_order = swap_idx
+        db.session.commit()
+    return jsonify({'success': True})
+
+
 # ==================== PROJECT COST ITEMS ====================
 
 @project_bp.route('/project/<project_id>/cost/add', endpoint='cost_item_add', methods=['POST'])
@@ -987,7 +1012,7 @@ def project_upload(project_id, attachment_type):
         db.session.commit()
         flash(f'{uploaded} file(s) uploaded.', 'success')
 
-    return redirect(url_for('project.project_detail', project_id=project_id))
+    return redirect(url_for('project.project_edit', project_id=project_id))
 
 
 @project_bp.route('/project/attachment/<int:att_id>/delete', endpoint='project_attachment_delete', methods=['POST'])

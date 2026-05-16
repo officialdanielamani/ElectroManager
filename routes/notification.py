@@ -154,6 +154,42 @@ def notifications():
         except Exception:
             pass
 
+    # --- Project deadline notifications ---
+    from models import Project
+    projects_with_notify = Project.query.filter(
+        Project.enable_dateline_notification == True,
+        Project.date_end.isnot(None),
+    ).all()
+    for proj in projects_with_notify:
+        try:
+            days_before = proj.notify_before_days or 3
+            end_date = proj.date_end
+            remind_date = end_date - timedelta(days=days_before)
+            if end_date < today:
+                notifications.append({
+                    'project': proj,
+                    'item': None,
+                    'message': f'Project "{proj.name}" deadline has passed ({end_date.strftime("%d/%m/%Y")})',
+                    'type': 'project_overdue',
+                })
+            elif end_date == today:
+                notifications.append({
+                    'project': proj,
+                    'item': None,
+                    'message': f'Project "{proj.name}" is due today ({end_date.strftime("%d/%m/%Y")})',
+                    'type': 'project_due',
+                })
+            elif remind_date <= today:
+                days_left = (end_date - today).days
+                notifications.append({
+                    'project': proj,
+                    'item': None,
+                    'message': f'Project "{proj.name}" deadline in {days_left} day(s) ({end_date.strftime("%d/%m/%Y")})',
+                    'type': 'project_soon',
+                })
+        except Exception:
+            pass
+
     return render_template('notifications.html', notifications=notifications, can_edit_notifications=can_edit)
 
 

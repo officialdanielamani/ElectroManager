@@ -72,6 +72,34 @@
                         </div>
                     </div>
 
+                    <!-- Thumbnail -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm mb-1">Thumbnail</label>
+                        <div class="d-flex align-items-center gap-2">
+                            <div id="projThumbPreview" style="width:56px;height:56px;border:1px solid #dee2e6;border-radius:6px;background:#f8f9fa;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;">
+                                {% if project and project.thumbnail %}
+                                    {% if project.thumbnail.startswith('biicon:') %}
+                                    <i class="bi bi-{{ project.thumbnail[7:] }}" style="font-size:28px;color:#333;"></i>
+                                    {% elif project.thumbnail.startswith('icon:') %}
+                                    <img src="{{ url_for('share.share_serve', category='icon', filename=project.thumbnail[5:]) }}" style="width:100%;height:100%;object-fit:contain;padding:4px;">
+                                    {% elif project.thumbnail.startswith('share:') %}
+                                    <img src="{{ url_for('share.share_serve', category='project', filename=project.thumbnail[6:]) }}" style="width:100%;height:100%;object-fit:cover;border-radius:6px;">
+                                    {% else %}
+                                    <i class="bi bi-image text-muted" style="font-size:1.5rem;"></i>
+                                    {% endif %}
+                                    <button type="button" onclick="clearProjThumb()" style="position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:none;background:#dc3545;color:white;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;z-index:1;" title="Remove thumbnail"><i class="bi bi-x"></i></button>
+                                {% else %}
+                                <i class="bi bi-image text-muted" style="font-size:1.5rem;"></i>
+                                {% endif %}
+                            </div>
+                            <div class="d-flex flex-column gap-1">
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="openProjThumbIconPicker()"><i class="bi bi-star"></i> Icon</button>
+                                <button type="button" class="btn btn-sm btn-outline-info" onclick="openProjThumbSharePicker()"><i class="bi bi-folder"></i> Share</button>
+                            </div>
+                        </div>
+                        <input type="hidden" name="thumbnail" id="projThumbnailValue" value="{{ project.thumbnail or '' if project else '' }}">
+                    </div>
+
                     <!-- Row 5: Tags -->
                     <div class="mb-2">
                         <label class="form-label form-label-sm">Tags</label>
@@ -252,17 +280,13 @@
                     </div>
 
                     <!-- Dateline Notification (edit only) -->
-                    <div class="row mb-2">
-                        <div class="col-6">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="enable_dateline_notification" name="enable_dateline_notification" {% if project.enable_dateline_notification %}checked{% endif %}>
-                                <label class="form-check-label form-label-sm" for="enable_dateline_notification">Enable Dateline Notification</label>
-                            </div>
+                    <div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="checkbox" id="enable_dateline_notification" name="enable_dateline_notification" {% if project.enable_dateline_notification %}checked{% endif %}>
+                            <label class="form-check-label form-label-sm mb-0" for="enable_dateline_notification">Notify before</label>
                         </div>
-                        <div class="col-6">
-                            <label class="form-label form-label-sm">Notify before X days</label>
-                            <input type="number" class="form-control form-control-sm" name="notify_before_days" value="{{ project.notify_before_days }}" min="0">
-                        </div>
+                        <input type="number" class="form-control form-control-sm" name="notify_before_days" value="{{ project.notify_before_days }}" min="1" style="width:65px;">
+                        <span class="form-label-sm mb-0">days before End Date</span>
                     </div>
                     {% endif %}
 
@@ -447,6 +471,7 @@
                     <table class="table table-sm table-hover" id="bomTable">
                         <thead>
                             <tr>
+                                <th style="width:60px;"></th>
                                 <th>Item</th>
                                 <th>Batch</th>
                                 <th>Req Qty <small class="text-muted fw-normal">(needed)</small></th>
@@ -460,6 +485,10 @@
                         <tbody>
                             {% for bom in bom_items %}
                             <tr id="bom-row-{{ bom.id }}" {% if not bom.item %}class="table-warning"{% endif %}>
+                                <td class="text-nowrap">
+                                    <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveBOM({{ bom.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
+                                    <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveBOM({{ bom.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
+                                </td>
                                 <td>
                                     {% if bom.item %}
                                     <a href="{{ url_for('item.item_detail', uuid=bom.item.uuid) }}" target="_blank">{{ bom.item.name }}</a>
@@ -508,12 +537,12 @@
                         {% if bom_items %}
                         <tfoot>
                             <tr class="table-active">
-                                <td colspan="5" class="text-end"><strong>Estimated Total:</strong></td>
+                                <td colspan="6" class="text-end"><strong>Estimated Total:</strong></td>
                                 <td><strong>{{ currency }} {{ '{:,.{}f}'.format(project.get_bom_total_cost(), currency_decimal) }}</strong></td>
                                 <td colspan="2"></td>
                             </tr>
                             <tr class="table-active">
-                                <td colspan="5" class="text-end"><strong>Actual Total:</strong></td>
+                                <td colspan="6" class="text-end"><strong>Actual Total:</strong></td>
                                 <td></td>
                                 <td><strong>{{ currency }} {{ '{:,.{}f}'.format(project.get_bom_actual_cost(), currency_decimal) }}</strong></td>
                                 <td></td>
@@ -549,40 +578,37 @@
                     <table class="table table-sm table-hover">
                         <thead>
                             <tr>
-                                <th style="width:60px;"></th>
                                 <th>Item</th>
                                 <th>Description</th>
                                 <th>Price per Qty</th>
                                 <th>Qty</th>
                                 <th>Total</th>
-                                <th style="width:72px;">Action</th>
+                                <th style="width:130px;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                         {% for ci in cost_items_per_qty %}
                         <tr>
-                            <td>
-                                <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="moveCostItem({{ ci.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
-                                <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="moveCostItem({{ ci.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
-                            </td>
                             <td><strong>{{ ci.name }}</strong></td>
                             <td>{{ ci.description or '-' }}</td>
                             <td>{{ currency }} {{ '{:,.{}f}'.format(ci.price, currency_decimal) }}{% if ci.unit_label %} /{{ ci.unit_label }}{% endif %}</td>
                             <td>{{ '{:g}'.format(ci.quantity) }}</td>
                             <td>{{ currency }} {{ '{:,.{}f}'.format(ci.total, currency_decimal) }}</td>
                             <td>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="editCostItem({{ ci.id }}, 'per_qty', {{ ci.name|tojson }}, {{ (ci.description or '')|tojson }}, {{ ci.price }}, {{ (ci.unit_label or '')|tojson }}, {{ ci.quantity }})" title="Edit"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
+                                <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="editCostItem({{ ci.id }}, 'per_qty', {{ ci.name|tojson|replace('"', '&quot;') }}, {{ (ci.description or '')|tojson|replace('"', '&quot;') }}, {{ ci.price }}, {{ (ci.unit_label or '')|tojson|replace('"', '&quot;') }}, {{ ci.quantity }})" title="Edit"><i class="bi bi-pencil"></i></button>
                                 <button class="btn btn-sm btn-outline-danger" onclick="deleteCostItem({{ ci.id }})" title="Delete"><i class="bi bi-trash"></i></button>
                             </td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="7" class="text-muted text-center py-2">No items yet. Click Add Item to start.</td></tr>
+                        <tr><td colspan="6" class="text-muted text-center py-2">No items yet. Click Add Item to start.</td></tr>
                         {% endfor %}
                         </tbody>
                         {% if cost_items_per_qty %}
                         <tfoot>
                             <tr class="table-active">
-                                <td colspan="5" class="text-end"><strong>Total/qty:</strong></td>
+                                <td colspan="4" class="text-end"><strong>Total/qty:</strong></td>
                                 <td colspan="2"><strong>{{ currency }} {{ '{:,.{}f}'.format(project.get_cost_per_qty_total(), currency_decimal) }}</strong></td>
                             </tr>
                         </tfoot>
@@ -603,40 +629,37 @@
                     <table class="table table-sm table-hover">
                         <thead>
                             <tr>
-                                <th style="width:60px;"></th>
                                 <th>Item</th>
                                 <th>Description</th>
                                 <th>Price per Qty</th>
                                 <th>Qty</th>
                                 <th>Total</th>
-                                <th style="width:72px;">Action</th>
+                                <th style="width:130px;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                         {% for ci in cost_items_overall %}
                         <tr>
-                            <td>
-                                <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="moveCostItem({{ ci.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
-                                <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="moveCostItem({{ ci.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
-                            </td>
                             <td><strong>{{ ci.name }}</strong></td>
                             <td>{{ ci.description or '-' }}</td>
                             <td>{{ currency }} {{ '{:,.{}f}'.format(ci.price, currency_decimal) }}{% if ci.unit_label %} /{{ ci.unit_label }}{% endif %}</td>
                             <td>{{ '{:g}'.format(ci.quantity) }}</td>
                             <td>{{ currency }} {{ '{:,.{}f}'.format(ci.total, currency_decimal) }}</td>
                             <td>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="editCostItem({{ ci.id }}, 'overall', {{ ci.name|tojson }}, {{ (ci.description or '')|tojson }}, {{ ci.price }}, {{ (ci.unit_label or '')|tojson }}, {{ ci.quantity }})" title="Edit"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
+                                <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="editCostItem({{ ci.id }}, 'overall', {{ ci.name|tojson|replace('"', '&quot;') }}, {{ (ci.description or '')|tojson|replace('"', '&quot;') }}, {{ ci.price }}, {{ (ci.unit_label or '')|tojson|replace('"', '&quot;') }}, {{ ci.quantity }})" title="Edit"><i class="bi bi-pencil"></i></button>
                                 <button class="btn btn-sm btn-outline-danger" onclick="deleteCostItem({{ ci.id }})" title="Delete"><i class="bi bi-trash"></i></button>
                             </td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="7" class="text-muted text-center py-2">No items yet. Click Add Item to start.</td></tr>
+                        <tr><td colspan="6" class="text-muted text-center py-2">No items yet. Click Add Item to start.</td></tr>
                         {% endfor %}
                         </tbody>
                         {% if cost_items_overall %}
                         <tfoot>
                             <tr class="table-active">
-                                <td colspan="5" class="text-end"><strong>Total:</strong></td>
+                                <td colspan="4" class="text-end"><strong>Total:</strong></td>
                                 <td colspan="2"><strong>{{ currency }} {{ '{:,.{}f}'.format(project.get_overall_cost_total(), currency_decimal) }}</strong></td>
                             </tr>
                         </tfoot>
@@ -701,9 +724,97 @@
     </div>
 </div>
 
+<!-- Project Thumbnail Share Picker Modal -->
+{% if share_files_project is defined %}
+<div class="modal fade" id="projThumbShareModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-folder"></i> Select from Share Files</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-2">
+                {% for sf in share_files_project %}
+                <div class="col-3 col-md-2">
+                    <div class="text-center p-1 border rounded" style="cursor:pointer;" onclick="_applyProjThumb('share:{{ sf.filename }}'); bootstrap.Modal.getInstance(document.getElementById('projThumbShareModal')).hide();">
+                        {% if sf.is_image %}
+                        <img src="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;">
+                        {% else %}
+                        <i class="bi bi-file-earmark" style="font-size:2rem;"></i>
+                        {% endif %}
+                        <small class="d-block text-truncate">{{ sf.name }}</small>
+                    </div>
+                </div>
+                {% else %}
+                <div class="col-12 text-muted">No project share files available.</div>
+                {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <script>
 (function() {
     const _pid = '{{ project.project_id }}';
+
+    window.clearProjThumb = function() {
+        document.getElementById('projThumbnailValue').value = '';
+        const p = document.getElementById('projThumbPreview');
+        p.innerHTML = '<i class="bi bi-image text-muted" style="font-size:1.5rem;"></i>';
+    };
+
+    window.openProjThumbIconPicker = function() {
+        _projThumbMode = 'icon';
+        // Reuse the item thumb icon picker modal if available, else show a simple prompt
+        const modal = document.getElementById('thumbIconPickerModal');
+        if (modal) {
+            new bootstrap.Modal(modal).show();
+        } else {
+            const icon = prompt('Enter Bootstrap icon name (e.g. kanban, cpu, box):');
+            if (icon) _applyProjThumb('biicon:' + icon.trim());
+        }
+    };
+
+    window.openProjThumbSharePicker = function() {
+        _projThumbMode = 'share';
+        new bootstrap.Modal(document.getElementById('projThumbShareModal')).show();
+    };
+
+    let _projThumbMode = '';
+
+    window._applyProjThumb = function(value) {
+        document.getElementById('projThumbnailValue').value = value;
+        const p = document.getElementById('projThumbPreview');
+        p.innerHTML = '';
+        if (value.startsWith('biicon:')) {
+            const iconName = value.slice(7).replace(/[^a-z0-9-]/gi, '');
+            p.innerHTML = '<i class="bi bi-' + iconName + '" style="font-size:28px;color:#333;"></i>';
+        } else if (value.startsWith('icon:') || value.startsWith('share:')) {
+            const img = document.createElement('img');
+            img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:6px;';
+            p.appendChild(img);
+        }
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.onclick = window.clearProjThumb;
+        closeBtn.style.cssText = 'position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:none;background:#dc3545;color:white;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;z-index:1;';
+        closeBtn.title = 'Remove thumbnail';
+        closeBtn.innerHTML = '<i class="bi bi-x"></i>';
+        p.appendChild(closeBtn);
+    };
+
+    window.moveBOM = function(id, direction) {
+        fetch(`/project/${_pid}/bom/${id}/move`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({direction})
+        }).then(r => r.json()).then(d => {
+            if (d.success) location.reload();
+            else alert('Error: ' + (d.error || 'Failed'));
+        }).catch(() => alert('Request failed'));
+    };
 
     window.openCostModal = function(costType) {
         document.getElementById('ci-id').value = '';
