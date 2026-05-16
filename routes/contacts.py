@@ -9,10 +9,17 @@ import re
 
 contacts_bp = Blueprint('contacts', __name__)
 
-_EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+_EMAIL_RE = re.compile(r'^[^@\s]{1,64}@[^@\s]{1,253}$')
 
 def _valid_email(value):
-    return not value or bool(_EMAIL_RE.match(value))
+    if not value:
+        return True
+    if len(value) > 254:
+        return False
+    if not _EMAIL_RE.match(value):
+        return False
+    domain = value.split('@', 1)[1]
+    return '.' in domain
 
 def _valid_url(value):
     return not value or value.startswith(('http://', 'https://'))

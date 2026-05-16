@@ -2006,6 +2006,7 @@ function _sfRender(files) {
     const currentUrl = (selectedElement !== null && layout[selectedElement]) ? layout[selectedElement].picture_url : null;
     const query = document.getElementById('sfpSearch').value.toLowerCase();
     const filtered = query ? files.filter(f => f.name.toLowerCase().includes(query) || f.category.toLowerCase().includes(query)) : files;
+    const _escSq = s => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
     // Card view
     const cardView = document.getElementById('sfpCardView');
@@ -2015,7 +2016,7 @@ function _sfRender(files) {
         cardView.innerHTML = filtered.map(f => {
             const sel = f.url === currentUrl;
             return `<div class="col">
-                <div class="card h-100 sfp-item ${sel ? 'border-success border-2' : ''}" style="cursor:pointer;" onclick="_sfSelect(${f.id},'${f.url.replace(/'/g,"\\'")}','${f.category.replace(/'/g,"\\'")}','${f.name.replace(/'/g,"\\'")}')">
+                <div class="card h-100 sfp-item ${sel ? 'border-success border-2' : ''}" style="cursor:pointer;" onclick="_sfSelect(${f.id},'${_escSq(f.url)}','${_escSq(f.category)}','${_escSq(f.name)}')">
                     <div style="aspect-ratio:1;overflow:hidden;padding:8px;display:flex;align-items:center;justify-content:center;">
                         <img src="${f.url}" style="max-width:100%;max-height:100%;object-fit:contain;">
                     </div>
@@ -2033,7 +2034,7 @@ function _sfRender(files) {
     const tbody = document.getElementById('sfpListView').querySelector('tbody');
     tbody.innerHTML = filtered.map(f => {
         const sel = f.url === currentUrl;
-        return `<tr class="sfp-item ${sel ? 'table-success' : ''}" style="cursor:pointer;" onclick="_sfSelect(${f.id},'${f.url.replace(/'/g,"\\'")}','${f.category.replace(/'/g,"\\'")}','${f.name.replace(/'/g,"\\'")}')">
+        return `<tr class="sfp-item ${sel ? 'table-success' : ''}" style="cursor:pointer;" onclick="_sfSelect(${f.id},'${_escSq(f.url)}','${_escSq(f.category)}','${_escSq(f.name)}')">
             <td style="width:50px;"><img src="${f.url}" style="width:40px;height:40px;object-fit:contain;"></td>
             <td>${f.name}</td>
             <td><span class="badge bg-secondary">${f.category}</span></td>

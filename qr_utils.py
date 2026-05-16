@@ -518,16 +518,21 @@ def render_template_to_svg(template, data):
                     if len(parts) >= 2 and parts[0] == 'uploads':
                         rel_path = '/'.join(parts[1:])
                         file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], rel_path)
-                        ext = os.path.splitext(rel_path)[1].lower()
-                        mime_map = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-                                    '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml'}
-                        mime = mime_map.get(ext, 'image/png')
-                        if os.path.exists(file_path):
-                            with open(file_path, 'rb') as f:
-                                img_b64 = base64.b64encode(f.read()).decode('utf-8')
-                            print(f"[SVG] PICTURE loaded {len(img_b64)} b64 chars from {file_path}")
+                        upload_root = os.path.realpath(current_app.config['UPLOAD_FOLDER'])
+                        real_file_path = os.path.realpath(file_path)
+                        if not real_file_path.startswith(upload_root + os.sep):
+                            print(f"[SVG] PICTURE path outside upload folder, skipping")
                         else:
-                            print(f"[SVG] PICTURE file not found: {file_path}")
+                            ext = os.path.splitext(rel_path)[1].lower()
+                            mime_map = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+                                        '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml'}
+                            mime = mime_map.get(ext, 'image/png')
+                            if os.path.exists(real_file_path):
+                                with open(real_file_path, 'rb') as f:
+                                    img_b64 = base64.b64encode(f.read()).decode('utf-8')
+                                print(f"[SVG] PICTURE loaded {len(img_b64)} b64 chars from {real_file_path}")
+                            else:
+                                print(f"[SVG] PICTURE file not found: {real_file_path}")
                 except Exception as e:
                     print(f"[SVG] PICTURE load error: {e}")
             if img_b64:
