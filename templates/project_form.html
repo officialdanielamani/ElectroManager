@@ -538,6 +538,114 @@
             </div>
         </div>
 
+        <!-- Cost per Quantity -->
+        <div class="card mt-3">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0"><i class="bi bi-calculator"></i> Cost per Quantity</h5>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="openCostModal('per_qty')"><i class="bi bi-plus-lg"></i> Add Item</button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width:60px;"></th>
+                                <th>Item</th>
+                                <th>Description</th>
+                                <th>Price per Qty</th>
+                                <th>Qty</th>
+                                <th>Total</th>
+                                <th style="width:72px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for ci in cost_items_per_qty %}
+                        <tr>
+                            <td>
+                                <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="moveCostItem({{ ci.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
+                                <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="moveCostItem({{ ci.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
+                            </td>
+                            <td><strong>{{ ci.name }}</strong></td>
+                            <td>{{ ci.description or '-' }}</td>
+                            <td>{{ currency }} {{ '{:,.{}f}'.format(ci.price, currency_decimal) }}{% if ci.unit_label %} /{{ ci.unit_label }}{% endif %}</td>
+                            <td>{{ '{:g}'.format(ci.quantity) }}</td>
+                            <td>{{ currency }} {{ '{:,.{}f}'.format(ci.total, currency_decimal) }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="editCostItem({{ ci.id }}, 'per_qty', {{ ci.name|tojson }}, {{ (ci.description or '')|tojson }}, {{ ci.price }}, {{ (ci.unit_label or '')|tojson }}, {{ ci.quantity }})" title="Edit"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteCostItem({{ ci.id }})" title="Delete"><i class="bi bi-trash"></i></button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="7" class="text-muted text-center py-2">No items yet. Click Add Item to start.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                        {% if cost_items_per_qty %}
+                        <tfoot>
+                            <tr class="table-active">
+                                <td colspan="5" class="text-end"><strong>Total/qty:</strong></td>
+                                <td colspan="2"><strong>{{ currency }} {{ '{:,.{}f}'.format(project.get_cost_per_qty_total(), currency_decimal) }}</strong></td>
+                            </tr>
+                        </tfoot>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overall Cost -->
+        <div class="card mt-3">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0"><i class="bi bi-receipt"></i> Overall Cost</h5>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="openCostModal('overall')"><i class="bi bi-plus-lg"></i> Add Item</button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width:60px;"></th>
+                                <th>Item</th>
+                                <th>Description</th>
+                                <th>Price per Qty</th>
+                                <th>Qty</th>
+                                <th>Total</th>
+                                <th style="width:72px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for ci in cost_items_overall %}
+                        <tr>
+                            <td>
+                                <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="moveCostItem({{ ci.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
+                                <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="moveCostItem({{ ci.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
+                            </td>
+                            <td><strong>{{ ci.name }}</strong></td>
+                            <td>{{ ci.description or '-' }}</td>
+                            <td>{{ currency }} {{ '{:,.{}f}'.format(ci.price, currency_decimal) }}{% if ci.unit_label %} /{{ ci.unit_label }}{% endif %}</td>
+                            <td>{{ '{:g}'.format(ci.quantity) }}</td>
+                            <td>{{ currency }} {{ '{:,.{}f}'.format(ci.total, currency_decimal) }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="editCostItem({{ ci.id }}, 'overall', {{ ci.name|tojson }}, {{ (ci.description or '')|tojson }}, {{ ci.price }}, {{ (ci.unit_label or '')|tojson }}, {{ ci.quantity }})" title="Edit"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteCostItem({{ ci.id }})" title="Delete"><i class="bi bi-trash"></i></button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="7" class="text-muted text-center py-2">No items yet. Click Add Item to start.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                        {% if cost_items_overall %}
+                        <tfoot>
+                            <tr class="table-active">
+                                <td colspan="5" class="text-end"><strong>Total:</strong></td>
+                                <td colspan="2"><strong>{{ currency }} {{ '{:,.{}f}'.format(project.get_overall_cost_total(), currency_decimal) }}</strong></td>
+                            </tr>
+                        </tfoot>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- Duplicate Save/Back at bottom -->
         <div class="card mt-3">
             <div class="card-body">
@@ -548,114 +656,6 @@
             </div>
         </div>
         {% endif %}
-    </div>
-</div>
-
-{% if project %}
-<!-- Cost Items Section -->
-<div class="card mt-3">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="bi bi-calculator"></i> Cost per Quantity</h5>
-        <button type="button" class="btn btn-sm btn-outline-primary" onclick="openCostModal('per_qty')"><i class="bi bi-plus-lg"></i> Add Item</button>
-    </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0" style="font-size:0.88rem;">
-                <thead>
-                    <tr>
-                        <th style="width:64px;"></th>
-                        <th>Item</th>
-                        <th>Description</th>
-                        <th>Price per Qty</th>
-                        <th>Qty</th>
-                        <th>Total</th>
-                        <th style="width:80px;">Action</th>
-                    </tr>
-                </thead>
-                <tbody id="cpq-tbody">
-                {% for ci in cost_items_per_qty %}
-                <tr>
-                    <td>
-                        <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="moveCostItem({{ ci.id }}, 'up', 'per_qty')" title="Move up"><i class="bi bi-arrow-up"></i></button>
-                        <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="moveCostItem({{ ci.id }}, 'down', 'per_qty')" title="Move down"><i class="bi bi-arrow-down"></i></button>
-                    </td>
-                    <td><strong>{{ ci.name }}</strong></td>
-                    <td>{{ ci.description or '-' }}</td>
-                    <td>{{ app_settings.currency }} {{ '{:,.{}f}'.format(ci.price, currency_decimal_places|int) }}{% if ci.unit_label %} /{{ ci.unit_label }}{% endif %}</td>
-                    <td>{{ '{:g}'.format(ci.quantity) }}</td>
-                    <td>{{ app_settings.currency }} {{ '{:,.{}f}'.format(ci.total, currency_decimal_places|int) }}</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="editCostItem({{ ci.id }}, 'per_qty', {{ ci.name|tojson }}, {{ (ci.description or '')|tojson }}, {{ ci.price }}, {{ (ci.unit_label or '')|tojson }}, {{ ci.quantity }})" title="Edit"><i class="bi bi-pencil"></i></button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCostItem({{ ci.id }})" title="Delete"><i class="bi bi-trash"></i></button>
-                    </td>
-                </tr>
-                {% else %}
-                <tr id="cpq-empty"><td colspan="7" class="text-muted text-center py-2">No items yet. Click Add Item to start.</td></tr>
-                {% endfor %}
-                </tbody>
-                {% if cost_items_per_qty %}
-                <tfoot>
-                    <tr class="table-active">
-                        <td colspan="5" class="text-end"><strong>Total/qty:</strong></td>
-                        <td colspan="2"><strong>{{ app_settings.currency }} {{ '{:,.{}f}'.format(project.get_cost_per_qty_total(), currency_decimal_places|int) }}</strong></td>
-                    </tr>
-                </tfoot>
-                {% endif %}
-            </table>
-        </div>
-    </div>
-</div>
-
-<div class="card mt-3">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="bi bi-receipt"></i> Overall Cost</h5>
-        <button type="button" class="btn btn-sm btn-outline-primary" onclick="openCostModal('overall')"><i class="bi bi-plus-lg"></i> Add Item</button>
-    </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0" style="font-size:0.88rem;">
-                <thead>
-                    <tr>
-                        <th style="width:64px;"></th>
-                        <th>Item</th>
-                        <th>Description</th>
-                        <th>Price per Qty</th>
-                        <th>Qty</th>
-                        <th>Total</th>
-                        <th style="width:80px;">Action</th>
-                    </tr>
-                </thead>
-                <tbody id="ov-tbody">
-                {% for ci in cost_items_overall %}
-                <tr>
-                    <td>
-                        <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="moveCostItem({{ ci.id }}, 'up', 'overall')" title="Move up"><i class="bi bi-arrow-up"></i></button>
-                        <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="moveCostItem({{ ci.id }}, 'down', 'overall')" title="Move down"><i class="bi bi-arrow-down"></i></button>
-                    </td>
-                    <td><strong>{{ ci.name }}</strong></td>
-                    <td>{{ ci.description or '-' }}</td>
-                    <td>{{ app_settings.currency }} {{ '{:,.{}f}'.format(ci.price, currency_decimal_places|int) }}{% if ci.unit_label %} /{{ ci.unit_label }}{% endif %}</td>
-                    <td>{{ '{:g}'.format(ci.quantity) }}</td>
-                    <td>{{ app_settings.currency }} {{ '{:,.{}f}'.format(ci.total, currency_decimal_places|int) }}</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="editCostItem({{ ci.id }}, 'overall', {{ ci.name|tojson }}, {{ (ci.description or '')|tojson }}, {{ ci.price }}, {{ (ci.unit_label or '')|tojson }}, {{ ci.quantity }})" title="Edit"><i class="bi bi-pencil"></i></button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCostItem({{ ci.id }})" title="Delete"><i class="bi bi-trash"></i></button>
-                    </td>
-                </tr>
-                {% else %}
-                <tr id="ov-empty"><td colspan="7" class="text-muted text-center py-2">No items yet. Click Add Item to start.</td></tr>
-                {% endfor %}
-                </tbody>
-                {% if cost_items_overall %}
-                <tfoot>
-                    <tr class="table-active">
-                        <td colspan="5" class="text-end"><strong>Total:</strong></td>
-                        <td colspan="2"><strong>{{ app_settings.currency }} {{ '{:,.{}f}'.format(project.get_overall_cost_total(), currency_decimal_places|int) }}</strong></td>
-                    </tr>
-                </tfoot>
-                {% endif %}
-            </table>
-        </div>
     </div>
 </div>
 
