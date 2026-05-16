@@ -256,6 +256,24 @@
     </div>
 </div>
 
+<!-- Drawer Icon File Picker Modal -->
+<div class="modal fade" id="diFilePickerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-images me-2"></i>Select Share File for Drawer Icon</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" class="form-control form-control-sm mb-3" id="diFpSearch" placeholder="Search by name or category…" oninput="_diRenderFiles(_diFileCache||[])">
+                <div id="diFpGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;max-height:400px;overflow-y:auto;">
+                    <p class="text-muted text-center py-4">Loading…</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Move Items Modal -->
 <div class="modal fade" id="moveItemsModal" tabindex="-1">
     <div class="modal-dialog">
@@ -879,6 +897,37 @@ function openDrawer(rackName, drawerId, rackId) {
         .then(data => {
             let html = '';
 
+            // Drawer Icon section (editable only with location_management.edit)
+            {% if current_user.has_permission('settings_sections.location_management', 'edit') %}
+            {
+                const di = data.drawer_icon || {type: 'none', value: ''};
+                _currentDrawerIconType = di.type || 'none';
+                _currentDrawerIconValue = di.value || '';
+                html += '<div class="mb-3 p-2 border rounded">';
+                html += '<label class="form-label form-label-sm mb-2 fw-bold"><i class="bi bi-image"></i> Drawer Icon</label>';
+                html += '<div class="d-flex gap-1 mb-2">';
+                html += `<button type="button" class="btn btn-xs btn-sm ${di.type === 'none' ? 'btn-secondary' : 'btn-outline-secondary'}" id="diBtn-none" onclick="selectDrawerIconType('none')"><i class="bi bi-x-circle"></i> None</button>`;
+                html += `<button type="button" class="btn btn-xs btn-sm ${di.type === 'icon' ? 'btn-primary' : 'btn-outline-primary'}" id="diBtn-icon" onclick="selectDrawerIconType('icon')"><i class="bi bi-grid-3x3"></i> Built-in Icon</button>`;
+                html += `<button type="button" class="btn btn-xs btn-sm ${di.type === 'file' ? 'btn-info' : 'btn-outline-info'}" id="diBtn-file" onclick="selectDrawerIconType('file')"><i class="bi bi-images"></i> Share File</button>`;
+                html += '</div>';
+                // Built-in icon picker (inline)
+                html += `<div id="di-icon-section" style="display:${di.type === 'icon' ? 'block' : 'none'}">`;
+                html += '<input type="text" class="form-control form-control-sm mb-1" id="di-icon-search" placeholder="Search icons..." oninput="filterDrawerIconGrid(this.value)">';
+                html += '<div id="di-icon-grid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:3px;max-height:180px;overflow-y:auto;padding:4px;border:1px solid #dee2e6;border-radius:4px;margin-bottom:4px;"><p class="text-muted mb-0" style="font-size:11px;grid-column:1/-1;text-align:center;padding:12px 0;">Loading icons…</p></div>';
+                if (di.type === 'icon' && di.value) {
+                    html += `<div class="text-center small text-muted p-1">Selected: <i class="bi bi-${di.value}"></i> <code>${di.value}</code></div>`;
+                }
+                html += '</div>';
+                // Share file section
+                html += `<div id="di-file-section" style="display:${di.type === 'file' ? 'block' : 'none'}">`;
+                const diHasFile = di.type === 'file' && di.value;
+                html += `<div class="mb-2 text-center p-2 border rounded" id="di-file-preview-wrap" style="display:${diHasFile ? 'block' : 'none'}"><img src="${diHasFile ? di.value.replace(/"/g,'&quot;') : ''}" style="max-width:80px;max-height:60px;object-fit:contain;" id="di-file-preview-img"><div class="small text-muted mt-1" id="di-file-preview-name">${diHasFile ? di.value.split('/').pop() : ''}</div></div>`;
+                html += '<button type="button" class="btn btn-sm btn-outline-secondary w-100" onclick="openDrawerFilePicker()"><i class="bi bi-folder2-open"></i> Browse Share Files</button>';
+                html += '</div>';
+                html += '</div>';
+            }
+            {% endif %}
+
             // Short Info section (always shown; editable only with location_management.edit)
             {% if current_user.has_permission('settings_sections.location_management', 'edit') %}
             html += '<div class="mb-2">';
@@ -964,6 +1013,8 @@ function openDrawer(rackName, drawerId, rackId) {
             {# endif #}
             
             document.getElementById('drawerModalBody').innerHTML = html;
+            // Load icon grid if built-in icon section is already visible
+            if (_currentDrawerIconType === 'icon') loadDrawerIcons();
         })
         .catch(error => {
             console.error('Drawer load error:', error);
@@ -1023,6 +1074,125 @@ function saveDrawerShortInfo() {
         }
     })
     .catch(err => alert('Error: ' + err));
+}
+
+// ===== Drawer Icon =====
+let _currentDrawerIconType = 'none';
+let _currentDrawerIconValue = '';
+let _diIconsCache = null;
+
+function selectDrawerIconType(type) {
+    _currentDrawerIconType = type;
+    ['none', 'icon', 'file'].forEach(t => {
+        const btn = document.getElementById('diBtn-' + t);
+        if (!btn) return;
+        if (t === type) {
+            btn.className = btn.className.replace('btn-outline-secondary','btn-secondary').replace('btn-outline-primary','btn-primary').replace('btn-outline-info','btn-info');
+        } else {
+            btn.className = btn.className.replace('btn-secondary','btn-outline-secondary').replace('btn-primary','btn-outline-primary').replace('btn-info','btn-outline-info');
+        }
+    });
+    const iconSec = document.getElementById('di-icon-section');
+    const fileSec = document.getElementById('di-file-section');
+    if (iconSec) iconSec.style.display = type === 'icon' ? 'block' : 'none';
+    if (fileSec) fileSec.style.display = type === 'file' ? 'block' : 'none';
+
+    if (type === 'icon') {
+        loadDrawerIcons();
+    } else if (type === 'none') {
+        _currentDrawerIconValue = '';
+        saveDrawerIcon('none', '');
+    }
+}
+
+function loadDrawerIcons() {
+    if (_diIconsCache) { renderDrawerIconGrid(_diIconsCache, ''); return; }
+    fetch('/api/icons')
+        .then(r => r.json())
+        .then(icons => { _diIconsCache = icons; renderDrawerIconGrid(icons, document.getElementById('di-icon-search')?.value || ''); })
+        .catch(() => { const g = document.getElementById('di-icon-grid'); if (g) g.innerHTML = '<p class="text-danger mb-0" style="font-size:11px;grid-column:1/-1;text-align:center;">Error loading icons</p>'; });
+}
+
+function filterDrawerIconGrid(text) {
+    const icons = (_diIconsCache || []).filter(ic => ic.name.includes(text.toLowerCase()));
+    renderDrawerIconGrid(icons, text);
+}
+
+function renderDrawerIconGrid(icons, searchText) {
+    const grid = document.getElementById('di-icon-grid');
+    if (!grid) return;
+    if (!icons || icons.length === 0) {
+        grid.innerHTML = '<p class="text-muted mb-0" style="font-size:11px;grid-column:1/-1;text-align:center;padding:12px 0;">No icons found</p>';
+        return;
+    }
+    grid.innerHTML = icons.map(ic => {
+        const sel = ic.name === _currentDrawerIconValue ? 'background:#0d6efd22;outline:2px solid #0d6efd;' : '';
+        return `<button type="button" style="border:1px solid #dee2e6;border-radius:4px;padding:4px 2px;background:white;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:48px;${sel}" title="${ic.name}" onclick="selectDrawerIcon('${ic.name}')"><i class="${ic.class}" style="font-size:16px;"></i><span style="font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${ic.name}</span></button>`;
+    }).join('');
+}
+
+function selectDrawerIcon(iconName) {
+    _currentDrawerIconValue = iconName;
+    renderDrawerIconGrid(_diIconsCache || [], document.getElementById('di-icon-search')?.value || '');
+    saveDrawerIcon('icon', iconName);
+}
+
+function openDrawerFilePicker() {
+    const modal = new bootstrap.Modal(document.getElementById('diFilePickerModal'));
+    modal.show();
+}
+
+let _diFileCache = null;
+
+async function _diLoadFiles() {
+    if (_diFileCache) { _diRenderFiles(_diFileCache); return; }
+    const wrap = document.getElementById('diFpGrid');
+    if (wrap) wrap.innerHTML = '<p class="text-muted text-center py-4">Loading…</p>';
+    try {
+        const resp = await fetch('/api/qr-template/shared-media');
+        _diFileCache = await resp.json();
+        _diRenderFiles(_diFileCache);
+    } catch (e) {
+        if (wrap) wrap.innerHTML = '<p class="text-danger text-center py-4">Error loading files.</p>';
+    }
+}
+
+function _diRenderFiles(files) {
+    const query = (document.getElementById('diFpSearch')?.value || '').toLowerCase();
+    const filtered = query ? files.filter(f => f.name.toLowerCase().includes(query) || f.category.toLowerCase().includes(query)) : files;
+    const wrap = document.getElementById('diFpGrid');
+    if (!wrap) return;
+    wrap.innerHTML = filtered.map(f => {
+        const sel = f.url === _currentDrawerIconValue ? 'border:2px solid #0d6efd;' : 'border:1px solid #dee2e6;';
+        return `<div style="cursor:pointer;border-radius:6px;padding:6px;background:white;${sel}display:flex;flex-direction:column;align-items:center;gap:4px;" onclick="_diSelectFile('${f.url.replace(/'/g,"\\'")}','${f.name.replace(/'/g,"\\'")}')">
+            <img src="${f.url}" style="max-width:60px;max-height:60px;object-fit:contain;">
+            <span style="font-size:10px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px;" title="${f.name}">${f.name}</span>
+            <span style="font-size:9px;background:#6c757d;color:white;padding:1px 5px;border-radius:10px;">${f.category}</span>
+        </div>`;
+    }).join('') || '<p class="text-muted text-center py-4" style="grid-column:1/-1;">No files found.</p>';
+}
+
+function _diSelectFile(url, name) {
+    _currentDrawerIconValue = url;
+    // Update preview in drawer modal
+    const wrap = document.getElementById('di-file-preview-wrap');
+    const img = document.getElementById('di-file-preview-img');
+    const lbl = document.getElementById('di-file-preview-name');
+    if (wrap) wrap.style.display = 'block';
+    if (img) img.src = url;
+    if (lbl) lbl.textContent = name;
+    bootstrap.Modal.getInstance(document.getElementById('diFilePickerModal')).hide();
+    saveDrawerIcon('file', url);
+}
+
+function saveDrawerIcon(type, value) {
+    fetch('/api/drawer/update-icon', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({rack_id: currentRackId, drawer_id: currentDrawerId, icon_type: type, icon_value: value})
+    }).then(r => r.json()).then(d => {
+        if (!d.success) console.error('Failed to save drawer icon:', d.error);
+    }).catch(err => console.error('Error saving drawer icon:', err));
 }
 
 function toggleMoveLocationType(type) {
@@ -1305,6 +1475,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 .forEach(el => el.classList.remove('group-highlight'));
         });
     });
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const diFpModal = document.getElementById('diFilePickerModal');
+    if (diFpModal) {
+        diFpModal.addEventListener('show.bs.modal', _diLoadFiles);
+    }
 });
 </script>
 {% endblock %}

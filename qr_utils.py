@@ -154,14 +154,17 @@ def get_drawer_data(rack, drawer_id):
     grp = group_cells.get(drawer_id)
     draw_group = grp['master'] if grp else ''
 
+    drawer_icon = rack.get_drawer_icon(drawer_id)
+
     return {
         **rack_data,
-        'DrawInfo':   draw_info,
-        'DrawLoc':    drawer_id,
-        'DrawSize':   draw_size,
-        'DrawICount': str(draw_item_count),
-        'DrawStatus': draw_status,
-        'DrawGroup':  draw_group,
+        'DrawInfo':    draw_info,
+        'DrawLoc':     drawer_id,
+        'DrawSize':    draw_size,
+        'DrawICount':  str(draw_item_count),
+        'DrawStatus':  draw_status,
+        'DrawGroup':   draw_group,
+        '_drawer_icon': drawer_icon,
     }
 
 def get_session_data(session):
@@ -296,8 +299,11 @@ def render_template_to_svg(template, data):
             font = element.get('font_family', 'Arial')
             if font:
                 text_fonts_used.add(font)
-        elif element.get('type') == 'icon' and element.get('icon_name'):
-            has_icons = True
+        elif element.get('type') == 'icon':
+            if element.get('icon_name'):
+                has_icons = True
+            elif element.get('use_target_icon') and data.get('_drawer_icon', {}).get('type') == 'icon':
+                has_icons = True
 
     # Build font-face rules for SVG with embedded fonts for project fonts
     font_styles = ''
@@ -460,8 +466,12 @@ def render_template_to_svg(template, data):
                 svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" text-anchor="middle">Barcode Error</text>\n'
 
         elif element['type'] == 'icon':
-            icon_name = element.get('icon_name', '')
             icon_color = element.get('icon_color', '#000000')
+            if element.get('use_target_icon'):
+                di = data.get('_drawer_icon', {})
+                icon_name = di.get('value', '') if di.get('type') == 'icon' else ''
+            else:
+                icon_name = element.get('icon_name', '')
             icon_size_px = min(w_px, h_px) * 0.8
             if icon_name:
                 print(f"[SVG] Element {idx}: ICON = '{icon_name}' (container: {w_px}×{h_px}px, scaled size: {icon_size_px}px, color: {icon_color})")
@@ -476,7 +486,11 @@ def render_template_to_svg(template, data):
                 print(f"[SVG] Element {idx}: ICON - No icon name specified")
 
         elif element['type'] == 'picture':
-            picture_url = element.get('picture_url') or ''
+            if element.get('use_target_image'):
+                di = data.get('_drawer_icon', {})
+                picture_url = di.get('value', '') if di.get('type') == 'file' else ''
+            else:
+                picture_url = element.get('picture_url') or ''
             print(f"[SVG] Element {idx}: PICTURE url='{picture_url}'")
             img_b64 = None
             mime = 'image/png'

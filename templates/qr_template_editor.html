@@ -1084,7 +1084,10 @@ function createElementDiv(element, index) {
 
         const iconColor = element.icon_color || '#000000';
 
-        if (element.icon_name) {
+        if (element.use_target_icon) {
+            const containerSize = Math.min(w, h) * 0.8;
+            div.innerHTML = `<div style="width:100%;height:100%;border:2px dashed #0d6efd;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(13,110,253,0.05);gap:2px;"><i class="bi bi-bullseye" style="font-size:${containerSize * 0.6}px;color:#0d6efd;"></i><span style="font-size:${Math.max(6, Math.min(w,h)*0.12)}px;color:#0d6efd;">Target Icon</span></div>`;
+        } else if (element.icon_name) {
             // Has icon selected - scale to fit container (use 80% of container size)
             const containerSize = Math.min(w, h) * 0.8;
             div.innerHTML = `<i class="bi bi-${element.icon_name}" style="font-size: ${containerSize}px; color: ${iconColor};"></i>`;
@@ -1097,7 +1100,10 @@ function createElementDiv(element, index) {
         div.style.justifyContent = 'center';
         div.style.alignItems = 'center';
 
-        if (element.picture_url) {
+        if (element.use_target_image) {
+            const minDim = Math.min(w, h);
+            div.innerHTML = `<div style="width:100%;height:100%;border:2px dashed #0d6efd;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(13,110,253,0.05);gap:2px;"><i class="bi bi-bullseye" style="font-size:${minDim*0.35}px;color:#0d6efd;"></i><span style="font-size:${Math.max(8,minDim*0.12)}px;color:#0d6efd;">Target Image</span></div>`;
+        } else if (element.picture_url) {
             div.innerHTML = `<img src="${element.picture_url}" style="max-width:100%;max-height:100%;object-fit:contain;" draggable="false">`;
         } else {
             const minDim = Math.min(w, h);
@@ -1473,15 +1479,21 @@ function updatePropertiesPanel(index) {
             <input type="text" class="form-control form-control-sm" id="prop-layername" value="${layerName}" style="font-size: 12px;">
         </div>
         
+        <!-- Use Target Icon -->
+        <div class="mb-2 form-check">
+            <input type="checkbox" class="form-check-input" id="prop-use-target-icon" ${element.use_target_icon ? 'checked' : ''}>
+            <label class="form-check-label" for="prop-use-target-icon" style="font-size: 12px;">Use target icon <small class="text-muted">(uses the icon set on the target entity, e.g. drawer icon)</small></label>
+        </div>
+
         <!-- Icon Search -->
-        <div class="mb-2">
+        <div class="mb-2" id="prop-icon-picker-section" style="display: ${element.use_target_icon ? 'none' : 'block'}">
             <label class="form-label" style="font-size: 12px;"><strong>Search Icons</strong></label>
             <input type="text" class="form-control form-control-sm" id="prop-icon-search" placeholder="Search Bootstrap Icons..." style="font-size: 12px;">
             <small class="text-muted" style="font-size: 11px;">Bootstrap Icons bundled with ElectroManager</small>
         </div>
 
         <!-- Icon Preview Grid -->
-        <div class="mb-2">
+        <div class="mb-2" id="prop-icon-grid-section" style="display: ${element.use_target_icon ? 'none' : 'block'}">
             <label class="form-label" style="font-size: 12px;"><strong>Icon Preview</strong></label>
             <div id="prop-icon-grid" class="icon-picker-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; max-height: 250px; overflow-y: auto; padding: 8px; border-radius: 4px;">
                 <p class="text-muted mb-0" style="font-size: 11px; grid-column: 1/-1; text-align: center; padding: 20px 0;">Loading icons…</p>
@@ -1510,8 +1522,14 @@ function updatePropertiesPanel(index) {
         <input type="text" class="form-control form-control-sm" id="prop-layername" value="${layerName}" style="font-size: 12px;">
     </div>
 
+    <!-- Use Target Image -->
+    <div class="mb-2 form-check">
+        <input type="checkbox" class="form-check-input" id="prop-use-target-image" ${element.use_target_image ? 'checked' : ''}>
+        <label class="form-check-label" for="prop-use-target-image" style="font-size: 12px;">Use target image <small class="text-muted">(uses the image set on the target entity, e.g. drawer icon)</small></label>
+    </div>
+
     <!-- Selected preview -->
-    <div class="mb-2" id="picture-selected-preview" style="display: ${element.picture_url ? 'block' : 'none'};">
+    <div class="mb-2" id="picture-selected-preview" style="display: ${element.use_target_image ? 'none' : (element.picture_url ? 'block' : 'none')};">
         <label class="form-label" style="font-size: 12px;"><strong>Selected Image</strong></label>
         <div style="text-align:center; padding:6px; border:1px solid #28a745; border-radius:4px; background:rgba(40,167,69,0.05);">
             <img src="${element.picture_url || ''}" style="max-width:80px;max-height:60px;object-fit:contain;" id="picture-preview-img">
@@ -1519,8 +1537,8 @@ function updatePropertiesPanel(index) {
     </div>
 
     <!-- Browse button -->
-    <div class="mb-2">
-        <button type="button" class="btn btn-sm btn-outline-secondary w-100" onclick="openShareFilePicker()">
+    <div class="mb-2" id="picture-browse-section" style="display: ${element.use_target_image ? 'none' : 'block'};">
+        <button type="button" class="btn btn-sm btn-outline-secondary w-100" onclick="openShareFilePicker()" ${element.use_target_image ? 'disabled' : ''}>
             <i class="bi bi-folder2-open"></i> Browse Share Files
         </button>
     </div>`;
@@ -1862,8 +1880,36 @@ function attachPropertyListeners(index) {
         });
     }
 
+    // Use target icon toggle
+    const useTargetIconCb = document.getElementById('prop-use-target-icon');
+    if (useTargetIconCb) {
+        useTargetIconCb.addEventListener('change', (e) => {
+            const checked = e.target.checked;
+            updateProp('use_target_icon', checked);
+            const pickerSection = document.getElementById('prop-icon-picker-section');
+            const gridSection = document.getElementById('prop-icon-grid-section');
+            if (pickerSection) pickerSection.style.display = checked ? 'none' : 'block';
+            if (gridSection) gridSection.style.display = checked ? 'none' : 'block';
+        });
+    }
+
+    // Use target image toggle
+    const useTargetImageCb = document.getElementById('prop-use-target-image');
+    if (useTargetImageCb) {
+        useTargetImageCb.addEventListener('change', (e) => {
+            const checked = e.target.checked;
+            updateProp('use_target_image', checked);
+            const browseSection = document.getElementById('picture-browse-section');
+            const previewSection = document.getElementById('picture-selected-preview');
+            if (browseSection) browseSection.style.display = checked ? 'none' : 'block';
+            if (previewSection) previewSection.style.display = checked ? 'none' : (el.picture_url ? 'block' : 'none');
+        });
+    }
+
     // Load Bootstrap Icons catalogue
-    loadBootstrapIcons(el);
+    if (!useTargetIconCb || !useTargetIconCb.checked) {
+        loadBootstrapIcons(el);
+    }
 
 }
 

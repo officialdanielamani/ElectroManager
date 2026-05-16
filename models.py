@@ -239,7 +239,8 @@ class Rack(db.Model):
     cols = db.Column(db.Integer, default=5)
     unavailable_drawers = db.Column(db.Text)
     merged_cells = db.Column(db.Text, default='[]')
-    drawer_info = db.Column(db.Text)  # JSON dict: {drawer_id: short_info_text}
+    drawer_info = db.Column(db.Text)   # JSON dict: {drawer_id: short_info_text}
+    drawer_icons = db.Column(db.Text)  # JSON dict: {drawer_id: {type: 'icon'|'file'|'none', value: '...'}}
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     items = db.relationship('Item', backref='rack', lazy=True)
@@ -285,6 +286,25 @@ class Rack(db.Model):
         elif drawer_id in info:
             del info[drawer_id]
         self.drawer_info = json.dumps(info) if info else None
+
+    def get_drawer_icons(self):
+        if not self.drawer_icons:
+            return {}
+        try:
+            return json.loads(self.drawer_icons)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+
+    def get_drawer_icon(self, drawer_id):
+        return self.get_drawer_icons().get(drawer_id, {'type': 'none', 'value': ''})
+
+    def set_drawer_icon(self, drawer_id, icon_type, icon_value):
+        icons = self.get_drawer_icons()
+        if icon_type == 'none':
+            icons.pop(drawer_id, None)
+        else:
+            icons[drawer_id] = {'type': icon_type, 'value': icon_value}
+        self.drawer_icons = json.dumps(icons) if icons else None
 
     def get_merge_group(self, cell_id):
         for group in self.get_merged_cells():
