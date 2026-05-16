@@ -217,6 +217,7 @@
 
                 <!-- Costing Summary -->
                 <hr>
+                <h5><i class="bi bi-coin"></i> Costing</h5>
                 {% set _bom_est = project.get_bom_total_cost() %}
                 {% set _bom_act = project.get_bom_actual_cost() %}
                 {% set _cpq    = project.get_cost_per_qty_total() %}
@@ -239,7 +240,7 @@
                                 <small class="text-muted d-block">Cost per Qty</small>
                                 <strong>{{ currency }} {{ '{:,.{}f}'.format(_cpq, currency_decimal) }}</strong>
                             </td>
-                            <td rowspan="2" class="text-center align-middle text-white" style="width:34%;background:#0d6efd;">
+                            <td rowspan="2" class="text-center align-middle text-white bg-primary" style="width:34%;">
                                 <small class="d-block opacity-75">Project Total Cost</small>
                                 <strong class="fs-5">{{ currency }} {{ '{:,.{}f}'.format(_est, currency_decimal) }}</strong>
                             </td>
@@ -464,13 +465,13 @@
 <!-- Lightbox Modal -->
 <div class="modal fade" id="projLightboxModal" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-centered">
-        <div class="modal-content bg-dark">
-            <div class="modal-header border-0 pb-0">
-                <span class="text-white" id="projLightboxTitle"></span>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="projLightboxTitle"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body text-center p-2">
-                <img id="projLightboxImg" src="" alt="" style="max-width:100%;max-height:80vh;object-fit:contain;">
+            <div class="modal-body text-center">
+                <img id="projLightboxImg" src="" class="img-fluid" alt="">
             </div>
         </div>
     </div>
