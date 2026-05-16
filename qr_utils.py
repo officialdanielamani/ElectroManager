@@ -75,6 +75,19 @@ def get_item_data(item):
 
     total_price = item.get_overall_total_price()
 
+    # Derive _item_icon from thumbnail value
+    thumb = item.thumbnail or ''
+    if thumb.startswith('biicon:'):
+        item_icon = {'type': 'icon', 'value': thumb[7:]}
+    elif thumb.startswith('share:'):
+        item_icon = {'type': 'file', 'value': f'/uploads/share/item/{thumb[6:]}'}
+    elif thumb.startswith('icon:'):
+        item_icon = {'type': 'file', 'value': f'/uploads/share/icon/{thumb[5:]}'}
+    elif thumb:
+        item_icon = {'type': 'file', 'value': f'/uploads/{thumb}'}
+    else:
+        item_icon = {'type': 'none', 'value': ''}
+
     return {
         'ItemUUID':     item.uuid,
         'ItemName':     item.name,
@@ -91,6 +104,7 @@ def get_item_data(item):
         'ItemMRackName': rack_name,
         'ItemMRackUUID': rack_uuid,
         'ItemMDrawLoc':  draw_loc,
+        '_item_icon':   item_icon,
     }
 
 def get_location_data(location):
@@ -302,8 +316,10 @@ def render_template_to_svg(template, data):
         elif element.get('type') == 'icon':
             if element.get('icon_name'):
                 has_icons = True
-            elif element.get('use_target_icon') and data.get('_drawer_icon', {}).get('type') == 'icon':
-                has_icons = True
+            elif element.get('use_target_icon'):
+                _ti = data.get('_drawer_icon') or data.get('_item_icon') or {}
+                if _ti.get('type') == 'icon':
+                    has_icons = True
 
     # Build font-face rules for SVG with embedded fonts for project fonts
     font_styles = ''
@@ -468,7 +484,7 @@ def render_template_to_svg(template, data):
         elif element['type'] == 'icon':
             icon_color = element.get('icon_color', '#000000')
             if element.get('use_target_icon'):
-                di = data.get('_drawer_icon', {})
+                di = data.get('_drawer_icon') or data.get('_item_icon') or {}
                 icon_name = di.get('value', '') if di.get('type') == 'icon' else ''
             else:
                 icon_name = element.get('icon_name', '')
@@ -487,7 +503,7 @@ def render_template_to_svg(template, data):
 
         elif element['type'] == 'picture':
             if element.get('use_target_image'):
-                di = data.get('_drawer_icon', {})
+                di = data.get('_drawer_icon') or data.get('_item_icon') or {}
                 picture_url = di.get('value', '') if di.get('type') == 'file' else ''
             else:
                 picture_url = element.get('picture_url') or ''
@@ -497,13 +513,12 @@ def render_template_to_svg(template, data):
             if picture_url:
                 try:
                     # picture_url is like /uploads/share/<category>/<filename>
+                    # or /uploads/<relative_path> for item attachments
                     parts = picture_url.strip('/').split('/')
-                    # expected: ['uploads', 'share', category, filename]
-                    if len(parts) >= 4 and parts[0] == 'uploads' and parts[1] == 'share':
-                        category = parts[2]
-                        filename = '/'.join(parts[3:])
-                        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', category, filename)
-                        ext = os.path.splitext(filename)[1].lower()
+                    if len(parts) >= 2 and parts[0] == 'uploads':
+                        rel_path = '/'.join(parts[1:])
+                        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], rel_path)
+                        ext = os.path.splitext(rel_path)[1].lower()
                         mime_map = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
                                     '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml'}
                         mime = mime_map.get(ext, 'image/png')

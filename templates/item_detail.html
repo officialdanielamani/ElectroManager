@@ -88,7 +88,9 @@
                     {% if item.thumbnail %}
                     <div style="flex-shrink:0; background-color:white; padding:8px; border-radius:4px; display:inline-block;">
                         <div style="width:140px;height:140px;border:2px solid #ddd;border-radius:4px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#f8f9fa;">
-                            {% if item.thumbnail.startswith('share:') %}
+                            {% if item.thumbnail.startswith('biicon:') %}
+                            <i class="bi bi-{{ item.thumbnail[7:] }}" style="font-size:4rem;color:#333;"></i>
+                            {% elif item.thumbnail.startswith('share:') %}
                             <img src="{{ url_for('share.share_serve', category='item', filename=item.thumbnail[6:]) }}"
                                  alt="Thumbnail" style="width:100%;height:100%;object-fit:cover;">
                             {% elif item.thumbnail.startswith('icon:') %}

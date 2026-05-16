@@ -384,6 +384,29 @@ def api_qr_shared_media():
         })
     return jsonify(result)
 
+
+@qr_template_bp.route('/api/item-thumb-media')
+@login_required
+def api_item_thumb_media():
+    """API: List item + icon share files for item thumbnail Share Files picker."""
+    from models import SharedFile
+    files = SharedFile.query.filter(
+        SharedFile.category.in_(['item', 'icon'])
+    ).order_by(SharedFile.category, SharedFile.name).all()
+    result = []
+    for f in files:
+        if not f.is_image:
+            continue
+        result.append({
+            'id': f.id,
+            'name': f.name,
+            'filename': f.filename,
+            'category': f.category,
+            'url': url_for('share.share_serve', category=f.category, filename=f.filename)
+        })
+    return jsonify(result)
+
+
 @qr_template_bp.route('/api/icons')
 def api_get_icons():
     """Return the bundled Bootstrap Icons catalogue (name + class)."""
