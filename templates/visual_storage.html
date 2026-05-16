@@ -56,11 +56,17 @@
                             </button>
                         </div>
                     </div>
-                    <div class="col-auto">
-                        <div class="form-check form-check-inline">
+                    <div class="col-auto d-flex gap-3 align-items-center">
+                        <div class="form-check form-check-inline mb-0">
                             <input class="form-check-input" type="checkbox" id="exactMatch" value="option1">
                             <label class="form-check-label" for="exactMatch">
                                 <small>Exact Match</small>
+                            </label>
+                        </div>
+                        <div class="form-check form-check-inline mb-0">
+                            <input class="form-check-input" type="checkbox" id="enablePicture">
+                            <label class="form-check-label" for="enablePicture">
+                                <small>Enable Picture</small>
                             </label>
                         </div>
                     </div>
@@ -112,9 +118,28 @@
         <div class="card">
             <div class="card-header bg-dark text-white">
                 <div class="d-flex justify-content-between align-items-start mb-2">
+                    {% set ri = rack.rack_icon %}
+                    <div class="rack-thumb-area me-2" data-rack-uuid="{{ rack.uuid }}">
+                        {% if ri.type == 'icon' and ri.value %}
+                        <i class="bi bi-{{ ri.value }}" style="font-size:26px;color:white;"></i>
+                        {% elif ri.type == 'file' and ri.value %}
+                        <img src="{{ ri.value }}" alt="">
+                        {% else %}
+                        <i class="bi bi-box-seam" style="font-size:22px;color:rgba(255,255,255,0.35);"></i>
+                        {% endif %}
+                        {% if current_user.has_permission('settings_sections.location_management', 'edit') %}
+                        <div class="rack-thumb-overlay">
+                            <button onclick="event.stopPropagation();openRackIconPicker('{{ rack.uuid }}')"><i class="bi bi-star" style="font-size:10px;"></i> Icon</button>
+                            <button onclick="event.stopPropagation();openRackFilePicker('{{ rack.uuid }}')"><i class="bi bi-folder" style="font-size:10px;"></i> File</button>
+                            {% if ri.type != 'none' and ri.value %}
+                            <button onclick="event.stopPropagation();clearRackIcon('{{ rack.uuid }}')" style="color:#dc3545;"><i class="bi bi-x" style="font-size:10px;"></i> Clear</button>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
                     <div class="flex-grow-1">
                         <h5 class="mb-1">
-                            <i class="bi bi-box-seam"></i> {{ rack.name }}
+                            {{ rack.name }}
                             <span class="badge bg-primary">{{ rack.item_count }} items</span>
                         </h5>
                         {% if rack.short_info %}
@@ -166,6 +191,16 @@
                             {% if grp and grp.role == 'master' %}<span class="merged-badge">{{ grp.count }} cells</span>{% endif %}
                             {% if is_slave %}<span class="merged-badge text-muted">→{{ grp.master }}</span>{% endif %}
                         </div>
+                        {% if not is_slave %}
+                        {% set d_icon = rack.drawer_icons.get(effective_id, {}) %}
+                        {% if d_icon and d_icon.get('type') == 'icon' and d_icon.get('value') %}
+                        <div class="drawer-icon-thumb"><i class="bi bi-{{ d_icon.value }}"></i></div>
+                        {% elif d_icon and d_icon.get('type') == 'file' and d_icon.get('value') %}
+                        <div class="drawer-icon-thumb"><img src="{{ d_icon.value }}" alt=""></div>
+                        {% else %}
+                        <div class="drawer-icon-thumb"></div>
+                        {% endif %}
+                        {% endif %}
                         {% if d_short_info and not is_slave %}
                         <div class="drawer-short-info" title="{{ d_short_info }}">{{ d_short_info }}</div>
                         {% endif %}
@@ -688,6 +723,48 @@
     #filterCard select,
     #filterCard .input-group { width: 100% !important; min-width: unset !important; }
 }
+
+/* ── Picture Mode ── */
+.rack-thumb-area {
+    display: none;
+    width: 56px; min-width: 56px; height: 56px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.15);
+    align-items: center; justify-content: center;
+    overflow: hidden;
+    position: relative;
+    flex-shrink: 0;
+    transition: box-shadow 0.2s;
+}
+.show-pictures .rack-thumb-area { display: flex; }
+.rack-thumb-area img { width: 100%; height: 100%; object-fit: cover; }
+.rack-thumb-overlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.65);
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center; gap: 2px;
+    border-radius: 7px;
+}
+.rack-thumb-area:hover .rack-thumb-overlay { display: flex; }
+.rack-thumb-overlay button {
+    border: none; background: rgba(255,255,255,0.92); color: #333;
+    border-radius: 3px; padding: 1px 6px; font-size: 11px;
+    cursor: pointer; line-height: 1.6; width: 88%;
+    display: flex; align-items: center; gap: 3px;
+}
+.rack-thumb-overlay button:hover { background: white; }
+
+.drawer-icon-thumb {
+    display: none;
+    align-items: center; justify-content: center;
+    width: 100%; height: 36px;
+    margin-bottom: 2px;
+    overflow: hidden;
+}
+.drawer-icon-thumb img { max-height: 32px; max-width: 90%; object-fit: contain; }
+.drawer-icon-thumb .bi { font-size: 1.4rem; }
+.show-pictures .drawer-icon-thumb { display: flex; }
+.show-pictures .drawer-cell { min-height: 130px; }
 </style>
 
 <script>
@@ -1093,6 +1170,7 @@ let _currentDrawerIconType = 'none';
 let _currentDrawerIconValue = '';
 let _diIconsCache = null;
 let _diFileCache = null;
+let _rackIconEditTarget = null;
 
 function _diUpdatePreview() {
     const preview = document.getElementById('di-preview');
@@ -1155,10 +1233,15 @@ function _diRenderIcons(icons) {
 function selectDrawerIcon(iconName) {
     _currentDrawerIconType = 'icon';
     _currentDrawerIconValue = iconName;
-    _diUpdatePreview();
-    _diRenderIcons(_diIconsCache || []);
     bootstrap.Modal.getInstance(document.getElementById('diIconPickerModal')).hide();
-    saveDrawerIcon('icon', iconName);
+    if (_rackIconEditTarget) {
+        saveRackIcon(_rackIconEditTarget, 'icon', iconName);
+        _rackIconEditTarget = null;
+    } else {
+        _diUpdatePreview();
+        _diRenderIcons(_diIconsCache || []);
+        saveDrawerIcon('icon', iconName);
+    }
 }
 
 async function _diLoadFiles() {
@@ -1190,11 +1273,16 @@ function _diRenderFiles(files) {
 }
 
 function _diSelectFile(url, name) {
-    _currentDrawerIconType = 'file';
-    _currentDrawerIconValue = url;
-    _diUpdatePreview();
     bootstrap.Modal.getInstance(document.getElementById('diFilePickerModal')).hide();
-    saveDrawerIcon('file', url);
+    if (_rackIconEditTarget) {
+        saveRackIcon(_rackIconEditTarget, 'file', url);
+        _rackIconEditTarget = null;
+    } else {
+        _currentDrawerIconType = 'file';
+        _currentDrawerIconValue = url;
+        _diUpdatePreview();
+        saveDrawerIcon('file', url);
+    }
 }
 
 function saveDrawerIcon(type, value) {
@@ -1205,6 +1293,74 @@ function saveDrawerIcon(type, value) {
     }).then(r => r.json()).then(d => {
         if (!d.success) console.error('Failed to save drawer icon:', d.error);
     }).catch(err => console.error('Error saving drawer icon:', err));
+}
+
+// ===== Rack Icon =====
+function openRackIconPicker(rackUuid) {
+    _rackIconEditTarget = rackUuid;
+    const modal = new bootstrap.Modal(document.getElementById('diIconPickerModal'));
+    modal.show();
+}
+
+function openRackFilePicker(rackUuid) {
+    _rackIconEditTarget = rackUuid;
+    const modal = new bootstrap.Modal(document.getElementById('diFilePickerModal'));
+    modal.show();
+}
+
+function clearRackIcon(rackUuid) {
+    fetch('/api/rack/update-rack-icon', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({rack_uuid: rackUuid, icon_type: 'none', icon_value: ''})
+    }).then(r => r.json()).then(d => {
+        if (d.success) _updateRackThumbDom(rackUuid, 'none', '');
+        else console.error('Failed to clear rack icon:', d.error);
+    }).catch(err => console.error('Error clearing rack icon:', err));
+}
+
+function saveRackIcon(rackUuid, type, value) {
+    fetch('/api/rack/update-rack-icon', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({rack_uuid: rackUuid, icon_type: type, icon_value: value})
+    }).then(r => r.json()).then(d => {
+        if (d.success) _updateRackThumbDom(rackUuid, type, value);
+        else console.error('Failed to save rack icon:', d.error);
+    }).catch(err => console.error('Error saving rack icon:', err));
+}
+
+function _updateRackThumbDom(rackUuid, type, value) {
+    const thumbArea = document.querySelector(`.rack-thumb-area[data-rack-uuid="${rackUuid}"]`);
+    if (!thumbArea) return;
+    const overlay = thumbArea.querySelector('.rack-thumb-overlay');
+    let inner = '';
+    if (type === 'icon' && value) {
+        inner = `<i class="bi bi-${value}" style="font-size:26px;color:white;"></i>`;
+    } else if (type === 'file' && value) {
+        inner = `<img src="${value}" alt="" style="width:100%;height:100%;object-fit:contain;">`;
+    } else {
+        inner = `<i class="bi bi-box-seam" style="font-size:22px;color:rgba(255,255,255,0.35);"></i>`;
+    }
+    // Remove old icon/img, leave overlay intact
+    Array.from(thumbArea.childNodes).forEach(n => { if (n !== overlay) n.remove(); });
+    thumbArea.insertAdjacentHTML('afterbegin', inner);
+    // Update clear button visibility in overlay
+    if (overlay) {
+        let clearBtn = overlay.querySelector('.rack-thumb-clear-btn');
+        if (type !== 'none' && value) {
+            if (!clearBtn) {
+                const btn = document.createElement('button');
+                btn.className = 'rack-thumb-clear-btn';
+                btn.style.cssText = 'background:none;border:none;color:#dc3545;font-size:10px;padding:0;cursor:pointer;';
+                btn.onclick = function(e) { e.stopPropagation(); clearRackIcon(rackUuid); };
+                btn.textContent = 'Clear';
+                overlay.appendChild(btn);
+            }
+        } else if (clearBtn) {
+            clearBtn.remove();
+        }
+    }
 }
 
 function toggleMoveLocationType(type) {
@@ -1492,6 +1648,21 @@ document.addEventListener('DOMContentLoaded', function() {
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('diIconPickerModal')?.addEventListener('show.bs.modal', _diLoadIcons);
     document.getElementById('diFilePickerModal')?.addEventListener('show.bs.modal', _diLoadFiles);
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const enablePictureEl = document.getElementById('enablePicture');
+    const rackContainer = document.getElementById('rackContainer');
+    if (enablePictureEl && rackContainer) {
+        if (sessionStorage.getItem('vs_show_pictures') === '1') {
+            enablePictureEl.checked = true;
+            rackContainer.classList.add('show-pictures');
+        }
+        enablePictureEl.addEventListener('change', function() {
+            sessionStorage.setItem('vs_show_pictures', this.checked ? '1' : '0');
+            rackContainer.classList.toggle('show-pictures', this.checked);
+        });
+    }
 });
 </script>
 {% endblock %}
