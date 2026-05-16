@@ -142,23 +142,6 @@
                 </div>
                 {% endif %}
 
-                <!-- Cost Summary -->
-                <hr>
-                {% set bom_est = project.get_bom_total_cost() %}
-                {% set bom_act = project.get_bom_actual_cost() %}
-                {% set cpq_total = project.get_cost_per_qty_total() %}
-                {% set ov_total = project.get_overall_cost_total() %}
-                {% set proj_qty = project.quantity or 1 %}
-                {% set est_total = (bom_est + cpq_total) * proj_qty + ov_total %}
-                {% set act_total = (bom_act + cpq_total) * proj_qty + ov_total %}
-                <div class="row mb-3 g-2">
-                    <div class="col-6 col-md-3"><div class="card bg-light"><div class="card-body text-center p-2"><small class="text-muted">BOM Est. (per unit)</small><h6 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(bom_est, currency_decimal) }}</h6></div></div></div>
-                    <div class="col-6 col-md-3"><div class="card bg-light"><div class="card-body text-center p-2"><small class="text-muted">BOM Actual (per unit)</small><h6 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(bom_act, currency_decimal) }}</h6></div></div></div>
-                    <div class="col-6 col-md-2"><div class="card bg-light"><div class="card-body text-center p-2"><small class="text-muted">Qty</small><h6 class="mb-0">{{ proj_qty }}</h6></div></div></div>
-                    <div class="col-6 col-md-2"><div class="card bg-primary text-white"><div class="card-body text-center p-2"><small>Est. Total</small><h6 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(est_total, currency_decimal) }}</h6></div></div></div>
-                    <div class="col-6 col-md-2"><div class="card bg-success text-white"><div class="card-body text-center p-2"><small>Actual Total</small><h6 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(act_total, currency_decimal) }}</h6></div></div></div>
-                </div>
-
                 <!-- Attachments (view only) -->
                 {% set att_types = [('picture', 'Pictures', 'bi-image'), ('document', 'Documents', 'bi-file-text'), ('schematic', 'Schematics', 'bi-cpu'), ('2d_design', '2D Designs', 'bi-pencil-square'), ('3d_design', '3D Designs', 'bi-box'), ('program', 'Programs', 'bi-code')] %}
                 {% set has_attachments = attachments.values() | map('length') | sum > 0 %}
@@ -232,8 +215,49 @@
                 </div>
                 {% endif %}
 
-                <!-- BOM Table -->
+                <!-- Costing Summary -->
                 <hr>
+                {% set _bom_est = project.get_bom_total_cost() %}
+                {% set _bom_act = project.get_bom_actual_cost() %}
+                {% set _cpq    = project.get_cost_per_qty_total() %}
+                {% set _ov     = project.get_overall_cost_total() %}
+                {% set _qty    = project.quantity or 1 %}
+                {% set _est    = (_bom_est + _cpq) * _qty + _ov %}
+                {% set _act    = (_bom_act + _cpq) * _qty + _ov %}
+                <table class="table table-bordered mb-3" style="table-layout:fixed;">
+                    <tbody>
+                        <tr>
+                            <td rowspan="2" class="text-center align-middle" style="width:22%;background:var(--bs-tertiary-bg,#f8f9fa);">
+                                <small class="text-muted d-block">Quantity</small>
+                                <strong class="fs-5">{{ _qty }}</strong>
+                            </td>
+                            <td class="text-center p-2" style="width:22%;background:var(--bs-tertiary-bg,#f8f9fa);">
+                                <small class="text-muted d-block">Estimate BOM</small>
+                                <strong>{{ currency }} {{ '{:,.{}f}'.format(_bom_est, currency_decimal) }}</strong>
+                            </td>
+                            <td class="text-center p-2" style="width:22%;background:var(--bs-tertiary-bg,#f8f9fa);">
+                                <small class="text-muted d-block">Cost per Qty</small>
+                                <strong>{{ currency }} {{ '{:,.{}f}'.format(_cpq, currency_decimal) }}</strong>
+                            </td>
+                            <td rowspan="2" class="text-center align-middle text-white" style="width:34%;background:#0d6efd;">
+                                <small class="d-block opacity-75">Project Total Cost</small>
+                                <strong class="fs-5">{{ currency }} {{ '{:,.{}f}'.format(_est, currency_decimal) }}</strong>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-center p-2" style="background:var(--bs-tertiary-bg,#f8f9fa);">
+                                <small class="text-muted d-block">Actual BOM</small>
+                                <strong>{{ currency }} {{ '{:,.{}f}'.format(_bom_act, currency_decimal) }}</strong>
+                            </td>
+                            <td class="text-center p-2" style="background:var(--bs-tertiary-bg,#f8f9fa);">
+                                <small class="text-muted d-block">Overall Cost</small>
+                                <strong>{{ currency }} {{ '{:,.{}f}'.format(_ov, currency_decimal) }}</strong>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- BOM Table -->
                 <h5><i class="bi bi-list-check"></i> Bill of Materials (BOM)</h5>
                 {% if bom_items %}
                 <div class="table-responsive mt-2">
