@@ -49,7 +49,7 @@ class AnonymousUser(AnonymousUserMixin):
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'auth.login'
-login_manager.login_message = 'Please log in to access this page.'
+login_manager.login_message = ''
 login_manager.anonymous_user = AnonymousUser  # Use custom anonymous user
 
 # Create upload and instance folders
@@ -166,6 +166,7 @@ def inject_settings():
         'dependencies': libs,
         'system_name': system_name,
         'system_logo_url': system_logo_url,
+        'demo_mode': app.config.get('DEMO_MODE', False),
     }
 
 
@@ -274,6 +275,7 @@ def _apply_column_migrations():
         ("item_batches",         "lend_disabled",        "BOOLEAN DEFAULT 0"),
         ("racks",                "drawer_icons",         "TEXT DEFAULT NULL"),
         ("racks",                "rack_icon",            "TEXT DEFAULT NULL"),
+        ("projects",             "thumbnail",            "VARCHAR(300)"),
     ]
     with db.engine.connect() as conn:
         for table, col, col_type in additions:

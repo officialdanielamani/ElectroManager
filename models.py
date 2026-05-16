@@ -1448,6 +1448,7 @@ class Project(db.Model):
     users = db.Column(db.Text)
     persons = db.Column(db.Text)
     organizations = db.Column(db.Text)
+    thumbnail = db.Column(db.String(300))
     enable_dateline_notification = db.Column(db.Boolean, default=False)
     notify_before_days = db.Column(db.Integer, default=3)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))

@@ -375,6 +375,8 @@ def project_edit(project_id):
         selected_orgs = request.form.getlist('organizations')
         project.organizations = json.dumps([int(o) for o in selected_orgs if o]) if selected_orgs else None
 
+        project.thumbnail = request.form.get('thumbnail', '').strip()[:300] or None
+
         date_start = request.form.get('date_start', '').strip()
         if date_start:
             try:
@@ -950,12 +952,12 @@ def cost_item_move(project_id, cost_id):
 def project_upload(project_id, attachment_type):
     if not current_user.has_permission('projects', 'edit'):
         flash('No permission.', 'danger')
-        return redirect(url_for('project.project_detail', project_id=project_id))
+        return redirect(url_for('project.project_edit', project_id=project_id))
 
     valid_types = ['picture', 'document', 'schematic', '2d_design', '3d_design', 'program']
     if attachment_type not in valid_types:
         flash('Invalid attachment type.', 'danger')
-        return redirect(url_for('project.project_detail', project_id=project_id))
+        return redirect(url_for('project.project_edit', project_id=project_id))
 
     project = Project.query.filter_by(project_id=project_id).first_or_404()
 
