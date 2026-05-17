@@ -470,15 +470,23 @@
                                 <div class="mb-4 p-3 bg-light rounded">
                                     <h6 class="mb-3"><i class="bi bi-qr-code"></i> QR/Barcode Stickers <code class="text-muted">/settings/qr</code></h6>
                                     <div class="row">
-                                        <div class="col-md-4">
+                                        <div class="col-md-3">
                                             <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" name="settings_sections_qr_templates_view" 
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_qr_templates_print_qr"
+                                                       {% if perms.get('settings_sections', {}).get('qr_templates', {}).get('print_qr') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">Print QR</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_qr_templates_view"
                                                        {% if perms.get('settings_sections', {}).get('qr_templates', {}).get('view') %}checked{% endif %}
                                                        {% if role.is_system_role %}disabled{% endif %}>
                                                 <label class="form-check-label">View</label>
                                             </div>
                                         </div>
-                                        <div class="col-md-4">
+                                        <div class="col-md-3">
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" name="settings_sections_qr_templates_edit" 
                                                        {% if perms.get('settings_sections', {}).get('qr_templates', {}).get('edit') %}checked{% endif %}
@@ -486,9 +494,9 @@
                                                 <label class="form-check-label">Edit</label>
                                             </div>
                                         </div>
-                                        <div class="col-md-4">
+                                        <div class="col-md-3">
                                             <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" name="settings_sections_qr_templates_delete" 
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_qr_templates_delete"
                                                        {% if perms.get('settings_sections', {}).get('qr_templates', {}).get('delete') %}checked{% endif %}
                                                        {% if role.is_system_role %}disabled{% endif %}>
                                                 <label class="form-check-label">Delete</label>

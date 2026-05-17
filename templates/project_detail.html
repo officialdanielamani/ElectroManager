@@ -9,6 +9,8 @@
 .image-grid-item:hover { transform: scale(1.05); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
 .image-grid-item img { width: 100%; height: 100%; object-fit: cover; }
 .bom-table th, .bom-table td { padding: 6px 10px; font-size: 0.88rem; }
+.cost-table th, .cost-table td { padding: 5px 8px; font-size: 0.85rem; }
+.cost-move-btn { padding: 1px 5px; font-size: 11px; line-height: 1.4; }
 </style>
 
 <div class="row justify-content-center">
@@ -27,6 +29,20 @@
                 </div>
             </div>
             <div class="card-body">
+                {% if project.thumbnail %}
+                <div class="mb-3 d-flex align-items-center gap-3">
+                    <div style="width:64px;height:64px;border:1px solid #dee2e6;border-radius:8px;background:#f8f9fa;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        {% if project.thumbnail.startswith('biicon:') %}
+                        <i class="bi bi-{{ project.thumbnail[7:] }}" style="font-size:32px;color:#333;"></i>
+                        {% elif project.thumbnail.startswith('icon:') %}
+                        <img src="{{ url_for('share.share_serve', category='icon', filename=project.thumbnail[5:]) }}" style="width:100%;height:100%;object-fit:contain;padding:4px;">
+                        {% elif project.thumbnail.startswith('share:') %}
+                        <img src="{{ url_for('share.share_serve', category='project', filename=project.thumbnail[6:]) }}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">
+                        {% endif %}
+                    </div>
+                    <strong class="fs-5">{{ project.name }}</strong>
+                </div>
+                {% endif %}
                 <!-- Header Info -->
                 <div class="row mb-3">
                     <div class="col-md-6">
@@ -126,16 +142,6 @@
                 </div>
                 {% endif %}
 
-                <!-- Cost Summary -->
-                <hr>
-                <div class="row mb-3 g-2">
-                    <div class="col-md-3"><div class="card bg-light"><div class="card-body text-center p-2"><small class="text-muted">Estimated (1×)</small><h5 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(project.get_bom_total_cost(), currency_decimal) }}</h5></div></div></div>
-                    <div class="col-md-3"><div class="card bg-light"><div class="card-body text-center p-2"><small class="text-muted">Actual (1×)</small><h5 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(project.get_bom_actual_cost(), currency_decimal) }}</h5></div></div></div>
-                    <div class="col-md-2"><div class="card bg-light"><div class="card-body text-center p-2"><small class="text-muted">Quantity</small><h5 class="mb-0">{{ project.quantity }}</h5></div></div></div>
-                    <div class="col-md-2"><div class="card bg-primary text-white"><div class="card-body text-center p-2"><small>Est. Total</small><h5 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(project.get_project_total_cost(), currency_decimal) }}</h5></div></div></div>
-                    <div class="col-md-2"><div class="card bg-success text-white"><div class="card-body text-center p-2"><small>Actual Total</small><h5 class="mb-0">{{ currency }} {{ '{:,.{}f}'.format(project.get_project_actual_cost(), currency_decimal) }}</h5></div></div></div>
-                </div>
-
                 <!-- Attachments (view only) -->
                 {% set att_types = [('picture', 'Pictures', 'bi-image'), ('document', 'Documents', 'bi-file-text'), ('schematic', 'Schematics', 'bi-cpu'), ('2d_design', '2D Designs', 'bi-pencil-square'), ('3d_design', '3D Designs', 'bi-box'), ('program', 'Programs', 'bi-code')] %}
                 {% set has_attachments = attachments.values() | map('length') | sum > 0 %}
@@ -157,7 +163,7 @@
                         {% if att_type == 'picture' %}
                         <div class="image-grid">
                             {% for att in attachments[att_type] %}
-                            <div class="image-grid-item"><a href="{{ url_for('uploaded_file', filename=att.file_path) }}" target="_blank"><img src="{{ url_for('uploaded_file', filename=att.file_path) }}" alt="{{ att.original_filename }}"></a></div>
+                            <div class="image-grid-item" onclick="openProjLightbox('{{ url_for('uploaded_file', filename=att.file_path) }}', '{{ att.original_filename|e }}')"><img src="{{ url_for('uploaded_file', filename=att.file_path) }}" alt="{{ att.original_filename }}"></div>
                             {% endfor %}
                         </div>
                         {% else %}
@@ -188,10 +194,8 @@
                     {% if sf_images %}
                     <div class="image-grid mb-2">
                         {% for sf in sf_images %}
-                        <div class="image-grid-item">
-                            <a href="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}" target="_blank">
-                                <img src="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}" alt="{{ sf.name }}">
-                            </a>
+                        <div class="image-grid-item" onclick="openProjLightbox('{{ url_for('share.share_serve', category='project', filename=sf.filename) }}', '{{ sf.name|e }}')">
+                            <img src="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}" alt="{{ sf.name }}">
                         </div>
                         {% endfor %}
                     </div>
@@ -211,8 +215,50 @@
                 </div>
                 {% endif %}
 
-                <!-- BOM Table -->
+                <!-- Costing Summary -->
                 <hr>
+                <h5><i class="bi bi-coin"></i> Costing</h5>
+                {% set _bom_est = project.get_bom_total_cost() %}
+                {% set _bom_act = project.get_bom_actual_cost() %}
+                {% set _cpq    = project.get_cost_per_qty_total() %}
+                {% set _ov     = project.get_overall_cost_total() %}
+                {% set _qty    = project.quantity or 1 %}
+                {% set _est    = (_bom_est + _cpq) * _qty + _ov %}
+                {% set _act    = (_bom_act + _cpq) * _qty + _ov %}
+                <table class="table table-bordered mb-3" style="table-layout:fixed;">
+                    <tbody>
+                        <tr>
+                            <td rowspan="2" class="text-center align-middle" style="width:22%;background:var(--bs-tertiary-bg,#f8f9fa);">
+                                <small class="text-muted d-block">Quantity</small>
+                                <strong class="fs-5">{{ _qty }}</strong>
+                            </td>
+                            <td class="text-center p-2" style="width:22%;background:var(--bs-tertiary-bg,#f8f9fa);">
+                                <small class="text-muted d-block">Estimate BOM</small>
+                                <strong>{{ currency }} {{ '{:,.{}f}'.format(_bom_est, currency_decimal) }}</strong>
+                            </td>
+                            <td class="text-center p-2" style="width:22%;background:var(--bs-tertiary-bg,#f8f9fa);">
+                                <small class="text-muted d-block">Cost per Qty</small>
+                                <strong>{{ currency }} {{ '{:,.{}f}'.format(_cpq, currency_decimal) }}</strong>
+                            </td>
+                            <td rowspan="2" class="text-center align-middle text-white bg-primary" style="width:34%;">
+                                <small class="d-block opacity-75">Project Total Cost</small>
+                                <strong class="fs-5">{{ currency }} {{ '{:,.{}f}'.format(_est, currency_decimal) }}</strong>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-center p-2" style="background:var(--bs-tertiary-bg,#f8f9fa);">
+                                <small class="text-muted d-block">Actual BOM</small>
+                                <strong>{{ currency }} {{ '{:,.{}f}'.format(_bom_act, currency_decimal) }}</strong>
+                            </td>
+                            <td class="text-center p-2" style="background:var(--bs-tertiary-bg,#f8f9fa);">
+                                <small class="text-muted d-block">Overall Cost</small>
+                                <strong>{{ currency }} {{ '{:,.{}f}'.format(_ov, currency_decimal) }}</strong>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- BOM Table -->
                 <h5><i class="bi bi-list-check"></i> Bill of Materials (BOM)</h5>
                 {% if bom_items %}
                 <div class="table-responsive mt-2">
@@ -280,15 +326,152 @@
                 <p class="text-muted mt-2">No BOM items added yet.{% if can_edit %} Use <strong>Edit</strong> to manage BOM.{% endif %}</p>
                 {% endif %}
 
+                <!-- Cost per Quantity Section -->
                 <hr>
-                <div class="mb-1 px-1">
-                    <small class="text-muted">
-                        <i class="bi bi-clock-history"></i>
-                        Created: {{ project.created_at.strftime('%Y-%m-%d %H:%M') if project.created_at else 'N/A' }}
-                        &nbsp;|&nbsp;
-                        Updated: {{ project.updated_at.strftime('%Y-%m-%d %H:%M') if project.updated_at else 'N/A' }}
-                    </small>
+                {% set cpq_total = project.get_cost_per_qty_total() %}
+                {% set ov_total = project.get_overall_cost_total() %}
+                <h5 class="mb-2"><i class="bi bi-calculator"></i> Cost per Quantity</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover cost-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Description</th>
+                                <th>Price per Qty</th>
+                                <th>Qty</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for ci in cost_items_per_qty %}
+                        <tr>
+                            <td><strong>{{ ci.name }}</strong></td>
+                            <td>{{ ci.description or '-' }}</td>
+                            <td>{{ currency }} {{ '{:,.{}f}'.format(ci.price, currency_decimal) }}{% if ci.unit_label %} /{{ ci.unit_label }}{% endif %}</td>
+                            <td>{{ '{:g}'.format(ci.quantity) }}</td>
+                            <td>{{ currency }} {{ '{:,.{}f}'.format(ci.total, currency_decimal) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="text-muted text-center py-2">No items.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-active">
+                                <td colspan="4" class="text-end"><strong>Total/qty:</strong></td>
+                                <td><strong>{{ currency }} {{ '{:,.{}f}'.format(cpq_total, currency_decimal) }}</strong></td>
+                            </tr>
+                            <tr class="table-light">
+                                <td colspan="4" class="text-end text-muted">Qty (project):</td>
+                                <td class="text-muted">{{ project.quantity }}</td>
+                            </tr>
+                            <tr class="table-active">
+                                <td colspan="4" class="text-end"><strong>Total:</strong></td>
+                                <td><strong>{{ currency }} {{ '{:,.{}f}'.format(cpq_total * (project.quantity or 1), currency_decimal) }}</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
                 </div>
+
+                <!-- Overall Cost Section -->
+                <hr>
+                <h5 class="mb-2"><i class="bi bi-receipt"></i> Overall Cost</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover cost-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Description</th>
+                                <th>Price per Qty</th>
+                                <th>Qty</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for ci in cost_items_overall %}
+                        <tr>
+                            <td><strong>{{ ci.name }}</strong></td>
+                            <td>{{ ci.description or '-' }}</td>
+                            <td>{{ currency }} {{ '{:,.{}f}'.format(ci.price, currency_decimal) }}{% if ci.unit_label %} /{{ ci.unit_label }}{% endif %}</td>
+                            <td>{{ '{:g}'.format(ci.quantity) }}</td>
+                            <td>{{ currency }} {{ '{:,.{}f}'.format(ci.total, currency_decimal) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="text-muted text-center py-2">No items.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-active">
+                                <td colspan="4" class="text-end"><strong>Total:</strong></td>
+                                <td><strong>{{ currency }} {{ '{:,.{}f}'.format(ov_total, currency_decimal) }}</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- Overall Cost Summary -->
+                <hr>
+                {% set bom_per_unit = project.get_bom_total_cost() %}
+                {% set proj_qty = project.quantity or 1 %}
+                {% set total_cost = (bom_per_unit + cpq_total) * proj_qty + ov_total %}
+                {% set avg_cost = total_cost / proj_qty %}
+                <h5><i class="bi bi-bar-chart-line"></i> Cost Summary</h5>
+                <div class="table-responsive mt-2">
+                    <table class="table table-sm" style="max-width:480px;">
+                        <tbody>
+                            <tr>
+                                <td class="text-muted">Total BOM Price (per unit):</td>
+                                <td><strong>{{ currency }} {{ '{:,.{}f}'.format(bom_per_unit, currency_decimal) }}</strong></td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Total Other Cost/Qty:</td>
+                                <td><strong>{{ currency }} {{ '{:,.{}f}'.format(cpq_total, currency_decimal) }}</strong></td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Total Other Overall Cost:</td>
+                                <td><strong>{{ currency }} {{ '{:,.{}f}'.format(ov_total, currency_decimal) }}</strong></td>
+                            </tr>
+                            <tr class="table-light"><td colspan="2"><hr class="my-1"></td></tr>
+                            <tr>
+                                <td class="text-muted">Unit/Quantity needed:</td>
+                                <td><strong>{{ proj_qty }}</strong></td>
+                            </tr>
+                            <tr class="table-primary">
+                                <td><strong>Total Cost:</strong></td>
+                                <td><strong>{{ currency }} {{ '{:,.{}f}'.format(total_cost, currency_decimal) }}</strong></td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Average cost/qty:</td>
+                                <td><strong>{{ currency }} {{ '{:,.{}f}'.format(avg_cost, currency_decimal) }}</strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <hr>
+                <div class="row text-muted small">
+                    <div class="col-md-6">
+                        <strong>Created:</strong> {{ project.created_at.strftime('%Y-%m-%d %H:%M') if project.created_at else 'N/A' }}{% if project.creator %} by <span class="badge bg-secondary">{{ project.creator.username }}</span>{% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Updated:</strong> {{ project.updated_at.strftime('%Y-%m-%d %H:%M') if project.updated_at else 'N/A' }}{% if project.updater %} by <span class="badge bg-secondary">{{ project.updater.username }}</span>{% endif %}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lightbox Modal -->
+<div class="modal fade" id="projLightboxModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="projLightboxTitle"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="projLightboxImg" src="" class="img-fluid" alt="">
             </div>
         </div>
     </div>
@@ -354,4 +537,15 @@ function confirmDeleteProject() {
 }
 </script>
 {% endif %}
+
+{% block scripts %}
+<script>
+function openProjLightbox(url, name) {
+    document.getElementById('projLightboxImg').src = url;
+    document.getElementById('projLightboxTitle').textContent = name;
+    new bootstrap.Modal(document.getElementById('projLightboxModal')).show();
+}
+</script>
+{% endblock %}
+
 {% endblock %}

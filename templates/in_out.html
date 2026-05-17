@@ -4,28 +4,163 @@
 <div class="container-fluid">
 <div class="row g-3">
 
-  <!-- LEFT: Search + Form -->
+  <!-- LEFT: Scan + Search + Cart + Detail -->
   <div class="col-lg-8">
     <div class="card">
-      <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2 py-2">
-        <!-- Left: Toggle switch + Mode title -->
+
+      <!-- ── Card Header (bg changes with mode) ── -->
+      <div class="card-header py-2 px-3 transition-bg" id="mainCardHeader"
+           style="background-color:var(--bs-primary-bg-subtle);transition:background-color 0.2s;">
         <div class="d-flex align-items-center gap-2" id="modeToggleGroup">
           <div class="form-check form-switch mb-0">
             <input class="form-check-input" type="checkbox" id="modeToggle" role="switch"
                    onchange="onModeChange()" {% if not can_lend %}disabled{% endif %} style="cursor:pointer;">
           </div>
-          <span class="fw-semibold" id="modeLabel">Lending</span>
+          <h5 class="mb-0 fw-semibold" id="modeLabel">Lending</h5>
         </div>
-        <!-- Right: Edit Batch -->
+      </div><!-- end card-header -->
+
+      <!-- ── Controls Bar (Edit Batch + Advanced Options, not affected by mode colour) ── -->
+      {% if can_edit_batch or can_lend %}
+      <div class="border-bottom px-3 py-2 d-flex align-items-center gap-3 flex-wrap" style="font-size:0.9rem;">
         {% if can_edit_batch %}
         <div class="form-check mb-0">
           <input class="form-check-input" type="checkbox" id="editBatchCheck" onchange="onEditBatchChange()">
-          <label class="form-check-label" for="editBatchCheck">Edit Batch</label>
+          <label class="form-check-label small" for="editBatchCheck"><i class="bi bi-pencil-square"></i> Edit Batch</label>
         </div>
         {% endif %}
+        {% if can_lend %}
+        <button class="btn btn-sm btn-outline-secondary py-0" id="advOptBtn" onclick="toggleAdvPanel()" type="button">
+          <i class="bi bi-sliders"></i> Advanced Options
+          <i class="bi bi-chevron-down ms-1" id="advOptChevron" style="transition:transform 0.15s;"></i>
+        </button>
+        {% endif %}
       </div>
+      {% endif %}
 
-      <div class="card-body" style="overflow-y:auto;max-height:90vh;padding-bottom:260px;">
+      <!-- ── Advanced Options Panel ── -->
+      {% if can_lend %}
+      <div id="advOptPanel" class="d-none border-bottom px-3 py-3" style="font-size:0.9rem;">
+        <div class="row g-3">
+
+          <!-- Submit behaviour toggle -->
+          <div class="col-12">
+            <div class="d-flex align-items-center gap-3">
+              <span class="fw-semibold">Scan / Search Behaviour:</span>
+              <div class="btn-group btn-group-sm" role="group">
+                <input type="radio" class="btn-check" name="submitMode" id="smCart" value="cart" onchange="saveAdvOpts()">
+                <label class="btn btn-outline-secondary" for="smCart">
+                  <i class="bi bi-cart3"></i> Use Cart
+                  <small class="d-block text-muted" style="font-size:0.7rem;line-height:1.1;">Collect items first, submit all at once</small>
+                </label>
+                <input type="radio" class="btn-check" name="submitMode" id="smAuto" value="auto" onchange="saveAdvOpts()">
+                <label class="btn btn-outline-secondary" for="smAuto">
+                  <i class="bi bi-lightning-fill"></i> Auto Submit
+                  <small class="d-block text-muted" style="font-size:0.7rem;line-height:1.1;">Submit each scan immediately when details are ready</small>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Session End Date -->
+          <div class="col-md-6">
+            <label class="form-label fw-semibold mb-1" for="advSessionEnd">
+              <i class="bi bi-calendar-event"></i> Session End Date &amp; Time
+            </label>
+            <div class="input-group input-group-sm">
+              <input type="datetime-local" class="form-control" id="advSessionEnd" onchange="saveAdvOpts()" title="Pre-fill the End Date/Time for all items in this session">
+              <button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('advSessionEnd').value='';saveAdvOpts();" title="Clear session end date"><i class="bi bi-x"></i></button>
+            </div>
+            <div class="form-text">Pre-fills the due date for every item added to the cart this session.</div>
+          </div>
+
+          <!-- Notification before due date -->
+          <div class="col-md-6" id="advNotifySection">
+            <label class="form-label fw-semibold mb-1">
+              <i class="bi bi-bell"></i> Notify Before Due Date
+            </label>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="advNotifyEnabled" onchange="saveAdvOpts()">
+                <label class="form-check-label" for="advNotifyEnabled">Enable</label>
+              </div>
+              <div class="input-group input-group-sm" id="advNotifyDaysInput" style="display:none;max-width:150px;">
+                <input type="number" class="form-control" id="advNotifyDays" min="1" max="90" value="3" onchange="saveAdvOpts()">
+                <span class="input-group-text">days</span>
+              </div>
+            </div>
+            <div class="form-text">Auto-configure notification for every item added to the lending cart.</div>
+          </div>
+
+          <!-- Default Contact (auto-fill) -->
+          {% if not can_only_self %}
+          <div class="col-md-6">
+            <label class="form-label fw-semibold mb-1">
+              <i class="bi bi-person-badge"></i> Default Contact
+              <small class="fw-normal text-muted ms-1">auto-fills lending form</small>
+            </label>
+            <input type="hidden" id="advContactId">
+            <input type="hidden" id="advContactType">
+            <div class="border rounded px-2 py-1 d-flex align-items-center justify-content-between"
+                 style="cursor:pointer;background:var(--bs-body-bg);min-height:31px;"
+                 onclick="toggleAdvContactSearch()">
+              <span id="advContactLabel" class="small text-muted">Click to select default contact…</span>
+              <i class="bi bi-x text-danger" id="advContactClear" style="display:none;"
+                 onclick="event.stopPropagation();clearAdvContact()"></i>
+            </div>
+            <div id="advContactPanel" style="display:none;" class="mt-1">
+              <input type="text" class="form-control form-control-sm" id="advContactInput"
+                     placeholder="Search contact…" oninput="doAdvContactSearch()">
+              <div id="advContactResults" class="border rounded"
+                   style="max-height:160px;overflow-y:auto;background:var(--bs-body-bg);"></div>
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Checkboxes grid -->
+          <div class="col-md-6">
+            <div class="d-flex flex-column gap-2">
+
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="advEnter" onchange="saveAdvOpts()">
+                <label class="form-check-label" for="advEnter">
+                  Use <kbd>Enter</kbd> at search bar to add / submit
+                  <small class="d-block text-muted">Useful when a barcode scanner appends an Enter keystroke after scanning.</small>
+                </label>
+              </div>
+
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="advSound" onchange="saveAdvOpts()">
+                <label class="form-check-label" for="advSound">
+                  Enable sound effects
+                  <small class="d-block text-muted">Plays <em>scanner.mp3</em>, <em>success.mp3</em>, or <em>error.mp3</em> from <code>static/mp3/</code>.</small>
+                </label>
+              </div>
+
+              <div class="form-check form-switch" id="advStartNowWrap">
+                <input class="form-check-input" type="checkbox" id="advStartNow" onchange="saveAdvOpts()">
+                <label class="form-check-label" for="advStartNow">
+                  Auto-fill Start Date/Time with current time <span class="badge bg-success" style="font-size:0.65rem;">ON by default</span>
+                  <small class="d-block text-muted">Lending: automatically sets the start date/time to now when submitting.</small>
+                </label>
+              </div>
+
+              <div class="form-check form-switch" id="advReturnNowWrap">
+                <input class="form-check-input" type="checkbox" id="advReturnNow" onchange="saveAdvOpts()">
+                <label class="form-check-label" for="advReturnNow">
+                  Auto-fill Return Date/Time with current time <span class="badge bg-success" style="font-size:0.65rem;">ON by default</span>
+                  <small class="d-block text-muted">Return: automatically sets the return date/time to now when submitting.</small>
+                </label>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- ── Card Body ── -->
+      <div class="card-body" style="overflow-y:auto;max-height:90vh;padding-bottom:20px;">
 
         <!-- Camera Scan Area -->
         {% if scan_enabled %}
@@ -37,8 +172,8 @@
                width:55%;height:65%;border:3px solid red;border-radius:4px;pointer-events:none;
                box-shadow: 0 0 0 9999px rgba(0,0,0,0.3);"></div>
             <div id="scanPlaceholder" class="text-center rounded py-3" style="background:#f8f9fa;border:2px dashed #dee2e6;">
-              <i class="bi bi-camera fs-2 text-muted"></i>
-              <div class="text-muted small mt-1" id="scanMsg">Scan barcode / QR code or search below</div>
+              <i class="bi bi-upc-scan fs-2 text-muted"></i>
+              <div class="text-muted small mt-1" id="scanMsg">Start camera or use the search bar below</div>
             </div>
           </div>
           <canvas id="scanCanvas" style="display:none;"></canvas>
@@ -47,129 +182,264 @@
               <i class="bi bi-camera"></i> Start Camera
             </button>
             <button class="btn btn-sm btn-outline-secondary d-none" id="redoBtn" onclick="redoScan()">
-              <i class="bi bi-arrow-counterclockwise"></i> Redo
+              <i class="bi bi-arrow-counterclockwise"></i> Redo Scan
             </button>
           </div>
         </div>
         {% else %}
-        <div class="text-center rounded mb-3 py-4" style="background:#f8f9fa;border:2px dashed #dee2e6;">
+        <div class="text-center rounded mb-3 py-3" style="background:#f8f9fa;border:2px dashed #dee2e6;">
           <i class="bi bi-camera-video-off fs-2 text-muted"></i>
-          <div class="text-muted small mt-1">Admin Disabled Scan QR/Barcode</div>
+          <div class="text-muted small mt-1">Camera scanning is disabled by administrator</div>
         </div>
         {% endif %}
 
-        <div class="text-center text-muted small mb-2">─────── Or Search ───────</div>
+        <div class="text-center text-muted small mb-2">── or search ──</div>
 
-        <!-- Search -->
+        <!-- Search Bar -->
         <div class="mb-3">
           <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
             <input type="text" class="form-control" id="inOutSearch"
-                   placeholder="Search by item name, UUID, ISN, batch ID ({uuid}-B{n})"
-                   oninput="debounceSearch(this.value)" autocomplete="off">
-            <button class="btn btn-outline-secondary" type="button" id="clearSearchBtn"
-                    onclick="clearSearch()" title="Clear search"><i class="bi bi-x-lg"></i></button>
+                   placeholder="Item name, UUID, ISN, Batch ID or Lending Session ID (e.g. 20260514-AB3K9X)"
+                   oninput="debounceSearch(this.value)"
+                   onkeydown="onSearchKeydown(event)"
+                   autocomplete="off">
+            <button class="btn btn-outline-secondary" type="button" onclick="clearSearch()" title="Clear search">
+              <i class="bi bi-x-lg"></i>
+            </button>
           </div>
         </div>
 
-        <!-- Search results -->
+        <!-- Search Results -->
         <div id="searchResults"></div>
+
+        <!-- ── Cart Section ── -->
+        <div id="cartSection" class="d-none">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="mb-0"><i class="bi bi-cart3"></i> Cart
+              <span id="cartBadge" class="badge bg-secondary ms-1">0</span>
+            </h6>
+            <button class="btn btn-sm btn-outline-danger" onclick="clearCart()" title="Clear entire cart">
+              <i class="bi bi-trash"></i> Clear Cart
+            </button>
+          </div>
+
+          <!-- Normal Batch Table -->
+          <div id="cartNormalSection" class="d-none mb-3">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+              <span class="small fw-semibold text-muted"><i class="bi bi-box-seam"></i> Standard Batch Items</span>
+              <button class="btn btn-sm btn-outline-danger py-0" onclick="deleteSelectedCart('normal')">
+                <i class="bi bi-trash"></i> Remove Selected
+              </button>
+            </div>
+            <div id="cartNormalTableWrap" class="table-responsive"></div>
+          </div>
+
+          <!-- SN Tracking Table (for both lend and return) -->
+          <div id="cartSnSection" class="d-none mb-3">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+              <span class="small fw-semibold text-muted"><i class="bi bi-fingerprint"></i> Serial-Tracked Items</span>
+              <button class="btn btn-sm btn-outline-danger py-0" onclick="deleteSelectedCart('sn')">
+                <i class="bi bi-trash"></i> Remove Selected
+              </button>
+            </div>
+            <div id="cartSnTableWrap" class="table-responsive"></div>
+          </div>
+
+          <div class="text-end mb-2">
+            <button class="btn btn-sm btn-primary" onclick="showDetailForm()">
+              <i class="bi bi-arrow-right-circle"></i> Continue to Details
+            </button>
+          </div>
+        </div>
+        <!-- end cartSection -->
+
         <hr id="formDivider" class="d-none">
-        <!-- Action form -->
+
+        <!-- ── Action / Detail Form ── -->
         <div id="actionForm"></div>
+
+      </div><!-- end card-body -->
+    </div><!-- end card -->
+  </div><!-- end col-lg-8 -->
+
+  <!-- RIGHT: Lending Sessions + Log -->
+  <div class="col-lg-4 d-flex flex-column gap-2">
+
+    <!-- ── Lending Sessions Card ── -->
+    {% if can_lend %}
+    <div class="card">
+      <div class="card-header py-2 px-3">
+        <h6 class="mb-0"><i class="bi bi-receipt"></i> Lending Sessions</h6>
+      </div>
+      <div class="card-body p-2">
+        <!-- Filter row: Start | End | Contact — stacks vertically on xs screens -->
+        <div class="d-flex flex-wrap gap-1 mb-2 align-items-center">
+          <input type="date" class="form-control form-control-sm" id="sessFilterStart"
+                 style="min-width:120px;flex:1 1 120px;"
+                 onchange="searchSessions()" title="Start date (lend_start ≥)">
+          <input type="date" class="form-control form-control-sm" id="sessFilterEnd"
+                 style="min-width:120px;flex:1 1 120px;"
+                 onchange="searchSessions()" title="Due date (lend_end ≤)">
+          {% if not can_only_self %}
+          <div class="position-relative" style="min-width:130px;flex:2 1 130px;">
+            <input type="hidden" id="sessFilterContactId">
+            <input type="hidden" id="sessFilterContactType">
+            <input type="text" class="form-control form-control-sm" id="sessFilterContactInput"
+                   placeholder="Contact…" oninput="debounceSessContact()" autocomplete="off">
+            <div id="sessFilterContactDrop" class="border rounded shadow-sm position-absolute"
+                 style="top:100%;left:0;right:0;z-index:200;max-height:160px;overflow-y:auto;
+                        background:var(--bs-body-bg);display:none;font-size:0.82rem;"></div>
+          </div>
+          {% endif %}
+        </div>
+        <!-- Results -->
+        <div id="sessResults" style="max-height:260px;overflow-y:auto;font-size:0.82rem;">
+          <div class="text-muted small text-center py-2"><i class="bi bi-hourglass-split"></i> Loading…</div>
+        </div>
+        <!-- Sessions pagination -->
+        <div id="sessPaginationWrap" class="d-flex justify-content-center align-items-center gap-1 mt-1" style="display:none!important;font-size:0.82rem;"></div>
       </div>
     </div>
-  </div>
+    {% endif %}
 
-  <!-- RIGHT: Log -->
-  <div class="col-lg-4">
-    <div class="card h-100">
-      <div class="card-header d-flex align-items-center justify-content-between py-2">
-        <h6 class="mb-0"><i class="bi bi-journal-text"></i> Log — Lending &amp; Return</h6>
-        {% if can_view_log and log_total_pages > 1 %}
-        <small class="text-muted">Page {{ log_page }}/{{ log_total_pages }}</small>
-        {% endif %}
+    <!-- ── Log Card ── -->
+    <div class="card flex-grow-1">
+      <div class="card-header py-2 px-3">
+        <h6 class="mb-0"><i class="bi bi-journal-text"></i> Lending &amp; Return Log</h6>
       </div>
-      <div class="card-body p-2" style="max-height:75vh;overflow-y:auto;">
-        {% if not can_view_log %}
+      {% if can_view_log %}
+      <div class="card-body p-2">
+        <!-- Log filter row: Start | End | Contact — stacks vertically on xs screens -->
+        <div class="d-flex flex-wrap gap-1 mb-2 align-items-center">
+          <input type="date" class="form-control form-control-sm" id="logFilterStart"
+                 style="min-width:120px;flex:1 1 120px;"
+                 onchange="loadLog()" title="Log entries on/after this date">
+          <input type="date" class="form-control form-control-sm" id="logFilterEnd"
+                 style="min-width:120px;flex:1 1 120px;"
+                 onchange="loadLog()" title="Log entries on/before this date">
+          {% if not can_only_self %}
+          <div class="position-relative" style="min-width:130px;flex:2 1 130px;">
+            <input type="hidden" id="logFilterContactId">
+            <input type="hidden" id="logFilterContactType">
+            <input type="text" class="form-control form-control-sm" id="logFilterContactInput"
+                   placeholder="Contact…" oninput="debounceLogContact()" autocomplete="off"
+                   title="Filter by borrower">
+            <div id="logFilterContactDrop" class="border rounded shadow-sm position-absolute"
+                 style="top:100%;left:0;right:0;z-index:200;max-height:160px;overflow-y:auto;
+                        background:var(--bs-body-bg);display:none;font-size:0.82rem;"></div>
+          </div>
+          {% endif %}
+        </div>
+        <!-- Log results -->
+        <div id="logResults" style="max-height:55vh;overflow-y:auto;font-size:0.83rem;">
+          <div class="text-muted small text-center py-2"><i class="bi bi-hourglass-split"></i> Loading…</div>
+        </div>
+        <!-- Log pagination -->
+        <div id="logPaginationWrap" class="d-flex justify-content-center align-items-center gap-1 mt-1" style="font-size:0.82rem;"></div>
+      </div>
+      {% else %}
+      <div class="card-body p-2">
         <div class="text-muted small p-2">No permission to view log.</div>
-        {% elif not logs %}
-        <div class="text-muted small p-2">No log entries yet.</div>
-        {% else %}
-        {% for entry in logs %}
-        {% set log = entry.log %}
-        <div class="border-bottom pb-2 mb-2 small">
-          {% if log.action == 'return' %}
-            {% if '"on_time": false' in (log.details or '') %}
-            <span class="badge bg-warning text-dark">Return Late</span>
-            {% else %}
-            <span class="badge bg-success">Return</span>
-            {% endif %}
-          {% elif log.action in ['lend', 'lend_update'] %}
-            <span class="badge bg-primary">Lend</span>
-          {% elif log.action in ['delete', 'batch_sn_purge'] %}
-            <span class="badge bg-danger">Delete</span>
-          {% elif log.action == 'update' %}
-            <span class="badge bg-secondary">Edit</span>
-          {% elif log.action == 'sn_batch_save' %}
-            <span class="badge bg-info text-dark">SN Edit</span>
-          {% endif %}
-          <span class="ms-1 fw-semibold">{{ entry.username }}</span>
-          <span class="text-muted ms-1">{{ entry.timestamp }}</span>
-          <div class="text-muted mt-1" style="font-size:0.78rem;word-break:break-word;">{{ entry.display }}</div>
-        </div>
-        {% endfor %}
-        {% endif %}
-      </div>
-      {% if can_view_log and log_total_pages > 1 %}
-      <div class="card-footer py-1 px-2">
-        <div class="d-flex justify-content-between align-items-center">
-          {% if log_page > 1 %}
-          <a href="{{ url_for('in_out.in_out', log_page=log_page-1) }}" class="btn btn-sm btn-outline-secondary py-0">
-            <i class="bi bi-chevron-left"></i> Newer
-          </a>
-          {% else %}
-          <span></span>
-          {% endif %}
-          <small class="text-muted">{{ log_page }}/{{ log_total_pages }}</small>
-          {% if log_page < log_total_pages %}
-          <a href="{{ url_for('in_out.in_out', log_page=log_page+1) }}" class="btn btn-sm btn-outline-secondary py-0">
-            Older <i class="bi bi-chevron-right"></i>
-          </a>
-          {% else %}
-          <span></span>
-          {% endif %}
-        </div>
       </div>
       {% endif %}
     </div>
-  </div>
+  </div><!-- end right col -->
 
-</div>
-</div>
+</div><!-- end row -->
+</div><!-- end container -->
 
 <script src="{{ url_for('static', filename='lib/jsqr.js') }}"></script>
 <script>
-/* ── State ── */
-var _mode = 'lending';
-var _editBatch = false;
+/* ════════════════════════════════════════════════════════
+   STATE
+   ════════════════════════════════════════════════════════ */
+var _mode        = 'lending';   // 'lending' | 'return' | 'edit_batch'
+var _editBatch   = false;
 var _selectedBatch = null;
 var _searchTimer = null;
-var _canLend = {{ can_lend | tojson }};
-var _canEditBatch = {{ can_edit_batch | tojson }};
-var _canDeleteBatch = {{ can_delete_batch | tojson }};
-var _canOnlySelf = {{ can_only_self | tojson }};
-var _currentUserId = {{ current_user_id }};
-var _ebCurrency = {{ currency | tojson }};
-var _lrSettings = {{ lr_settings | tojson }};
-var _scanEnabled = {{ scan_enabled | tojson }};
+var _lastSearchData = null;     // last raw search response
+var _cartKey     = 0;           // incrementing key for cart items
+var _cart        = [];          // [{_key, type, batch_id, ...}, ...]
+var _batchCache  = {};          // batch summaries keyed by batch id
+var _sessionCache = {};         // session objects keyed by lending_id
 
-/* ── Restore toggle state from sessionStorage after page reload ── */
+/* Sessions panel */
+var _sessSearchTimer  = null;
+var _sessContactTimer = null;
+var _sdmSession       = null;   // session currently shown in detail modal
+var _advContactTimer  = null;
+
+var _canLend        = {{ can_lend | tojson }};
+var _canEditBatch   = {{ can_edit_batch | tojson }};
+var _canDeleteBatch = {{ can_delete_batch | tojson }};
+var _canOnlySelf    = {{ can_only_self | tojson }};
+var _currentUserId  = {{ current_user_id }};
+var _currentUserLabel = {{ current_user_label | tojson }};
+var _ebCurrency     = {{ currency | tojson }};
+var _lrSettings     = {{ lr_settings | tojson }};
+var _scanEnabled    = {{ scan_enabled | tojson }};
+
+/* Log panel state */
+var _logPage            = 1;
+var _logTotalPages      = 1;
+var _logContactId       = '';
+var _logContactType     = '';
+var _logContactTimer    = null;
+
+/* Sessions panel state */
+var _sessPage       = 1;
+var _sessTotalPages = 1;
+
+/* Advanced options — persisted per-user in localStorage */
+var _ADV_KEY = 'lr_adv_{{ current_user_id }}';
+var _adv = {
+    submitMode:    'cart',  // 'cart' | 'auto'
+    sessionEnd:    '',      // pre-set end date for this session
+    enterSubmit:   false,   // use Enter to add/submit
+    sound:         true,    // sound effects
+    startNow:      true,    // auto-fill start datetime with now (lending)
+    returnNow:     true,    // auto-fill return datetime with now (return)
+    contactId:     '',      // default contact id (persisted)
+    contactType:   '',      // default contact type
+    contactLabel:  '',      // default contact display label
+    notifyEnabled: false,   // default notify before due date
+    notifyDays:    3,       // days before due to notify
+};
+
+/* Contact selected in the detail form (shared between lend/return) */
+var _detailContact = { id: '', type: '', label: '' };
+var _lendContactSearchTimer = null;
+var _ebSnState = null;
+
+/* ════════════════════════════════════════════════════════
+   INIT
+   ════════════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', function() {
+    loadAdvOpts();
+    _sessInitDefaults();
+    _logInitDefaults();
+
+    /* Click outside closes contact dropdowns */
+    document.addEventListener('click', function(e) {
+        var drop = document.getElementById('sessFilterContactDrop');
+        var inp  = document.getElementById('sessFilterContactInput');
+        if (drop && inp && !inp.contains(e.target) && !drop.contains(e.target)) {
+            drop.style.display = 'none';
+        }
+        var ldrop = document.getElementById('logFilterContactDrop');
+        var linp  = document.getElementById('logFilterContactInput');
+        if (ldrop && linp && !linp.contains(e.target) && !ldrop.contains(e.target)) {
+            ldrop.style.display = 'none';
+        }
+    });
+
+    /* Restore toggle state after page reload */
     var savedMode = sessionStorage.getItem('inout_mode');
-    var savedEditBatch = sessionStorage.getItem('inout_edit_batch');
+    var savedEB   = sessionStorage.getItem('inout_edit_batch');
     sessionStorage.removeItem('inout_mode');
     sessionStorage.removeItem('inout_edit_batch');
-    if (savedEditBatch === '1' && _canEditBatch) {
+    if (savedEB === '1' && _canEditBatch) {
         var eb = document.getElementById('editBatchCheck');
         if (eb) { eb.checked = true; onEditBatchChange(); }
     } else if (savedMode === 'return') {
@@ -177,75 +447,329 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tog) { tog.checked = true; onModeChange(); }
     }
     if (_scanEnabled) { _initCameraState(); }
+    if (_canLend) { searchSessions(); }
+    loadLog();
 });
 
-/* ── Mode toggle ── */
+/* ════════════════════════════════════════════════════════
+   ADVANCED OPTIONS
+   ════════════════════════════════════════════════════════ */
+function loadAdvOpts() {
+    try {
+        var stored = JSON.parse(localStorage.getItem(_ADV_KEY) || '{}');
+        _adv.submitMode   = stored.submitMode  !== undefined ? stored.submitMode  : 'cart';
+        _adv.sessionEnd   = stored.sessionEnd  !== undefined ? stored.sessionEnd  : '';
+        _adv.enterSubmit  = stored.enterSubmit !== undefined ? stored.enterSubmit : false;
+        _adv.sound        = stored.sound       !== undefined ? stored.sound       : true;
+        _adv.startNow     = stored.startNow    !== undefined ? stored.startNow    : true;
+        _adv.returnNow    = stored.returnNow   !== undefined ? stored.returnNow   : true;
+        _adv.contactId     = stored.contactId    || '';
+        _adv.contactType   = stored.contactType  || '';
+        _adv.contactLabel  = stored.contactLabel || '';
+        _adv.notifyEnabled = stored.notifyEnabled !== undefined ? stored.notifyEnabled : false;
+        _adv.notifyDays    = stored.notifyDays    !== undefined ? stored.notifyDays    : 3;
+    } catch(e) {}
+    /* Sync UI */
+    var smEl = document.querySelector('input[name="submitMode"][value="' + _adv.submitMode + '"]');
+    if (smEl) smEl.checked = true;
+    _setVal('advSessionEnd', _adv.sessionEnd);
+    _setChk('advEnter',  _adv.enterSubmit);
+    _setChk('advSound',  _adv.sound);
+    _setChk('advStartNow',  _adv.startNow);
+    _setChk('advReturnNow', _adv.returnNow);
+    _setChk('advNotifyEnabled', _adv.notifyEnabled);
+    _setVal('advNotifyDays', _adv.notifyDays);
+    var dw = document.getElementById('advNotifyDaysInput');
+    if (dw) dw.style.display = _adv.notifyEnabled ? '' : 'none';
+    /* Restore saved contact */
+    if (_adv.contactId) {
+        _setVal('advContactId',   _adv.contactId);
+        _setVal('advContactType', _adv.contactType);
+        var lbl = document.getElementById('advContactLabel');
+        if (lbl) { lbl.textContent = _adv.contactLabel; lbl.className = 'small'; }
+        var clr = document.getElementById('advContactClear');
+        if (clr) clr.style.display = '';
+    }
+}
+
+function saveAdvOpts() {
+    var smEl = document.querySelector('input[name="submitMode"]:checked');
+    _adv.submitMode    = smEl ? smEl.value : 'cart';
+    _adv.sessionEnd    = _getVal('advSessionEnd');
+    _adv.enterSubmit   = _getChk('advEnter');
+    _adv.sound         = _getChk('advSound');
+    _adv.startNow      = _getChk('advStartNow');
+    _adv.returnNow     = _getChk('advReturnNow');
+    _adv.contactId     = _getVal('advContactId');
+    _adv.contactType   = _getVal('advContactType');
+    _adv.notifyEnabled = _getChk('advNotifyEnabled');
+    _adv.notifyDays    = parseInt(_getVal('advNotifyDays')) || 3;
+    var dw = document.getElementById('advNotifyDaysInput');
+    if (dw) dw.style.display = _adv.notifyEnabled ? '' : 'none';
+    /* contactLabel stays in _adv directly (updated by selectAdvContact) */
+    try { localStorage.setItem(_ADV_KEY, JSON.stringify(_adv)); } catch(e) {}
+}
+
+function toggleAdvPanel() {
+    var panel   = document.getElementById('advOptPanel');
+    var chevron = document.getElementById('advOptChevron');
+    if (!panel) return;
+    var open = panel.classList.toggle('d-none') === false;
+    // panel.classList.toggle returns true if class was added (i.e., now hidden)
+    open = !panel.classList.contains('d-none');
+    if (chevron) chevron.style.transform = open ? 'rotate(180deg)' : '';
+}
+
+/* ════════════════════════════════════════════════════════
+   MODE TOGGLE
+   ════════════════════════════════════════════════════════ */
 function onModeChange() {
     _mode = document.getElementById('modeToggle').checked ? 'return' : 'lending';
     document.getElementById('modeLabel').textContent = _mode === 'return' ? 'Return' : 'Lending';
+    var hdr = document.getElementById('mainCardHeader');
+    if (hdr) {
+        hdr.style.backgroundColor = _mode === 'return'
+            ? 'var(--bs-success-bg-subtle)'
+            : 'var(--bs-primary-bg-subtle)';
+    }
     clearActionForm();
+    _renderCart();
 }
 
 function onEditBatchChange() {
     _editBatch = document.getElementById('editBatchCheck').checked;
-    var toggleGroup = document.getElementById('modeToggleGroup');
+    var tg  = document.getElementById('modeToggleGroup');
+    var hdr = document.getElementById('mainCardHeader');
     if (_editBatch) {
-        toggleGroup.style.opacity = '0.4';
-        toggleGroup.style.pointerEvents = 'none';
+        tg.style.opacity = '0.4'; tg.style.pointerEvents = 'none';
         _mode = 'edit_batch';
         document.getElementById('modeLabel').textContent = 'Edit Batch';
+        if (hdr) hdr.style.backgroundColor = 'var(--bs-secondary-bg-subtle)';
     } else {
-        toggleGroup.style.opacity = '';
-        toggleGroup.style.pointerEvents = '';
+        tg.style.opacity = ''; tg.style.pointerEvents = '';
         _mode = document.getElementById('modeToggle').checked ? 'return' : 'lending';
         document.getElementById('modeLabel').textContent = _mode === 'return' ? 'Return' : 'Lending';
+        if (hdr) hdr.style.backgroundColor = _mode === 'return'
+            ? 'var(--bs-success-bg-subtle)'
+            : 'var(--bs-primary-bg-subtle)';
     }
     if (_selectedBatch) showActionForm(_selectedBatch);
 }
 
-/* ── Search ── */
+/* ════════════════════════════════════════════════════════
+   SOUND
+   ════════════════════════════════════════════════════════ */
+function _playSound(name) {
+    if (!_adv.sound) return;
+    try {
+        var a = new Audio('/static/mp3/' + name + '.mp3');
+        a.play().catch(function(){});
+    } catch(e) {}
+}
+
+/* ════════════════════════════════════════════════════════
+   SEARCH
+   ════════════════════════════════════════════════════════ */
 function debounceSearch(val) {
     clearTimeout(_searchTimer);
-    if (val.length < 2) { document.getElementById('searchResults').innerHTML = ''; return; }
+    if (val.length < 2) {
+        document.getElementById('searchResults').innerHTML = '';
+        _lastSearchData = null;
+        return;
+    }
     _searchTimer = setTimeout(function() { doSearch(val); }, 300);
 }
 
+function onSearchKeydown(e) {
+    if (e.key !== 'Enter' || !_adv.enterSubmit) return;
+    e.preventDefault();
+    if (_lastSearchData) {
+        _handleEnterOnResult(_lastSearchData);
+    }
+}
+
+function _handleEnterOnResult(data) {
+    if (_mode === 'edit_batch') return;
+    if (data.type === 'sn') {
+        _tryAddOrAutoSubmit(data.results[0], 'sn');
+    } else if (data.type === 'batch') {
+        _tryAddOrAutoSubmit(data.results[0], 'batch');
+    } else if (data.type === 'session') {
+        addSessionToCart(data.results[0]);
+    }
+    /* For multi-result types (items, item_batches) Enter does nothing — user must click */
+}
+
 function doSearch(q) {
-    fetch('/in-out/search?q=' + encodeURIComponent(q))
+    fetch('/in-out/search?q=' + encodeURIComponent(q) + '&mode=' + encodeURIComponent(_mode))
     .then(function(r) { return r.json(); })
-    .then(function(d) { renderResults(d); })
+    .then(function(d) {
+        _lastSearchData = d;
+        renderResults(d);
+    })
     .catch(function() {});
 }
 
 function renderResults(data) {
     var el = document.getElementById('searchResults');
     if (!data.results || data.results.length === 0) {
-        el.innerHTML = '<div class="text-muted small">No results found.</div>';
+        if (data.lend_disabled) {
+            el.innerHTML = '<div class="alert alert-warning py-2 small"><i class="bi bi-slash-circle me-1"></i> This batch is <strong>disabled from lending</strong>.</div>';
+        } else {
+            el.innerHTML = '<div class="alert alert-secondary py-2 small"><i class="bi bi-search"></i> No results found.</div>';
+        }
+        _playSound('error');
         return;
     }
     var html = '';
-    if (data.type === 'sn' || data.type === 'batch') {
-        html = renderBatchCard(data.results[0], true);
+    if (data.type === 'session') {
+        html = _renderSessionCard(data.results[0]);
+    } else if (data.type === 'sn') {
+        _playSound('scanner');
+        html = _renderBatchCard(data.results[0], true);
+        /* In edit_batch mode, select it directly */
+        if (_mode === 'edit_batch') { selectBatch(data.results[0].id, data.results[0].preselected_sn_id); }
+        else if (_adv.submitMode === 'auto') {
+            _tryAutoSubmitSingle(data.results[0], 'sn');
+            return;
+        } else {
+            /* Auto-add to cart on unambiguous ISN scan */
+            _tryAddSnToCart(data.results[0], data.results[0].preselected_sn_id);
+        }
+    } else if (data.type === 'batch') {
+        _playSound('scanner');
+        html = _renderBatchCard(data.results[0], true);
+        if (_mode === 'edit_batch') { selectBatch(data.results[0].id, null); }
+        else if (_adv.submitMode === 'auto') {
+            _tryAutoSubmitSingle(data.results[0], 'batch');
+            return;
+        }
     } else if (data.type === 'item_batches') {
-        html = renderItemCard(data.results[0], true);
+        html = _renderItemCard(data.results[0], true);
     } else {
-        data.results.forEach(function(item) { html += renderItemCard(item, false); });
+        data.results.forEach(function(item) { html += _renderItemCard(item, false); });
     }
     el.innerHTML = html;
-    if (data.type === 'sn' && data.results[0]) {
-        selectBatch(data.results[0].id, data.results[0].preselected_sn_id);
-    } else if (data.type === 'batch' && data.results[0]) {
-        selectBatch(data.results[0].id, null);
-    }
 }
 
-function renderItemCard(item, expanded) {
+function _renderSessionCard(session) {
+    _sessionCache[session.lending_id] = session;
+    var isReturn   = (session.mode === 'return');
+    var returnable = (session.items || []).filter(function(i){ return i.returnable; });
+    var allItems   = session.items || [];
+
+    var headerColor = isReturn ? 'success' : 'info';
+    var modeLabel   = isReturn ? 'Return Session' : 'Lending Session';
+    var modeBadge   = isReturn
+        ? '<span class="badge bg-success">Return</span>'
+        : '<span class="badge bg-primary">Lend</span>';
+
+    var html = '<div class="card mb-2 border-' + headerColor + '">' +
+        '<div class="card-header py-2 px-3 d-flex align-items-center justify-content-between bg-' + headerColor + ' bg-opacity-10">' +
+        '<span><i class="bi bi-receipt me-1"></i><strong>' + modeLabel + '</strong> ' +
+        '<code class="ms-1">' + _esc(session.lending_id) + '</code></span>' +
+        '<div class="d-flex align-items-center gap-2">' + modeBadge +
+        (isReturn
+            ? '<a href="/in-out/session/' + _esc(session.lending_id) + '/qr-sticker" class="btn btn-sm btn-outline-success py-0"><i class="bi bi-qr-code"></i> Print QR Return</a>'
+            : '<a href="/in-out/session/' + _esc(session.lending_id) + '/qr-sticker" class="btn btn-sm btn-outline-primary py-0"><i class="bi bi-qr-code"></i> Print QR Lending</a>') +
+        '<button class="btn btn-sm btn-outline-secondary py-0" onclick="showSessionDetailModal(\'' + _esc(session.lending_id) + '\')">' +
+        '<i class="bi bi-info-circle"></i> Detail</button>' +
+        '</div></div>' +
+        '<div class="card-body py-2 px-3 small">';
+
+    if (isReturn) {
+        /* ── Return session card ── */
+        html += '<div class="text-muted mb-2">' +
+            '<i class="bi bi-box-arrow-in-left me-1"></i>' +
+            'Returned on <strong>' + _esc(session.created_at || '') + '</strong>' +
+            ' by <strong>' + _esc(session.created_by_label || '') + '</strong>' +
+            (session.notes ? ' — <em>' + _esc(session.notes) + '</em>' : '') +
+            '</div>';
+
+        var normals = allItems.filter(function(i){ return i.type === 'lend_record'; });
+        var sns     = allItems.filter(function(i){ return i.type === 'sn'; });
+
+        if (normals.length) {
+            html += '<div class="fw-semibold text-muted mb-1"><i class="bi bi-box-seam me-1"></i>Standard Items</div>' +
+                '<div style="max-height:140px;overflow-y:auto;border:1px solid var(--bs-border-color);border-radius:4px;padding:4px;" class="mb-2">';
+            normals.forEach(function(it) {
+                var badge = it.on_time === false
+                    ? '<span class="badge bg-warning text-dark me-1" style="font-size:0.65rem;">Late</span>'
+                    : '<span class="badge bg-success me-1" style="font-size:0.65rem;">On time</span>';
+                html += '<div class="py-1 border-bottom d-flex align-items-center gap-1">' + badge +
+                    _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span>' +
+                    ' &times;' + (it.qty || 1) +
+                    (it.lend_display ? ' — <em class="text-muted">' + _esc(it.lend_display) + '</em>' : '') +
+                    '</div>';
+            });
+            html += '</div>';
+        }
+
+        if (sns.length) {
+            html += '<div class="fw-semibold text-muted mb-1"><i class="bi bi-fingerprint me-1"></i>Serial-Tracked Items</div>' +
+                '<div style="max-height:140px;overflow-y:auto;border:1px solid var(--bs-border-color);border-radius:4px;padding:4px;" class="mb-2">';
+            sns.forEach(function(it) {
+                var badge = it.on_time === false
+                    ? '<span class="badge bg-warning text-dark me-1" style="font-size:0.65rem;">Late</span>'
+                    : '<span class="badge bg-success me-1" style="font-size:0.65rem;">On time</span>';
+                html += '<div class="py-1 border-bottom d-flex align-items-center gap-1">' + badge +
+                    _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span>' +
+                    ' — <code style="font-size:0.78rem">' + _esc(it.isn || '') + '</code>' +
+                    (it.lend_display ? ' — <em class="text-muted">' + _esc(it.lend_display) + '</em>' : '') +
+                    '</div>';
+            });
+            html += '</div>';
+        }
+
+        if (!normals.length && !sns.length) {
+            html += '<div class="text-muted">No items recorded in this return session.</div>';
+        }
+
+    } else {
+        /* ── Lend session card ── */
+        html += '<div class="row g-1 mb-2">' +
+            (session.lend_to_label ? '<div class="col-auto"><i class="bi bi-person me-1"></i>' + _esc(session.lend_to_label) + '</div>' : '') +
+            (session.lend_start ? '<div class="col-auto text-muted"><i class="bi bi-calendar-check me-1"></i>' + _esc(session.lend_start.slice(0,10)) + '</div>' : '') +
+            (session.lend_end ? '<div class="col-auto text-muted"><i class="bi bi-calendar-x me-1"></i>' + _esc(session.lend_end.slice(0,10)) + '</div>' : '') +
+            (session.notes ? '<div class="col-12 text-muted fst-italic">' + _esc(session.notes) + '</div>' : '') +
+            '</div>' +
+            '<div class="mb-2"><strong>' + returnable.length + '</strong> item(s) available' +
+            (returnable.length > 0 ? ' to ' + (_mode === 'return' ? 'return' : 'view') : '') + '</div>';
+
+        if (returnable.length > 0) {
+            html += '<div style="max-height:160px;overflow-y:auto;border:1px solid var(--bs-border-color);border-radius:4px;padding:4px;" class="mb-2">';
+            returnable.forEach(function(it) {
+                var label = _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span>';
+                if (it.type === 'sn') {
+                    label += ' — <code style="font-size:0.78rem">' + _esc(it.isn) + '</code>';
+                } else {
+                    label += ' &times;' + it.qty;
+                }
+                html += '<div class="py-1 border-bottom">' + label + '</div>';
+            });
+            html += '</div>';
+            if (_mode === 'return') {
+                html += '<button class="btn btn-sm btn-success" onclick="addSessionToCart(\'' + _esc(session.lending_id) + '\')">' +
+                    '<i class="bi bi-cart-plus"></i> Add All to Return Cart</button>';
+            } else {
+                html += '<div class="text-muted small">Switch to <strong>Return</strong> mode to process returns from this session.</div>';
+            }
+        }
+    }
+
+    html += '</div></div>';
+    return html;
+}
+
+function _renderItemCard(item, expanded) {
     var batchesHtml = '';
     item.batches.forEach(function(b) {
+        if (_mode === 'lending' && b.lend_disabled) return;
+        _batchCache[b.id] = b;
         batchesHtml += '<div class="px-3 py-2 border-bottom d-flex justify-content-between align-items-center" ' +
-            'style="cursor:pointer;" onclick="selectBatch(' + b.id + ', null)">' +
-            '<span><i class="bi bi-box-seam me-1"></i>' + _esc(b.display_label) + '</span>' +
-            '<span class="text-muted small">Qty:' + b.quantity + ' Avail:' + b.available_qty +
+            'style="cursor:pointer;" onclick="onBatchClick(' + b.id + ', null)">' +
+            '<span><i class="bi bi-box-seam me-1 text-muted"></i>' + _esc(b.display_label) + '</span>' +
+            '<span class="text-muted small">Total: ' + b.quantity + ' | Avail: ' + b.available_qty +
             (b.sn_tracking ? ' <span class="badge bg-dark" style="font-size:0.65rem;">SN</span>' : '') + '</span>' +
             '</div>';
     });
@@ -259,20 +783,845 @@ function renderItemCard(item, expanded) {
         '<div class="' + (expanded ? '' : 'd-none') + '">' + batchesHtml + '</div></div>';
 }
 
-function renderBatchCard(b, selected) {
+function _renderBatchCard(b, selected) {
+    _batchCache[b.id] = b;
     return '<div class="card mb-2 border-primary">' +
-        '<div class="card-body py-2 px-3 d-flex justify-content-between align-items-center" style="cursor:pointer;" onclick="selectBatch(' + b.id + ', null)">' +
+        '<div class="card-body py-2 px-3 d-flex justify-content-between align-items-center" style="cursor:pointer;"' +
+        ' onclick="onBatchClick(' + b.id + ', ' + (b.preselected_sn_id || 'null') + ')">' +
         '<span><strong>' + _esc(b.item_name || b.display_label) + '</strong>' +
         (b.item_short_info ? ' <span class="text-muted">— ' + _esc(b.item_short_info) + '</span>' : '') +
-        ' / ' + _esc(b.display_label) + '</span>' +
-        '<span class="text-muted small">Qty:' + b.quantity + '</span>' +
+        ' / ' + _esc(b.display_label) +
+        (b.sn_tracking ? ' <span class="badge bg-dark ms-1" style="font-size:0.65rem;">SN</span>' : '') +
+        '</span>' +
+        '<span class="text-muted small">Avail: ' + b.available_qty + '</span>' +
         '</div></div>';
 }
 
-function _esc(s) {
-    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+/* ════════════════════════════════════════════════════════
+   BATCH CLICK HANDLER (from search results)
+   ════════════════════════════════════════════════════════ */
+function onBatchClick(batchId, preselectedSnId) {
+    if (_mode === 'edit_batch') {
+        selectBatch(batchId, preselectedSnId);
+        return;
+    }
+    fetch('/in-out/batch/' + batchId + '/detail')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        d._preselectedSnId = preselectedSnId;
+        if (_adv.submitMode === 'auto') {
+            _tryAutoSubmitSingle(d, d.sn_tracking ? 'sn' : 'batch');
+        } else {
+            /* Cart mode: add to cart instead of showing single-item form */
+            if (d.sn_tracking) {
+                if (preselectedSnId) {
+                    _tryAddSnToCart(d, preselectedSnId);
+                } else {
+                    _showSnPickerForCart(d);
+                }
+            } else {
+                _tryAddNormalToCart(d);
+            }
+        }
+    });
 }
 
+function _showSnPickerForCart(batchData) {
+    _batchCache[batchData.id] = batchData;
+    var sns = batchData.serial_numbers || [];
+    var eligible = (_mode === 'return')
+        ? sns.filter(function(s){ return !s.is_deleted && s.lend_to_id; })
+        : sns.filter(function(s){ return !s.is_deleted && !s.lend_to_id; });
+    if (eligible.length === 0) {
+        showToast(_mode === 'return' ? 'No lent units to return.' : 'No available units to lend.', 'warning');
+        _playSound('error');
+        return;
+    }
+    if (eligible.length === 1) {
+        _tryAddSnToCart(batchData, eligible[0].id);
+        return;
+    }
+    var html = '<div class="card mb-2 border-primary">' +
+        '<div class="card-header py-2 px-3 d-flex justify-content-between align-items-center bg-primary bg-opacity-10">' +
+        '<span><strong>' + _esc(batchData.item_name) + '</strong> / ' + _esc(batchData.display_label) + '</span>' +
+        '<span class="badge bg-primary">' + eligible.length + ' unit(s)</span>' +
+        '</div><div class="card-body p-2">' +
+        '<div class="small text-muted mb-2"><i class="bi bi-cart-plus me-1"></i>Select units to add to cart:</div>' +
+        '<div style="max-height:220px;overflow-y:auto;">';
+    eligible.forEach(function(sn) {
+        var inCart = _cart.some(function(c){ return c.type === 'sn' && c.sn_id === sn.id; });
+        var label = '<code>' + _esc(sn.internal_serial_number || sn.isn || '') + '</code>' +
+            (sn.serial_number ? ' <span class="text-muted">' + _esc(sn.serial_number) + '</span>' : '') +
+            (sn.lend_display ? ' <em class="text-muted">→ ' + _esc(sn.lend_display) + '</em>' : '');
+        html += '<div class="d-flex align-items-center justify-content-between py-1 px-1 border-bottom">' +
+            '<span class="small">' + label + '</span>' +
+            '<button class="btn btn-sm btn-outline-primary py-0 ms-2"' +
+            (inCart ? ' disabled' : ' onclick="_addSnPickerItem(' + batchData.id + ',' + sn.id + ')"') + '>' +
+            (inCart ? '<i class="bi bi-check2"></i> In Cart' : '<i class="bi bi-cart-plus"></i> Add') +
+            '</button></div>';
+    });
+    html += '</div></div></div>';
+    document.getElementById('searchResults').innerHTML = html;
+}
+
+function _addSnPickerItem(batchId, snId) {
+    var batchData = _batchCache[batchId];
+    if (!batchData || !batchData.serial_numbers) return;
+    _tryAddSnToCart(batchData, snId);
+    _showSnPickerForCart(batchData);
+}
+
+function _tryAddNormalToCart(batchData) {
+    if (_mode === 'return') {
+        var recs = batchData.lend_records || [];
+        /* Filter by adv contact if one is set */
+        var aCid   = _adv.contactId;
+        var aCtype = _adv.contactType;
+        if (aCid && aCtype) {
+            var filtered = recs.filter(function(r) {
+                return String(r.contact_id) === String(aCid) && r.type === aCtype;
+            });
+            if (filtered.length > 0) {
+                recs = filtered;
+            } else {
+                showToast('No lending record found for the selected contact.', 'warning');
+                _playSound('error');
+                return;
+            }
+        }
+        if (!recs.length) {
+            showToast('No lending records to return for "' + batchData.display_label + '".', 'warning');
+            _playSound('error');
+            return;
+        }
+        var added = 0;
+        recs.forEach(function(r) {
+            var dup = _cart.find(function(c){ return c.type === 'lend_record' && c.lend_record_id === r.id; });
+            if (!dup) {
+                _cart.push({ _key: ++_cartKey, type: 'lend_record', batch_id: batchData.id,
+                             lend_record_id: r.id,
+                             item_name: batchData.item_name, batch_label: batchData.display_label,
+                             qty: r.qty || 1, max_qty: r.qty || 1,
+                             lend_display: r.label || '', lend_end: r.end || '',
+                             note: '' });
+                added++;
+            }
+        });
+        _renderCart();
+        if (added) {
+            showToast('Added ' + added + ' record(s) to return cart.', 'success');
+            _playSound('scanner');
+        } else {
+            showToast('All records already in cart.', 'warning');
+        }
+    } else {
+        var avail = batchData.available_qty || 0;
+        if (avail < 1) {
+            showToast('No stock available for "' + batchData.display_label + '".', 'warning');
+            _playSound('error');
+            return;
+        }
+        var existing = _cart.find(function(c){ return c.type === 'normal' && c.batch_id === batchData.id; });
+        if (existing) {
+            var newQty = (existing.qty || 1) + 1;
+            if (existing.max_qty && newQty > existing.max_qty) {
+                showToast('Exceeds available quantity (' + existing.max_qty + ').', 'warning');
+                return;
+            }
+            existing.qty = newQty;
+            _renderCart();
+            showToast('Qty increased: ' + batchData.display_label + ' \xd7' + newQty, 'success');
+            _playSound('scanner');
+        } else {
+            _cartAdd({ type: 'normal', batch_id: batchData.id,
+                       item_name: batchData.item_name, batch_label: batchData.display_label,
+                       qty: 1, max_qty: avail, note: '' });
+            showToast('Added to cart: ' + batchData.display_label, 'success');
+            _playSound('scanner');
+        }
+    }
+}
+
+/* ════════════════════════════════════════════════════════
+   CART MANAGEMENT
+   ════════════════════════════════════════════════════════ */
+function _tryAddSnToCart(batchData, preselectedSnId) {
+    /* Called when ISN scan resolves to a unique SN */
+    if (_mode === 'return') {
+        /* Find the SN in the batch's serial_numbers array */
+        var sns = batchData.serial_numbers || [];
+        var target = preselectedSnId
+            ? sns.find(function(s){ return s.id === preselectedSnId; })
+            : sns.find(function(s){ return !s.is_deleted && s.lend_to_id; });
+        if (!target || !target.lend_to_id) {
+            showToast('This unit is not currently lent out.', 'warning');
+            _playSound('error');
+            return;
+        }
+        _cartAdd({ type: 'sn', batch_id: batchData.id,
+                   sn_id: target.id, isn: target.isn,
+                   item_name: batchData.item_name, batch_label: batchData.display_label,
+                   lend_display: target.lend_display || '',
+                   lend_end: target.lend_end || '',
+                   note: '' });
+        showToast('Added to return cart: ' + target.isn, 'success');
+        _playSound('scanner');
+    } else {
+        /* Lending: find available SN */
+        var sns = batchData.serial_numbers || [];
+        var target = preselectedSnId
+            ? sns.find(function(s){ return s.id === preselectedSnId; })
+            : null;
+        if (!target) {
+            target = sns.find(function(s){ return !s.is_deleted && !s.lend_to_id; });
+        }
+        if (!target) {
+            showToast('No available unit found to lend.', 'warning');
+            _playSound('error');
+            return;
+        }
+        if (target.lend_to_id) {
+            showToast('This unit is already lent out.', 'warning');
+            _playSound('error');
+            return;
+        }
+        _cartAdd({ type: 'sn', batch_id: batchData.id,
+                   sn_id: target.id, isn: target.isn,
+                   item_name: batchData.item_name, batch_label: batchData.display_label,
+                   note: '' });
+        showToast('Added to cart: ' + target.isn, 'success');
+        _playSound('scanner');
+    }
+    _renderCart();
+}
+
+function _cartAdd(item) {
+    /* Check for duplicate SN items */
+    if (item.type === 'sn') {
+        var dup = _cart.find(function(c){ return c.type === 'sn' && c.sn_id === item.sn_id; });
+        if (dup) { showToast('Already in cart: ' + item.isn, 'warning'); return; }
+    }
+    item._key = ++_cartKey;
+    _cart.push(item);
+    _renderCart();
+}
+
+function _cartRemove(key) {
+    _cart = _cart.filter(function(c){ return c._key !== key; });
+    _renderCart();
+}
+
+function _cartUpdateQty(key, delta) {
+    var item = _cart.find(function(c){ return c._key === key; });
+    if (!item) return;
+    var newQty = (item.qty || 1) + delta;
+    if (newQty < 1) return;
+    if (item.max_qty && newQty > item.max_qty) { showToast('Exceeds available quantity (' + item.max_qty + ').', 'warning'); return; }
+    item.qty = newQty;
+    _renderCart();
+}
+
+function _cartUpdateNote(key, note) {
+    var item = _cart.find(function(c){ return c._key === key; });
+    if (item) item.note = note;
+}
+
+function clearCart() {
+    _cart = [];
+    _renderCart();
+    clearActionForm();
+}
+
+function deleteSelectedCart(tableType) {
+    var selector = tableType === 'normal' ? '.cart-chk-normal' : '.cart-chk-sn';
+    var checked = Array.from(document.querySelectorAll(selector + ':checked')).map(function(c){ return parseInt(c.value); });
+    if (!checked.length) { showToast('Select items to remove.', 'warning'); return; }
+    _cart = _cart.filter(function(c){ return checked.indexOf(c._key) === -1; });
+    _renderCart();
+}
+
+function cartToggleAll(tableType, master) {
+    var selector = tableType === 'normal' ? '.cart-chk-normal' : '.cart-chk-sn';
+    document.querySelectorAll(selector).forEach(function(c){ c.checked = master.checked; });
+}
+
+function addSessionToCart(sessionOrId) {
+    var session = (typeof sessionOrId === 'string') ? _sessionCache[sessionOrId] : sessionOrId;
+    if (!session) { showToast('Session data not found.', 'danger'); return; }
+    (session.items || []).forEach(function(it) {
+        if (!it.returnable) return;
+        if (it.type === 'sn') {
+            var dup = _cart.find(function(c){ return c.type === 'sn' && c.sn_id === it.sn_id; });
+            if (!dup) {
+                _cart.push({ _key: ++_cartKey, type: 'sn', batch_id: it.batch_id,
+                             sn_id: it.sn_id, isn: it.isn,
+                             item_name: it.item_name, batch_label: it.batch_label,
+                             lend_display: it.lend_display || '',
+                             lend_end: it.lend_end || '',
+                             note: it.lend_note || '' });
+            }
+        } else if (it.type === 'lend_record') {
+            var dup2 = _cart.find(function(c){ return c.type === 'lend_record' && c.lend_record_id === it.lend_record_id; });
+            if (!dup2) {
+                _cart.push({ _key: ++_cartKey, type: 'lend_record', batch_id: it.batch_id,
+                             lend_record_id: it.lend_record_id,
+                             item_name: it.item_name, batch_label: it.batch_label,
+                             qty: it.qty, max_qty: it.qty,
+                             lend_display: it.lend_display || '', lend_end: it.lend_end || '',
+                             note: it.lend_note || '' });
+            }
+        }
+    });
+    _renderCart();
+    /* Pre-fill contact from session if in lending mode and session has lend_to */
+    if (session.lend_to_id && session.lend_to_type) {
+        _detailContact = { id: session.lend_to_id, type: session.lend_to_type, label: session.lend_to_label };
+    }
+    showToast('Added ' + (session.items || []).filter(function(i){ return i.returnable; }).length + ' item(s) to cart.', 'success');
+}
+
+function _renderCart() {
+    var isReturn = (_mode === 'return');
+    var normals  = _cart.filter(function(c){ return c.type === 'normal' || c.type === 'lend_record'; });
+    var sns      = _cart.filter(function(c){ return c.type === 'sn'; });
+    var total    = _cart.length;
+
+    var sec   = document.getElementById('cartSection');
+    var norm  = document.getElementById('cartNormalSection');
+    var snSec = document.getElementById('cartSnSection');
+    if (!sec) return;
+
+    document.getElementById('cartBadge').textContent = total;
+    sec.classList.toggle('d-none', total === 0);
+
+    /* ── Normal batch table (dynamic header) ── */
+    norm.classList.toggle('d-none', normals.length === 0);
+    var nWrap = document.getElementById('cartNormalTableWrap');
+    if (nWrap) {
+        var nHdr = '<thead class="table-light"><tr>' +
+            '<th style="width:28px"><input type="checkbox" id="cartNormalChkAll" onchange="cartToggleAll(\'normal\',this)"></th>' +
+            '<th>Item</th>' +
+            '<th style="width:95px">Qty</th>' +
+            (isReturn ? '<th>Contact</th><th>Due</th>' : '') +
+            '<th>Notes</th>' +
+            '<th style="width:28px"></th>' +
+            '</tr></thead>';
+        var nRows = normals.map(function(it) {
+            var itemCell = _esc(it.item_name) + ' <span class="text-muted small">(' + _esc(it.batch_label) + ')</span>';
+            var contactCell = '';
+            var dueCell = '';
+            if (isReturn && it.type === 'lend_record') {
+                contactCell = it.lend_display ? _esc(it.lend_display) : '<span class="text-muted">—</span>';
+                dueCell     = it.lend_end ? _esc(it.lend_end.slice(0, 10)) : '<span class="text-muted">—</span>';
+            }
+            return '<tr>' +
+                '<td><input type="checkbox" class="cart-chk-normal" value="' + it._key + '"></td>' +
+                '<td class="small">' + itemCell + '</td>' +
+                '<td>' +
+                  '<div class="input-group input-group-sm" style="width:88px;">' +
+                  '<button class="btn btn-outline-secondary py-0 px-1" type="button" onclick="_cartUpdateQty(' + it._key + ', -1)">−</button>' +
+                  '<input type="number" class="form-control text-center py-0 px-0" value="' + (it.qty || 1) + '" min="1"' +
+                  (it.max_qty ? ' max="' + it.max_qty + '"' : '') +
+                  ' onchange="_cartSetQty(' + it._key + ', parseInt(this.value))" style="width:34px;">' +
+                  '<button class="btn btn-outline-secondary py-0 px-1" type="button" onclick="_cartUpdateQty(' + it._key + ', 1)">+</button>' +
+                  '</div>' +
+                  (it.max_qty ? '<div class="text-muted" style="font-size:0.68rem;">max ' + it.max_qty + '</div>' : '') +
+                '</td>' +
+                (isReturn ? '<td class="small">' + contactCell + '</td><td class="small">' + dueCell + '</td>' : '') +
+                '<td><input type="text" class="form-control form-control-sm py-0" value="' + _esc(it.note || '') + '" maxlength="128" placeholder="Note" oninput="_cartUpdateNote(' + it._key + ', this.value)" style="min-width:70px;"></td>' +
+                '<td><button class="btn btn-link btn-sm text-danger p-0" onclick="_cartRemove(' + it._key + ')" title="Remove"><i class="bi bi-x-lg"></i></button></td>' +
+                '</tr>';
+        }).join('');
+        nWrap.innerHTML = '<table class="table table-sm table-hover mb-0" style="font-size:0.83rem;">' +
+            nHdr + '<tbody id="cartNormalBody">' + nRows + '</tbody></table>';
+    }
+
+    /* ── SN table (dynamic header) ── */
+    snSec.classList.toggle('d-none', sns.length === 0);
+    var sWrap = document.getElementById('cartSnTableWrap');
+    if (sWrap) {
+        var sHdr = '<thead class="table-light"><tr>' +
+            '<th style="width:28px"><input type="checkbox" id="cartSnChkAll" onchange="cartToggleAll(\'sn\',this)"></th>' +
+            '<th>Item</th>' +
+            '<th>ISN</th>' +
+            (isReturn ? '<th>Contact</th><th>Due</th>' : '') +
+            '<th>Notes</th>' +
+            '<th style="width:28px"></th>' +
+            '</tr></thead>';
+        var sRows = sns.map(function(it) {
+            var snCode = '<code style="font-size:0.78rem;">' + _esc(it.isn || '') + '</code>';
+            var contactCell = isReturn ? (it.lend_display ? _esc(it.lend_display) : '<span class="text-muted">—</span>') : '';
+            var dueCell     = isReturn ? (it.lend_end ? _esc(it.lend_end.slice(0, 10)) : '<span class="text-muted">—</span>') : '';
+            return '<tr>' +
+                '<td><input type="checkbox" class="cart-chk-sn" value="' + it._key + '"></td>' +
+                '<td class="small">' + _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span></td>' +
+                '<td class="small">' + snCode + '</td>' +
+                (isReturn ? '<td class="small">' + contactCell + '</td><td class="small">' + dueCell + '</td>' : '') +
+                '<td><input type="text" class="form-control form-control-sm py-0" value="' + _esc(it.note || '') + '" maxlength="128" placeholder="Note" oninput="_cartUpdateNote(' + it._key + ', this.value)" style="min-width:70px;"></td>' +
+                '<td><button class="btn btn-link btn-sm text-danger p-0" onclick="_cartRemove(' + it._key + ')" title="Remove"><i class="bi bi-x-lg"></i></button></td>' +
+                '</tr>';
+        }).join('');
+        sWrap.innerHTML = '<table class="table table-sm table-hover mb-0" style="font-size:0.83rem;">' +
+            sHdr + '<tbody id="cartSnBody">' + sRows + '</tbody></table>';
+    }
+}
+
+function _cartSetQty(key, val) {
+    var item = _cart.find(function(c){ return c._key === key; });
+    if (!item) return;
+    val = parseInt(val) || 1;
+    if (val < 1) val = 1;
+    if (item.max_qty && val > item.max_qty) val = item.max_qty;
+    item.qty = val;
+}
+
+/* ════════════════════════════════════════════════════════
+   DETAIL FORM  (called after cart is ready OR single-item)
+   ════════════════════════════════════════════════════════ */
+function showDetailForm() {
+    if (_cart.length === 0) { showToast('Add items to cart first.', 'warning'); return; }
+    document.getElementById('formDivider').classList.remove('d-none');
+    var el = document.getElementById('actionForm');
+    el.innerHTML = _buildCartDetailForm();
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    /* Restore saved contact (session-level contact, or fall back to adv default) */
+    if (_detailContact.id) {
+        selectDetailContact(_detailContact.type, _detailContact.id, _detailContact.label);
+    } else if (_adv.contactId) {
+        selectDetailContact(_adv.contactType, _adv.contactId, _adv.contactLabel);
+    }
+    /* Apply session end date if set */
+    if (_adv.sessionEnd) {
+        _setVal('detailLendEnd', _adv.sessionEnd);
+    }
+}
+
+function _buildCartDetailForm() {
+    var isReturn = (_mode === 'return');
+    var startReq = _lrSettings.lend_start_date_required;
+    var endReq   = _lrSettings.lend_end_date_required;
+    var retReq   = _lrSettings.return_date_required;
+
+    /* ── Cart summary ── */
+    var summaryHtml = '';
+    if (isReturn) {
+        var normalItems = _cart.filter(function(c){ return c.type === 'normal' || c.type === 'lend_record'; });
+        var snItems     = _cart.filter(function(c){ return c.type === 'sn'; });
+        if (normalItems.length) {
+            summaryHtml += '<div class="fw-semibold small mb-1 mt-1"><i class="bi bi-box-seam me-1"></i>Standard Items</div>' +
+                '<div class="table-responsive mb-2"><table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">' +
+                '<thead class="table-light"><tr><th>Item (Batch)</th><th style="width:50px">Qty</th><th>Contact</th><th>Due</th></tr></thead><tbody>';
+            normalItems.forEach(function(it) {
+                summaryHtml += '<tr>' +
+                    '<td>' + _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span></td>' +
+                    '<td class="text-center">' + (it.qty || 1) + '&times;</td>' +
+                    '<td>' + (it.lend_display ? _esc(it.lend_display) : '<span class="text-muted">—</span>') + '</td>' +
+                    '<td>' + (it.lend_end ? _esc(it.lend_end.slice(0,10)) : '<span class="text-muted">—</span>') + '</td>' +
+                    '</tr>';
+            });
+            summaryHtml += '</tbody></table></div>';
+        }
+        if (snItems.length) {
+            summaryHtml += '<div class="fw-semibold small mb-1"><i class="bi bi-fingerprint me-1"></i>Serial-Tracked Items</div>' +
+                '<div class="table-responsive mb-2"><table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">' +
+                '<thead class="table-light"><tr><th>Item (Batch)</th><th>ISN</th><th>Contact</th><th>Due</th></tr></thead><tbody>';
+            snItems.forEach(function(it) {
+                summaryHtml += '<tr>' +
+                    '<td>' + _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span></td>' +
+                    '<td><code style="font-size:0.78rem;">' + _esc(it.isn || '') + '</code></td>' +
+                    '<td>' + (it.lend_display ? _esc(it.lend_display) : '<span class="text-muted">—</span>') + '</td>' +
+                    '<td>' + (it.lend_end ? _esc(it.lend_end.slice(0,10)) : '<span class="text-muted">—</span>') + '</td>' +
+                    '</tr>';
+            });
+            summaryHtml += '</tbody></table></div>';
+        }
+    } else {
+        var normalItems2 = _cart.filter(function(c){ return c.type === 'normal'; });
+        var snItems2     = _cart.filter(function(c){ return c.type === 'sn'; });
+        summaryHtml = '<ul class="mb-3 ps-3" style="max-height:120px;overflow-y:auto;">';
+        normalItems2.forEach(function(it){
+            summaryHtml += '<li class="small">' + _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span> &times;' + (it.qty||1) + '</li>';
+        });
+        snItems2.forEach(function(it){
+            summaryHtml += '<li class="small"><code style="font-size:0.78rem;">' + _esc(it.isn) + '</code> — ' + _esc(it.item_name) + '</li>';
+        });
+        summaryHtml += '</ul>';
+    }
+
+    var html = '<div class="border rounded p-3">' +
+        '<h6 class="mb-2"><i class="bi bi-' + (isReturn ? 'box-arrow-in-left' : 'hand-index-thumb') + '"></i> ' +
+        (isReturn ? 'Return' : 'Lending') + ' Details — ' + _cart.length + ' item(s)</h6>' +
+        summaryHtml;
+
+    if (!isReturn) {
+        /* Lend To */
+        if (!_canOnlySelf) {
+            html += '<div class="mb-3"><label class="form-label fw-semibold">Lend To <span class="text-danger">*</span></label>' +
+                '<input type="hidden" id="detailContactId" value="' + _detailContact.id + '">' +
+                '<input type="hidden" id="detailContactType" value="' + _detailContact.type + '">' +
+                '<div class="border rounded px-2 py-1 d-flex align-items-center justify-content-between" style="cursor:pointer;background:var(--bs-body-bg);min-height:34px;" onclick="toggleDetailContactSearch()">' +
+                '<span id="detailContactLabel" class="small ' + (_detailContact.id ? '' : 'text-muted') + '">' +
+                    (_detailContact.id ? _esc(_detailContact.label) : 'Click to search contact...') + '</span>' +
+                '<i class="bi bi-x text-danger" id="detailContactClear" style="display:' + (_detailContact.id ? 'inline' : 'none') + ';" onclick="event.stopPropagation();clearDetailContact()"></i>' +
+                '</div>' +
+                '<div id="detailContactPanel" style="display:none;" class="mt-1">' +
+                '<input type="text" class="form-control form-control-sm" id="detailContactInput" placeholder="Search by name..." oninput="doDetailContactSearch()">' +
+                '<div id="detailContactResults" class="border rounded" style="max-height:180px;overflow-y:auto;background:var(--bs-body-bg);"></div>' +
+                '</div></div>';
+        } else {
+            html += '<div class="alert alert-info py-2 small mb-3"><i class="bi bi-person-check me-1"></i>Lending to yourself — your account will be recorded as the borrower.</div>';
+        }
+
+        /* Start / End date */
+        html += '<div class="row g-2 mb-3">' +
+            '<div class="col-md-6"><label class="form-label form-label-sm">Start Date/Time' + _req(startReq) + '</label>' +
+            '<div class="input-group input-group-sm"><button class="btn btn-outline-secondary" type="button" onclick="_setNow(\'detailLendStart\')" title="Set to now"><i class="bi bi-clock"></i></button>' +
+            '<input type="datetime-local" class="form-control" id="detailLendStart"' + (startReq ? ' required' : '') + '></div></div>' +
+            '<div class="col-md-6"><label class="form-label form-label-sm">End / Due Date/Time' + _req(endReq) + '</label>' +
+            '<input type="datetime-local" class="form-control form-control-sm" id="detailLendEnd"' + (endReq ? ' required' : '') + ((_adv.sessionEnd) ? ' value="' + _esc(_adv.sessionEnd) + '"' : '') + '></div></div>';
+
+    } else {
+        /* Return date */
+        html += '<div class="mb-3"><label class="form-label form-label-sm">Return Date/Time' + _req(retReq) + (retReq ? '' : ' <span class="text-muted">(leave blank to use current time)</span>') + '</label>' +
+            '<div class="input-group input-group-sm"><button class="btn btn-outline-secondary" type="button" onclick="_setNow(\'detailReturnDt\')" title="Set to now"><i class="bi bi-clock"></i></button>' +
+            '<input type="datetime-local" class="form-control" id="detailReturnDt"' + (retReq ? ' required' : '') + '></div></div>';
+    }
+
+    /* Notification option (lending only) */
+    if (!isReturn) {
+        var notifyChecked = _adv.notifyEnabled ? ' checked' : '';
+        var daysVal = _adv.notifyDays || 3;
+        var daysDisplay = _adv.notifyEnabled ? 'flex' : 'none';
+        html += '<div class="mb-3"><div class="d-flex align-items-center gap-2 flex-wrap">' +
+            '<div class="form-check form-switch mb-0">' +
+            '<input class="form-check-input" type="checkbox" id="detailNotifyEnabled"' + notifyChecked +
+            ' onchange="var w=document.getElementById(\'detailNotifyDaysWrap\');if(w)w.style.display=this.checked?\'flex\':\'none\'">' +
+            '<label class="form-check-label" for="detailNotifyEnabled"><i class="bi bi-bell me-1"></i>Enable Notification</label>' +
+            '</div>' +
+            '<div id="detailNotifyDaysWrap" class="d-flex align-items-center gap-1" style="display:' + daysDisplay + ';">' +
+            '<input type="number" class="form-control form-control-sm" id="detailNotifyDays" min="1" max="90" value="' + daysVal + '" style="width:65px;">' +
+            '<span class="text-muted small">days before due date</span>' +
+            '</div>' +
+            '</div></div>';
+    }
+
+    /* Global notes */
+    html += '<div class="mb-3"><label class="form-label form-label-sm">Notes <small class="text-muted">(applies to all items unless overridden per-item in the cart above)</small></label>' +
+        '<input type="text" class="form-control form-control-sm" id="detailNotes" maxlength="256" placeholder="e.g. FYP, Lab assignment..."></div>';
+
+    /* Submit */
+    var btnClass = isReturn ? 'btn-warning' : 'btn-primary';
+    var btnIcon  = isReturn ? 'bi-check-circle' : 'bi-check-circle-fill';
+    html += '<div class="d-flex gap-2 align-items-center">' +
+        '<button class="btn ' + btnClass + ' btn-sm" onclick="submitCart()">' +
+        '<i class="bi ' + btnIcon + '"></i> ' + (isReturn ? 'Confirm Return' : 'Confirm Lending') + '</button>' +
+        '<button class="btn btn-outline-secondary btn-sm" onclick="clearActionForm()">Cancel</button>' +
+        '</div></div>';
+
+    return html;
+}
+
+/* Contact search inside detail form */
+function toggleDetailContactSearch() {
+    var panel = document.getElementById('detailContactPanel');
+    if (!panel) return;
+    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    document.getElementById('detailContactInput').value = '';
+    document.getElementById('detailContactInput').focus();
+    doDetailContactSearch();
+}
+
+function doDetailContactSearch() {
+    clearTimeout(_lendContactSearchTimer);
+    _lendContactSearchTimer = setTimeout(function() {
+        var q   = (document.getElementById('detailContactInput') || {}).value || '';
+        var el  = document.getElementById('detailContactResults');
+        if (!el) return;
+        el.innerHTML = '<div class="text-muted small p-1">Loading...</div>';
+        fetch('/api/contacts/all?q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.length) { el.innerHTML = '<div class="text-muted small p-1">No contacts found.</div>'; return; }
+            var icons  = {user:'bi-person-circle', person:'bi-person', organization:'bi-building', group:'bi-people'};
+            var badges = {user:'bg-primary', person:'bg-secondary', organization:'bg-success', group:'bg-info'};
+            el.innerHTML = data.map(function(c) {
+                var icon  = icons[c.type] || 'bi-person';
+                var badge = badges[c.type] || 'bg-secondary';
+                var lbl   = _esc(c.label || '');
+                var extra = c.extra ? '<small class="text-muted d-block">' + _esc(c.extra) + '</small>' : '';
+                var rawL  = (c.label || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+                return '<div class="d-flex align-items-center gap-2 p-1 border-bottom" style="cursor:pointer;"' +
+                    ' onclick="selectDetailContact(\'' + c.type + '\',' + c.id + ',\'' + rawL + '\')">' +
+                    '<i class="bi ' + icon + ' text-muted small"></i>' +
+                    '<div class="flex-grow-1"><div class="small">' + lbl + '</div>' + extra + '</div>' +
+                    '<span class="badge ' + badge + '" style="font-size:0.65rem">' + c.type + '</span></div>';
+            }).join('');
+        })
+        .catch(function() { if (el) el.innerHTML = '<div class="text-danger small p-1">Search failed.</div>'; });
+    }, 300);
+}
+
+function selectDetailContact(type, id, label) {
+    _detailContact = { id: id, type: type, label: label };
+    var hidId   = document.getElementById('detailContactId');
+    var hidType = document.getElementById('detailContactType');
+    var lbl     = document.getElementById('detailContactLabel');
+    var clr     = document.getElementById('detailContactClear');
+    if (hidId)   hidId.value   = id;
+    if (hidType) hidType.value = type;
+    if (lbl)   { lbl.textContent = label; lbl.className = 'small'; }
+    if (clr)     clr.style.display = '';
+    var panel = document.getElementById('detailContactPanel');
+    if (panel) panel.style.display = 'none';
+}
+
+function clearDetailContact() {
+    _detailContact = { id: '', type: '', label: '' };
+    var hidId   = document.getElementById('detailContactId');
+    var hidType = document.getElementById('detailContactType');
+    var lbl     = document.getElementById('detailContactLabel');
+    var clr     = document.getElementById('detailContactClear');
+    if (hidId)   hidId.value   = '';
+    if (hidType) hidType.value = '';
+    if (lbl)   { lbl.textContent = 'Click to search contact...'; lbl.className = 'small text-muted'; }
+    if (clr)     clr.style.display = 'none';
+}
+
+/* ════════════════════════════════════════════════════════
+   SUBMIT CART
+   ════════════════════════════════════════════════════════ */
+function submitCart() {
+    var isReturn = (_mode === 'return');
+    var detail   = {};
+
+    if (isReturn) {
+        var retReq = _lrSettings.return_date_required;
+        var retDt  = _getVal('detailReturnDt');
+        if (retReq && !retDt) { showToast('Return Date/Time is required.', 'danger'); _playSound('error'); return; }
+        /* If auto-fill return now is enabled and no date entered, leave blank (server uses now) */
+        if (!retDt && _adv.returnNow) retDt = '';  /* server defaults to now */
+        detail.return_datetime = retDt;
+        detail.return_notes    = _getVal('detailNotes');
+    } else {
+        var startReq = _lrSettings.lend_start_date_required;
+        var endReq   = _lrSettings.lend_end_date_required;
+        var startVal = _getVal('detailLendStart');
+        var endVal   = _getVal('detailLendEnd');
+
+        /* Auto-fill start now if setting is ON and field is empty */
+        if (!startVal && _adv.startNow) {
+            startVal = _nowStr();
+        }
+        if (startReq && !startVal) { showToast('Start Date/Time is required.', 'danger'); _playSound('error'); return; }
+        if (endReq && !endVal)     { showToast('End Date/Time is required.', 'danger'); _playSound('error'); return; }
+
+        if (!_canOnlySelf) {
+            var cid   = _getVal('detailContactId');
+            var ctype = _getVal('detailContactType');
+            if (!cid) { showToast('Please select a contact to lend to.', 'danger'); _playSound('error'); return; }
+            detail.lend_to_id   = parseInt(cid);
+            detail.lend_to_type = ctype;
+        }
+        detail.lend_start    = startVal;
+        detail.lend_end      = endVal;
+        detail.notes         = _getVal('detailNotes');
+        detail.lend_notify   = _getChk('detailNotifyEnabled');
+        detail.lend_days     = parseInt(_getVal('detailNotifyDays')) || 3;
+    }
+
+    var payload = { mode: isReturn ? 'return' : 'lend', cart: _cart, detail: detail };
+
+    fetch('/in-out/submit-cart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.success) {
+            var msg = (isReturn ? 'Return' : 'Lending') + ' recorded! Session: ' + d.lending_id;
+            if (d.errors && d.errors.length) {
+                msg += ' (' + d.errors.length + ' error(s): ' + d.errors[0] + ')';
+                showToast(msg, 'warning');
+                _playSound('error');
+            } else {
+                showToast(msg, 'success');
+                _playSound('success');
+            }
+            /* Show session notification with inline QR */
+            var af = document.getElementById('actionForm');
+            if (af) {
+                var lateNote = d.on_time === false ? '<br><span class="badge bg-warning text-dark mt-1"><i class="bi bi-exclamation-triangle-fill"></i> Some items returned LATE</span>' : '';
+                var qrImgId = 'notif-session-qr-' + Date.now();
+                af.innerHTML = '<div class="alert alert-success p-3">' +
+                    '<div class="d-flex align-items-center gap-3">' +
+                    '<div style="flex-shrink:0;background:white;padding:4px;border-radius:4px;border:1px solid #ccc;">' +
+                    '<img id="' + qrImgId + '" src="/api/in-out/session/' + _esc(d.lending_id) + '/session-qr-svg" width="90" height="90" style="display:block;" alt="Session QR">' +
+                    '</div>' +
+                    '<div>' +
+                    '<div class="fw-bold mb-1"><i class="bi bi-check-circle-fill me-1"></i>' + (isReturn ? 'Return' : 'Lending') + ' processed successfully!</div>' +
+                    '<div class="mb-2">' +
+                    '<a href="/in-out/session/' + _esc(d.lending_id) + '/qr-sticker" class="btn btn-sm ' + (isReturn ? 'btn-outline-success' : 'btn-outline-primary') + '">' +
+                    '<i class="bi bi-qr-code"></i> Print ' + (isReturn ? 'Return' : 'Lending') + ' QR</a>' +
+                    '</div>' +
+                    '<div><strong>Session ID: <code>' + _esc(d.lending_id) + '</code></strong>' +
+                    ' <small class="text-muted">(search this ID later to reference this transaction)</small></div>' +
+                    lateNote +
+                    '</div>' +
+                    '</div>' +
+                    '</div>';
+            }
+            _cart = [];
+            _renderCart();
+            refreshLog();
+        } else {
+            showToast(d.message || 'Submission failed.', 'danger');
+            _playSound('error');
+        }
+    })
+    .catch(function(e) {
+        showToast('Network error: ' + e, 'danger');
+        _playSound('error');
+    });
+}
+
+/* ════════════════════════════════════════════════════════
+   AUTO-SUBMIT (single item, no cart)
+   ════════════════════════════════════════════════════════ */
+function _tryAutoSubmitSingle(batchData, resultType) {
+    /* Build a minimal cart of one item, validate detail, then submit */
+    var cartItem = null;
+    if (resultType === 'sn' || batchData.sn_tracking) {
+        var sns = batchData.serial_numbers || [];
+        var preSn = batchData._preselectedSnId;
+        var target = preSn ? sns.find(function(s){ return s.id === preSn; }) : null;
+        if (!target) {
+            if (_mode === 'return') {
+                target = sns.find(function(s){ return !s.is_deleted && s.lend_to_id; });
+            } else {
+                target = sns.find(function(s){ return !s.is_deleted && !s.lend_to_id; });
+            }
+        }
+        if (!target) {
+            showToast('No eligible unit found.', 'warning');
+            _playSound('error');
+            /* Fall back to showing form */
+            _selectedBatch = batchData;
+            showActionForm(batchData);
+            return;
+        }
+        var type = (_mode === 'return') ? 'sn' : 'sn';
+        cartItem = { _key: ++_cartKey, type: type, batch_id: batchData.id,
+                     sn_id: target.id, isn: target.isn,
+                     item_name: batchData.item_name, batch_label: batchData.display_label, note: '' };
+    } else {
+        if (_mode === 'return') {
+            var recs = batchData.lend_records || [];
+            if (!recs.length) {
+                showToast('No lending records to return.', 'warning');
+                _playSound('error');
+                _selectedBatch = batchData;
+                showActionForm(batchData);
+                return;
+            }
+            /* Prefer matching contact from adv default or open detail form */
+            var aCid   = _adv.contactId   || _getVal('detailContactId');
+            var aCtype = _adv.contactType || _getVal('detailContactType');
+            var targetRec = null;
+            if (aCid && aCtype) {
+                targetRec = recs.find(function(r) {
+                    return String(r.contact_id) === String(aCid) && r.type === aCtype;
+                });
+                if (!targetRec) {
+                    showToast('No lending record found for the selected contact.', 'warning');
+                    _playSound('error');
+                    _selectedBatch = batchData;
+                    showActionForm(batchData);
+                    return;
+                }
+            } else if (recs.length === 1) {
+                targetRec = recs[0];
+            } else {
+                /* Multiple records and no contact set — cannot auto-determine; show form */
+                showToast('Multiple lending records exist. Select which to return.', 'warning');
+                _selectedBatch = batchData;
+                showActionForm(batchData);
+                return;
+            }
+            cartItem = { _key: ++_cartKey, type: 'lend_record', batch_id: batchData.id,
+                         lend_record_id: targetRec.id,
+                         item_name: batchData.item_name, batch_label: batchData.display_label,
+                         qty: targetRec.qty, max_qty: targetRec.qty,
+                         lend_display: targetRec.label || '', lend_end: targetRec.end || '',
+                         note: '' };
+        } else {
+            if (batchData.available_qty < 1) {
+                showToast('No stock available to lend.', 'warning');
+                _playSound('error');
+                _selectedBatch = batchData;
+                showActionForm(batchData);
+                return;
+            }
+            cartItem = { _key: ++_cartKey, type: 'normal', batch_id: batchData.id,
+                         item_name: batchData.item_name, batch_label: batchData.display_label,
+                         qty: 1, max_qty: batchData.available_qty, note: '' };
+        }
+    }
+
+    /* Build detail using whatever is currently filled in the form */
+    var detail = {};
+    var isReturn = (_mode === 'return');
+    if (isReturn) {
+        detail.return_datetime = _adv.returnNow ? _nowStr() : '';
+        detail.return_notes    = '';
+    } else {
+        if (!_canOnlySelf) {
+            var cid   = _getVal('detailContactId');
+            var ctype = _getVal('detailContactType');
+            if (!cid) {
+                /* Can't auto-submit without contact — fall back to form */
+                _cart.push(cartItem);
+                _renderCart();
+                showDetailForm();
+                return;
+            }
+            detail.lend_to_id   = parseInt(cid);
+            detail.lend_to_type = ctype;
+        }
+        detail.lend_start = _adv.startNow ? _nowStr() : '';
+        detail.lend_end   = _adv.sessionEnd || '';
+        detail.notes      = '';
+    }
+
+    fetch('/in-out/submit-cart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: isReturn ? 'return' : 'lend', cart: [cartItem], detail: detail }),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.success) {
+            showToast((isReturn ? 'Returned' : 'Lent') + ': ' + (cartItem.isn || cartItem.item_name) + ' — Session: ' + d.lending_id, 'success');
+            _playSound('success');
+            document.getElementById('searchResults').innerHTML = '';
+            document.getElementById('inOutSearch').value = '';
+            _lastSearchData = null;
+            refreshLog();
+        } else {
+            showToast(d.message || 'Error', 'danger');
+            _playSound('error');
+        }
+    })
+    .catch(function(e) {
+        showToast('Error: ' + e, 'danger');
+        _playSound('error');
+    });
+}
+
+/* ════════════════════════════════════════════════════════
+   SINGLE-ITEM ACTION FORM  (legacy / edit_batch)
+   ════════════════════════════════════════════════════════ */
 function selectBatch(batchId, preselectedSnId) {
     _ebSnState = null;
     fetch('/in-out/batch/' + batchId + '/detail')
@@ -302,18 +1651,21 @@ function showActionForm(batch) {
     }
 }
 
-/* ── Required label helper ── */
+/* ── Required-field helper ── */
 function _req(flag) { return flag ? ' <span class="text-danger">*</span>' : ''; }
 function _setNow(id) {
     var el = document.getElementById(id);
     if (!el) return;
+    el.value = _nowStr();
+}
+function _nowStr() {
     var now = new Date();
     var pad = function(n){ return String(n).padStart(2,'0'); };
-    el.value = now.getFullYear() + '-' + pad(now.getMonth()+1) + '-' + pad(now.getDate()) +
-               'T' + pad(now.getHours()) + ':' + pad(now.getMinutes());
+    return now.getFullYear() + '-' + pad(now.getMonth()+1) + '-' + pad(now.getDate()) +
+           'T' + pad(now.getHours()) + ':' + pad(now.getMinutes());
 }
 
-/* ── Lending Form ── */
+/* ── Lending Form (single-item, non-cart mode) ── */
 function buildLendForm(b) {
     if (!_canLend) return '<div class="alert alert-warning">No permission to lend.</div>';
     var html = '<h6 class="mb-3"><i class="bi bi-hand-index-thumb"></i> Lend — ' + _esc(b.display_label) + ' (' + _esc(b.item_name) + ')</h6>';
@@ -336,148 +1688,165 @@ function buildLendForm(b) {
     }
 
     if (!_canOnlySelf) {
-        html += '<div class="mb-2"><label class="form-label fw-semibold">Lend To <span class="text-danger">*</span></label>';
-        html += '<input type="hidden" id="lendContactId" value=""><input type="hidden" id="lendContactType" value="">';
-        html += '<div class="border rounded px-2 py-1 d-flex align-items-center justify-content-between" style="cursor:pointer;background:var(--bs-body-bg);min-height:31px;" onclick="toggleLendContactSearch()">' +
-            '<span id="lendContactLabel" class="small text-muted">Click to search contact...</span>' +
-            '<i class="bi bi-x text-danger" id="lendContactClear" style="display:none;" onclick="event.stopPropagation();clearLendContact()"></i>' +
-            '</div>' +
-            '<div id="lendContactSearchPanel" style="display:none;" class="mt-1">' +
-            '<input type="text" class="form-control form-control-sm" id="lendContactSearchInput" placeholder="Search by name..." oninput="doLendContactSearch()">' +
-            '<div id="lendContactResults" class="border rounded" style="max-height:180px;overflow-y:auto;background:var(--bs-body-bg);"></div>' +
-            '</div></div>';
+        html += _buildContactPickerHtml('lend');
     } else {
-        html += '<div class="alert alert-info py-1 small mb-2">Lending to yourself only.</div>';
+        html += '<div class="alert alert-info py-1 small mb-2"><i class="bi bi-person-check me-1"></i>Lending to yourself only.</div>';
     }
 
     var startReq = _lrSettings.lend_start_date_required;
     var endReq   = _lrSettings.lend_end_date_required;
     html += '<div class="row g-2 mb-2">' +
         '<div class="col-md-6"><label class="form-label form-label-sm">Start Date/Time' + _req(startReq) + '</label>' +
-        '<div class="input-group input-group-sm"><button class="btn btn-outline-secondary" type="button" onclick="_setNow(\'lendStart\')" title="Set to now"><i class="bi bi-clock"></i> Now</button>' +
+        '<div class="input-group input-group-sm"><button class="btn btn-outline-secondary" type="button" onclick="_setNow(\'lendStart\')" title="Now"><i class="bi bi-clock"></i></button>' +
         '<input type="datetime-local" class="form-control" id="lendStart"' + (startReq ? ' required' : '') + '></div></div>' +
-        '<div class="col-md-6"><label class="form-label form-label-sm">End Date/Time' + _req(endReq) + '</label>' +
-        '<input type="datetime-local" class="form-control form-control-sm" id="lendEnd"' + (endReq ? ' required' : '') + '></div></div>' +
+        '<div class="col-md-6"><label class="form-label form-label-sm">End / Due Date/Time' + _req(endReq) + '</label>' +
+        '<input type="datetime-local" class="form-control form-control-sm" id="lendEnd"' + (endReq ? ' required' : '') + ((_adv.sessionEnd) ? ' value="' + _esc(_adv.sessionEnd) + '"' : '') + '></div></div>' +
         '<div class="mb-2"><label class="form-label form-label-sm">Notes</label>' +
         '<input type="text" class="form-control form-control-sm" id="lendNote" maxlength="128" placeholder="Optional notes"></div>' +
-        '<button class="btn btn-primary btn-sm" onclick="submitLend(' + b.id + ',' + (b.sn_tracking ? 'true' : 'false') + ')"><i class="bi bi-check-circle"></i> Confirm Lend</button>';
+        '<div class="d-flex gap-2">' +
+        '<button class="btn btn-primary btn-sm" onclick="submitLend(' + b.id + ',' + (b.sn_tracking ? 'true' : 'false') + ')"><i class="bi bi-check-circle-fill"></i> Confirm Lend</button>' +
+        '<button class="btn btn-sm btn-outline-secondary" onclick="clearActionForm()">Cancel</button>' +
+        '</div>';
     return html;
 }
 
-var _lendContactSearchTimer = null;
-function toggleLendContactSearch() {
-    var panel = document.getElementById('lendContactSearchPanel');
+function _buildContactPickerHtml(prefix) {
+    return '<div class="mb-2"><label class="form-label fw-semibold">Lend To <span class="text-danger">*</span></label>' +
+        '<input type="hidden" id="' + prefix + 'ContactId" value="">' +
+        '<input type="hidden" id="' + prefix + 'ContactType" value="">' +
+        '<div class="border rounded px-2 py-1 d-flex align-items-center justify-content-between" style="cursor:pointer;background:var(--bs-body-bg);min-height:31px;" onclick="toggleLendContactSearch(\'' + prefix + '\')">' +
+        '<span id="' + prefix + 'ContactLabel" class="small text-muted">Click to search contact...</span>' +
+        '<i class="bi bi-x text-danger" id="' + prefix + 'ContactClear" style="display:none;" onclick="event.stopPropagation();clearLendContact(\'' + prefix + '\')"></i>' +
+        '</div>' +
+        '<div id="' + prefix + 'ContactPanel" style="display:none;" class="mt-1">' +
+        '<input type="text" class="form-control form-control-sm" id="' + prefix + 'ContactInput" placeholder="Search by name..." oninput="doLendContactSearchFor(\'' + prefix + '\')">' +
+        '<div id="' + prefix + 'ContactResults" class="border rounded" style="max-height:180px;overflow-y:auto;background:var(--bs-body-bg);"></div>' +
+        '</div></div>';
+}
+
+var _lcTimer = {};
+function toggleLendContactSearch(prefix) {
+    var panel = document.getElementById(prefix + 'ContactPanel');
     if (!panel) return;
     if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
     panel.style.display = '';
-    document.getElementById('lendContactSearchInput').value = '';
-    document.getElementById('lendContactSearchInput').focus();
-    doLendContactSearch();
+    document.getElementById(prefix + 'ContactInput').value = '';
+    document.getElementById(prefix + 'ContactInput').focus();
+    doLendContactSearchFor(prefix);
 }
-function doLendContactSearch() {
-    clearTimeout(_lendContactSearchTimer);
-    _lendContactSearchTimer = setTimeout(function() {
-        var q = document.getElementById('lendContactSearchInput').value.trim();
-        var el = document.getElementById('lendContactResults');
+function doLendContactSearchFor(prefix) {
+    clearTimeout(_lcTimer[prefix]);
+    _lcTimer[prefix] = setTimeout(function() {
+        var q   = (document.getElementById(prefix + 'ContactInput') || {}).value || '';
+        var el  = document.getElementById(prefix + 'ContactResults');
+        if (!el) return;
         el.innerHTML = '<div class="text-muted small p-1">Loading...</div>';
         fetch('/api/contacts/all?q=' + encodeURIComponent(q))
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (!data.length) { el.innerHTML = '<div class="text-muted small p-1">No contacts found.</div>'; return; }
-            var icons = {user:'bi-person-circle', person:'bi-person', organization:'bi-building', group:'bi-people'};
+            var icons  = {user:'bi-person-circle', person:'bi-person', organization:'bi-building', group:'bi-people'};
             var badges = {user:'bg-primary', person:'bg-secondary', organization:'bg-success', group:'bg-info'};
             el.innerHTML = data.map(function(c) {
-                var icon = icons[c.type] || 'bi-person';
+                var icon  = icons[c.type] || 'bi-person';
                 var badge = badges[c.type] || 'bg-secondary';
-                var lbl = (c.label||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-                var extra = c.extra ? '<small class="text-muted d-block">' + c.extra.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</small>' : '';
-                var rawLabel = (c.label||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-                return '<div class="d-flex align-items-center gap-2 p-1 border-bottom" style="cursor:pointer;" ' +
-                    'onclick="selectLendContact(\'' + c.type + '\',' + c.id + ',\'' + rawLabel + '\')">' +
+                var lbl   = _esc(c.label || '');
+                var extra = c.extra ? '<small class="text-muted d-block">' + _esc(c.extra) + '</small>' : '';
+                var rawL  = (c.label || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+                return '<div class="d-flex align-items-center gap-2 p-1 border-bottom" style="cursor:pointer;"' +
+                    ' onclick="selectLendContact(\'' + prefix + '\',\'' + c.type + '\',' + c.id + ',\'' + rawL + '\')">' +
                     '<i class="bi ' + icon + ' text-muted small"></i>' +
                     '<div class="flex-grow-1"><div class="small">' + lbl + '</div>' + extra + '</div>' +
                     '<span class="badge ' + badge + '" style="font-size:0.65rem">' + c.type + '</span></div>';
             }).join('');
         })
-        .catch(function() { el.innerHTML = '<div class="text-danger small p-1">Search failed.</div>'; });
+        .catch(function() { if (el) el.innerHTML = '<div class="text-danger small p-1">Search failed.</div>'; });
     }, 300);
 }
-function selectLendContact(type, id, label) {
-    var hidId = document.getElementById('lendContactId');
-    var hidType = document.getElementById('lendContactType');
-    var lbl = document.getElementById('lendContactLabel');
-    var clr = document.getElementById('lendContactClear');
-    if (hidId) hidId.value = id;
-    if (hidType) hidType.value = type;
-    if (lbl) { lbl.textContent = label; lbl.className = 'small'; }
-    if (clr) clr.style.display = '';
-    var panel = document.getElementById('lendContactSearchPanel');
+function selectLendContact(prefix, type, id, label) {
+    var hidId  = document.getElementById(prefix + 'ContactId');
+    var hidT   = document.getElementById(prefix + 'ContactType');
+    var lbl    = document.getElementById(prefix + 'ContactLabel');
+    var clr    = document.getElementById(prefix + 'ContactClear');
+    if (hidId)  hidId.value  = id;
+    if (hidT)   hidT.value   = type;
+    if (lbl)  { lbl.textContent = label; lbl.className = 'small'; }
+    if (clr)    clr.style.display = '';
+    var panel = document.getElementById(prefix + 'ContactPanel');
     if (panel) panel.style.display = 'none';
 }
-function clearLendContact() {
-    var hidId = document.getElementById('lendContactId');
-    var hidType = document.getElementById('lendContactType');
-    var lbl = document.getElementById('lendContactLabel');
-    var clr = document.getElementById('lendContactClear');
-    if (hidId) hidId.value = '';
-    if (hidType) hidType.value = '';
-    if (lbl) { lbl.textContent = 'Click to search contact...'; lbl.className = 'small text-muted'; }
-    if (clr) clr.style.display = 'none';
+function clearLendContact(prefix) {
+    var hidId = document.getElementById(prefix + 'ContactId');
+    var hidT  = document.getElementById(prefix + 'ContactType');
+    var lbl   = document.getElementById(prefix + 'ContactLabel');
+    var clr   = document.getElementById(prefix + 'ContactClear');
+    if (hidId)  hidId.value  = '';
+    if (hidT)   hidT.value   = '';
+    if (lbl)  { lbl.textContent = 'Click to search contact...'; lbl.className = 'small text-muted'; }
+    if (clr)    clr.style.display = 'none';
 }
 
 function submitLend(batchId, snTracking) {
-    var payload = { batch_id: batchId };
-    var startReq = _lrSettings.lend_start_date_required;
-    var endReq   = _lrSettings.lend_end_date_required;
-    var startVal = (document.getElementById('lendStart')||{}).value || '';
-    var endVal   = (document.getElementById('lendEnd')||{}).value || '';
-    if (startReq && !startVal) { alert('Start Date/Time is required.'); return; }
-    if (endReq && !endVal) { alert('End Date/Time is required.'); return; }
+    var payload    = { batch_id: batchId };
+    var startReq   = _lrSettings.lend_start_date_required;
+    var endReq     = _lrSettings.lend_end_date_required;
+    var startVal   = _getVal('lendStart');
+    var endVal     = _getVal('lendEnd');
+    if (!startVal && _adv.startNow) startVal = _nowStr();
+    if (startReq && !startVal) { showToast('Start Date/Time is required.', 'danger'); _playSound('error'); return; }
+    if (endReq && !endVal)     { showToast('End Date/Time is required.', 'danger'); _playSound('error'); return; }
 
     if (snTracking) {
-        var ids = Array.from(document.querySelectorAll('.sn-lend-chk:checked')).map(function(c) { return parseInt(c.value); });
-        if (ids.length === 0) { alert('Select at least one unit.'); return; }
+        var ids = Array.from(document.querySelectorAll('.sn-lend-chk:checked')).map(function(c){ return parseInt(c.value); });
+        if (ids.length === 0) { showToast('Select at least one unit.', 'warning'); return; }
         payload.sn_ids = ids;
         if (!_canOnlySelf) {
-            var cid = document.getElementById('lendContactId');
-            var ctype = document.getElementById('lendContactType');
-            if (!cid || !cid.value) { alert('Select a contact.'); return; }
-            payload.lend_to_id = parseInt(cid.value);
-            payload.lend_to_type = (ctype && ctype.value) ? ctype.value : 'person';
+            var cid   = _getVal('lendContactId');
+            var ctype = _getVal('lendContactType');
+            if (!cid) { showToast('Select a contact.', 'danger'); _playSound('error'); return; }
+            payload.lend_to_id   = parseInt(cid);
+            payload.lend_to_type = ctype || 'person';
         } else {
-            payload.lend_to_id = _currentUserId;
+            payload.lend_to_id   = _currentUserId;
             payload.lend_to_type = 'user';
         }
         payload.lend_start = startVal;
         payload.lend_end   = endVal;
-        payload.lend_note  = (document.getElementById('lendNote')||{}).value || '';
+        payload.lend_note  = _getVal('lendNote');
     } else {
-        var qty = parseInt((document.getElementById('lendQty')||{}).value) || 1;
-        var contact_id = null, contact_type = 'person';
+        var qty = parseInt(_getVal('lendQty')) || 1;
+        var cid2 = null, ctype2 = 'person';
         if (!_canOnlySelf) {
-            var cid2 = document.getElementById('lendContactId');
-            var ctype2 = document.getElementById('lendContactType');
-            if (!cid2 || !cid2.value) { alert('Select a contact.'); return; }
-            contact_id = parseInt(cid2.value);
-            contact_type = (ctype2 && ctype2.value) ? ctype2.value : 'person';
+            cid2  = _getVal('lendContactId');
+            ctype2 = _getVal('lendContactType') || 'person';
+            if (!cid2) { showToast('Select a contact.', 'danger'); _playSound('error'); return; }
+            cid2 = parseInt(cid2);
         } else {
-            contact_id = _currentUserId;
-            contact_type = 'user';
+            cid2  = _currentUserId;
+            ctype2 = 'user';
         }
         payload.lend_records = [{
-            contact_id: contact_id, type: contact_type, qty: qty,
+            contact_id: cid2, type: ctype2, qty: qty,
             start: startVal, end: endVal,
-            lend_note: (document.getElementById('lendNote')||{}).value || '',
+            lend_note: _getVal('lendNote'),
         }];
     }
-    fetch('/in-out/lend', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
-    .then(function(r){ return r.json(); }).then(function(d){
-        if (d.success) { showToast('Lend recorded successfully.', 'success'); clearActionForm(); refreshLog(); }
-        else { alert(d.message || 'Error'); }
+    fetch('/in-out/lend', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+        if (d.success) {
+            showToast('Lend recorded successfully.', 'success');
+            _playSound('success');
+            clearActionForm();
+            refreshLog();
+        } else {
+            showToast(d.message || 'Error', 'danger');
+            _playSound('error');
+        }
     });
 }
 
-/* ── Return Form ── */
+/* ── Return Form (single-item, non-cart mode) ── */
 function buildReturnForm(b) {
     if (!_canLend) return '<div class="alert alert-warning">No permission to process returns.</div>';
     var html = '<h6 class="mb-3"><i class="bi bi-box-arrow-in-left"></i> Return — ' + _esc(b.display_label) + ' (' + _esc(b.item_name) + ')</h6>';
@@ -498,7 +1867,7 @@ function buildReturnForm(b) {
         html += '</div></div>';
     } else {
         var recs = b.lend_records || [];
-        if (recs.length === 0) { return html + '<div class="alert alert-info">No lending records.</div>'; }
+        if (recs.length === 0) { return html + '<div class="alert alert-info">No lending records to return.</div>'; }
         html += '<div class="mb-2"><label class="form-label fw-semibold">Select lending record(s) to return</label>' +
             '<div style="max-height:350px;overflow-y:auto;border:1px solid #dee2e6;border-radius:4px;padding:4px;">';
         recs.forEach(function(r) {
@@ -514,62 +1883,72 @@ function buildReturnForm(b) {
     }
 
     html += '<div class="mb-2"><label class="form-label form-label-sm">Return Date/Time' + _req(retReq) + (retReq ? '' : ' <span class="text-muted">(leave blank for now)</span>') + '</label>' +
-        '<div class="input-group input-group-sm"><button class="btn btn-outline-secondary" type="button" onclick="_setNow(\'returnDatetime\')" title="Set to now"><i class="bi bi-clock"></i> Now</button>' +
+        '<div class="input-group input-group-sm"><button class="btn btn-outline-secondary" type="button" onclick="_setNow(\'returnDatetime\')" title="Now"><i class="bi bi-clock"></i> Now</button>' +
         '<input type="datetime-local" class="form-control" id="returnDatetime"' + (retReq ? ' required' : '') + '></div></div>' +
         '<div class="mb-2"><label class="form-label form-label-sm">Return Notes</label>' +
         '<input type="text" class="form-control form-control-sm" id="returnNotes" maxlength="128" placeholder="Optional"></div>' +
-        '<button class="btn btn-warning btn-sm" onclick="submitReturn(' + b.id + ',' + (b.sn_tracking ? 'true' : 'false') + ')"><i class="bi bi-check-circle"></i> Confirm Return</button>';
+        '<div class="d-flex gap-2">' +
+        '<button class="btn btn-warning btn-sm" onclick="submitReturn(' + b.id + ',' + (b.sn_tracking ? 'true' : 'false') + ')"><i class="bi bi-check-circle"></i> Confirm Return</button>' +
+        '<button class="btn btn-sm btn-outline-secondary" onclick="clearActionForm()">Cancel</button>' +
+        '</div>';
     return html;
 }
 
 function submitReturn(batchId, snTracking) {
     var retReq = _lrSettings.return_date_required;
-    var retDt = (document.getElementById('returnDatetime')||{}).value || '';
-    if (retReq && !retDt) { alert('Return Date/Time is required.'); return; }
+    var retDt  = _getVal('returnDatetime');
+    if (!retDt && _adv.returnNow) retDt = '';  /* server uses now */
+    if (retReq && !retDt) { showToast('Return Date/Time is required.', 'danger'); _playSound('error'); return; }
     var payload = {
         batch_id: batchId,
         return_datetime: retDt,
-        return_notes: (document.getElementById('returnNotes')||{}).value || '',
+        return_notes: _getVal('returnNotes') || '',
     };
     if (snTracking) {
         var ids = Array.from(document.querySelectorAll('.sn-return-chk:checked')).map(function(c){ return parseInt(c.value); });
-        if (!ids.length) { alert('Select at least one unit.'); return; }
+        if (!ids.length) { showToast('Select at least one unit.', 'warning'); return; }
         payload.sn_ids = ids;
     } else {
         var rids = Array.from(document.querySelectorAll('.lend-rec-chk:checked')).map(function(c){ return parseInt(c.value); });
-        if (!rids.length) { alert('Select at least one lending record.'); return; }
+        if (!rids.length) { showToast('Select at least one lending record.', 'warning'); return; }
         payload.lend_record_ids = rids;
-        payload.return_qty = 0; // 0 = return full qty of each selected record
+        payload.return_qty = 0;
     }
-    fetch('/in-out/return', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
-    .then(function(r){ return r.json(); }).then(function(d){
+    fetch('/in-out/return', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
         if (d.success) {
-            showToast(d.on_time ? 'Returned on time.' : 'Returned (late).', d.on_time ? 'success' : 'warning');
-            clearActionForm(); refreshLog();
-        } else { alert(d.message || 'Error'); }
+            showToast(d.on_time ? 'Returned on time.' : 'Returned (LATE).', d.on_time ? 'success' : 'warning');
+            _playSound(d.on_time ? 'success' : 'error');
+            clearActionForm();
+            refreshLog();
+        } else {
+            showToast(d.message || 'Error', 'danger');
+            _playSound('error');
+        }
     });
 }
 
-/* ── Edit Batch Form ── */
-var _ebSnState = null;
-
+/* ════════════════════════════════════════════════════════
+   EDIT BATCH FORM
+   ════════════════════════════════════════════════════════ */
 function _ebCalcTotal() {
-    var qty = parseFloat((document.getElementById('eb_qty')||{}).value) || 0;
-    var price = parseFloat((document.getElementById('eb_price')||{}).value) || 0;
-    var el = document.getElementById('eb_total');
+    var qty   = parseFloat((_getValE('eb_qty')) || '0') || 0;
+    var price = parseFloat((_getValE('eb_price')) || '0') || 0;
+    var el    = document.getElementById('eb_total');
     if (el) el.value = (qty * price).toFixed(2);
 }
 function _ebCalcTotalSn() {
-    var qty = _ebSnState ? _ebSnState.filter(function(r){ return !r.is_deleted && !r._del && !r._add; }).length +
-                           _ebSnState.filter(function(r){ return r._add; }).length : 0;
-    var price = parseFloat((document.getElementById('eb_price')||{}).value) || 0;
-    var el = document.getElementById('eb_total');
+    var qty   = _ebSnState ? _ebSnState.filter(function(r){ return !r.is_deleted && !r._del && !r._add; }).length +
+                             _ebSnState.filter(function(r){ return r._add; }).length : 0;
+    var price = parseFloat((_getValE('eb_price')) || '0') || 0;
+    var el    = document.getElementById('eb_total');
     if (el) el.value = (qty * price).toFixed(2);
 }
 
 function buildEditBatchForm(b) {
     if (!_canEditBatch) return '<div class="alert alert-warning">No permission to edit batch.</div>';
-    var cur = _ebCurrency;
+    var cur  = _ebCurrency;
     var isSn = b.sn_tracking;
 
     var row1 = '<div class="row g-2 mb-2">' +
@@ -592,13 +1971,17 @@ function buildEditBatchForm(b) {
         '<div class="input-group input-group-sm"><span class="input-group-text">' + _esc(cur) + '</span>' +
         '<input type="number" step="0.01" class="form-control" id="eb_price" value="' + b.price_per_unit + '" min="0" ' +
         'oninput="' + (isSn ? '_ebCalcTotalSn()' : '_ebCalcTotal()') + '"></div></div>' +
-        '<div class="col-md-4"><label class="form-label form-label-sm">Total Price</label>' +
+        '<div class="col-md-4"><label class="form-label form-label-sm">Total</label>' +
         '<div class="input-group input-group-sm"><span class="input-group-text">' + _esc(cur) + '</span>' +
         '<input type="text" class="form-control" id="eb_total" value="' + totalVal + '" readonly></div></div>' +
         '</div>';
 
     var row3 = '<div class="mb-2"><label class="form-label form-label-sm">Note</label>' +
-        '<input type="text" class="form-control form-control-sm" id="eb_note" value="' + _esc(b.note) + '" maxlength="256"></div>';
+        '<input type="text" class="form-control form-control-sm" id="eb_note" value="' + _esc(b.note) + '" maxlength="256"></div>' +
+        '<div class="mb-2 form-check">' +
+        '<input type="checkbox" class="form-check-input" id="eb_lend_disabled"' + (b.lend_disabled ? ' checked' : '') + '>' +
+        '<label class="form-check-label form-label-sm" for="eb_lend_disabled">Disable this batch from lending</label>' +
+        '</div>';
 
     var snTable = '';
     if (isSn) {
@@ -645,7 +2028,7 @@ function _ebRenderSnTable(batchId) {
                 '<td colspan="3" class="text-muted">' + _esc(r.internal_serial_number||r.isn||'') + '</td>' +
                 '<td><span class="badge bg-danger">Removed</span></td></tr>';
         } else {
-            var chkId = 'eb_sn_chk_' + r.id;
+            var chkId    = 'eb_sn_chk_' + r.id;
             var disabled = r.is_deleted ? ' disabled' : '';
             html += '<tr>' +
                 '<td><input type="checkbox" class="eb-sn-chk" id="' + chkId + '" value="' + r.id + '"' + disabled + '></td>' +
@@ -659,7 +2042,6 @@ function _ebRenderSnTable(batchId) {
                 '</tr>';
         }
     });
-
     html += '</tbody></table></div>';
     return html;
 }
@@ -670,21 +2052,21 @@ function _ebToggleAll(master) {
 
 function _ebOpenEditModal() {
     var checked = Array.from(document.querySelectorAll('.eb-sn-chk:checked:not([disabled])')).map(function(c){ return parseInt(c.value); });
-    if (!checked.length) { alert('Select at least one serial number.'); return; }
+    if (!checked.length) { showToast('Select at least one serial number.', 'warning'); return; }
     document.getElementById('ebEditSnCount').textContent = checked.length;
-    document.getElementById('ebEditSnSn').value = '';
+    document.getElementById('ebEditSnSn').value   = '';
     document.getElementById('ebEditSnInfo').value = '';
     window._ebEditSnIds = checked;
     new bootstrap.Modal(document.getElementById('ebEditSnModal')).show();
 }
 function _ebSaveEditModal() {
-    var snVal  = document.getElementById('ebEditSnSn').value;
+    var snVal   = document.getElementById('ebEditSnSn').value;
     var infoVal = document.getElementById('ebEditSnInfo').value;
-    if (snVal === '' && infoVal === '') { alert('Enter at least one value to update.'); return; }
+    if (snVal === '' && infoVal === '') { showToast('Enter at least one value to update.', 'warning'); return; }
     _ebSnState.forEach(function(r) {
         if ((window._ebEditSnIds||[]).indexOf(r.id) === -1 || r.is_deleted || r._del) return;
-        if (snVal !== '') { r.serial_number = snVal.trim().slice(0,200); r._dirty = true; }
-        if (infoVal !== '') { r.info = infoVal.trim().slice(0,32); r._dirty = true; }
+        if (snVal !== '')   { r.serial_number = snVal.trim().slice(0,200);  r._dirty = true; }
+        if (infoVal !== '') { r.info          = infoVal.trim().slice(0,32); r._dirty = true; }
     });
     bootstrap.Modal.getInstance(document.getElementById('ebEditSnModal')).hide();
     document.getElementById('actionForm').innerHTML = buildEditBatchForm(_selectedBatch);
@@ -693,17 +2075,17 @@ function _ebSaveEditModal() {
 var _ebDeleteSnIds = [];
 function _ebDeleteSelected(batchId) {
     var checked = Array.from(document.querySelectorAll('.eb-sn-chk:checked:not([disabled])')).map(function(c){ return parseInt(c.value); });
-    if (!checked.length) { alert('Select at least one serial number.'); return; }
+    if (!checked.length) { showToast('Select at least one serial number.', 'warning'); return; }
     _ebDeleteSnIds = checked;
     document.getElementById('eb_del_count').textContent = checked.length;
     document.getElementById('eb_del_reason').value = '';
-    document.getElementById('eb_del_notes').value = '';
+    document.getElementById('eb_del_notes').value  = '';
     new bootstrap.Modal(document.getElementById('ebDeleteSnModal')).show();
 }
 function _ebConfirmDelete() {
     var reasonType = document.getElementById('eb_del_reason').value;
-    if (!reasonType) { alert('Please select a reason for removal.'); return; }
-    var notes = document.getElementById('eb_del_notes').value.trim();
+    if (!reasonType) { showToast('Please select a reason for removal.', 'warning'); return; }
+    var notes  = document.getElementById('eb_del_notes').value.trim();
     var reason = reasonType === 'Other'
         ? ('Other: ' + notes).slice(0, 256)
         : (notes ? reasonType + ' — ' + notes : reasonType).slice(0, 256);
@@ -726,25 +2108,25 @@ function _ebConfirmPurge() {
     if (!_ebPurgeBatchId) return;
     var btn = document.getElementById('ebPurgeSnConfirmBtn');
     btn.disabled = true;
-    fetch('/in-out/batch/' + _ebPurgeBatchId + '/purge-deleted-sn', { method: 'POST',
-        headers: {'X-CSRFToken': document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : ''} })
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-            bootstrap.Modal.getInstance(document.getElementById('ebPurgeSnModal')).hide();
-            btn.disabled = false;
-            if (d.success) {
-                sessionStorage.setItem('inout_mode', _mode === 'return' ? '1' : '0');
-                sessionStorage.setItem('inout_edit_batch', '1');
-                window.location.reload();
-            } else {
-                alert(d.message || 'Error purging serial numbers.');
-            }
-        })
-        .catch(function(e) { btn.disabled = false; alert('Error: ' + e); });
+    var csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+    fetch('/in-out/batch/' + _ebPurgeBatchId + '/purge-deleted-sn', { method: 'POST', headers: {'X-CSRFToken': csrf} })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        bootstrap.Modal.getInstance(document.getElementById('ebPurgeSnModal')).hide();
+        btn.disabled = false;
+        if (d.success) {
+            sessionStorage.setItem('inout_mode', _mode === 'return' ? '1' : '0');
+            sessionStorage.setItem('inout_edit_batch', '1');
+            window.location.reload();
+        } else {
+            showToast(d.message || 'Error purging serial numbers.', 'danger');
+        }
+    })
+    .catch(function(e) { btn.disabled = false; showToast('Error: ' + e, 'danger'); });
 }
 
 function _ebAddSn(batchId) {
-    var qty = parseInt((document.getElementById('eb_add_qty')||{}).value) || 1;
+    var qty = parseInt((_getValE('eb_add_qty')) || '1') || 1;
     if (qty < 1) return;
     if (!_ebSnState) _ebSnState = [];
     for (var i = 0; i < qty; i++) {
@@ -757,16 +2139,17 @@ function _ebAddSn(batchId) {
 
 function submitEditBatch(batchId, snTracking) {
     var payload = {
-        batch_label: (document.getElementById('eb_label')||{}).value || '',
-        manufacturer: (document.getElementById('eb_manuf')||{}).value || '',
-        price_per_unit: parseFloat((document.getElementById('eb_price')||{}).value) || 0,
-        purchase_date: (document.getElementById('eb_date')||{}).value || '',
-        note: (document.getElementById('eb_note')||{}).value || '',
+        batch_label:   _getValE('eb_label')  || '',
+        manufacturer:  _getValE('eb_manuf')  || '',
+        price_per_unit: parseFloat(_getValE('eb_price')) || 0,
+        purchase_date: _getValE('eb_date')   || '',
+        note:          _getValE('eb_note')   || '',
+        lend_disabled: !!(document.getElementById('eb_lend_disabled') && document.getElementById('eb_lend_disabled').checked),
     };
-    if (!snTracking) payload.quantity = parseInt((document.getElementById('eb_qty')||{}).value) || 0;
+    if (!snTracking) payload.quantity = parseInt(_getValE('eb_qty')) || 0;
 
     var batchSave = fetch('/in-out/batch/' + batchId + '/edit', {
-        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
     }).then(function(r){ return r.json(); });
 
     var snSave = Promise.resolve({success: true});
@@ -776,7 +2159,7 @@ function submitEditBatch(batchId, snTracking) {
         var edits   = _ebSnState.filter(function(r){ return r._dirty && !r._del && !r._add && r.id > 0; }).map(function(r){ return {sn_id: r.id, sn: r.serial_number, info: r.info}; });
         if (adds > 0 || deletes.length > 0 || edits.length > 0) {
             snSave = fetch('/item/' + _selectedBatch.item_uuid + '/batch/' + batchId + '/sn/save-pending', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
+                method: 'POST', headers: {'Content-Type':'application/json'},
                 body: JSON.stringify({adds: adds, deletes: deletes, edits: edits, lend_changes: []})
             }).then(function(r){ return r.json(); });
         }
@@ -784,26 +2167,36 @@ function submitEditBatch(batchId, snTracking) {
 
     Promise.all([batchSave, snSave]).then(function(results) {
         var d1 = results[0], d2 = results[1];
-        if (d1.success && d2.success) { showToast('Batch updated.', 'success'); refreshLog(); }
-        else { alert((d1.success ? '' : (d1.message || 'Batch save error. ')) + (d2.success ? '' : (d2.message || 'SN save error.'))); }
+        if (d1.success && d2.success) {
+            showToast('Batch updated.', 'success');
+            refreshLog();
+        } else {
+            showToast((d1.success ? '' : (d1.message || 'Batch save error. ')) + (d2.success ? '' : (d2.message || 'SN save error.')), 'danger');
+        }
     });
 }
 
 function submitDeleteBatch(batchId, label) {
     if (!confirm('Delete batch "' + label + '"? This cannot be undone.')) return;
     fetch('/in-out/batch/' + batchId + '/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
-    .then(function(r){ return r.json(); }).then(function(d){
+    .then(function(r){ return r.json(); })
+    .then(function(d){
         if (d.success) {
             showToast(d.message || 'Batch deleted.', 'success');
             clearActionForm();
             document.getElementById('searchResults').innerHTML = '';
             document.getElementById('inOutSearch').value = '';
+            _lastSearchData = null;
             refreshLog();
-        } else { alert(d.message || 'Error'); }
+        } else {
+            showToast(d.message || 'Error', 'danger');
+        }
     });
 }
 
-/* ── Camera Scan ── */
+/* ════════════════════════════════════════════════════════
+   CAMERA SCAN
+   ════════════════════════════════════════════════════════ */
 var _camStream = null;
 var _camAnimFrame = null;
 var _scanPaused = false;
@@ -811,23 +2204,19 @@ var _scanPaused = false;
 function _initCameraState() { /* camera starts stopped */ }
 
 function toggleCamera() {
-    if (_camStream) {
-        _stopCamera();
-    } else {
-        _startCamera();
-    }
+    if (_camStream) { _stopCamera(); } else { _startCamera(); }
 }
 
 function _startCamera() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        document.getElementById('scanMsg').textContent = 'Enable Camera to use Scan QR/Barcode';
+        document.getElementById('scanMsg').textContent = 'Camera not available in this browser.';
         return;
     }
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
     .then(function(stream) {
         _camStream = stream;
         var video = document.getElementById('scanVideo');
-        var ph = document.getElementById('scanPlaceholder');
+        var ph    = document.getElementById('scanPlaceholder');
         if (video) { video.srcObject = stream; video.style.display = ''; }
         if (ph) ph.style.display = 'none';
         var aim = document.getElementById('aimOverlay'); if (aim) aim.style.display = '';
@@ -838,18 +2227,15 @@ function _startCamera() {
     })
     .catch(function() {
         var msg = document.getElementById('scanMsg');
-        if (msg) msg.textContent = 'Enable Camera to use Scan QR/Barcode';
+        if (msg) msg.textContent = 'Camera access denied or unavailable.';
     });
 }
 
 function _stopCamera() {
-    if (_camStream) {
-        _camStream.getTracks().forEach(function(t){ t.stop(); });
-        _camStream = null;
-    }
+    if (_camStream) { _camStream.getTracks().forEach(function(t){ t.stop(); }); _camStream = null; }
     if (_camAnimFrame) { cancelAnimationFrame(_camAnimFrame); _camAnimFrame = null; }
     var video = document.getElementById('scanVideo');
-    var ph = document.getElementById('scanPlaceholder');
+    var ph    = document.getElementById('scanPlaceholder');
     if (video) { video.srcObject = null; video.style.display = 'none'; }
     if (ph) ph.style.display = '';
     var aim = document.getElementById('aimOverlay'); if (aim) aim.style.display = 'none';
@@ -863,6 +2249,7 @@ function clearSearch() {
     if (el) { el.value = ''; debounceSearch(''); }
     clearActionForm();
     document.getElementById('searchResults').innerHTML = '';
+    _lastSearchData = null;
 }
 
 function redoScan() {
@@ -893,105 +2280,625 @@ function _scanLoop() {
     _camAnimFrame = requestAnimationFrame(_scanLoop);
 }
 
-/* ── Utilities ── */
+/* ════════════════════════════════════════════════════════
+   UTILITIES
+   ════════════════════════════════════════════════════════ */
+function _esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function _escJsonAttr(obj) {
+    return "'" + JSON.stringify(obj).replace(/'/g,"\\'").replace(/\//g,'\\/') + "'";
+}
+function _getVal(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+function _getValE(id) { return _getVal(id); }
+function _setVal(id, v) { var el = document.getElementById(id); if (el) el.value = v; }
+function _getChk(id) { var el = document.getElementById(id); return el ? el.checked : false; }
+function _setChk(id, v) { var el = document.getElementById(id); if (el) el.checked = !!v; }
+
 function showToast(msg, type) {
     var t = document.createElement('div');
     t.className = 'position-fixed bottom-0 end-0 p-3';
     t.style.zIndex = 9999;
-    t.innerHTML = '<div class="toast show align-items-center text-white bg-' +
-        (type==='success' ? 'success' : type==='warning' ? 'warning' : 'danger') + ' border-0">' +
-        '<div class="d-flex"><div class="toast-body">' + msg + '</div>' +
-        '<button type="button" class="btn-close btn-close-white me-2 m-auto" onclick="this.closest(\'.position-fixed\').remove()"></button>' +
+    var bg = type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'danger';
+    var textClass = (type === 'warning') ? 'text-dark' : 'text-white';
+    t.innerHTML = '<div class="toast show align-items-center ' + textClass + ' bg-' + bg + ' border-0">' +
+        '<div class="d-flex"><div class="toast-body">' + _esc(msg) + '</div>' +
+        '<button type="button" class="btn-close ' + (type === 'warning' ? '' : 'btn-close-white') + ' me-2 m-auto" onclick="this.closest(\'.position-fixed\').remove()"></button>' +
         '</div></div>';
     document.body.appendChild(t);
-    setTimeout(function(){ t.remove(); }, 4000);
+    setTimeout(function(){ if (t.parentNode) t.remove(); }, 5000);
 }
 
 function refreshLog() {
-    sessionStorage.setItem('inout_mode', _mode);
-    sessionStorage.setItem('inout_edit_batch', _editBatch ? '1' : '0');
-    setTimeout(function(){ window.location.reload(); }, 800);
+    _logPage = 1;
+    loadLog();
+    if (_canLend) { searchSessions(); }
+}
+
+/* ════════════════════════════════════════════════════════
+   LENDING SESSIONS PANEL
+   ════════════════════════════════════════════════════════ */
+function _sessInitDefaults() {
+    var now    = new Date();
+    var past   = new Date(now.getTime() - 7 * 86400000);
+    var future = new Date(now.getTime() + 7 * 86400000);
+    var fmt = function(d) {
+        return d.getFullYear() + '-' +
+               String(d.getMonth() + 1).padStart(2, '0') + '-' +
+               String(d.getDate()).padStart(2, '0');
+    };
+    _setVal('sessFilterStart', fmt(past));
+    _setVal('sessFilterEnd',   fmt(future));
+    /* Default contact to current user for non-self-only users */
+    if (!_canOnlySelf) {
+        _setVal('sessFilterContactId',    String(_currentUserId));
+        _setVal('sessFilterContactType',  'user');
+        _setVal('sessFilterContactInput', _currentUserLabel);
+    }
+}
+
+function searchSessions() {
+    _sessPage = 1;
+    clearTimeout(_sessSearchTimer);
+    _sessSearchTimer = setTimeout(_doSearchSessions, 300);
+}
+
+function _doSearchSessions() {
+    var start = _getVal('sessFilterStart');
+    var end   = _getVal('sessFilterEnd');
+    var cid   = _getVal('sessFilterContactId');
+    var ctype = _getVal('sessFilterContactType');
+    var url   = '/in-out/sessions?page=' + _sessPage +
+                '&start_date=' + encodeURIComponent(start) +
+                '&end_date='   + encodeURIComponent(end);
+    if (cid && ctype) url += '&contact_id=' + encodeURIComponent(cid) +
+                              '&contact_type=' + encodeURIComponent(ctype);
+    var el = document.getElementById('sessResults');
+    if (!el) return;
+    el.innerHTML = '<div class="text-muted small text-center py-2"><i class="bi bi-hourglass-split"></i> Loading…</div>';
+    fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        _sessTotalPages = d.total_pages || 1;
+        _sessPage       = d.page       || 1;
+        _renderSessions(d.sessions || []);
+        _renderSessPagination();
+    })
+    .catch(function() {
+        if (el) el.innerHTML = '<div class="text-danger small p-1">Failed to load sessions.</div>';
+    });
+}
+
+function _goSessPage(p) {
+    _sessPage = p;
+    _doSearchSessions();
+}
+
+function _renderSessPagination() {
+    var wrap = document.getElementById('sessPaginationWrap');
+    if (!wrap) return;
+    if (_sessTotalPages <= 1) { wrap.style.display = 'none'; return; }
+    wrap.style.display = '';
+    var html = '<button class="btn btn-sm btn-outline-secondary py-0 px-2" ' +
+        (_sessPage <= 1 ? 'disabled' : 'onclick="_goSessPage(' + (_sessPage - 1) + ')"') +
+        '><i class="bi bi-chevron-left"></i></button>';
+    html += '<span class="px-2 text-muted">' + _sessPage + ' / ' + _sessTotalPages + '</span>';
+    html += '<button class="btn btn-sm btn-outline-secondary py-0 px-2" ' +
+        (_sessPage >= _sessTotalPages ? 'disabled' : 'onclick="_goSessPage(' + (_sessPage + 1) + ')"') +
+        '><i class="bi bi-chevron-right"></i></button>';
+    wrap.innerHTML = html;
+}
+
+function _renderSessions(sessions) {
+    var el = document.getElementById('sessResults');
+    if (!el) return;
+    if (!sessions.length) {
+        el.innerHTML = '<div class="text-muted small text-center py-2">No sessions found.</div>';
+        return;
+    }
+    var html = '';
+    sessions.forEach(function(s) {
+        var dateRange = '';
+        if (s.lend_start) dateRange += s.lend_start;
+        if (s.lend_start && s.lend_end) dateRange += ' – ';
+        if (s.lend_end)   dateRange += s.lend_end;
+        html += '<div class="d-flex align-items-center gap-1 border-bottom py-1 px-1" style="min-width:0;">' +
+            '<button class="btn btn-link btn-sm p-0 flex-shrink-0" title="Details"' +
+            ' onclick="showSessionDetailModal(\'' + _esc(s.lending_id) + '\')">' +
+            '<i class="bi bi-info-circle text-primary"></i></button>' +
+            '<code class="flex-shrink-0 text-muted" style="font-size:0.72rem;">' + _esc(s.lending_id) + '</code>' +
+            '<div class="flex-grow-1 text-truncate small" style="min-width:0;">' +
+            (s.lend_to_label ? '<span class="fw-semibold">' + _esc(s.lend_to_label) + '</span>' : '') +
+            (dateRange ? ' <span class="text-muted">' + _esc(dateRange) + '</span>' : '') +
+            '</div>' +
+            '<span class="badge bg-secondary flex-shrink-0" style="font-size:0.65rem;">' + (s.item_count || 0) + ' item(s)</span>' +
+            '</div>';
+    });
+    el.innerHTML = html;
+}
+
+function showSessionDetailModal(lendingId) {
+    _sdmSession = null;
+    document.getElementById('sdmTitle').textContent = lendingId;
+    document.getElementById('sdmBody').innerHTML =
+        '<div class="text-muted text-center py-3"><i class="bi bi-hourglass-split"></i> Loading…</div>';
+    document.getElementById('sdmReturnBtn').style.display = 'none';
+    new bootstrap.Modal(document.getElementById('sessDetailModal')).show();
+    fetch('/in-out/session/' + encodeURIComponent(lendingId))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        _sdmSession = d;
+        _sessionCache[d.lending_id] = d;
+        _renderSessionDetailModal(d);
+    })
+    .catch(function() {
+        document.getElementById('sdmBody').innerHTML =
+            '<div class="text-danger p-2">Failed to load session details.</div>';
+    });
+}
+
+function _renderSessionDetailModal(s) {
+    var isReturn  = (s.mode === 'return');
+    var returnable = (s.items || []).filter(function(i) { return i.returnable; });
+    var html = '';
+
+    if (isReturn) {
+        /* ── Return session detail ── */
+        html += '<div class="alert alert-secondary py-2 mb-3 small">' +
+            '<i class="bi bi-box-arrow-in-left me-1"></i>' +
+            'Returned on <strong>' + _esc(s.created_at || '') + '</strong>' +
+            ' by <strong>' + _esc(s.created_by_label || '') + '</strong>' +
+            (s.notes ? ' — <em>' + _esc(s.notes) + '</em>' : '') +
+            '</div>';
+
+        var normals = (s.items || []).filter(function(i){ return i.type === 'lend_record'; });
+        var sns     = (s.items || []).filter(function(i){ return i.type === 'sn'; });
+
+        if (normals.length) {
+            html += '<div class="fw-semibold small mb-1"><i class="bi bi-box-seam me-1"></i>Standard Items</div>' +
+                '<div class="table-responsive mb-3"><table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">' +
+                '<thead class="table-light"><tr><th style="width:80px">Status</th><th>Item (Batch)</th><th style="width:46px">Qty</th><th>Contact</th><th>Note</th></tr></thead><tbody>';
+            normals.forEach(function(it) {
+                var badge = it.on_time === false
+                    ? '<span class="badge bg-warning text-dark">Late</span>'
+                    : '<span class="badge bg-success">On time</span>';
+                html += '<tr>' +
+                    '<td>' + badge + '</td>' +
+                    '<td>' + _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span></td>' +
+                    '<td class="text-center">' + (it.qty || 1) + '&times;</td>' +
+                    '<td>' + _esc(it.lend_display || '—') + '</td>' +
+                    '<td class="text-muted fst-italic">' + _esc(it.lend_note || '') + '</td>' +
+                    '</tr>';
+            });
+            html += '</tbody></table></div>';
+        }
+
+        if (sns.length) {
+            html += '<div class="fw-semibold small mb-1"><i class="bi bi-fingerprint me-1"></i>Serial-Tracked Items</div>' +
+                '<div class="table-responsive mb-3"><table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">' +
+                '<thead class="table-light"><tr><th style="width:80px">Status</th><th>Item (Batch)</th><th>ISN</th><th>Contact</th><th>Note</th></tr></thead><tbody>';
+            sns.forEach(function(it) {
+                var badge = it.on_time === false
+                    ? '<span class="badge bg-warning text-dark">Late</span>'
+                    : '<span class="badge bg-success">On time</span>';
+                html += '<tr>' +
+                    '<td>' + badge + '</td>' +
+                    '<td>' + _esc(it.item_name) + ' <span class="text-muted">(' + _esc(it.batch_label) + ')</span></td>' +
+                    '<td><code style="font-size:0.75rem;">' + _esc(it.isn || '') + '</code></td>' +
+                    '<td>' + _esc(it.lend_display || '—') + '</td>' +
+                    '<td class="text-muted fst-italic">' + _esc(it.lend_note || '') + '</td>' +
+                    '</tr>';
+            });
+            html += '</tbody></table></div>';
+        }
+
+        if (!normals.length && !sns.length) {
+            html += '<div class="text-muted small">No items recorded in this return session.</div>';
+        }
+
+    } else {
+        /* ── Lend session detail ── */
+        html += '<div class="row g-2 mb-3 small">';
+        if (s.lend_to_label) html += '<div class="col-auto"><i class="bi bi-person me-1"></i><strong>' + _esc(s.lend_to_label) + '</strong></div>';
+        if (s.lend_start)    html += '<div class="col-auto text-muted"><i class="bi bi-calendar-check me-1"></i>' + _esc(s.lend_start.slice(0, 10)) + '</div>';
+        if (s.lend_end)      html += '<div class="col-auto text-muted"><i class="bi bi-calendar-x me-1"></i>' + _esc(s.lend_end.slice(0, 10)) + '</div>';
+        html += '</div>';
+        if (s.notes) {
+            html += '<div class="alert alert-secondary py-1 mb-3 small fst-italic">' + _esc(s.notes) + '</div>';
+        }
+        if (s.items && s.items.length) {
+            html += '<div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:0.83rem;">' +
+                '<thead class="table-light"><tr><th>Item</th><th>Batch</th><th>ISN / Qty</th><th>Note</th><th>Status</th></tr></thead><tbody>';
+            s.items.forEach(function(it) {
+                var snCell = (it.type === 'sn')
+                    ? '<code style="font-size:0.75rem;">' + _esc(it.isn || '') + '</code>'
+                    : '&times;' + (it.qty || 1);
+                var statusBadge = it.returnable
+                    ? '<span class="badge bg-warning text-dark">Out</span>'
+                    : '<span class="badge bg-secondary">Returned</span>';
+                html += '<tr>' +
+                    '<td>' + _esc(it.item_name || '') + '</td>' +
+                    '<td class="text-muted">' + _esc(it.batch_label || '') + '</td>' +
+                    '<td>' + snCell + '</td>' +
+                    '<td class="text-muted fst-italic">' + _esc(it.lend_note || '') + '</td>' +
+                    '<td>' + statusBadge + '</td>' +
+                    '</tr>';
+            });
+            html += '</tbody></table></div>';
+        } else {
+            html += '<div class="text-muted small">No items recorded in this session.</div>';
+        }
+    }
+
+    document.getElementById('sdmBody').innerHTML = html;
+    if (!isReturn && _mode === 'return' && returnable.length > 0) {
+        document.getElementById('sdmReturnBtn').style.display = '';
+    }
+}
+
+function sdmAddToReturnCart() {
+    if (!_sdmSession) return;
+    addSessionToCart(_sdmSession.lending_id);
+    var m = bootstrap.Modal.getInstance(document.getElementById('sessDetailModal'));
+    if (m) m.hide();
+    showToast('Session items added to return cart.', 'success');
+}
+
+/* ── Sessions contact filter ── */
+function debounceSessContact() {
+    clearTimeout(_sessContactTimer);
+    _sessContactTimer = setTimeout(_doSessContactSearch, 300);
+}
+
+function _doSessContactSearch() {
+    var q    = _getVal('sessFilterContactInput');
+    var drop = document.getElementById('sessFilterContactDrop');
+    if (!drop) return;
+    if (!q) {
+        _setVal('sessFilterContactId', '');
+        _setVal('sessFilterContactType', '');
+        drop.style.display = 'none';
+        searchSessions();
+        return;
+    }
+    drop.style.display = '';
+    drop.innerHTML = '<div class="text-muted p-1 small">Loading…</div>';
+    fetch('/api/contacts/all?q=' + encodeURIComponent(q))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.length) { drop.innerHTML = '<div class="text-muted p-1 small">No contacts found.</div>'; return; }
+        drop.innerHTML = data.map(function(c) {
+            var rawL = (c.label || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            return '<div class="d-flex align-items-center gap-2 p-1 border-bottom" style="cursor:pointer;"' +
+                ' onclick="selectSessContact(\'' + c.type + '\',' + c.id + ',\'' + rawL + '\')">' +
+                '<span class="small flex-grow-1">' + _esc(c.label || '') + '</span>' +
+                '<span class="badge bg-secondary" style="font-size:0.65rem;">' + c.type + '</span></div>';
+        }).join('');
+    })
+    .catch(function() { if (drop) drop.innerHTML = '<div class="text-danger p-1 small">Error</div>'; });
+}
+
+function selectSessContact(type, id, label) {
+    _setVal('sessFilterContactId',   id);
+    _setVal('sessFilterContactType', type);
+    _setVal('sessFilterContactInput', label);
+    var drop = document.getElementById('sessFilterContactDrop');
+    if (drop) drop.style.display = 'none';
+    searchSessions();
+}
+
+/* ── Advanced Options contact ── */
+function toggleAdvContactSearch() {
+    var panel = document.getElementById('advContactPanel');
+    if (!panel) return;
+    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    var inp = document.getElementById('advContactInput');
+    if (inp) { inp.value = ''; inp.focus(); }
+    doAdvContactSearch();
+}
+
+function doAdvContactSearch() {
+    clearTimeout(_advContactTimer);
+    _advContactTimer = setTimeout(function() {
+        var q  = _getVal('advContactInput');
+        var el = document.getElementById('advContactResults');
+        if (!el) return;
+        el.innerHTML = '<div class="text-muted small p-1">Loading…</div>';
+        fetch('/api/contacts/all?q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.length) { el.innerHTML = '<div class="text-muted small p-1">No contacts found.</div>'; return; }
+            var icons  = { user: 'bi-person-circle', person: 'bi-person', organization: 'bi-building', group: 'bi-people' };
+            var badges = { user: 'bg-primary', person: 'bg-secondary', organization: 'bg-success', group: 'bg-info' };
+            el.innerHTML = data.map(function(c) {
+                var rawL = (c.label || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                return '<div class="d-flex align-items-center gap-2 p-1 border-bottom" style="cursor:pointer;"' +
+                    ' onclick="selectAdvContact(\'' + c.type + '\',' + c.id + ',\'' + rawL + '\')">' +
+                    '<i class="bi ' + (icons[c.type] || 'bi-person') + ' text-muted small"></i>' +
+                    '<span class="small flex-grow-1">' + _esc(c.label || '') + '</span>' +
+                    '<span class="badge ' + (badges[c.type] || 'bg-secondary') + '" style="font-size:0.65rem;">' + c.type + '</span>' +
+                    '</div>';
+            }).join('');
+        })
+        .catch(function() { if (el) el.innerHTML = '<div class="text-danger small p-1">Search failed.</div>'; });
+    }, 300);
+}
+
+function selectAdvContact(type, id, label) {
+    _adv.contactId    = String(id);
+    _adv.contactType  = type;
+    _adv.contactLabel = label;
+    _setVal('advContactId',   id);
+    _setVal('advContactType', type);
+    var lbl = document.getElementById('advContactLabel');
+    var clr = document.getElementById('advContactClear');
+    if (lbl) { lbl.textContent = label; lbl.className = 'small'; }
+    if (clr)   clr.style.display = '';
+    var panel = document.getElementById('advContactPanel');
+    if (panel) panel.style.display = 'none';
+    saveAdvOpts();
+}
+
+function clearAdvContact() {
+    _adv.contactId = _adv.contactType = _adv.contactLabel = '';
+    _setVal('advContactId',   '');
+    _setVal('advContactType', '');
+    var lbl = document.getElementById('advContactLabel');
+    var clr = document.getElementById('advContactClear');
+    if (lbl) { lbl.textContent = 'Click to select default contact…'; lbl.className = 'small text-muted'; }
+    if (clr)   clr.style.display = 'none';
+    saveAdvOpts();
+}
+
+/* ════════════════════════════════════════════════════════
+   LENDING & RETURN LOG PANEL
+   ════════════════════════════════════════════════════════ */
+function _logInitDefaults() {
+    /* Default log date range: past 7 days to today */
+    var now  = new Date();
+    var past = new Date(now.getTime() - 7 * 86400000);
+    var fmt  = function(d) {
+        return d.getFullYear() + '-' +
+               String(d.getMonth() + 1).padStart(2, '0') + '-' +
+               String(d.getDate()).padStart(2, '0');
+    };
+    _setVal('logFilterStart', fmt(past));
+    _setVal('logFilterEnd',   fmt(now));
+    /* Default contact to current user */
+    if (!_canOnlySelf) {
+        _logContactId   = String(_currentUserId);
+        _logContactType = 'user';
+        _setVal('logFilterContactId',    String(_currentUserId));
+        _setVal('logFilterContactType',  'user');
+        _setVal('logFilterContactInput', _currentUserLabel);
+    }
+}
+
+function loadLog() {
+    _logPage = 1;
+    _doLoadLog();
+}
+
+function _goLogPage(p) {
+    _logPage = p;
+    _doLoadLog();
+}
+
+function _renderLogPagination() {
+    var wrap = document.getElementById('logPaginationWrap');
+    if (!wrap) return;
+    if (_logTotalPages <= 1) { wrap.innerHTML = ''; return; }
+    var html = '<button class="btn btn-sm btn-outline-secondary py-0 px-2" ' +
+        (_logPage <= 1 ? 'disabled' : 'onclick="_goLogPage(' + (_logPage - 1) + ')"') +
+        '><i class="bi bi-chevron-left"></i></button>';
+    html += '<span class="px-2 text-muted">' + _logPage + ' / ' + _logTotalPages + '</span>';
+    html += '<button class="btn btn-sm btn-outline-secondary py-0 px-2" ' +
+        (_logPage >= _logTotalPages ? 'disabled' : 'onclick="_goLogPage(' + (_logPage + 1) + ')"') +
+        '><i class="bi bi-chevron-right"></i></button>';
+    wrap.innerHTML = html;
+}
+
+function _doLoadLog() {
+    var start = _getVal('logFilterStart');
+    var end   = _getVal('logFilterEnd');
+    var cid   = _getVal('logFilterContactId') || _logContactId;
+    var ctype = _getVal('logFilterContactType') || _logContactType;
+    var url   = '/in-out/logs?page=' + _logPage +
+                '&start_date=' + encodeURIComponent(start) +
+                '&end_date='   + encodeURIComponent(end);
+    if (cid && ctype) url += '&contact_id=' + encodeURIComponent(cid) +
+                              '&contact_type=' + encodeURIComponent(ctype);
+
+    var el = document.getElementById('logResults');
+    if (!el) return;
+    el.innerHTML = '<div class="text-muted small text-center py-2"><i class="bi bi-hourglass-split"></i> Loading…</div>';
+
+    fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        _logTotalPages = d.total_pages || 1;
+        _logPage       = d.page       || _logPage;
+        var entries = d.entries || [];
+        el.innerHTML = '';
+        if (!entries.length) {
+            el.innerHTML = '<div class="text-muted small text-center py-2">No log entries found.</div>';
+        } else {
+            var frag = '';
+            var actionBadge = function(action) {
+                if (action === 'return') return '<span class="badge bg-success">Return</span>';
+                if (action === 'lend' || action === 'lend_update') return '<span class="badge bg-primary">Lend</span>';
+                if (action === 'delete' || action === 'batch_sn_purge') return '<span class="badge bg-danger">Delete</span>';
+                if (action === 'update') return '<span class="badge bg-secondary">Edit</span>';
+                if (action === 'sn_batch_save') return '<span class="badge bg-info text-dark">SN Edit</span>';
+                return '<span class="badge bg-secondary">' + _esc(action) + '</span>';
+            };
+            entries.forEach(function(e) {
+                frag += '<div class="border-bottom pb-2 mb-2 small">' +
+                    actionBadge(e.action) +
+                    '<span class="ms-1 fw-semibold">' + _esc(e.username) + '</span>' +
+                    '<span class="text-muted ms-1">' + _esc(e.timestamp) + '</span>' +
+                    (e.display ? '<div class="text-muted mt-1" style="font-size:0.78rem;word-break:break-word;">' + _esc(e.display) + '</div>' : '') +
+                    '</div>';
+            });
+            el.innerHTML = frag;
+        }
+        _renderLogPagination();
+    })
+    .catch(function() {
+        if (el) el.innerHTML = '<div class="text-danger small p-1">Failed to load log.</div>';
+    });
+}
+
+/* Log contact filter */
+function debounceLogContact() {
+    clearTimeout(_logContactTimer);
+    _logContactTimer = setTimeout(_doLogContactSearch, 300);
+}
+
+function _doLogContactSearch() {
+    var q    = _getVal('logFilterContactInput');
+    var drop = document.getElementById('logFilterContactDrop');
+    if (!drop) return;
+    if (!q) {
+        _logContactId   = '';
+        _logContactType = '';
+        _setVal('logFilterContactId',   '');
+        _setVal('logFilterContactType', '');
+        drop.style.display = 'none';
+        loadLog();
+        return;
+    }
+    drop.style.display = '';
+    drop.innerHTML = '<div class="text-muted p-1 small">Loading…</div>';
+    fetch('/api/contacts/all?q=' + encodeURIComponent(q))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.length) { drop.innerHTML = '<div class="text-muted p-1 small">No contacts found.</div>'; return; }
+        drop.innerHTML = data.map(function(c) {
+            var rawL = (c.label || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            return '<div class="d-flex align-items-center gap-2 p-1 border-bottom" style="cursor:pointer;"' +
+                ' onclick="selectLogContact(\'' + c.type + '\',' + c.id + ',\'' + rawL + '\')">' +
+                '<span class="small flex-grow-1">' + _esc(c.label || '') + '</span>' +
+                '<span class="badge bg-secondary" style="font-size:0.65rem;">' + c.type + '</span></div>';
+        }).join('');
+    })
+    .catch(function() { if (drop) drop.innerHTML = '<div class="text-danger p-1 small">Error</div>'; });
+}
+
+function selectLogContact(type, id, label) {
+    _logContactId   = String(id);
+    _logContactType = type;
+    _setVal('logFilterContactId',    id);
+    _setVal('logFilterContactType',  type);
+    _setVal('logFilterContactInput', label);
+    var drop = document.getElementById('logFilterContactDrop');
+    if (drop) drop.style.display = 'none';
+    loadLog();
 }
 </script>
 
 <!-- SN Edit modal -->
 <div class="modal fade" id="ebEditSnModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Edit Serial Numbers</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p class="mb-3">Editing <strong><span id="ebEditSnCount">0</span></strong> selected unit(s). Leave a field blank to keep current value.</p>
-                <div class="mb-2">
-                    <label class="form-label">Serial Number <small class="text-muted">(max 200)</small></label>
-                    <input type="text" class="form-control" id="ebEditSnSn" maxlength="200" placeholder="Leave blank to keep current">
-                </div>
-                <div class="mb-2">
-                    <label class="form-label">Info <small class="text-muted">(max 32)</small></label>
-                    <input type="text" class="form-control" id="ebEditSnInfo" maxlength="32" placeholder="Leave blank to keep current">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="_ebSaveEditModal()"><i class="bi bi-save"></i> Apply</button>
-            </div>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Edit Serial Numbers</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3">Editing <strong><span id="ebEditSnCount">0</span></strong> selected unit(s). Leave a field blank to keep current value.</p>
+        <div class="mb-2">
+          <label class="form-label">Serial Number <small class="text-muted">(max 200)</small></label>
+          <input type="text" class="form-control" id="ebEditSnSn" maxlength="200" placeholder="Leave blank to keep current">
         </div>
+        <div class="mb-2">
+          <label class="form-label">Info <small class="text-muted">(max 32)</small></label>
+          <input type="text" class="form-control" id="ebEditSnInfo" maxlength="32" placeholder="Leave blank to keep current">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="_ebSaveEditModal()"><i class="bi bi-save"></i> Apply</button>
+      </div>
     </div>
+  </div>
 </div>
 
 <!-- SN Delete modal -->
 <div class="modal fade" id="ebDeleteSnModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title"><i class="bi bi-trash"></i> Remove Serial Numbers</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p class="mb-2">Removing <strong><span id="eb_del_count">0</span></strong> selected unit(s). Removed entries are kept for audit record.</p>
-                <div class="mb-2">
-                    <label class="form-label fw-semibold">Reason for removal <span class="text-danger">*</span></label>
-                    <select class="form-select mb-2" id="eb_del_reason" required>
-                        <option value="">— Select reason —</option>
-                        <option value="Damage">Damage</option>
-                        <option value="Missing By Lender">Missing By Lender</option>
-                        <option value="Missing on Own">Missing on Own</option>
-                        <option value="Sold">Sold</option>
-                        <option value="Incorrect Item">Incorrect Item</option>
-                        <option value="Other">Other</option>
-                    </select>
-                    <label class="form-label form-label-sm">Additional notes (optional)</label>
-                    <textarea class="form-control" id="eb_del_notes" rows="2" maxlength="200" placeholder="Optional notes..."></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" onclick="_ebConfirmDelete()"><i class="bi bi-trash"></i> Confirm Remove</button>
-            </div>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title"><i class="bi bi-trash"></i> Remove Serial Numbers</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">Removing <strong><span id="eb_del_count">0</span></strong> selected unit(s). Removed entries are kept for audit record.</p>
+        <div class="mb-2">
+          <label class="form-label fw-semibold">Reason for removal <span class="text-danger">*</span></label>
+          <select class="form-select mb-2" id="eb_del_reason" required>
+            <option value="">— Select reason —</option>
+            <option value="Damage">Damage</option>
+            <option value="Missing By Lender">Missing By Lender</option>
+            <option value="Missing on Own">Missing on Own</option>
+            <option value="Sold">Sold</option>
+            <option value="Incorrect Item">Incorrect Item</option>
+            <option value="Other">Other</option>
+          </select>
+          <label class="form-label form-label-sm">Additional notes (optional)</label>
+          <textarea class="form-control" id="eb_del_notes" rows="2" maxlength="200" placeholder="Optional notes..."></textarea>
         </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" onclick="_ebConfirmDelete()"><i class="bi bi-trash"></i> Confirm Remove</button>
+      </div>
     </div>
+  </div>
 </div>
 
 <!-- Purge Deleted SN Modal -->
 <div class="modal fade" id="ebPurgeSnModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-warning">
-                <h5 class="modal-title"><i class="bi bi-eraser"></i> Clear Deleted Serial Numbers</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Are you sure want to continue for free up the batch?</p>
-                <p class="text-danger"><strong>This action can't be undo.</strong></p>
-                <p class="text-muted small mb-0">All soft-deleted serial number records will be permanently removed. Those serial number slots will become available for new entries.</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No</button>
-                <button type="button" class="btn btn-warning" id="ebPurgeSnConfirmBtn" onclick="_ebConfirmPurge()"><i class="bi bi-eraser"></i> Yes</button>
-            </div>
-        </div>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-warning">
+        <h5 class="modal-title"><i class="bi bi-eraser"></i> Clear Deleted Serial Numbers</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to permanently clear all deleted serial number records for this batch?</p>
+        <p class="text-danger fw-semibold">This action cannot be undone.</p>
+        <p class="text-muted small mb-0">All soft-deleted serial number records will be permanently removed, freeing their slots for new entries.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-warning" id="ebPurgeSnConfirmBtn" onclick="_ebConfirmPurge()"><i class="bi bi-eraser"></i> Yes, Clear</button>
+      </div>
     </div>
+  </div>
 </div>
+
+<!-- Session Detail Modal -->
+<div class="modal fade" id="sessDetailModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h5 class="modal-title"><i class="bi bi-receipt me-2"></i><span id="sdmTitle"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-3" id="sdmBody">
+        <div class="text-muted text-center py-3"><i class="bi bi-hourglass-split"></i> Loading…</div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-success btn-sm" id="sdmReturnBtn"
+                onclick="sdmAddToReturnCart()" style="display:none;">
+          <i class="bi bi-cart-plus"></i> Add All to Return Cart
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}

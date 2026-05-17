@@ -126,6 +126,8 @@ def visual_storage():
             'unavailable_drawers': rack.get_unavailable_drawers(),
             'merged_cells': rack.get_merged_cells(),
             'drawer_info': rack.get_drawer_info(),
+            'drawer_icons': rack.get_drawer_icons(),
+            'rack_icon': rack.get_rack_icon(),
             'skip_cells': list(skip_cells),
             'cell_spans': cell_spans,
             'group_cells': group_cells,
@@ -191,6 +193,7 @@ def get_drawer_contents(rack_uuid, drawer_id):
         'drawer_id': drawer_id,
         'is_unavailable': rack.is_drawer_unavailable(drawer_id),
         'short_info': rack.get_drawer_short_info(drawer_id),
+        'drawer_icon': rack.get_drawer_icon(drawer_id),
     })
 
 
@@ -253,6 +256,61 @@ def update_drawer_info():
         db.session.rollback()
         logging.error(f"Error updating drawer info: {str(e)}")
         return jsonify({'success': False, 'error': 'An error occurred while updating drawer info'})
+
+
+@visual_storage_bp.route('/api/rack/update-rack-icon', methods=['POST'])
+@login_required
+@permission_required("settings_sections.location_management", "edit")
+def update_rack_icon_api():
+    """Save or clear the icon/picture for a rack."""
+    try:
+        data = request.get_json()
+        rack_uuid = data.get('rack_uuid')
+        icon_type = data.get('icon_type', 'none')
+        icon_value = (data.get('icon_value', '') or '').strip()
+
+        if icon_type not in ('none', 'icon', 'file'):
+            return jsonify({'success': False, 'error': 'Invalid icon_type'})
+
+        rack = Rack.query.filter_by(uuid=rack_uuid).first_or_404()
+        rack.set_rack_icon(icon_type, icon_value)
+        db.session.commit()
+
+        log_audit(current_user.id, 'update', 'rack', rack.id,
+                  f'Updated icon for rack {rack.name}')
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error updating rack icon: {str(e)}")
+        return jsonify({'success': False, 'error': 'An error occurred'})
+
+
+@visual_storage_bp.route('/api/drawer/update-icon', methods=['POST'])
+@login_required
+@permission_required("settings_sections.location_management", "edit")
+def update_drawer_icon():
+    """Save or clear the icon for a specific drawer."""
+    try:
+        data = request.get_json()
+        rack_uuid = data.get('rack_id')
+        drawer_id = data.get('drawer_id')
+        icon_type = data.get('icon_type', 'none')
+        icon_value = (data.get('icon_value', '') or '').strip()
+
+        if icon_type not in ('none', 'icon', 'file'):
+            return jsonify({'success': False, 'error': 'Invalid icon_type'})
+
+        rack = Rack.query.filter_by(uuid=rack_uuid).first_or_404()
+        rack.set_drawer_icon(drawer_id, icon_type, icon_value)
+        db.session.commit()
+
+        log_audit(current_user.id, 'update', 'rack', rack.id,
+                  f'Updated icon for drawer {drawer_id} in rack {rack.name}')
+        return jsonify({'success': True, 'icon_type': icon_type, 'icon_value': icon_value})
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error updating drawer icon: {str(e)}")
+        return jsonify({'success': False, 'error': 'An error occurred while updating drawer icon'})
 
 
 @visual_storage_bp.route('/api/drawer/move-items', methods=['POST'])

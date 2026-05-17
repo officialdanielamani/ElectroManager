@@ -19,25 +19,44 @@
 
         <div class="list-group">
             {% for notif in notifications %}
+            {% if notif.item %}
             <a href="{{ url_for('item.item_detail', uuid=notif.item.uuid) }}" class="list-group-item list-group-item-action">
-                <div class="d-flex w-100 justify-content-between">
-                    <div>
-                        <h5 class="mb-1">{{ notif.item.name }}</h5>
-                        <p class="mb-1">
-                            <strong>{{ notif.message }}</strong>
-                        </p>
-                        <small class="text-muted">
-                            {% if notif.batch is defined and notif.batch %}
-                                <i class="bi bi-collection"></i> {{ notif.batch.get_display_label() }}
-                                {% if notif.sn is defined and notif.sn %}
-                                — <i class="bi bi-upc-scan"></i> {{ notif.sn.serial_number or notif.sn.internal_serial_number }}
-                                {% endif %}
-                            {% elif notif.parameter is defined and notif.parameter %}
-                                {{ notif.parameter.get_display_text() }}
+            {% elif notif.project is defined and notif.project %}
+            <a href="{{ url_for('project.project_detail', project_id=notif.project.project_id) }}" class="list-group-item list-group-item-action">
+            {% else %}
+            <div class="list-group-item">
+            {% endif %}
+                <div class="d-flex w-100 justify-content-between align-items-start gap-2">
+                    <div class="d-flex gap-3 align-items-start flex-grow-1">
+                        <!-- Icon -->
+                        <div class="mt-1">
+                            {% if notif.type in ['overdue', 'lend_overdue', 'project_overdue'] %}
+                            <i class="bi bi-exclamation-triangle-fill text-danger fs-5"></i>
+                            {% elif notif.type in ['due', 'lend_due', 'project_due'] %}
+                            <i class="bi bi-exclamation-circle-fill text-warning fs-5"></i>
+                            {% else %}
+                            <i class="bi bi-info-circle-fill text-primary fs-5"></i>
                             {% endif %}
-                        </small>
+                        </div>
+                        <div>
+                            <h6 class="mb-1">{% if notif.item %}{{ notif.item.name }}{% elif notif.project is defined and notif.project %}<i class="bi bi-kanban me-1"></i>{{ notif.project.name }}{% endif %}</h6>
+                            <p class="mb-1 small">{{ notif.message }}</p>
+                            <div class="text-muted small">
+                                {% if notif.session_label is defined and notif.session_label %}
+                                <span><i class="bi bi-tag me-1"></i>Session: <code>{{ notif.session_label }}</code></span>
+                                {% endif %}
+                                {% if notif.batch is defined and notif.batch %}
+                                &nbsp;<span><i class="bi bi-collection me-1"></i>{{ notif.batch.get_display_label() }}</span>
+                                {% if notif.sn is defined and notif.sn %}
+                                &nbsp;— <span><i class="bi bi-upc-scan me-1"></i>{{ notif.sn.serial_number or notif.sn.internal_serial_number }}</span>
+                                {% endif %}
+                                {% elif notif.parameter is defined and notif.parameter %}
+                                {{ notif.parameter.get_display_text() }}
+                                {% endif %}
+                            </div>
+                        </div>
                     </div>
-                    <div class="text-end">
+                    <div class="text-end flex-shrink-0">
                         {% if notif.type in ['overdue', 'lend_overdue'] %}
                         <span class="badge bg-danger">Overdue</span>
                         {% elif notif.type in ['due', 'lend_due'] %}
@@ -45,14 +64,23 @@
                         {% elif notif.type == 'active' %}
                         <span class="badge bg-info">Active</span>
                         {% elif notif.type == 'lend_soon' %}
-                        <span class="badge bg-primary">Lending Due Soon</span>
+                        <span class="badge bg-primary">Due Soon</span>
+                        {% elif notif.type == 'project_overdue' %}
+                        <span class="badge bg-danger">Overdue</span>
+                        {% elif notif.type == 'project_due' %}
+                        <span class="badge bg-warning text-dark">Due Today</span>
+                        {% elif notif.type == 'project_soon' %}
+                        <span class="badge bg-info">Due Soon</span>
                         {% endif %}
                         {% if notif.type in ['lend_overdue', 'lend_due', 'lend_soon'] %}
                         <div><span class="badge bg-secondary mt-1"><i class="bi bi-hand-index-thumb"></i> Lending</span></div>
                         {% endif %}
+                        {% if notif.type in ['project_overdue', 'project_due', 'project_soon'] %}
+                        <div><span class="badge bg-secondary mt-1"><i class="bi bi-kanban"></i> Project</span></div>
+                        {% endif %}
                     </div>
                 </div>
-            </a>
+            {% if notif.item or (notif.project is defined and notif.project) %}</a>{% else %}</div>{% endif %}
             {% endfor %}
         </div>
         {% else %}
@@ -63,14 +91,4 @@
     </div>
 </div>
 
-<div class="row mt-3">
-    <div class="col-md-12">
-        <a href="{{ url_for('index') }}" class="btn btn-secondary">
-            <i class="bi bi-arrow-left"></i> Back to Items
-        </a>
-        <a href="{{ url_for('magic_parameter.magic_parameters') }}" class="btn btn-outline-primary">
-            <i class="bi bi-magic"></i> Manage Parameters
-        </a>
-    </div>
-</div>
 {% endblock %}

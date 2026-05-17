@@ -52,13 +52,13 @@ def _save_lend_records(batch, records_data, max_qty):
         except (ValueError, TypeError):
             qty = 1
         try:
-            days = int(r.get('days', 3))
+            days = max(1, min(int(r.get('days', 3)), 365))
         except (ValueError, TypeError):
             days = 3
         note = (r.get('lend_note', '') or '').strip()[:128] or None
         rec = BatchLendRecord(
             batch_id=batch.id,
-            lend_to_type=r.get('type', '').strip(),
+            lend_to_type=r.get('type', '').strip()[:32],
             lend_to_id=contact_id,
             quantity=qty,
             lend_start=_parse_datetime(r.get('start', '')),
@@ -384,6 +384,11 @@ def delete_batch(uuid, batch_id):
 
     batch_label = batch.get_display_label()
 
+    active_loan = BatchLendRecord.query.filter_by(batch_id=batch.id).filter(BatchLendRecord.returned_at == None).first()
+    if active_loan:
+        flash(f'Cannot delete batch "{batch_label}" — it has outstanding (unreturned) lending records.', 'danger')
+        return redirect(url_for('item.item_edit', uuid=uuid) + '#batches-section')
+
     if batch.sn_tracking_enabled and batch.serial_numbers:
         isn_list = ', '.join(sn.internal_serial_number for sn in batch.serial_numbers)
         log_audit(current_user.id, 'batch_sn_purge', 'batch', batch_id,
@@ -417,9 +422,13 @@ def bulk_delete_batches(uuid):
         return jsonify({'success': False, 'message': 'No batches selected'}), 400
     
     deleted = 0
+    skipped_loan = 0
     for bid in batch_ids:
         batch = ItemBatch.query.get(int(bid))
         if batch and batch.item_id == item.id:
+            if BatchLendRecord.query.filter_by(batch_id=batch.id).filter(BatchLendRecord.returned_at == None).first():
+                skipped_loan += 1
+                continue
             if batch.sn_tracking_enabled and batch.serial_numbers:
                 isn_list = ', '.join(sn.internal_serial_number for sn in batch.serial_numbers)
                 log_audit(current_user.id, 'batch_sn_purge', 'batch', batch.id,
@@ -434,8 +443,11 @@ def bulk_delete_batches(uuid):
 
     log_audit(current_user.id, 'bulk_delete', 'batch', None,
               f'Bulk deleted {deleted} batches from item: {item.name}')
-    
-    return jsonify({'success': True, 'deleted_count': deleted})
+
+    result = {'success': True, 'deleted_count': deleted}
+    if skipped_loan:
+        result['warning'] = f'{skipped_loan} batch(es) skipped — outstanding (unreturned) lending records exist.'
+    return jsonify(result)
 
 
 @batch_bp.route('/item/<string:uuid>/batch/transfer', methods=['POST'])
@@ -604,7 +616,7 @@ def update_serial_lend(uuid, batch_id):
         lend_id_raw = request.form.get(f'lend_id_{sn.id}', '').strip()
         lend_start_str = request.form.get(f'lend_start_{sn.id}', '').strip()
         lend_end_str = request.form.get(f'lend_end_{sn.id}', '').strip()
-        sn.lend_to_type = lend_type
+        sn.lend_to_type = lend_type[:32]
         try:
             sn.lend_to_id = int(lend_id_raw) if lend_id_raw else None
         except (ValueError, TypeError):
@@ -613,7 +625,7 @@ def update_serial_lend(uuid, batch_id):
         sn.lend_end = _parse_datetime(lend_end_str)
         sn.lend_notify_enabled = request.form.get(f'lend_notify_{sn.id}', '0') == '1'
         try:
-            sn.lend_notify_before_days = int(request.form.get(f'lend_notify_days_{sn.id}', 3))
+            sn.lend_notify_before_days = max(1, min(int(request.form.get(f'lend_notify_days_{sn.id}', 3)), 365))
         except (ValueError, TypeError):
             sn.lend_notify_before_days = 3
         if sn.lend_to_id:
@@ -662,13 +674,13 @@ def inline_update_sn(uuid):
             lend_to_id = None
         if not lend_to_id:
             return jsonify({'success': False, 'message': 'Lend to contact is required.'}), 400
-        sn.lend_to_type = data.get('lend_to_type', '').strip()
+        sn.lend_to_type = data.get('lend_to_type', '').strip()[:32]
         sn.lend_to_id = lend_to_id
         sn.lend_start = _parse_datetime(data.get('lend_start', ''))
         sn.lend_end = _parse_datetime(data.get('lend_end', ''))
         sn.lend_notify_enabled = bool(data.get('lend_notify_enabled', False))
         try:
-            sn.lend_notify_before_days = int(data.get('lend_notify_before_days', 3))
+            sn.lend_notify_before_days = max(1, min(int(data.get('lend_notify_before_days', 3)), 365))
         except (ValueError, TypeError):
             sn.lend_notify_before_days = 3
         sn.lend_note = (data.get('lend_note', '') or '').strip()[:128] or None
@@ -733,13 +745,13 @@ def bulk_update_sn(uuid):
                 if not lend_id:
                     count += 1
                     continue  # contact required for non-clear lend
-                sn.lend_to_type = lend_data.get('type', '').strip()
+                sn.lend_to_type = lend_data.get('type', '').strip()[:32]
                 sn.lend_to_id = lend_id
                 sn.lend_start = _parse_datetime(lend_data.get('start', ''))
                 sn.lend_end = _parse_datetime(lend_data.get('end', ''))
                 sn.lend_notify_enabled = bool(lend_data.get('notify', False))
                 try:
-                    sn.lend_notify_before_days = int(lend_data.get('days', 3))
+                    sn.lend_notify_before_days = max(1, min(int(lend_data.get('days', 3)), 365))
                 except (ValueError, TypeError):
                     sn.lend_notify_before_days = 3
                 sn.lend_note = (lend_data.get('lend_note', '') or '').strip()[:128] or None
@@ -926,14 +938,14 @@ def save_sn_pending(uuid, batch_id):
             except (ValueError, TypeError):
                 lend_id = None
             if lend_id:
-                sn.lend_to_type = lc.get('lend_to_type', '')
+                sn.lend_to_type = lc.get('lend_to_type', '')[:32]
                 sn.lend_to_id = lend_id
                 sn.lend_start = _parse_datetime(lc.get('lend_start', ''))
                 sn.lend_end = _parse_datetime(lc.get('lend_end', ''))
                 sn.lend_note = (lc.get('lend_note', '') or '').strip()[:128] or None
                 sn.lend_notify_enabled = bool(lc.get('lend_notify', False))
                 try:
-                    sn.lend_notify_before_days = int(lc.get('lend_days', 3))
+                    sn.lend_notify_before_days = max(1, min(int(lc.get('lend_days', 3)), 365))
                 except (ValueError, TypeError):
                     sn.lend_notify_before_days = 3
             else:

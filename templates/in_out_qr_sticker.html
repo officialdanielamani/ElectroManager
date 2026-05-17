@@ -1,0 +1,39 @@
+{% extends "_qr_sticker_base.html" %}
+
+{% block title %}QR Sticker - Session {{ session.lending_id }}{% endblock %}
+
+{% block sticker_header %}
+<div class="card mb-4">
+    <div class="card-header {% if session.mode == 'return' %}bg-success{% else %}bg-primary{% endif %} text-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h4 class="mb-0 text-white"><i class="bi bi-qr-code"></i> QR/Barcode Sticker</h4>
+            <a href="{{ url_for('in_out.in_out') }}" class="btn btn-light btn-sm">
+                <i class="bi bi-arrow-left-right"></i> Back to In/Out
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="d-flex align-items-center gap-3">
+            <span class="badge {% if session.mode == 'return' %}bg-success{% else %}bg-primary{% endif %} fs-6">
+                {{ 'Return' if session.mode == 'return' else 'Lending' }}
+            </span>
+            <div>
+                <h6 class="mb-0">Session <strong><code>{{ session.lending_id }}</code></strong></h6>
+                <small class="text-muted">
+                    Submitted by {{ session.creator.username if session.creator else 'Unknown' }}
+                    on {{ session.created_at.strftime('%Y-%m-%d %H:%M') if session.created_at else '' }}
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block no_templates_type %}In-Out{% endblock %}
+
+{% block sticker_init_js %}
+const _previewUrl   = id  => `/api/in-out/session/{{ session.lending_id }}/sticker-preview/${id}`;
+const _printUrl     = id  => `/api/in-out/session/{{ session.lending_id }}/sticker-print/${id}`;
+const _downloadName = ext => `session_{{ session.lending_id }}.${ext}`;
+const _entityLabel  = ()  => `Session: {{ session.lending_id }}`;
+{% endblock %}

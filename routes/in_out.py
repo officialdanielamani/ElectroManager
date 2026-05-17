@@ -1,14 +1,18 @@
 from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, flash
 from flask_login import login_required, current_user
 from models import (db, AuditLog, User, Item, ItemBatch, BatchSerialNumber,
-                    BatchLendRecord, Setting)
+                    BatchLendRecord, LendingSession, _generate_lending_id, Setting)
 from utils import log_audit, get_item_edit_permissions
 from datetime import datetime, timezone
 import json
+import re
 
 in_out_bp = Blueprint('in_out', __name__)
 
-LOG_PAGE_SIZE = 25
+LOG_PAGE_SIZE  = 15
+SESS_PAGE_SIZE = 15
+
+_LENDING_ID_RE = re.compile(r'^\d{8}-[A-Z0-9]{6}$')
 
 
 def _parse_dt(s):
@@ -23,24 +27,18 @@ def _parse_dt(s):
 
 
 def _format_log_details(action, details):
-    """Convert raw log details to a human-readable string for display."""
     if not details:
         return ''
     if action == 'return':
         try:
             d = json.loads(details)
             parts = []
+            sid = d.get('session_id', '')
             cnt = d.get('count') or d.get('qty')
+            if sid:
+                parts.append(sid)
             if cnt is not None:
                 parts.append(f'{cnt} unit(s)')
-            on_time = d.get('on_time')
-            if on_time is True:
-                parts.append('on time')
-            elif on_time is False:
-                parts.append('LATE')
-            ret_dt = d.get('return_dt', '')
-            if ret_dt:
-                parts.append(f'@ {ret_dt}')
             notes = d.get('notes', '')
             if notes:
                 parts.append(f'— {notes}')
@@ -51,12 +49,11 @@ def _format_log_details(action, details):
 
 
 def _build_log_entries(page=1, can_view_log=True):
-    """Return (entries, total_pages) for the given log page."""
     if not can_view_log:
         return [], 0
     actions = ['lend', 'return', 'update', 'delete', 'batch_sn_purge', 'lend_update', 'sn_batch_save']
     q = (AuditLog.query
-         .filter(AuditLog.entity_type.in_(['batch', 'item', 'sn']))
+         .filter(AuditLog.entity_type.in_(['batch', 'item', 'sn', 'lending_session']))
          .filter(AuditLog.action.in_(actions))
          .order_by(AuditLog.timestamp.desc()))
     total = q.count()
@@ -93,7 +90,6 @@ def in_out():
     log_page = request.args.get('log_page', 1, type=int)
     logs, log_total_pages = _build_log_entries(log_page, can_view_log)
 
-    # LR settings for form required-field indicators
     lr_settings = {
         'lend_start_date_required': Setting.get('lr_lend_start_date_required', False) is True,
         'lend_start_time_required': Setting.get('lr_lend_start_time_required', False) is True,
@@ -111,22 +107,33 @@ def in_out():
                            scan_enabled=scan_enabled,
                            lr_settings=lr_settings,
                            current_user_id=current_user.id,
+                           current_user_label=current_user.username,
                            currency=Setting.get('currency', '$'))
 
 
 @in_out_bp.route('/in-out/search')
 @login_required
 def in_out_search():
-    """AJAX: search by item name, UUID, batch ID ({uuid}-B{n}), or ISN."""
+    """AJAX: search by item name, UUID, ISN, batch ID, or lending session ID."""
     q = request.args.get('q', '').strip()
+    mode = request.args.get('mode', 'lending')
+    is_lending = (mode == 'lending')
     if len(q) < 2:
         return jsonify({'results': [], 'type': 'none'})
 
-    # Try ISN exact match first
+    # Check for lending session ID: YYYYMMDD-XXXXXX
+    if _LENDING_ID_RE.match(q.upper()):
+        session = LendingSession.query.filter_by(lending_id=q.upper()).first()
+        if session:
+            return jsonify({'type': 'session', 'results': [_session_json(session)]})
+
+    # Try ISN exact match
     sn_row = BatchSerialNumber.query.filter_by(internal_serial_number=q).first()
     if sn_row:
         batch = sn_row.batch
         item  = batch.item
+        if is_lending and batch.lend_disabled:
+            return jsonify({'type': 'none', 'results': [], 'lend_disabled': True})
         return jsonify({'type': 'sn', 'results': [_batch_json(batch, item, sn_row)]})
 
     # Try batch ID format {uuid}-B{n}
@@ -140,6 +147,8 @@ def in_out_search():
                 if item:
                     batch = ItemBatch.query.filter_by(item_id=item.id, batch_number=num).first()
                     if batch:
+                        if is_lending and batch.lend_disabled:
+                            return jsonify({'type': 'none', 'results': [], 'lend_disabled': True})
                         return jsonify({'type': 'batch', 'results': [_batch_json(batch, item)]})
             except ValueError:
                 pass
@@ -179,10 +188,10 @@ def _batch_summary(batch):
         'lend_qty': batch.get_lend_quantity(),
         'available_qty': batch.get_available_quantity(),
         'item_uuid': batch.item.uuid,
+        'lend_disabled': bool(batch.lend_disabled),
     }
 
 def _batch_json(batch, item, sn_row=None):
-    """Full batch detail for form pre-population."""
     base = _batch_summary(batch)
     base.update({
         'item_name': item.name,
@@ -193,6 +202,7 @@ def _batch_json(batch, item, sn_row=None):
         'price_per_unit': float(batch.price_per_unit or 0),
         'purchase_date': batch.purchase_date.strftime('%Y-%m-%d') if batch.purchase_date else '',
         'note': batch.note or '',
+        'lend_disabled': bool(batch.lend_disabled),
         'location_id': batch.location_id,
         'rack_id': batch.rack_id,
         'drawer': batch.drawer or '',
@@ -203,20 +213,472 @@ def _batch_json(batch, item, sn_row=None):
     })
     return base
 
+def _session_json(session):
+    """Serialise a LendingSession for JS consumption."""
+    items = []
+    is_return = (session.mode == 'return')
+
+    # For lend sessions: use the forward link (lending_session_id → lend_records)
+    # For return sessions: use the reverse link (return_session_id → returned_lend_records)
+    lend_recs = session.returned_lend_records if is_return else session.lend_records
+    for rec in lend_recs:
+        try:
+            batch = rec.batch
+            item  = batch.item
+            if is_return:
+                # on_time relative to lend_end; use returned_at if set, else session created_at
+                ret_dt  = rec.returned_at or session.created_at
+                on_time = (rec.lend_end is None) or (ret_dt.replace(tzinfo=None) <= rec.lend_end)
+            else:
+                on_time = None
+            items.append({
+                'type':          'lend_record',
+                'batch_id':      batch.id,
+                'lend_record_id': rec.id,
+                'item_name':     item.name,
+                'item_uuid':     item.uuid,
+                'item_short_info': item.short_info or '',
+                'batch_label':   batch.get_display_label(),
+                'qty':           rec.quantity,
+                'lend_note':     rec.lend_note or '',
+                'lend_display':  rec.get_lend_to_display(),
+                'lend_end':      rec.lend_end.strftime('%Y-%m-%dT%H:%M') if rec.lend_end else '',
+                'returnable':    rec.returned_at is None,
+                'on_time':       on_time,
+            })
+        except Exception:
+            pass
+
+    sn_recs = session.returned_sn_records if is_return else session.serial_number_records
+    for sn in sn_recs:
+        try:
+            if sn.is_deleted:
+                continue
+            batch = sn.batch
+            item  = batch.item
+            if is_return:
+                ret_dt  = sn.returned_at or session.created_at
+                on_time = (sn.lend_end is None) or (ret_dt.replace(tzinfo=None) <= sn.lend_end)
+                contact_label = sn.returned_from_label or ''
+            else:
+                on_time       = None
+                contact_label = sn.get_lend_to_display() if sn.lend_to_id else ''
+            items.append({
+                'type':          'sn',
+                'batch_id':      batch.id,
+                'sn_id':         sn.id,
+                'item_name':     item.name,
+                'item_uuid':     item.uuid,
+                'item_short_info': item.short_info or '',
+                'batch_label':   batch.get_display_label(),
+                'isn':           sn.internal_serial_number,
+                'lend_note':     sn.lend_note or '',
+                'lend_display':  contact_label,
+                'lend_end':      sn.lend_end.strftime('%Y-%m-%dT%H:%M') if sn.lend_end else '',
+                'returnable':    bool(sn.lend_to_id),
+                'on_time':       on_time,
+            })
+        except Exception:
+            pass
+
+    return {
+        'lending_id':      session.lending_id,
+        'mode':            session.mode,
+        'lend_to_label':   session.get_lend_to_display(),
+        'lend_to_id':      session.lend_to_id,
+        'lend_to_type':    session.lend_to_type or '',
+        'lend_start':      session.lend_start.strftime('%Y-%m-%dT%H:%M') if session.lend_start else '',
+        'lend_end':        session.lend_end.strftime('%Y-%m-%dT%H:%M') if session.lend_end else '',
+        'notes':           session.notes or '',
+        'created_at':      session.created_at.strftime('%d/%m/%Y %H:%M') if session.created_at else '',
+        'created_by_label': session.creator.username if session.creator else 'Unknown',
+        'items':           items,
+    }
+
 
 @in_out_bp.route('/in-out/batch/<int:batch_id>/detail')
 @login_required
 def in_out_batch_detail(batch_id):
-    """AJAX: get full batch detail JSON."""
     batch = ItemBatch.query.get_or_404(batch_id)
     item  = batch.item
     return jsonify(_batch_json(batch, item))
 
 
+@in_out_bp.route('/in-out/session/<lending_id>')
+@login_required
+def in_out_session_detail(lending_id):
+    """AJAX: get full details for a lending session by its lending_id."""
+    session = LendingSession.query.filter_by(lending_id=lending_id.upper()).first_or_404()
+    return jsonify(_session_json(session))
+
+
+@in_out_bp.route('/in-out/sessions')
+@login_required
+def in_out_sessions_list():
+    """AJAX: list lending sessions with date / contact filters."""
+    can_lend = (current_user.is_admin()
+                or current_user.has_permission('lending_return', 'edit_lending')
+                or current_user.has_permission('lending_return', 'only_self_lending'))
+    if not can_lend:
+        return jsonify({'sessions': []})
+
+    can_only_self = (not current_user.is_admin()
+                     and current_user.has_permission('lending_return', 'only_self_lending')
+                     and not current_user.has_permission('lending_return', 'edit_batch'))
+
+    start_str  = request.args.get('start_date', '').strip()
+    end_str    = request.args.get('end_date',   '').strip()
+    contact_id = request.args.get('contact_id', '').strip()
+    contact_type = request.args.get('contact_type', '').strip()
+
+    q = LendingSession.query.filter_by(mode='lend').order_by(LendingSession.created_at.desc())
+
+    if can_only_self:
+        q = q.filter_by(created_by_id=current_user.id)
+
+    if start_str:
+        try:
+            q = q.filter(LendingSession.lend_start >= datetime.strptime(start_str, '%Y-%m-%d'))
+        except ValueError:
+            pass
+
+    if end_str:
+        try:
+            from datetime import timedelta
+            end_dt = datetime.strptime(end_str, '%Y-%m-%d') + timedelta(days=1)
+            q = q.filter(db.or_(LendingSession.lend_end == None,
+                                 LendingSession.lend_end <= end_dt))
+        except ValueError:
+            pass
+
+    if contact_id and contact_type:
+        try:
+            q = q.filter_by(lend_to_id=int(contact_id), lend_to_type=contact_type)
+        except ValueError:
+            pass
+
+    page = request.args.get('page', 1, type=int)
+    total = q.count()
+    total_pages = max(1, (total + SESS_PAGE_SIZE - 1) // SESS_PAGE_SIZE)
+    sessions = q.offset((page - 1) * SESS_PAGE_SIZE).limit(SESS_PAGE_SIZE).all()
+
+    def _list_json(s):
+        item_count = (len(s.lend_records) +
+                      sum(1 for sn in s.serial_number_records if not sn.is_deleted))
+        return {
+            'lending_id':   s.lending_id,
+            'lend_to_label': s.get_lend_to_display(),
+            'lend_to_id':   s.lend_to_id,
+            'lend_to_type': s.lend_to_type or '',
+            'lend_start':   s.lend_start.strftime('%d/%m/%y') if s.lend_start else '',
+            'lend_end':     s.lend_end.strftime('%d/%m/%y')   if s.lend_end   else '',
+            'notes':        s.notes or '',
+            'item_count':   item_count,
+        }
+
+    return jsonify({'sessions': [_list_json(s) for s in sessions],
+                    'total_pages': total_pages, 'page': page})
+
+
+@in_out_bp.route('/in-out/logs')
+@login_required
+def in_out_logs_ajax():
+    """AJAX: return filtered audit log entries as JSON."""
+    can_view_log = current_user.is_admin() or current_user.has_permission('lending_return', 'view_log')
+    if not can_view_log:
+        return jsonify({'entries': [], 'has_more': False})
+
+    can_only_self = (not current_user.is_admin()
+                     and current_user.has_permission('lending_return', 'only_self_lending')
+                     and not current_user.has_permission('lending_return', 'edit_batch'))
+
+    start_str    = request.args.get('start_date',   '').strip()
+    end_str      = request.args.get('end_date',     '').strip()
+    contact_id   = request.args.get('contact_id',   '').strip()
+    contact_type = request.args.get('contact_type', '').strip()
+    page         = request.args.get('page', 1, type=int)
+
+    actions = ['lend', 'return', 'update', 'delete', 'batch_sn_purge', 'lend_update', 'sn_batch_save']
+    q = (AuditLog.query
+         .filter(AuditLog.entity_type.in_(['batch', 'item', 'sn', 'lending_session']))
+         .filter(AuditLog.action.in_(actions)))
+
+    if can_only_self:
+        q = q.filter(AuditLog.user_id == current_user.id)
+
+    if start_str:
+        try:
+            q = q.filter(AuditLog.timestamp >= datetime.strptime(start_str, '%Y-%m-%d'))
+        except ValueError:
+            pass
+
+    if end_str:
+        try:
+            from datetime import timedelta
+            end_dt = datetime.strptime(end_str, '%Y-%m-%d') + timedelta(days=1)
+            q = q.filter(AuditLog.timestamp < end_dt)
+        except ValueError:
+            pass
+
+    if contact_id and contact_type:
+        try:
+            cid = int(contact_id)
+            matching_ids = db.session.query(LendingSession.id).filter_by(
+                lend_to_id=cid, lend_to_type=contact_type
+            ).subquery()
+            q = q.filter(
+                db.and_(
+                    AuditLog.entity_type == 'lending_session',
+                    AuditLog.entity_id.in_(matching_ids)
+                )
+            )
+        except ValueError:
+            pass
+
+    q = q.order_by(AuditLog.timestamp.desc())
+    total = q.count()
+    total_pages = max(1, (total + LOG_PAGE_SIZE - 1) // LOG_PAGE_SIZE)
+    raw = q.offset((page - 1) * LOG_PAGE_SIZE).limit(LOG_PAGE_SIZE).all()
+
+    result = []
+    for log in raw:
+        user = User.query.get(log.user_id)
+        result.append({
+            'action':    log.action,
+            'username':  user.username if user else 'Unknown',
+            'timestamp': log.timestamp.strftime('%d/%m/%Y %H:%M') if log.timestamp else '?',
+            'display':   _format_log_details(log.action, log.details),
+        })
+
+    return jsonify({'entries': result, 'has_more': page < total_pages,
+                    'total_pages': total_pages, 'page': page})
+
+
+@in_out_bp.route('/in-out/submit-cart', methods=['POST'])
+@login_required
+def in_out_submit_cart():
+    """Process a multi-item cart submission (lend or return)."""
+    can_lend = (current_user.is_admin()
+                or current_user.has_permission('lending_return', 'edit_lending')
+                or current_user.has_permission('lending_return', 'only_self_lending'))
+    if not can_lend:
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+
+    data   = request.get_json()
+    mode   = data.get('mode', 'lend')
+    cart   = data.get('cart', [])
+    detail = data.get('detail', {})
+    now    = datetime.now(timezone.utc)
+
+    can_only_self = (not current_user.is_admin()
+                     and current_user.has_permission('lending_return', 'only_self_lending')
+                     and not current_user.has_permission('lending_return', 'edit_batch'))
+
+    global_notes = (detail.get('notes', '') or '').strip()[:256]
+
+    if not cart:
+        return jsonify({'success': False, 'message': 'Cart is empty'}), 400
+
+    if mode == 'lend':
+        lend_to_type = detail.get('lend_to_type', '')[:32]
+        try:
+            lend_to_id = int(detail.get('lend_to_id')) if detail.get('lend_to_id') else None
+        except (ValueError, TypeError):
+            lend_to_id = None
+
+        if can_only_self:
+            lend_to_id   = current_user.id
+            lend_to_type = 'user'
+        elif not lend_to_id:
+            return jsonify({'success': False, 'message': 'A contact is required for lending'}), 400
+
+        lend_start = _parse_dt(detail.get('lend_start', ''))
+        lend_end   = _parse_dt(detail.get('lend_end', ''))
+        lend_notify = bool(detail.get('lend_notify', False))
+        try:
+            lend_notify_days = max(1, min(int(detail.get('lend_days', 3)), 365))
+        except (ValueError, TypeError):
+            lend_notify_days = 3
+
+        session_obj = LendingSession(
+            lending_id=_generate_lending_id(),
+            mode='lend',
+            created_by_id=current_user.id,
+            lend_to_type=lend_to_type,
+            lend_to_id=lend_to_id,
+            lend_start=lend_start,
+            lend_end=lend_end,
+            notes=global_notes or None,
+        )
+        db.session.add(session_obj)
+        db.session.flush()
+
+        errors = []
+        processed = 0
+
+        for cart_item in cart:
+            item_type = cart_item.get('type')
+            batch_id  = cart_item.get('batch_id')
+            item_note = (cart_item.get('note', '') or '').strip()[:128] or (global_notes[:128] if global_notes else None)
+
+            batch = ItemBatch.query.get(batch_id)
+            if not batch:
+                errors.append(f'Batch {batch_id} not found')
+                continue
+
+            if batch.lend_disabled:
+                errors.append(f'Batch "{batch.get_display_label()}" is disabled from lending')
+                continue
+
+            if item_type == 'sn':
+                sn_id = cart_item.get('sn_id')
+                sn = BatchSerialNumber.query.get(sn_id)
+                if not sn or sn.batch_id != batch.id or sn.is_deleted or sn.lend_to_id:
+                    errors.append(f'Serial number {sn_id} not available for lending')
+                    continue
+                sn.lend_to_type              = lend_to_type
+                sn.lend_to_id               = lend_to_id
+                sn.lend_start               = lend_start
+                sn.lend_end                 = lend_end
+                sn.lend_note                = item_note
+                sn.lend_notify_enabled      = lend_notify
+                sn.lend_notify_before_days  = lend_notify_days
+                sn.lending_session_id       = session_obj.id
+                batch.item.updated_by     = current_user.id
+                batch.item.updated_at     = now
+                processed += 1
+
+            elif item_type == 'normal':
+                qty          = max(1, int(cart_item.get('qty', 1)))
+                current_lent = batch.get_lend_quantity()
+                if current_lent + qty > batch.quantity:
+                    errors.append(f'Qty {qty} exceeds available for "{batch.get_display_label()}" (avail: {batch.get_available_quantity()})')
+                    continue
+                rec = BatchLendRecord(
+                    batch_id               = batch.id,
+                    lend_to_type           = lend_to_type,
+                    lend_to_id             = lend_to_id,
+                    quantity               = qty,
+                    lend_start             = lend_start,
+                    lend_end               = lend_end,
+                    lend_note              = item_note,
+                    lending_session_id     = session_obj.id,
+                    lend_notify_enabled    = lend_notify,
+                    lend_notify_before_days = lend_notify_days,
+                )
+                db.session.add(rec)
+                batch.item.updated_by = current_user.id
+                batch.item.updated_at = now
+                processed += 1
+
+        db.session.commit()
+        log_audit(current_user.id, 'lend', 'lending_session', session_obj.id,
+                  f'Lending session {session_obj.lending_id}: {processed} item(s) lent' +
+                  (f' | Errors: {"; ".join(errors)}' if errors else ''))
+        return jsonify({
+            'success': True,
+            'lending_id': session_obj.lending_id,
+            'processed': processed,
+            'errors': errors,
+        })
+
+    elif mode == 'return':
+        return_dt    = _parse_dt(detail.get('return_datetime', '')) or now
+        return_notes = (detail.get('return_notes', '') or '').strip()[:128]
+
+        session_obj = LendingSession(
+            lending_id    = _generate_lending_id(),
+            mode          = 'return',
+            created_by_id = current_user.id,
+            notes         = return_notes or global_notes or None,
+        )
+        db.session.add(session_obj)
+        db.session.flush()
+
+        errors      = []
+        processed   = 0
+        any_late    = False
+
+        for cart_item in cart:
+            item_type = cart_item.get('type')
+            batch_id  = cart_item.get('batch_id')
+            item_note = (cart_item.get('note', '') or '').strip()[:128] or (return_notes[:128] if return_notes else None)
+
+            batch = ItemBatch.query.get(batch_id)
+            if not batch:
+                errors.append(f'Batch {batch_id} not found')
+                continue
+
+            if item_type == 'sn':
+                sn_id = cart_item.get('sn_id')
+                sn = BatchSerialNumber.query.get(sn_id)
+                if not sn or sn.batch_id != batch.id or sn.is_deleted or not sn.lend_to_id:
+                    errors.append(f'SN {sn_id} is not currently lent out')
+                    continue
+                lend_end = sn.lend_end
+                on_time  = (lend_end is None) or (return_dt.replace(tzinfo=None) <= lend_end)
+                if not on_time:
+                    any_late = True
+                # Snapshot contact before clearing (for return session history)
+                sn.returned_from_label = sn.get_lend_to_display()
+                sn.returned_at         = return_dt.replace(tzinfo=None)
+                sn.lend_to_type        = ''
+                sn.lend_to_id          = None
+                sn.lend_start          = None
+                # keep sn.lend_end so on_time can be computed from history
+                sn.lend_note           = item_note
+                sn.lend_notify_enabled = False
+                sn.return_session_id   = session_obj.id
+                batch.item.updated_by  = current_user.id
+                batch.item.updated_at  = now
+                processed += 1
+
+            elif item_type == 'lend_record':
+                lend_record_id = cart_item.get('lend_record_id')
+                rec = BatchLendRecord.query.get(lend_record_id)
+                if not rec or rec.batch_id != batch.id or rec.returned_at is not None:
+                    errors.append(f'Lend record {lend_record_id} not found or already returned')
+                    continue
+                return_qty = max(1, int(cart_item.get('qty') or rec.quantity))
+                return_qty = min(return_qty, rec.quantity)
+                lend_end = rec.lend_end
+                on_time  = (lend_end is None) or (return_dt.replace(tzinfo=None) <= lend_end)
+                if not on_time:
+                    any_late = True
+                if return_qty >= rec.quantity:
+                    rec.returned_at       = return_dt.replace(tzinfo=None)
+                    rec.return_session_id = session_obj.id
+                else:
+                    rec.quantity -= return_qty
+                    rec.return_session_id = session_obj.id
+                batch.item.updated_by = current_user.id
+                batch.item.updated_at = now
+                processed += 1
+
+        db.session.commit()
+        log_audit(current_user.id, 'return', 'lending_session', session_obj.id,
+                  json.dumps({
+                      'session_id': session_obj.lending_id,
+                      'count': processed,
+                      'return_dt': return_dt.strftime('%Y-%m-%d %H:%M'),
+                      'notes': return_notes or global_notes,
+                  }))
+        return jsonify({
+            'success': True,
+            'lending_id': session_obj.lending_id,
+            'processed': processed,
+            'errors': errors,
+            'on_time': not any_late,
+        })
+
+    return jsonify({'success': False, 'message': 'Invalid mode'}), 400
+
+
+# ── Legacy single-batch endpoints (kept for backward compatibility) ──────────
+
 @in_out_bp.route('/in-out/lend', methods=['POST'])
 @login_required
 def in_out_lend():
-    """Process a new lending record (normal batch or SN batch)."""
     can_lend = (current_user.is_admin()
                 or current_user.has_permission('lending_return', 'edit_lending')
                 or current_user.has_permission('lending_return', 'only_self_lending'))
@@ -235,7 +697,7 @@ def in_out_lend():
 
     if batch.sn_tracking_enabled:
         sn_ids    = data.get('sn_ids', [])
-        lend_type = data.get('lend_to_type', '')
+        lend_type = data.get('lend_to_type', '')[:32]
         try:
             lend_id = int(data.get('lend_to_id')) if data.get('lend_to_id') else None
         except (ValueError, TypeError):
@@ -247,7 +709,7 @@ def in_out_lend():
         lend_note  = (data.get('lend_note', '') or '').strip()[:128] or None
         notify     = bool(data.get('lend_notify', False))
         try:
-            days = int(data.get('lend_days', 3))
+            days = max(1, min(int(data.get('lend_days', 3)), 365))
         except (ValueError, TypeError):
             days = 3
         updated = 0
@@ -271,20 +733,13 @@ def in_out_lend():
         return jsonify({'success': True, 'updated': updated})
     else:
         records = data.get('lend_records', [])
-        
-        # Calculate current total quantity already lent out
-        current_lent = batch.get_lend_quantity() 
-        
-        # Calculate quantity requested in this new transaction
+        current_lent = batch.get_lend_quantity()
         new_request_qty = sum(max(1, int(r.get('qty', 1))) for r in records if isinstance(r, dict))
-        
-        # Validate that the total (old + new) doesn't exceed batch stock
         if (current_lent + new_request_qty) > batch.quantity:
             return jsonify({
-                'success': False, 
+                'success': False,
                 'message': f'Total lend qty ({current_lent + new_request_qty}) exceeds batch qty ({batch.quantity})'
             }), 400
-            
         if can_only_self:
             for r in records:
                 try:
@@ -294,16 +749,11 @@ def in_out_lend():
                 if cid != current_user.id:
                     return jsonify({'success': False, 'message': 'Only self-lending allowed'}), 403
 
-        # REMOVED: BatchLendRecord.query.filter_by(batch_id=batch.id).delete()
-        # This allows _save_lend_records to append new records instead of replacing them.
-
         from routes.batch import _save_lend_records
         _save_lend_records(batch, records, batch.quantity)
-        
         item.updated_by = current_user.id
         item.updated_at = now
         db.session.commit()
-        
         log_audit(current_user.id, 'lend', 'batch', batch.id,
                   f'Added lending for {batch.get_display_label()} of {item.name} ({len(records)} new record(s))')
         return jsonify({'success': True})
@@ -312,7 +762,6 @@ def in_out_lend():
 @in_out_bp.route('/in-out/return', methods=['POST'])
 @login_required
 def in_out_return():
-    """Process return of lent items."""
     can_lend = (current_user.is_admin()
                 or current_user.has_permission('lending_return', 'edit_lending')
                 or current_user.has_permission('lending_return', 'only_self_lending'))
@@ -368,7 +817,7 @@ def in_out_return():
                 any_late = True
             rqty = min(return_qty if return_qty > 0 else rec.quantity, rec.quantity)
             if rqty >= rec.quantity:
-                db.session.delete(rec)
+                rec.returned_at = return_dt.replace(tzinfo=None)
             else:
                 rec.quantity -= rqty
             returned_count += rqty
@@ -385,7 +834,6 @@ def in_out_return():
 @in_out_bp.route('/in-out/batch/<int:batch_id>/edit', methods=['POST'])
 @login_required
 def in_out_edit_batch(batch_id):
-    """Edit batch fields (qty, price, label, date, note, location)."""
     if not (current_user.is_admin() or current_user.has_permission('lending_return', 'edit_batch')):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
     batch = ItemBatch.query.get_or_404(batch_id)
@@ -412,6 +860,7 @@ def in_out_edit_batch(batch_id):
         except ValueError:
             pass
     batch.note = (data.get('note', '') or '').strip()[:256] or None
+    batch.lend_disabled = bool(data.get('lend_disabled', False))
     item.recalculate_from_batches()
     item.updated_by = current_user.id
     item.updated_at = datetime.now(timezone.utc)
@@ -425,7 +874,6 @@ def in_out_edit_batch(batch_id):
 @in_out_bp.route('/in-out/batch/<int:batch_id>/purge-deleted-sn', methods=['POST'])
 @login_required
 def in_out_purge_deleted_sn(batch_id):
-    """Hard-delete all soft-deleted serial numbers for a batch, freeing their slots."""
     if not (current_user.is_admin() or current_user.has_permission('lending_return', 'delete_batch')):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
     batch = ItemBatch.query.get_or_404(batch_id)
@@ -450,7 +898,6 @@ def in_out_purge_deleted_sn(batch_id):
 @in_out_bp.route('/in-out/batch/<int:batch_id>/delete', methods=['POST'])
 @login_required
 def in_out_delete_batch(batch_id):
-    """Delete a batch."""
     if not (current_user.is_admin() or current_user.has_permission('lending_return', 'delete_batch')):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
     batch = ItemBatch.query.get_or_404(batch_id)
@@ -468,3 +915,78 @@ def in_out_delete_batch(batch_id):
     log_audit(current_user.id, 'delete', 'batch', batch_id,
               f'Deleted batch "{label}" from {item.name} via /in-out')
     return jsonify({'success': True, 'message': f'Batch "{label}" deleted.'})
+
+
+# ─── In-Out Session QR Sticker Routes ────────────────────────────────────────
+
+@in_out_bp.route('/in-out/session/<string:lending_id>/qr-sticker')
+@login_required
+def session_qr_sticker(lending_id):
+    """Show QR sticker page for a lending/return session."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        abort(403)
+    from models import StickerTemplate
+    session = LendingSession.query.filter_by(lending_id=lending_id).first_or_404()
+    templates = StickerTemplate.query.filter_by(template_type='In-Out').order_by(StickerTemplate.name).all()
+    return render_template('in_out_qr_sticker.html', session=session, templates=templates)
+
+
+@in_out_bp.route('/api/in-out/session/<string:lending_id>/session-qr-svg')
+@login_required
+def api_session_inline_qr(lending_id):
+    """Return a simple QR SVG for the session ID (for inline notification display)."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
+    from flask import Response
+    from qr_utils import generate_session_qr_svg
+    LendingSession.query.filter_by(lending_id=lending_id).first_or_404()
+    svg = generate_session_qr_svg(lending_id, size_px=120)
+    return Response(svg, mimetype='image/svg+xml')
+
+
+@in_out_bp.route('/api/in-out/session/<string:lending_id>/sticker-preview/<int:template_id>')
+@login_required
+def api_session_sticker_preview(lending_id, template_id):
+    """Return JSON with SVG preview for a session sticker."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
+    from flask import send_file
+    from models import StickerTemplate
+    from qr_utils import get_session_data, render_template_to_svg
+    session = LendingSession.query.filter_by(lending_id=lending_id).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'In-Out':
+        return jsonify({'error': 'Template must be In-Out type'}), 400
+    data = get_session_data(session)
+    svg = render_template_to_svg(template, data)
+    return jsonify({
+        'svg': svg,
+        'width_mm': template.width_mm,
+        'height_mm': template.height_mm,
+        'template_name': template.name,
+    })
+
+
+@in_out_bp.route('/api/in-out/session/<string:lending_id>/sticker-print/<int:template_id>')
+@login_required
+def api_session_sticker_print(lending_id, template_id):
+    """Generate and return a PDF sticker for a session."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
+    from flask import send_file
+    from models import StickerTemplate
+    from qr_utils import get_session_data, generate_single_sticker_pdf
+    session = LendingSession.query.filter_by(lending_id=lending_id).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'In-Out':
+        return jsonify({'error': 'Template must be In-Out type'}), 400
+    data = get_session_data(session)
+    output = generate_single_sticker_pdf(template, data, lending_id)
+    log_audit(current_user.id, 'print', 'lending_session', session.id,
+              f'Printed In-Out sticker: {template.name} session {lending_id}')
+    return send_file(
+        output,
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f'{template.name}_{lending_id}.pdf'
+    )

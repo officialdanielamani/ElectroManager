@@ -15,8 +15,10 @@ def _add_missing_columns():
     """Add new columns to existing tables without a migration script."""
     with db.engine.connect() as conn:
         additions = [
-            ("batch_lend_records",   "lend_note", "VARCHAR(128)"),
-            ("batch_serial_numbers", "lend_note", "VARCHAR(128)"),
+            ("batch_lend_records",   "lend_note",           "VARCHAR(128)"),
+            ("batch_serial_numbers", "lend_note",           "VARCHAR(128)"),
+            ("batch_serial_numbers", "lending_session_id",  "INTEGER"),
+            ("batch_lend_records",   "lending_session_id",  "INTEGER"),
         ]
         for table, col, col_type in additions:
             try:

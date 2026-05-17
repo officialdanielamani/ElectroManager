@@ -7,7 +7,7 @@ from models import (db, User, Item, ItemBatch, BatchSerialNumber, Setting,
                     Project, ProjectCategory, ProjectTag, ProjectStatus,
                     ProjectPerson, ProjectGroup, ProjectGroupMember,
                     ContactPerson, ContactOrganization,
-                    ProjectBOMItem, ProjectAttachment, ProjectURL, SharedFile,
+                    ProjectBOMItem, ProjectCostItem, ProjectAttachment, ProjectURL, SharedFile,
                     MagicParameter, ProjectParameter, ProjectParameterStringValue)
 from utils import log_audit, permission_required, allowed_file
 from werkzeug.utils import secure_filename
@@ -181,56 +181,82 @@ def project_new():
     contact_orgs = ContactOrganization.query.order_by(ContactOrganization.name).all()
 
     if request.method == 'POST':
-        name = request.form.get('name', '').strip()
+        name = request.form.get('name', '').strip()[:512]
         if not name:
             flash('Project name is required.', 'danger')
             return render_template('project_form.html', title='New Project', project=None,
                                    categories=categories, tags=tags, statuses=statuses,
                                    users=users, contact_persons=contact_persons, contact_orgs=contact_orgs)
 
+        cat_id = request.form.get('category_id', type=int) or None
+        stat_id = request.form.get('status_id', type=int) or None
+        if cat_id and not ProjectCategory.query.get(cat_id):
+            flash('Selected category does not exist.', 'danger')
+            return render_template('project_form.html', title='New Project', project=None,
+                                   categories=categories, tags=tags, statuses=statuses,
+                                   users=users, contact_persons=contact_persons, contact_orgs=contact_orgs)
+        if stat_id and not ProjectStatus.query.get(stat_id):
+            flash('Selected status does not exist.', 'danger')
+            return render_template('project_form.html', title='New Project', project=None,
+                                   categories=categories, tags=tags, statuses=statuses,
+                                   users=users, contact_persons=contact_persons, contact_orgs=contact_orgs)
+
         project = Project(
             name=name,
-            info=request.form.get('info', '').strip(),
-            category_id=request.form.get('category_id', type=int) or None,
-            status_id=request.form.get('status_id', type=int) or None,
+            info=request.form.get('info', '').strip()[:128],
+            category_id=cat_id,
+            status_id=stat_id,
             quantity=request.form.get('quantity', 1, type=int),
             created_by=current_user.id,
             updated_by=current_user.id
         )
 
-        # Tags
+        # Tags — validate each ID exists
         selected_tags = request.form.getlist('tags')
-        if selected_tags:
-            project.tags = json.dumps([int(t) for t in selected_tags])
+        valid_tag_ids = []
+        for t in selected_tags:
+            try:
+                tid = int(t)
+                if ProjectTag.query.get(tid):
+                    valid_tag_ids.append(tid)
+            except (ValueError, TypeError):
+                pass
+        project.tags = json.dumps(valid_tag_ids) if valid_tag_ids else None
 
         # Users
         selected_users = request.form.getlist('users')
         if selected_users:
-            project.users = json.dumps([int(u) for u in selected_users])
+            project.users = json.dumps([int(u) for u in selected_users if u])
 
         # Persons
         selected_persons = request.form.getlist('persons')
         if selected_persons:
-            project.persons = json.dumps([int(p) for p in selected_persons])
+            project.persons = json.dumps([int(p) for p in selected_persons if p])
 
         # Organizations
         selected_orgs = request.form.getlist('organizations')
         if selected_orgs:
-            project.organizations = json.dumps([int(o) for o in selected_orgs])
+            project.organizations = json.dumps([int(o) for o in selected_orgs if o])
 
         # Dates
-        date_start = request.form.get('date_start')
+        date_start = request.form.get('date_start', '').strip()
         if date_start:
             try:
                 project.date_start = datetime.strptime(date_start, '%Y-%m-%d').date()
             except ValueError:
-                pass
-        date_end = request.form.get('date_end')
+                flash(f'Invalid start date format: "{date_start}". Use YYYY-MM-DD.', 'danger')
+                return render_template('project_form.html', title='New Project', project=None,
+                                       categories=categories, tags=tags, statuses=statuses,
+                                       users=users, contact_persons=contact_persons, contact_orgs=contact_orgs)
+        date_end = request.form.get('date_end', '').strip()
         if date_end:
             try:
                 project.date_end = datetime.strptime(date_end, '%Y-%m-%d').date()
             except ValueError:
-                pass
+                flash(f'Invalid end date format: "{date_end}". Use YYYY-MM-DD.', 'danger')
+                return render_template('project_form.html', title='New Project', project=None,
+                                       categories=categories, tags=tags, statuses=statuses,
+                                       users=users, contact_persons=contact_persons, contact_orgs=contact_orgs)
 
         db.session.add(project)
         db.session.commit()
@@ -258,7 +284,11 @@ def project_detail(project_id):
     currency_decimal = int(Setting.get('currency_decimal_places', '2'))
 
     # BOM items
-    bom_items = ProjectBOMItem.query.filter_by(project_id=project.id).all()
+    bom_items = ProjectBOMItem.query.filter_by(project_id=project.id).order_by(ProjectBOMItem.sort_order, ProjectBOMItem.id).all()
+
+    # Cost items
+    cost_items_per_qty = ProjectCostItem.query.filter_by(project_id=project.id, cost_type='per_qty').order_by(ProjectCostItem.sort_order).all()
+    cost_items_overall = ProjectCostItem.query.filter_by(project_id=project.id, cost_type='overall').order_by(ProjectCostItem.sort_order).all()
 
     # Attachments by type
     attachments = {}
@@ -271,6 +301,8 @@ def project_detail(project_id):
     return render_template('project_detail.html',
                            project=project,
                            bom_items=bom_items,
+                           cost_items_per_qty=cost_items_per_qty,
+                           cost_items_overall=cost_items_overall,
                            attachments=attachments,
                            currency=currency,
                            currency_decimal=currency_decimal,
@@ -298,38 +330,71 @@ def project_edit(project_id):
     contact_orgs = ContactOrganization.query.order_by(ContactOrganization.name).all()
 
     if request.method == 'POST':
-        name = request.form.get('name', '').strip()
+        name = request.form.get('name', '').strip()[:512]
         if not name:
             flash('Project name is required.', 'danger')
             return redirect(url_for('project.project_edit', project_id=project_id))
 
+        cat_id = request.form.get('category_id', type=int) or None
+        stat_id = request.form.get('status_id', type=int) or None
+        if cat_id and not ProjectCategory.query.get(cat_id):
+            flash('Selected category does not exist.', 'danger')
+            return redirect(url_for('project.project_edit', project_id=project_id))
+        if stat_id and not ProjectStatus.query.get(stat_id):
+            flash('Selected status does not exist.', 'danger')
+            return redirect(url_for('project.project_edit', project_id=project_id))
+
         project.name = name
-        project.info = request.form.get('info', '').strip()
+        project.info = request.form.get('info', '').strip()[:128]
         project.description = request.form.get('description', '').strip()
-        project.category_id = request.form.get('category_id', type=int) or None
-        project.status_id = request.form.get('status_id', type=int) or None
+        project.category_id = cat_id
+        project.status_id = stat_id
         project.quantity = request.form.get('quantity', 1, type=int)
         project.updated_by = current_user.id
 
         project.enable_dateline_notification = 'enable_dateline_notification' in request.form
-        project.notify_before_days = request.form.get('notify_before_days', 3, type=int)
+        project.notify_before_days = max(1, min(request.form.get('notify_before_days', 3, type=int), 365))
 
         selected_tags = request.form.getlist('tags')
-        project.tags = json.dumps([int(t) for t in selected_tags]) if selected_tags else None
+        valid_tag_ids = []
+        for t in selected_tags:
+            try:
+                tid = int(t)
+                if ProjectTag.query.get(tid):
+                    valid_tag_ids.append(tid)
+            except (ValueError, TypeError):
+                pass
+        project.tags = json.dumps(valid_tag_ids) if valid_tag_ids else None
 
         selected_users = request.form.getlist('users')
-        project.users = json.dumps([int(u) for u in selected_users]) if selected_users else None
+        project.users = json.dumps([int(u) for u in selected_users if u]) if selected_users else None
 
         selected_persons = request.form.getlist('persons')
-        project.persons = json.dumps([int(p) for p in selected_persons]) if selected_persons else None
+        project.persons = json.dumps([int(p) for p in selected_persons if p]) if selected_persons else None
 
         selected_orgs = request.form.getlist('organizations')
-        project.organizations = json.dumps([int(o) for o in selected_orgs]) if selected_orgs else None
+        project.organizations = json.dumps([int(o) for o in selected_orgs if o]) if selected_orgs else None
 
-        date_start = request.form.get('date_start')
-        project.date_start = datetime.strptime(date_start, '%Y-%m-%d').date() if date_start else None
-        date_end = request.form.get('date_end')
-        project.date_end = datetime.strptime(date_end, '%Y-%m-%d').date() if date_end else None
+        project.thumbnail = request.form.get('thumbnail', '').strip()[:300] or None
+
+        date_start = request.form.get('date_start', '').strip()
+        if date_start:
+            try:
+                project.date_start = datetime.strptime(date_start, '%Y-%m-%d').date()
+            except ValueError:
+                flash(f'Invalid start date format: "{date_start}". Use YYYY-MM-DD.', 'danger')
+                return redirect(url_for('project.project_edit', project_id=project_id))
+        else:
+            project.date_start = None
+        date_end = request.form.get('date_end', '').strip()
+        if date_end:
+            try:
+                project.date_end = datetime.strptime(date_end, '%Y-%m-%d').date()
+            except ValueError:
+                flash(f'Invalid end date format: "{date_end}". Use YYYY-MM-DD.', 'danger')
+                return redirect(url_for('project.project_edit', project_id=project_id))
+        else:
+            project.date_end = None
 
         sf_ids = [int(i) for i in request.form.getlist('share_file_ids[]') if i]
         project.linked_share_files = SharedFile.query.filter(SharedFile.id.in_(sf_ids)).all() if sf_ids else []
@@ -342,7 +407,9 @@ def project_edit(project_id):
     return render_template('project_form.html', title='Edit Project', project=project,
                            categories=categories, tags=tags, statuses=statuses,
                            users=users, contact_persons=contact_persons, contact_orgs=contact_orgs,
-                           bom_items=ProjectBOMItem.query.filter_by(project_id=project.id).all(),
+                           bom_items=ProjectBOMItem.query.filter_by(project_id=project.id).order_by(ProjectBOMItem.sort_order, ProjectBOMItem.id).all(),
+                           cost_items_per_qty=ProjectCostItem.query.filter_by(project_id=project.id, cost_type='per_qty').order_by(ProjectCostItem.sort_order).all(),
+                           cost_items_overall=ProjectCostItem.query.filter_by(project_id=project.id, cost_type='overall').order_by(ProjectCostItem.sort_order).all(),
                            attachments={atype: ProjectAttachment.query.filter_by(project_id=project.id, attachment_type=atype).all() for atype in ['picture', 'document', 'schematic', '2d_design', '3d_design', 'program']},
                            share_files_project=SharedFile.query.filter_by(category='project').order_by(SharedFile.name).all(),
                            currency=Setting.get('currency', 'USD'),
@@ -454,7 +521,7 @@ def project_add_parameter(project_id):
         value=value if param_type in ['number', 'date'] else None,
         value2=value2 if operation in ['range', 'duration'] else None,
         unit=unit if param_type == 'number' else None,
-        description=description
+        description=description[:512]
     )
     db.session.add(proj_param)
     db.session.flush()
@@ -555,7 +622,7 @@ def project_edit_parameter(project_id, param_id):
         proj_param.value = value
         proj_param.value2 = value2
         proj_param.unit = request.form.get('unit', '').strip()
-        proj_param.description = request.form.get('description', '').strip()
+        proj_param.description = request.form.get('description', '').strip()[:512]
 
         if param.param_type == 'string':
             ProjectParameterStringValue.query.filter_by(project_parameter_id=proj_param.id).delete()
@@ -766,6 +833,143 @@ def bom_delete(project_id, bom_id):
     return jsonify({'success': True})
 
 
+@project_bp.route('/project/<project_id>/bom/<int:bom_id>/move', endpoint='project_bom_move', methods=['POST'])
+@login_required
+def project_bom_move(project_id, bom_id):
+    if not current_user.has_permission('projects', 'edit'):
+        return jsonify({'error': 'No permission'}), 403
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    data = request.get_json()
+    direction = data.get('direction')
+    bom = ProjectBOMItem.query.get_or_404(bom_id)
+    if bom.project_id != project.id:
+        return jsonify({'error': 'Not found'}), 404
+    items = ProjectBOMItem.query.filter_by(project_id=project.id).order_by(ProjectBOMItem.sort_order, ProjectBOMItem.id).all()
+    idx = next((i for i, b in enumerate(items) if b.id == bom_id), None)
+    if idx is None:
+        return jsonify({'error': 'Not found'}), 404
+    swap_idx = idx - 1 if direction == 'up' else idx + 1
+    if 0 <= swap_idx < len(items):
+        items[idx].sort_order, items[swap_idx].sort_order = items[swap_idx].sort_order, items[idx].sort_order
+        if items[idx].sort_order == items[swap_idx].sort_order:
+            items[idx].sort_order = idx
+            items[swap_idx].sort_order = swap_idx
+        db.session.commit()
+    return jsonify({'success': True})
+
+
+# ==================== PROJECT COST ITEMS ====================
+
+@project_bp.route('/project/<project_id>/cost/add', endpoint='cost_item_add', methods=['POST'])
+@login_required
+def cost_item_add(project_id):
+    if not current_user.has_permission('projects', 'edit'):
+        return jsonify({'error': 'No permission'}), 403
+
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    data = request.get_json()
+    cost_type = data.get('cost_type', 'per_qty')
+    if cost_type not in ('per_qty', 'overall'):
+        return jsonify({'error': 'Invalid cost_type'}), 400
+
+    # Assign sort_order as max + 1 for this type
+    existing = ProjectCostItem.query.filter_by(project_id=project.id, cost_type=cost_type).all()
+    sort_order = max((i.sort_order for i in existing), default=-1) + 1
+
+    try:
+        price = float(data.get('price', 0))
+        qty = float(data.get('quantity', 1))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid price or quantity'}), 400
+
+    item = ProjectCostItem(
+        project_id=project.id,
+        cost_type=cost_type,
+        name=(data.get('name') or '').strip(),
+        description=(data.get('description') or '').strip(),
+        price=price,
+        unit_label=(data.get('unit_label') or '').strip(),
+        quantity=qty,
+        sort_order=sort_order,
+    )
+    if not item.name:
+        return jsonify({'error': 'Name is required'}), 400
+    db.session.add(item)
+    db.session.commit()
+    log_audit(current_user.id, 'create', 'project_cost_item', item.id, f'Added cost item to project {project.project_id}')
+    return jsonify({'success': True, 'id': item.id})
+
+
+@project_bp.route('/project/<project_id>/cost/<int:cost_id>/edit', endpoint='cost_item_edit', methods=['POST'])
+@login_required
+def cost_item_edit(project_id, cost_id):
+    if not current_user.has_permission('projects', 'edit'):
+        return jsonify({'error': 'No permission'}), 403
+
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    item = ProjectCostItem.query.filter_by(id=cost_id, project_id=project.id).first_or_404()
+    data = request.get_json()
+
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'error': 'Name is required'}), 400
+
+    try:
+        price = float(data.get('price', 0))
+        qty = float(data.get('quantity', 1))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid price or quantity'}), 400
+
+    item.name = name
+    item.description = (data.get('description') or '').strip()
+    item.price = price
+    item.unit_label = (data.get('unit_label') or '').strip()
+    item.quantity = qty
+    db.session.commit()
+    log_audit(current_user.id, 'update', 'project_cost_item', item.id, f'Edited cost item in project {project.project_id}')
+    return jsonify({'success': True})
+
+
+@project_bp.route('/project/<project_id>/cost/<int:cost_id>/delete', endpoint='cost_item_delete', methods=['POST'])
+@login_required
+def cost_item_delete(project_id, cost_id):
+    if not current_user.has_permission('projects', 'edit'):
+        return jsonify({'error': 'No permission'}), 403
+
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    item = ProjectCostItem.query.filter_by(id=cost_id, project_id=project.id).first_or_404()
+    db.session.delete(item)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@project_bp.route('/project/<project_id>/cost/<int:cost_id>/move', endpoint='cost_item_move', methods=['POST'])
+@login_required
+def cost_item_move(project_id, cost_id):
+    if not current_user.has_permission('projects', 'edit'):
+        return jsonify({'error': 'No permission'}), 403
+
+    project = Project.query.filter_by(project_id=project_id).first_or_404()
+    item = ProjectCostItem.query.filter_by(id=cost_id, project_id=project.id).first_or_404()
+    direction = (request.get_json() or {}).get('direction', 'up')
+
+    siblings = ProjectCostItem.query.filter_by(
+        project_id=project.id, cost_type=item.cost_type
+    ).order_by(ProjectCostItem.sort_order).all()
+
+    idx = next((i for i, s in enumerate(siblings) if s.id == item.id), None)
+    if idx is None:
+        return jsonify({'error': 'Item not found'}), 404
+
+    swap_idx = idx - 1 if direction == 'up' else idx + 1
+    if swap_idx < 0 or swap_idx >= len(siblings):
+        return jsonify({'success': True})  # already at boundary
+
+    siblings[idx].sort_order, siblings[swap_idx].sort_order = siblings[swap_idx].sort_order, siblings[idx].sort_order
+    db.session.commit()
+    return jsonify({'success': True})
+
+
 # ==================== PROJECT ATTACHMENTS ====================
 
 @project_bp.route('/project/<project_id>/upload/<attachment_type>', endpoint='project_upload', methods=['POST'])
@@ -773,12 +977,12 @@ def bom_delete(project_id, bom_id):
 def project_upload(project_id, attachment_type):
     if not current_user.has_permission('projects', 'edit'):
         flash('No permission.', 'danger')
-        return redirect(url_for('project.project_detail', project_id=project_id))
+        return redirect(url_for('project.project_edit', project_id=project_id))
 
     valid_types = ['picture', 'document', 'schematic', '2d_design', '3d_design', 'program']
     if attachment_type not in valid_types:
         flash('Invalid attachment type.', 'danger')
-        return redirect(url_for('project.project_detail', project_id=project_id))
+        return redirect(url_for('project.project_edit', project_id=project_id))
 
     project = Project.query.filter_by(project_id=project_id).first_or_404()
 
@@ -808,7 +1012,30 @@ def project_upload(project_id, attachment_type):
         db.session.commit()
         flash(f'{uploaded} file(s) uploaded.', 'success')
 
-    return redirect(url_for('project.project_detail', project_id=project_id))
+    return redirect(url_for('project.project_edit', project_id=project_id))
+
+
+@project_bp.route('/api/project-thumb-media', endpoint='api_project_thumb_media')
+@login_required
+def api_project_thumb_media():
+    """API: List icon + project share files (images only) for project thumbnail picker."""
+    from models import SharedFile
+    from flask import url_for as _url_for
+    files = SharedFile.query.filter(
+        SharedFile.category.in_(['icon', 'project'])
+    ).order_by(SharedFile.category, SharedFile.name).all()
+    result = []
+    for f in files:
+        if not f.is_image:
+            continue
+        result.append({
+            'id': f.id,
+            'name': f.name,
+            'filename': f.filename,
+            'category': f.category,
+            'url': _url_for('share.share_serve', category=f.category, filename=f.filename),
+        })
+    return jsonify(result)
 
 
 @project_bp.route('/project/attachment/<int:att_id>/delete', endpoint='project_attachment_delete', methods=['POST'])
@@ -892,6 +1119,9 @@ def project_url_add(project_id):
     if not url_val:
         flash('URL is required.', 'danger')
         return redirect(url_for('project.project_detail', project_id=project_id))
+    if not url_val.startswith(('http://', 'https://')):
+        flash('URL must start with http:// or https://', 'danger')
+        return redirect(url_for('project.project_detail', project_id=project_id))
 
     purl = ProjectURL(
         project_id=project.id,
@@ -947,14 +1177,14 @@ def project_category_add():
     if not current_user.has_permission('settings_sections.project_settings', 'edit'):
         flash('No permission.', 'danger')
         return redirect(url_for('project.project_settings'))
-    name = request.form.get('name', '').strip()
+    name = request.form.get('name', '').strip()[:128]
     if not name:
         flash('Name required.', 'danger')
         return redirect(url_for('project.project_settings'))
     if ProjectCategory.query.filter_by(name=name).first():
         flash('Category already exists.', 'danger')
         return redirect(url_for('project.project_settings'))
-    cat = ProjectCategory(name=name, description=request.form.get('description', '').strip(),
+    cat = ProjectCategory(name=name, description=request.form.get('description', '').strip()[:512],
                           color=request.form.get('color', '#6c757d'))
     db.session.add(cat)
     db.session.commit()
@@ -969,8 +1199,8 @@ def project_category_edit(id):
         flash('No permission.', 'danger')
         return redirect(url_for('project.project_settings'))
     cat = ProjectCategory.query.get_or_404(id)
-    cat.name = request.form.get('name', cat.name).strip()
-    cat.description = request.form.get('description', '').strip()
+    cat.name = (request.form.get('name', cat.name).strip() or cat.name)[:128]
+    cat.description = request.form.get('description', '').strip()[:512]
     cat.color = request.form.get('color', cat.color)
     db.session.commit()
     flash('Category updated.', 'success')
@@ -997,14 +1227,14 @@ def project_tag_add():
     if not current_user.has_permission('settings_sections.project_settings', 'edit'):
         flash('No permission.', 'danger')
         return redirect(url_for('project.project_settings'))
-    name = request.form.get('name', '').strip()
+    name = request.form.get('name', '').strip()[:128]
     if not name:
         flash('Name required.', 'danger')
         return redirect(url_for('project.project_settings'))
     if ProjectTag.query.filter_by(name=name).first():
         flash('Tag already exists.', 'danger')
         return redirect(url_for('project.project_settings'))
-    tag = ProjectTag(name=name, description=request.form.get('description', '').strip(),
+    tag = ProjectTag(name=name, description=request.form.get('description', '').strip()[:512],
                      color=request.form.get('color', '#6c757d'))
     db.session.add(tag)
     db.session.commit()
@@ -1019,8 +1249,8 @@ def project_tag_edit(id):
         flash('No permission.', 'danger')
         return redirect(url_for('project.project_settings'))
     tag = ProjectTag.query.get_or_404(id)
-    tag.name = request.form.get('name', tag.name).strip()
-    tag.description = request.form.get('description', '').strip()
+    tag.name = (request.form.get('name', tag.name).strip() or tag.name)[:128]
+    tag.description = request.form.get('description', '').strip()[:512]
     tag.color = request.form.get('color', tag.color)
     db.session.commit()
     flash('Tag updated.', 'success')
@@ -1047,7 +1277,7 @@ def project_status_add():
     if not current_user.has_permission('settings_sections.project_settings', 'edit'):
         flash('No permission.', 'danger')
         return redirect(url_for('project.project_settings'))
-    name = request.form.get('name', '').strip()
+    name = request.form.get('name', '').strip()[:128]
     if not name:
         flash('Name required.', 'danger')
         return redirect(url_for('project.project_settings'))
@@ -1055,7 +1285,7 @@ def project_status_add():
         flash('Status already exists.', 'danger')
         return redirect(url_for('project.project_settings'))
     st = ProjectStatus(name=name, color=request.form.get('color', '#6c757d'),
-                       description=request.form.get('description', '').strip())
+                       description=request.form.get('description', '').strip()[:512])
     db.session.add(st)
     db.session.commit()
     flash(f'Status "{name}" added.', 'success')
@@ -1069,9 +1299,9 @@ def project_status_edit(id):
         flash('No permission.', 'danger')
         return redirect(url_for('project.project_settings'))
     st = ProjectStatus.query.get_or_404(id)
-    st.name = request.form.get('name', st.name).strip()
+    st.name = (request.form.get('name', st.name).strip() or st.name)[:128]
     st.color = request.form.get('color', st.color)
-    st.description = request.form.get('description', '').strip()
+    st.description = request.form.get('description', '').strip()[:512]
     db.session.commit()
     flash('Status updated.', 'success')
     return redirect(url_for('project.project_settings'))

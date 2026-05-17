@@ -235,7 +235,7 @@ def item_new():
             category_id=form.category_id.data if form.category_id.data and form.category_id.data > 0 else None,
             footprint_id=form.footprint_id.data if form.footprint_id.data and form.footprint_id.data > 0 else None,
             tags=tags_json,
-            datasheet_urls=form.datasheet_urls.data if perms['can_edit_advance'] else None,
+            datasheet_urls=(form.datasheet_urls.data or '')[:2048] or None if perms['can_edit_advance'] else None,
             created_by=current_user.id,
             updated_by=current_user.id
         )
@@ -468,14 +468,14 @@ def _apply_pending_sn_changes(item, perms):
                 except (ValueError, TypeError):
                     lend_id = None
                 if lend_id:
-                    sn_obj.lend_to_type = lc.get('lend_to_type', '')
+                    sn_obj.lend_to_type = lc.get('lend_to_type', '')[:32]
                     sn_obj.lend_to_id = lend_id
                     sn_obj.lend_start = _parse_dt(lc.get('lend_start', ''))
                     sn_obj.lend_end   = _parse_dt(lc.get('lend_end', ''))
                     sn_obj.lend_note  = (lc.get('lend_note', '') or '').strip()[:128] or None
                     sn_obj.lend_notify_enabled    = bool(lc.get('lend_notify', False))
                     try:
-                        sn_obj.lend_notify_before_days = int(lc.get('lend_days', 3))
+                        sn_obj.lend_notify_before_days = max(1, min(int(lc.get('lend_days', 3)), 365))
                     except (ValueError, TypeError):
                         sn_obj.lend_notify_before_days = 3
                 else:
@@ -589,7 +589,7 @@ def item_edit(uuid):
         # Advance Info section
         if perms['can_edit_advance']:
             item.description = form.description.data
-            item.datasheet_urls = form.datasheet_urls.data
+            item.datasheet_urls = (form.datasheet_urls.data or '')[:2048] or None
             # Thumbnail
             item.thumbnail = request.form.get('thumbnail', '').strip() or None
             # Linked share files
@@ -639,6 +639,15 @@ def item_delete(uuid):
         return redirect(url_for('item.item_detail', uuid=item.uuid))
     
     item_name = item.name
+
+    from models import ItemBatch, BatchLendRecord
+    has_active_loans = db.session.query(BatchLendRecord).join(ItemBatch).filter(
+        ItemBatch.item_id == item.id,
+        BatchLendRecord.returned_at == None
+    ).first() is not None
+    if has_active_loans:
+        flash(f'Cannot delete "{item_name}" — it has outstanding (unreturned) lending records.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=item.uuid))
 
     for attachment in item.attachments:
         try:
@@ -693,14 +702,26 @@ def bulk_delete_items():
         if not items_to_delete:
             return jsonify({'success': False, 'message': 'No items found to delete.'}), 404
         
+        from models import ItemBatch, BatchLendRecord, ItemParameter, ProjectBOMItem
+
         deleted_items = []
         deleted_count = 0
-        
+        skipped_loan_names = []
+
         # Delete each item
         for item in items_to_delete:
             item_name = item.name
             item_id = item.id
-            
+
+            # Block deletion if any batch has unreturned lending records
+            has_active_loans = db.session.query(BatchLendRecord).join(ItemBatch).filter(
+                ItemBatch.item_id == item.id,
+                BatchLendRecord.returned_at == None
+            ).first() is not None
+            if has_active_loans:
+                skipped_loan_names.append(item_name)
+                continue
+
             # Delete attachments
             for attachment in item.attachments:
                 try:
@@ -711,7 +732,6 @@ def bulk_delete_items():
                     logging.error(f"Error deleting attachment file {attachment.id}: {e}")
             
             # Delete item parameters
-            from models import ItemParameter, ProjectBOMItem
             ItemParameter.query.filter_by(item_id=item.id).delete()
             # Preserve BOM entries: clear item_id so entries remain with snapshot name
             for bom in ProjectBOMItem.query.filter_by(item_id=item.id).all():
@@ -736,11 +756,17 @@ def bulk_delete_items():
             f'Bulk deleted {deleted_count} items: {deleted_items_str}'
         )
         
-        return jsonify({
-            'success': True, 
+        result = {
+            'success': True,
             'deleted_count': deleted_count,
             'message': f'Successfully deleted {deleted_count} item(s).'
-        }), 200
+        }
+        if skipped_loan_names:
+            result['warning'] = (
+                f'{len(skipped_loan_names)} item(s) skipped — outstanding (unreturned) lending records exist: '
+                + ', '.join(skipped_loan_names)
+            )
+        return jsonify(result), 200
         
     except Exception as e:
         db.session.rollback()
@@ -953,7 +979,7 @@ def update_datasheets(item_id):
         
         # Save as JSON
         import json
-        item.datasheet_urls = json.dumps(datasheets)
+        item.datasheet_urls = json.dumps(datasheets)[:2048]
         db.session.commit()
         
         log_audit(current_user.id, 'update', 'item', item.id, f'Updated datasheets for item: {item.name}')
@@ -1092,7 +1118,7 @@ def item_add_parameter(id):
         value=value if param_type in ['number', 'date'] else None,
         value2=value2 if operation in ['range', 'duration'] else None,
         unit=unit if param_type == 'number' else None,
-        description=description
+        description=description[:512]
     )
 
     db.session.add(item_param)
@@ -1208,7 +1234,7 @@ def item_edit_parameter(uuid, param_id):
         item_param.value = value
         item_param.value2 = value2
         item_param.unit = request.form.get('unit', '').strip()
-        item_param.description = request.form.get('description', '').strip()
+        item_param.description = request.form.get('description', '').strip()[:512]
 
         if param.param_type == 'string':
             from models import ItemParameterStringValue

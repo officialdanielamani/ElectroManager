@@ -209,6 +209,17 @@
                             </div>
                         </div>
 
+                        <!-- ALLOW CHANGE NAME -->
+                        <div class="mb-3 form-check">
+                            {% if user and user.is_demo_user and config.DEMO_MODE %}
+                                <input type="checkbox" class="form-check-input" disabled checked>
+                                {{ form.allow_change_name.label(class="form-check-label") }}
+                            {% else %}
+                                {{ form.allow_change_name(class="form-check-input") }}
+                                {{ form.allow_change_name.label(class="form-check-label") }}
+                            {% endif %}
+                        </div>
+
                         <!-- ALLOW CHANGE SHORT INFO -->
                         <div class="mb-3 form-check">
                             {% if user and user.is_demo_user and config.DEMO_MODE %}

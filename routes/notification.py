@@ -64,11 +64,14 @@ def notifications():
         except Exception:
             pass
 
-    # --- Batch lend record notifications ---
+    # --- Batch lend record notifications (user-specific: only show to the borrower) ---
     from models import BatchLendRecord
     lend_recs_with_notify = BatchLendRecord.query.filter(
         BatchLendRecord.lend_notify_enabled == True,
         BatchLendRecord.lend_end.isnot(None),
+        BatchLendRecord.returned_at.is_(None),
+        BatchLendRecord.lend_to_type == 'user',
+        BatchLendRecord.lend_to_id == current_user.id,
     ).all()
 
     for rec in lend_recs_with_notify:
@@ -77,35 +80,42 @@ def notifications():
             if not batch or not batch.item:
                 continue
             days_before = rec.lend_notify_before_days or 3
-            remind_date = rec.lend_end - timedelta(days=days_before)
-            lend_label = rec.get_lend_to_display() or 'Unknown'
-            if rec.lend_end < today:
+            lend_end_date = rec.lend_end.date() if rec.lend_end else None
+            if not lend_end_date:
+                continue
+            remind_date = lend_end_date - timedelta(days=days_before)
+            session_label = rec.lending_session.lending_id if rec.lending_session else '—'
+            if lend_end_date < today:
                 notifications.append({
-                    'item': batch.item, 'batch': batch,
-                    'message': f"Lending to {lend_label} (qty {rec.quantity}) was due {rec.lend_end.strftime('%d/%m/%Y')} (overdue)",
+                    'item': batch.item, 'batch': batch, 'rec': rec,
+                    'session_label': session_label,
+                    'message': f"The item you borrowed is overdue (due {lend_end_date.strftime('%d/%m/%Y')})",
                     'type': 'lend_overdue',
                 })
-            elif rec.lend_end == today:
+            elif lend_end_date == today:
                 notifications.append({
-                    'item': batch.item, 'batch': batch,
-                    'message': f"Lending to {lend_label} (qty {rec.quantity}) ends today",
+                    'item': batch.item, 'batch': batch, 'rec': rec,
+                    'session_label': session_label,
+                    'message': f"You have items to return today ({lend_end_date.strftime('%d/%m/%Y')})",
                     'type': 'lend_due',
                 })
             elif remind_date <= today:
-                days_left = (rec.lend_end - today).days
+                days_left = (lend_end_date - today).days
                 notifications.append({
-                    'item': batch.item, 'batch': batch,
-                    'message': f"Lending to {lend_label} (qty {rec.quantity}) ends in {days_left} day(s) ({rec.lend_end.strftime('%d/%m/%Y')})",
+                    'item': batch.item, 'batch': batch, 'rec': rec,
+                    'session_label': session_label,
+                    'message': f"You have items to return before {lend_end_date.strftime('%d/%m/%Y')} ({days_left} day(s) left)",
                     'type': 'lend_soon',
                 })
         except Exception:
             pass
 
-    # --- SN-level lending notifications ---
+    # --- SN-level lending notifications (user-specific) ---
     sns_with_notify = BatchSerialNumber.query.filter(
         BatchSerialNumber.lend_notify_enabled == True,
         BatchSerialNumber.lend_end.isnot(None),
-        BatchSerialNumber.lend_to_id.isnot(None),
+        BatchSerialNumber.lend_to_id == current_user.id,
+        BatchSerialNumber.lend_to_type == 'user',
     ).all()
 
     for sn in sns_with_notify:
@@ -114,33 +124,68 @@ def notifications():
             if not batch or not batch.item:
                 continue
             days_before = sn.lend_notify_before_days or 3
-            remind_date = sn.lend_end - timedelta(days=days_before)
-            lend_label = sn.get_lend_to_display() or 'Unknown'
-            sn_ref = sn.serial_number or sn.internal_serial_number
-            if sn.lend_end < today:
+            lend_end_date = sn.lend_end.date() if sn.lend_end else None
+            if not lend_end_date:
+                continue
+            remind_date = lend_end_date - timedelta(days=days_before)
+            session_label = sn.lending_session.lending_id if sn.lending_session else '—'
+            if lend_end_date < today:
                 notifications.append({
-                    'item': batch.item,
-                    'batch': batch,
-                    'sn': sn,
-                    'message': f"SN {sn_ref} lent to {lend_label} was due {sn.lend_end.strftime('%d/%m/%Y')} (overdue)",
+                    'item': batch.item, 'batch': batch, 'sn': sn,
+                    'session_label': session_label,
+                    'message': f"The item you borrowed is overdue (due {lend_end_date.strftime('%d/%m/%Y')})",
                     'type': 'lend_overdue',
                 })
-            elif sn.lend_end == today:
+            elif lend_end_date == today:
                 notifications.append({
-                    'item': batch.item,
-                    'batch': batch,
-                    'sn': sn,
-                    'message': f"SN {sn_ref} lent to {lend_label} ends today",
+                    'item': batch.item, 'batch': batch, 'sn': sn,
+                    'session_label': session_label,
+                    'message': f"You have items to return today ({lend_end_date.strftime('%d/%m/%Y')})",
                     'type': 'lend_due',
                 })
             elif remind_date <= today:
-                days_left = (sn.lend_end - today).days
+                days_left = (lend_end_date - today).days
                 notifications.append({
-                    'item': batch.item,
-                    'batch': batch,
-                    'sn': sn,
-                    'message': f"SN {sn_ref} lent to {lend_label} ends in {days_left} day(s) ({sn.lend_end.strftime('%d/%m/%Y')})",
+                    'item': batch.item, 'batch': batch, 'sn': sn,
+                    'session_label': session_label,
+                    'message': f"You have items to return before {lend_end_date.strftime('%d/%m/%Y')} ({days_left} day(s) left)",
                     'type': 'lend_soon',
+                })
+        except Exception:
+            pass
+
+    # --- Project deadline notifications ---
+    from models import Project
+    projects_with_notify = Project.query.filter(
+        Project.enable_dateline_notification == True,
+        Project.date_end.isnot(None),
+    ).all()
+    for proj in projects_with_notify:
+        try:
+            days_before = proj.notify_before_days or 3
+            end_date = proj.date_end
+            remind_date = end_date - timedelta(days=days_before)
+            if end_date < today:
+                notifications.append({
+                    'project': proj,
+                    'item': None,
+                    'message': f'Project "{proj.name}" deadline has passed ({end_date.strftime("%d/%m/%Y")})',
+                    'type': 'project_overdue',
+                })
+            elif end_date == today:
+                notifications.append({
+                    'project': proj,
+                    'item': None,
+                    'message': f'Project "{proj.name}" is due today ({end_date.strftime("%d/%m/%Y")})',
+                    'type': 'project_due',
+                })
+            elif remind_date <= today:
+                days_left = (end_date - today).days
+                notifications.append({
+                    'project': proj,
+                    'item': None,
+                    'message': f'Project "{proj.name}" deadline in {days_left} day(s) ({end_date.strftime("%d/%m/%Y")})',
+                    'type': 'project_soon',
                 })
         except Exception:
             pass

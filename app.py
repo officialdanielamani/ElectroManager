@@ -49,7 +49,7 @@ class AnonymousUser(AnonymousUserMixin):
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'auth.login'
-login_manager.login_message = 'Please log in to access this page.'
+login_manager.login_message = ''
 login_manager.anonymous_user = AnonymousUser  # Use custom anonymous user
 
 # Create upload and instance folders
@@ -166,6 +166,7 @@ def inject_settings():
         'dependencies': libs,
         'system_name': system_name,
         'system_logo_url': system_logo_url,
+        'demo_mode': app.config.get('DEMO_MODE', False),
     }
 
 
@@ -256,6 +257,39 @@ register_blueprints(app)
 from qr_utils import validate_bootstrap_icons
 with app.app_context():
     validate_bootstrap_icons()
+
+# Apply any pending column migrations to existing databases
+def _apply_column_migrations():
+    """Add new columns to existing tables that predate them."""
+    additions = [
+        ("batch_lend_records",   "lend_note",           "VARCHAR(128)"),
+        ("batch_serial_numbers", "lend_note",           "VARCHAR(128)"),
+        ("batch_serial_numbers", "lending_session_id",  "INTEGER"),
+        ("batch_lend_records",   "lending_session_id",  "INTEGER"),
+        ("batch_lend_records",   "returned_at",         "DATETIME"),
+        ("batch_lend_records",   "return_session_id",    "INTEGER"),
+        ("batch_serial_numbers", "return_session_id",    "INTEGER"),
+        ("batch_serial_numbers", "returned_at",          "DATETIME"),
+        ("batch_serial_numbers", "returned_from_label",  "VARCHAR(128)"),
+        ("users",                "allow_change_name",    "BOOLEAN DEFAULT 1"),
+        ("item_batches",         "lend_disabled",        "BOOLEAN DEFAULT 0"),
+        ("racks",                "drawer_icons",         "TEXT DEFAULT NULL"),
+        ("racks",                "rack_icon",            "TEXT DEFAULT NULL"),
+        ("projects",             "thumbnail",            "VARCHAR(300)"),
+        ("project_bom_items",    "sort_order",           "INTEGER DEFAULT 0"),
+    ]
+    with db.engine.connect() as conn:
+        for table, col, col_type in additions:
+            try:
+                conn.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+                conn.commit()
+                logger.info(f"DB migration: added {table}.{col}")
+            except Exception:
+                pass  # column already exists
+
+with app.app_context():
+    db.create_all()          # create any brand-new tables (e.g. lending_sessions)
+    _apply_column_migrations()
 
 
 if __name__ == '__main__':
