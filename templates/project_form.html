@@ -637,7 +637,12 @@
                             <td>{{ '{:g}'.format(ci.quantity) }}</td>
                             <td>{{ currency }} {{ '{:,.{}f}'.format(ci.total, currency_decimal) }}</td>
                             <td>
-                                <button class="btn btn-outline-warning py-0 px-1" style="font-size:0.7rem;" onclick="editCostItem({{ ci.id }}, 'per_qty', {{ ci.name|tojson|replace('"', '&quot;') }}, {{ (ci.description or '')|tojson|replace('"', '&quot;') }}, {{ ci.price }}, {{ (ci.unit_label or '')|tojson|replace('"', '&quot;') }}, {{ ci.quantity }})" title="Edit"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-outline-warning py-0 px-1" style="font-size:0.7rem;"
+                                    data-ci-id="{{ ci.id }}" data-ci-type="per_qty"
+                                    data-ci-name="{{ ci.name|e }}" data-ci-desc="{{ (ci.description or '')|e }}"
+                                    data-ci-price="{{ ci.price }}" data-ci-unit="{{ (ci.unit_label or '')|e }}"
+                                    data-ci-qty="{{ ci.quantity }}"
+                                    onclick="editCostItemFromData(this)" title="Edit"><i class="bi bi-pencil"></i></button>
                             </td>
                         </tr>
                         {% else %}
@@ -695,7 +700,12 @@
                             <td>{{ '{:g}'.format(ci.quantity) }}</td>
                             <td>{{ currency }} {{ '{:,.{}f}'.format(ci.total, currency_decimal) }}</td>
                             <td>
-                                <button class="btn btn-outline-warning py-0 px-1" style="font-size:0.7rem;" onclick="editCostItem({{ ci.id }}, 'overall', {{ ci.name|tojson|replace('"', '&quot;') }}, {{ (ci.description or '')|tojson|replace('"', '&quot;') }}, {{ ci.price }}, {{ (ci.unit_label or '')|tojson|replace('"', '&quot;') }}, {{ ci.quantity }})" title="Edit"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-outline-warning py-0 px-1" style="font-size:0.7rem;"
+                                    data-ci-id="{{ ci.id }}" data-ci-type="overall"
+                                    data-ci-name="{{ ci.name|e }}" data-ci-desc="{{ (ci.description or '')|e }}"
+                                    data-ci-price="{{ ci.price }}" data-ci-unit="{{ (ci.unit_label or '')|e }}"
+                                    data-ci-qty="{{ ci.quantity }}"
+                                    onclick="editCostItemFromData(this)" title="Edit"><i class="bi bi-pencil"></i></button>
                             </td>
                         </tr>
                         {% else %}
@@ -1000,6 +1010,11 @@
         document.getElementById('ci-quantity').value = '1';
         document.getElementById('costItemModalTitle').innerHTML = '<i class="bi bi-calculator"></i> Add ' + (costType === 'per_qty' ? 'Cost per Quantity' : 'Overall Cost') + ' Item';
         new bootstrap.Modal(document.getElementById('costItemModal')).show();
+    };
+
+    window.editCostItemFromData = function(btn) {
+        const d = btn.dataset;
+        editCostItem(d.ciId, d.ciType, d.ciName, d.ciDesc, parseFloat(d.ciPrice), d.ciUnit, parseFloat(d.ciQty));
     };
 
     window.editCostItem = function(id, costType, name, description, price, unitLabel, qty) {

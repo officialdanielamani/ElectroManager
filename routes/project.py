@@ -284,7 +284,7 @@ def project_detail(project_id):
     currency_decimal = int(Setting.get('currency_decimal_places', '2'))
 
     # BOM items
-    bom_items = ProjectBOMItem.query.filter_by(project_id=project.id).all()
+    bom_items = ProjectBOMItem.query.filter_by(project_id=project.id).order_by(ProjectBOMItem.sort_order, ProjectBOMItem.id).all()
 
     # Cost items
     cost_items_per_qty = ProjectCostItem.query.filter_by(project_id=project.id, cost_type='per_qty').order_by(ProjectCostItem.sort_order).all()
@@ -407,7 +407,7 @@ def project_edit(project_id):
     return render_template('project_form.html', title='Edit Project', project=project,
                            categories=categories, tags=tags, statuses=statuses,
                            users=users, contact_persons=contact_persons, contact_orgs=contact_orgs,
-                           bom_items=ProjectBOMItem.query.filter_by(project_id=project.id).all(),
+                           bom_items=ProjectBOMItem.query.filter_by(project_id=project.id).order_by(ProjectBOMItem.sort_order, ProjectBOMItem.id).all(),
                            cost_items_per_qty=ProjectCostItem.query.filter_by(project_id=project.id, cost_type='per_qty').order_by(ProjectCostItem.sort_order).all(),
                            cost_items_overall=ProjectCostItem.query.filter_by(project_id=project.id, cost_type='overall').order_by(ProjectCostItem.sort_order).all(),
                            attachments={atype: ProjectAttachment.query.filter_by(project_id=project.id, attachment_type=atype).all() for atype in ['picture', 'document', 'schematic', '2d_design', '3d_design', 'program']},
