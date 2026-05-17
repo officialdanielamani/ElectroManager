@@ -493,11 +493,15 @@
                 </div>
             </div>
             <div class="card-body">
+                <div class="mb-2">
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteBOMSelected()"><i class="bi bi-trash"></i> Delete Selected</button>
+                </div>
                 <div class="table-responsive">
                     <table class="table table-sm table-hover" id="bomTable">
                         <thead>
                             <tr>
-                                <th style="width:60px;"></th>
+                                <th style="width:30px;"><input type="checkbox" id="bomCheckAll" title="Select all" onclick="toggleCheckAll('bom-sel', this.checked)"></th>
+                                <th style="width:60px;">Arrange</th>
                                 <th>Item</th>
                                 <th>Batch</th>
                                 <th>Req Qty <small class="text-muted fw-normal">(needed)</small></th>
@@ -511,9 +515,10 @@
                         <tbody>
                             {% for bom in bom_items %}
                             <tr id="bom-row-{{ bom.id }}" {% if not bom.item %}class="table-warning"{% endif %}>
+                                <td><input type="checkbox" class="bom-sel" value="{{ bom.id }}"></td>
                                 <td class="text-nowrap">
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="moveBOM({{ bom.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="moveBOM({{ bom.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
+                                    <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveBOM({{ bom.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
+                                    <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveBOM({{ bom.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
                                 </td>
                                 <td>
                                     {% if bom.item %}
@@ -552,10 +557,9 @@
                                 </td>
                                 <td>{{ currency }} {{ '{:,.{}f}'.format(bom.get_total_cost(), currency_decimal) }}</td>
                                 <td>{{ currency }} {{ '{:,.{}f}'.format(bom.get_actual_cost(), currency_decimal) }}</td>
-                                <td>
+                                <td class="text-nowrap">
                                     <button class="btn btn-outline-warning py-0 px-1" style="font-size:0.7rem;" onclick="openEditBOMModal({{ bom.id }}, {{ bom.item_id or 'null' }}, {{ bom.batch_id or 'null' }}, {{ bom.quantity }}, this.dataset.itemname)" data-itemname="{{ bom.item_display_name|e }}" title="Edit"><i class="bi bi-pencil"></i></button>
                                     {% if bom.item %}<a href="{{ url_for('item.item_detail', uuid=bom.item.uuid) }}" target="_blank" class="btn btn-outline-info py-0 px-1" style="font-size:0.7rem;" title="Item Info"><i class="bi bi-info-circle"></i></a>{% endif %}
-                                    <button class="btn btn-outline-danger py-0 px-1" style="font-size:0.7rem;" onclick="deleteBOM({{ bom.id }})" title="Remove"><i class="bi bi-trash"></i></button>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -563,17 +567,19 @@
                         {% if bom_items %}
                         <tfoot>
                             <tr class="table-active">
-                                <td colspan="6" class="text-end"><strong>Estimated Total:</strong></td>
+                                <td colspan="7" class="text-end"><strong>Estimated Total:</strong></td>
                                 <td><strong>{{ currency }} {{ '{:,.{}f}'.format(project.get_bom_total_cost(), currency_decimal) }}</strong></td>
                                 <td colspan="2"></td>
                             </tr>
                             <tr class="table-active">
-                                <td colspan="6" class="text-end"><strong>Actual Total:</strong></td>
+                                <td colspan="7" class="text-end"><strong>Actual Total:</strong></td>
                                 <td></td>
                                 <td><strong>{{ currency }} {{ '{:,.{}f}'.format(project.get_bom_actual_cost(), currency_decimal) }}</strong></td>
                                 <td></td>
                             </tr>
                         </tfoot>
+                        {% else %}
+                        <tbody><tr><td colspan="10" class="text-muted text-center py-2">No BOM items yet.</td></tr></tbody>
                         {% endif %}
                     </table>
                 </div>
@@ -600,41 +606,48 @@
                 <button type="button" class="btn btn-sm btn-outline-primary" onclick="openCostModal('per_qty')"><i class="bi bi-plus-lg"></i> Add Item</button>
             </div>
             <div class="card-body">
+                <div class="mb-2">
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteCostSelected('per_qty')"><i class="bi bi-trash"></i> Delete Selected</button>
+                </div>
                 <div class="table-responsive">
                     <table class="table table-sm table-hover">
                         <thead>
                             <tr>
+                                <th style="width:30px;"><input type="checkbox" id="cpqCheckAll" title="Select all" onclick="toggleCheckAll('cpq-sel', this.checked)"></th>
+                                <th style="width:60px;">Arrange</th>
                                 <th>Item</th>
                                 <th>Description</th>
                                 <th>Price per Qty</th>
                                 <th>Qty</th>
                                 <th>Total</th>
-                                <th style="width:130px;">Action</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
                         {% for ci in cost_items_per_qty %}
                         <tr>
+                            <td><input type="checkbox" class="cpq-sel" value="{{ ci.id }}"></td>
+                            <td class="text-nowrap">
+                                <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
+                                <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
+                            </td>
                             <td><strong>{{ ci.name }}</strong></td>
                             <td>{{ ci.description or '-' }}</td>
                             <td>{{ currency }} {{ '{:,.{}f}'.format(ci.price, currency_decimal) }}{% if ci.unit_label %} /{{ ci.unit_label }}{% endif %}</td>
                             <td>{{ '{:g}'.format(ci.quantity) }}</td>
                             <td>{{ currency }} {{ '{:,.{}f}'.format(ci.total, currency_decimal) }}</td>
                             <td>
-                                <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
-                                <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
                                 <button class="btn btn-outline-warning py-0 px-1" style="font-size:0.7rem;" onclick="editCostItem({{ ci.id }}, 'per_qty', {{ ci.name|tojson|replace('"', '&quot;') }}, {{ (ci.description or '')|tojson|replace('"', '&quot;') }}, {{ ci.price }}, {{ (ci.unit_label or '')|tojson|replace('"', '&quot;') }}, {{ ci.quantity }})" title="Edit"><i class="bi bi-pencil"></i></button>
-                                <button class="btn btn-outline-danger py-0 px-1" style="font-size:0.7rem;" onclick="deleteCostItem({{ ci.id }})" title="Delete"><i class="bi bi-trash"></i></button>
                             </td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="6" class="text-muted text-center py-2">No items yet. Click Add Item to start.</td></tr>
+                        <tr><td colspan="8" class="text-muted text-center py-2">No items yet. Click Add Item to start.</td></tr>
                         {% endfor %}
                         </tbody>
                         {% if cost_items_per_qty %}
                         <tfoot>
                             <tr class="table-active">
-                                <td colspan="4" class="text-end"><strong>Total/qty:</strong></td>
+                                <td colspan="6" class="text-end"><strong>Total/qty:</strong></td>
                                 <td colspan="2"><strong>{{ currency }} {{ '{:,.{}f}'.format(project.get_cost_per_qty_total(), currency_decimal) }}</strong></td>
                             </tr>
                         </tfoot>
@@ -651,41 +664,48 @@
                 <button type="button" class="btn btn-sm btn-outline-primary" onclick="openCostModal('overall')"><i class="bi bi-plus-lg"></i> Add Item</button>
             </div>
             <div class="card-body">
+                <div class="mb-2">
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteCostSelected('overall')"><i class="bi bi-trash"></i> Delete Selected</button>
+                </div>
                 <div class="table-responsive">
                     <table class="table table-sm table-hover">
                         <thead>
                             <tr>
+                                <th style="width:30px;"><input type="checkbox" id="overallCheckAll" title="Select all" onclick="toggleCheckAll('overall-sel', this.checked)"></th>
+                                <th style="width:60px;">Arrange</th>
                                 <th>Item</th>
                                 <th>Description</th>
                                 <th>Price per Qty</th>
                                 <th>Qty</th>
                                 <th>Total</th>
-                                <th style="width:130px;">Action</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
                         {% for ci in cost_items_overall %}
                         <tr>
+                            <td><input type="checkbox" class="overall-sel" value="{{ ci.id }}"></td>
+                            <td class="text-nowrap">
+                                <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
+                                <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
+                            </td>
                             <td><strong>{{ ci.name }}</strong></td>
                             <td>{{ ci.description or '-' }}</td>
                             <td>{{ currency }} {{ '{:,.{}f}'.format(ci.price, currency_decimal) }}{% if ci.unit_label %} /{{ ci.unit_label }}{% endif %}</td>
                             <td>{{ '{:g}'.format(ci.quantity) }}</td>
                             <td>{{ currency }} {{ '{:,.{}f}'.format(ci.total, currency_decimal) }}</td>
                             <td>
-                                <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
-                                <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
                                 <button class="btn btn-outline-warning py-0 px-1" style="font-size:0.7rem;" onclick="editCostItem({{ ci.id }}, 'overall', {{ ci.name|tojson|replace('"', '&quot;') }}, {{ (ci.description or '')|tojson|replace('"', '&quot;') }}, {{ ci.price }}, {{ (ci.unit_label or '')|tojson|replace('"', '&quot;') }}, {{ ci.quantity }})" title="Edit"><i class="bi bi-pencil"></i></button>
-                                <button class="btn btn-outline-danger py-0 px-1" style="font-size:0.7rem;" onclick="deleteCostItem({{ ci.id }})" title="Delete"><i class="bi bi-trash"></i></button>
                             </td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="6" class="text-muted text-center py-2">No items yet. Click Add Item to start.</td></tr>
+                        <tr><td colspan="8" class="text-muted text-center py-2">No items yet. Click Add Item to start.</td></tr>
                         {% endfor %}
                         </tbody>
                         {% if cost_items_overall %}
                         <tfoot>
                             <tr class="table-active">
-                                <td colspan="4" class="text-end"><strong>Total:</strong></td>
+                                <td colspan="6" class="text-end"><strong>Total:</strong></td>
                                 <td colspan="2"><strong>{{ currency }} {{ '{:,.{}f}'.format(project.get_overall_cost_total(), currency_decimal) }}</strong></td>
                             </tr>
                         </tfoot>
@@ -1261,6 +1281,29 @@ function deleteBOM(bomId) {
     if (!confirm('Remove this item from BOM?')) return;
     fetch(`/project/{{ project.project_id }}/bom/${bomId}/delete`, {method: 'POST'})
         .then(r => r.json()).then(d => { if (d.success) location.reload(); });
+}
+
+function toggleCheckAll(cls, checked) {
+    document.querySelectorAll('.' + cls).forEach(cb => cb.checked = checked);
+}
+
+function deleteBOMSelected() {
+    const ids = [...document.querySelectorAll('.bom-sel:checked')].map(cb => parseInt(cb.value));
+    if (!ids.length) { alert('No BOM items selected.'); return; }
+    if (!confirm(`Remove ${ids.length} selected BOM item(s)?`)) return;
+    Promise.all(ids.map(id =>
+        fetch(`/project/{{ project.project_id }}/bom/${id}/delete`, {method: 'POST'}).then(r => r.json())
+    )).then(() => location.reload());
+}
+
+function deleteCostSelected(type) {
+    const cls = type === 'per_qty' ? '.cpq-sel:checked' : '.overall-sel:checked';
+    const ids = [...document.querySelectorAll(cls)].map(cb => parseInt(cb.value));
+    if (!ids.length) { alert('No items selected.'); return; }
+    if (!confirm(`Delete ${ids.length} selected item(s)?`)) return;
+    Promise.all(ids.map(id =>
+        fetch(`/project/{{ project.project_id }}/cost/${id}/delete`, {method: 'POST', headers: {'Content-Type': 'application/json'}}).then(r => r.json())
+    )).then(() => location.reload());
 }
 
 document.addEventListener('click', function(e) {
