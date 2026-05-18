@@ -298,20 +298,32 @@
                         {% for batch in item.batches %}
                         <div class="card batch-card mb-2">
                             <div class="card-header p-2 d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#batchBody{{ batch.id }}" style="cursor:pointer; background: var(--bs-tertiary-bg, #f8f9fa);">
-                                <div>
+                                <div class="d-flex flex-wrap align-items-center gap-1" style="min-width:0;flex:1;">
                                     <strong><i class="bi bi-box-seam"></i> {{ batch.get_display_label() }}</strong>
-                                    <span class="badge bg-primary ms-2">Qty: {{ batch.quantity }}</span>
-                                    {% if batch.sn_tracking_enabled %}<span class="badge bg-dark ms-1"><i class="bi bi-upc-scan"></i> Tracking</span>{% endif %}
-                                    {% if batch.lend_disabled %}<span class="badge bg-secondary ms-1"><i class="bi bi-hand-index-thumb"></i> Lending Disabled</span>{% endif %}
-                                    <span class="badge bg-success ms-1">{{ currency }}{{ "%.2f"|format(batch.price_per_unit) }}/unit</span>
-                                    <span class="badge bg-info ms-1">Price: {{ currency }}{{ "%.2f"|format(batch.get_batch_total_price()) }}</span>
-                                    <span class="badge bg-secondary ms-1">Value: {{ currency }}{{ "%.2f"|format(batch.get_batch_total_value()) }}</span>
-                                    {% if batch.get_lend_quantity() > 0 %}<span class="badge ms-1" style="background-color:#c9a227; color:#fff;"><i class="bi bi-hand-index-thumb"></i> On Lend</span>{% endif %}
-                                    {% set proj_names = batch.get_project_names_for_batch() %}
-                                    {% if proj_names %}<span class="badge bg-info ms-1"><i class="bi bi-kanban"></i> In Project</span>{% endif %}
-                                    {% if not batch.follow_main_location %}<span class="badge ms-1" style="background-color: {{ batch.get_effective_location_color() }};"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>{% endif %}
-                                    {% if batch.purchase_date %}<small class="text-muted ms-2"><i class="bi bi-calendar"></i> {{ batch.purchase_date.strftime('%d/%m/%Y') }}</small>{% endif %}
-                                    {% if batch.note %}<small class="text-muted ms-2"><i class="bi bi-sticky"></i> {{ batch.note }}</small>{% endif %}
+                                    <span class="badge bg-primary">Qty: {{ batch.quantity }}</span>
+                                    {% if batch.sn_tracking_enabled %}
+                                    <span class="badge bg-dark"><i class="bi bi-upc-scan"></i> Tracking</span>
+                                    {% endif %}
+                                    <span class="badge bg-success">{{ currency }}{{ "%.2f"|format(batch.price_per_unit) }}/unit</span>
+                                    <span class="badge bg-info">Price: {{ currency }}{{ "%.2f"|format(batch.get_batch_total_price()) }}</span>
+                                    {% if not batch.follow_main_location %}
+                                    <span class="badge" style="background-color: {{ batch.get_effective_location_color() }};"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>
+                                    {% endif %}
+                                    {% if batch.get_project_used_quantity() > 0 %}
+                                    <span class="badge bg-info"><i class="bi bi-diagram-3"></i> In Project</span>
+                                    {% endif %}
+                                    {% if batch.get_lend_quantity() > 0 %}
+                                    <span class="badge" style="background-color:#c9a227; color:#fff;"><i class="bi bi-hand-index-thumb"></i> On Lend</span>
+                                    {% endif %}
+                                    {% if batch.lend_disabled %}
+                                    <span class="badge bg-danger"><i class="bi bi-slash-circle"></i> Lend Disable</span>
+                                    {% endif %}
+                                    {% if batch.purchase_date %}
+                                    <small class="text-muted"><i class="bi bi-calendar"></i> {{ batch.purchase_date.strftime('%d/%m/%Y') }}</small>
+                                    {% endif %}
+                                    {% if batch.note %}
+                                    <small class="text-muted"><i class="bi bi-sticky"></i> {{ batch.note }}</small>
+                                    {% endif %}
                                 </div>
                                 <div class="d-flex gap-1 align-items-center">
                                     {% if item_perms and item_perms.can_edit_info %}
