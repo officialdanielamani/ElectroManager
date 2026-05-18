@@ -302,6 +302,7 @@
                                     <strong><i class="bi bi-box-seam"></i> {{ batch.get_display_label() }}</strong>
                                     <span class="badge bg-primary ms-2">Qty: {{ batch.quantity }}</span>
                                     {% if batch.sn_tracking_enabled %}<span class="badge bg-dark ms-1"><i class="bi bi-upc-scan"></i> Tracking</span>{% endif %}
+                                    {% if batch.lend_disabled %}<span class="badge bg-secondary ms-1"><i class="bi bi-hand-index-thumb"></i> Lending Disabled</span>{% endif %}
                                     <span class="badge bg-success ms-1">{{ currency }}{{ "%.2f"|format(batch.price_per_unit) }}/unit</span>
                                     <span class="badge bg-info ms-1">Price: {{ currency }}{{ "%.2f"|format(batch.get_batch_total_price()) }}</span>
                                     <span class="badge bg-secondary ms-1">Value: {{ currency }}{{ "%.2f"|format(batch.get_batch_total_value()) }}</span>
@@ -381,16 +382,18 @@
                                     </div>
                                     {% endif %}
                                     {% if not batch.sn_tracking_enabled %}
+                                    {% set active_lends = batch.lend_records | selectattr('returned_at', 'none') | list %}
                                     {% set lend_total = batch.get_lend_quantity() %}
+                                    {% if lend_total > 0 %}
                                     <div class="mb-2">
-                                        <strong class="small"><i class="bi bi-hand-index-thumb text-warning"></i> Lending — Total: {{ lend_total }}</strong>
-                                        {% if batch.lend_records %}
+                                        <strong class="small"><i class="bi bi-hand-index-thumb text-warning"></i> Currently On Lend — {{ lend_total }}</strong>
+                                        {% if active_lends %}
                                         <table class="table table-sm table-bordered mt-1 mb-0" style="font-size:0.8rem;">
                                             <thead class="table-light">
                                                 <tr><th>Lend To</th><th style="width:80px">Qty</th><th style="width:90px">Start</th><th style="width:90px">Due Date</th><th>Notes</th><th style="width:30px"><i class="bi bi-bell" title="Notify"></i></th></tr>
                                             </thead>
                                             <tbody>
-                                                {% for r in batch.lend_records %}
+                                                {% for r in active_lends %}
                                                 <tr>
                                                     <td>{{ r.get_lend_to_display() or '(not set)' }}</td>
                                                     <td>{{ r.quantity }}</td>
@@ -402,10 +405,9 @@
                                                 {% endfor %}
                                             </tbody>
                                         </table>
-                                        {% else %}
-                                        <div class="text-muted small ms-1">No lending records.</div>
                                         {% endif %}
                                     </div>
+                                    {% endif %}
                                     {% endif %}
 
                                     {% if batch.sn_tracking_enabled and batch.serial_numbers|length > 0 %}
@@ -439,7 +441,6 @@
                                             <tbody id="snTableBody_{{ batch.id }}"></tbody>
                                         </table>
                                     </div>
-                                    <small class="text-muted">Double-click SN or Info to edit inline. Removed entries kept for record.</small>
                                     {% elif batch.sn_tracking_enabled and batch.serial_numbers|length == 0 and item_perms and item_perms.can_edit_batch %}
                                     <hr class="my-2">
                                     <div class="d-flex align-items-center gap-2">
@@ -3299,8 +3300,7 @@ function _snRender(batchId) {
         var canEdit = !r.is_deleted && !r._del && !r._add;
         var snCell   = canEdit ? '<span id="snVal'  +r.id+'" ondblclick="inlineEdit('+batchId+','+r.id+',\'sn\')">'  +_esc(snDisplay)  +'</span>' : _esc(snDisplay);
         var infoCell = canEdit ? '<span id="infoVal'+r.id+'" ondblclick="inlineEdit('+batchId+','+r.id+',\'info\')">' +_esc(infoDisplay)+'</span>' : _esc(infoDisplay);
-        var lendCell = (canEdit && r.lend_to_id) ? '<span id="lendVal'+r.id+'" style="cursor:pointer" onclick="openSnLendModal('+batchId+','+r.id+')">' +_esc(lendDisplay)+'</span>'
-                     : (canEdit ? '<span id="lendVal'+r.id+'" class="text-muted" style="cursor:pointer" onclick="openSnLendModal('+batchId+','+r.id+')">(click to lend)</span>' : '-');
+        var lendCell = r.lend_to_id ? _esc(lendDisplay) : '<span class="text-muted">—</span>';
         html += '<tr class="'+rowCls+'" style="'+rowStyle+'">' +
             '<td><input type="checkbox" class="form-check-input sn-check-'+batchId+'" value="'+r.id+'"'+(cbDisabled?' '+cbDisabled:'')+('></td>') +
             '<td>' + seqDisplay + '</td>' +
