@@ -646,8 +646,7 @@
     color: var(--bs-body-color);
 }
 .move-drawer-cell {
-    width: 44px;
-    height: 52px;
+    min-height: 52px;
     border: 1px solid var(--dc-normal-border);
     border-radius: 4px;
     display: flex;
@@ -696,14 +695,10 @@
     cursor: not-allowed;
 }
 .move-drawer-cell.merged {
-    width: 100%;       /* override fixed width so grid-column:span N stretches the cell */
     border-color: var(--dc-merged-border);
     border-style: dashed;
     background: linear-gradient(145deg, var(--dc-merged-bg-1), var(--dc-merged-bg-2));
     color: var(--dc-merged-color);
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
 }
 .move-drawer-cell.has-items.merged {
     background: linear-gradient(145deg, var(--dc-items-bg-1), var(--dc-items-bg-2));
@@ -1620,10 +1615,9 @@ function _buildMiniGrid(container, rackId, rows, cols, mergedGroups, selfDrawerI
         }
     });
 
-    // Use 1fr columns; cells have a fixed width but merged cells override with width:100%
-    // so grid-column:span N stretches them across multiple tracks (same as item_form.html)
-    container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-    container.style.width = `${cols * 44 + (cols - 1) * 4}px`;
+    // Mirrors rack_detail.html: minmax(0,1fr) columns + explicit width; no fixed width on cells
+    container.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+    container.style.width = `${cols * 56}px`;
 
     for (let r = 1; r <= rows; r++) {
         for (let c = 1; c <= cols; c++) {
@@ -1668,8 +1662,6 @@ function _buildMiniGrid(container, rackId, rows, cols, mergedGroups, selfDrawerI
             if (span) {
                 cellDiv.style.gridRow    = `span ${span.rowspan}`;
                 cellDiv.style.gridColumn = `span ${span.colspan}`;
-                // Explicit height so the cell fills multi-row spans (mirrors item_form.html)
-                cellDiv.style.height = `${span.rowspan * 52 + (span.rowspan - 1) * 4}px`;
             }
 
             // Label badge (span size / group count / slave arrow)
