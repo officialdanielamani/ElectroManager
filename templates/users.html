@@ -124,9 +124,7 @@
                                 <td>{{ user.email }}</td>
                                 <td>
                                     {% if user.user_role.is_system_role %}
-                                        {% if user.user_role.name == 'Admin' %}
-                                        <span class="badge bg-danger">{{ user.user_role.name }} <i class="bi bi-star-fill"></i></span>
-                                        {% endif %}
+                                    <span class="badge bg-danger">{{ user.user_role.name }} <i class="bi bi-shield-fill"></i></span>
                                     {% else %}
                                     <span class="badge bg-primary">{{ user.user_role.name }}</span>
                                     {% endif %}

@@ -506,7 +506,8 @@ def role_edit(id):
         if 'update_info' in request.form:
             # Update role name and description
             if form.validate_on_submit():
-                role.name = form.name.data
+                if not role.is_system_role:
+                    role.name = form.name.data
                 role.description = form.description.data
                 db.session.commit()
                 log_audit(current_user.id, 'update', 'role', role.id, f'Updated role info: {role.name}')
