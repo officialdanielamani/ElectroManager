@@ -33,7 +33,19 @@ AVAILABLE_PLACEHOLDERS = {
         '{LendRealSt}', '{LendUser}',
         '{ReturnDate}', '{ReturnTime}', '{ReturnStat}',
         '{ReturnReal}', '{ReturnUser}'
-    ]
+    ],
+    'Item Batch': [
+        # All item-level placeholders
+        '{ItemUUID}', '{ItemName}', '{ItemType}', '{ItemSKU}', '{ItemInfo}',
+        '{ItemCat}', '{ItemFoot}', '{ItemTPrice}', '{ItemMOvrQty}', '{ItemMinQty}',
+        '{ItemMLocName}', '{ItemMLocUUID}', '{ItemMRackName}', '{ItemMRackUUID}', '{ItemMDrawLoc}',
+        # Batch-specific placeholders
+        '{BatchName}', '{BatchID}', '{BatchManu}', '{BatchNote}', '{BatchDate}',
+        '{BatchPriceU}', '{BatchPriceT}', '{BatchQty}',
+        '{BatchLocName}', '{BatchLocUUID}',
+        '{BatchRackName}', '{BatchRackUUID}', '{BatchDrawLoc}',
+        '{BatchInfo}', '{BatchSN}', '{BatchISN}', '{BatchSISN}', '{BatchINSD}',
+    ],
 }
 
 def validate_bootstrap_icons():
@@ -106,6 +118,76 @@ def get_item_data(item):
         'ItemMDrawLoc':  draw_loc,
         '_item_icon':   item_icon,
     }
+
+def get_batch_data(batch, sn=None):
+    """Extract printable data from ItemBatch; optionally include a specific BatchSerialNumber."""
+    item = batch.item
+    base = get_item_data(item) if item else {}
+
+    # Effective batch location
+    if batch.follow_main_location and item:
+        if item.rack_id and item.rack and item.rack.physical_location:
+            b_loc_name = item.rack.physical_location.name
+            b_loc_uuid = item.rack.physical_location.uuid
+        elif item.location_id and item.general_location:
+            b_loc_name = item.general_location.name
+            b_loc_uuid = item.general_location.uuid
+        else:
+            b_loc_name = b_loc_uuid = ''
+        b_rack_name = item.rack.name if item.rack else ''
+        b_rack_uuid = item.rack.uuid if item.rack else ''
+        b_draw_loc  = item.drawer if (item.rack_id and item.drawer) else ''
+    else:
+        if batch.rack_id and batch.batch_rack and batch.batch_rack.physical_location:
+            b_loc_name = batch.batch_rack.physical_location.name
+            b_loc_uuid = batch.batch_rack.physical_location.uuid
+        elif batch.location_id and batch.batch_location:
+            b_loc_name = batch.batch_location.name
+            b_loc_uuid = batch.batch_location.uuid
+        else:
+            b_loc_name = b_loc_uuid = ''
+        b_rack_name = batch.batch_rack.name if batch.batch_rack else ''
+        b_rack_uuid = batch.batch_rack.uuid if batch.batch_rack else ''
+        b_draw_loc  = batch.drawer if (batch.rack_id and batch.drawer) else ''
+
+    price_u = f"{batch.price_per_unit:.2f}" if batch.price_per_unit else ''
+    price_t = f"{batch.get_batch_total_price():.2f}" if batch.get_batch_total_price() else ''
+    b_date  = batch.purchase_date.strftime('%Y-%m-%d') if batch.purchase_date else ''
+
+    data = {**base,
+        'BatchName':     batch.get_display_label(),
+        'BatchID':       batch.get_batch_uid(),
+        'BatchManu':     batch.manufacturer or '',
+        'BatchNote':     batch.note or '',
+        'BatchDate':     b_date,
+        'BatchPriceU':   price_u,
+        'BatchPriceT':   price_t,
+        'BatchQty':      str(batch.quantity),
+        'BatchLocName':  b_loc_name,
+        'BatchLocUUID':  b_loc_uuid,
+        'BatchRackName': b_rack_name,
+        'BatchRackUUID': b_rack_uuid,
+        'BatchDrawLoc':  b_draw_loc,
+        'BatchInfo':     '',
+        'BatchSN':       '',
+        'BatchISN':      '',
+        'BatchSISN':     '',
+        'BatchINSD':     '',
+    }
+
+    if sn:
+        isn   = sn.internal_serial_number or ''
+        parts = isn.split('-')
+        data.update({
+            'BatchInfo':  sn.info or '',
+            'BatchSN':    sn.serial_number or '',
+            'BatchISN':   isn,
+            'BatchSISN':  '-'.join(parts[1:]) if len(parts) > 1 else '',
+            'BatchINSD':  '-'.join(parts[2:]) if len(parts) > 2 else '',
+        })
+
+    return data
+
 
 def get_location_data(location):
     """Extract printable data from Location"""

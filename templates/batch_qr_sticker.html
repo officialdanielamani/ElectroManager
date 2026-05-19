@@ -1,0 +1,67 @@
+{% extends "_qr_sticker_base.html" %}
+
+{% block title %}QR Sticker — {{ item.name }} / {{ batch.get_display_label() }}{% endblock %}
+
+{% block sticker_header %}
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h4 class="mb-0 text-white"><i class="bi bi-qr-code"></i> QR/Barcode Sticker</h4>
+            <a href="{{ url_for('item.item_detail', uuid=item.uuid) }}" class="btn btn-light btn-sm">
+                <i class="bi bi-box-seam"></i> Back to Item
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        <h6 class="text-muted mb-1">
+            {{ item.name }}
+            <span class="badge bg-secondary ms-1">{{ batch.get_display_label() }}</span>
+            {% if sn_ids %}
+            <span class="badge bg-info ms-1">{{ sn_ids|length }} serial number{{ 's' if sn_ids|length != 1 }}</span>
+            {% endif %}
+        </h6>
+        <small class="text-muted">Batch UID: <code>{{ batch.get_batch_uid() }}</code></small>
+    </div>
+</div>
+{% endblock %}
+
+{% block no_templates_type %}Item Batch{% endblock %}
+
+{% block sticker_init_js %}
+{% if sn_ids %}
+const _pages          = {{ sn_ids | tojson }};
+const _pageLabel      = i  => `SN ID: ${_pages[i]} ({{ batch.get_display_label() }})`;
+const _pagePreviewUrl = (id, i) => `/api/item/{{ item.uuid }}/batch/{{ batch.id }}/sticker-preview/${id}?sn_id=${_pages[i]}`;
+const _pagePrintUrl   = id  => `/api/item/{{ item.uuid }}/batches/sticker-print/${id}?batch_id={{ batch.id }}&sn_ids=${encodeURIComponent(_pages.join(','))}`;
+const _pageSvgZipUrl  = id  => `/api/item/{{ item.uuid }}/batches/sticker-svg-zip/${id}?batch_id={{ batch.id }}&sn_ids=${encodeURIComponent(_pages.join(','))}`;
+const _pageFilename   = (ext, i) => `{{ item.name|replace("'","")|replace(" ","_") }}_{{ batch.get_display_label()|replace(" ","_") }}_sn${_pages[i]}.${ext}`;
+
+const _pageTablePrintUrl = (id, opts) => {
+    const p = new URLSearchParams({
+        batch_id:    '{{ batch.id }}',
+        sn_ids:      _pages.join(','),
+        paper_w:     opts.paper_w,    paper_h:     opts.paper_h,
+        margin_t:    opts.margin_t,   margin_b:    opts.margin_b,
+        margin_l:    opts.margin_l,   margin_r:    opts.margin_r,
+        spacing_v:   opts.spacing_v,  spacing_h:   opts.spacing_h,
+        border:      opts.border ? '1' : '0',
+        border_w:    opts.border_w,   border_color: opts.border_color,
+    });
+    return `/api/item/{{ item.uuid }}/batches/sticker-table-print/${id}?${p}`;
+};
+
+/* Single-page fallbacks (also used when _pages.length === 1) */
+const _previewUrl   = id  => _pagePreviewUrl(id, 0);
+const _printUrl     = id  => `/api/item/{{ item.uuid }}/batches/sticker-print/${id}?batch_id={{ batch.id }}&sn_ids=${_pages[0]}`;
+const _downloadName = ext => ext === 'zip'
+    ? `{{ item.name|replace("'","")|replace(" ","_") }}_{{ batch.get_display_label()|replace(" ","_") }}_sn.zip`
+    : `{{ item.name|replace("'","")|replace(" ","_") }}_{{ batch.get_display_label()|replace(" ","_") }}_sn${_pages[0]}.${ext}`;
+const _entityLabel  = ()  => `SN ID: ${_pages[0]} ({{ batch.get_display_label() }})`;
+{% else %}
+/* Single batch sticker (no SN selection) */
+const _previewUrl   = id  => `/api/item/{{ item.uuid }}/batch/{{ batch.id }}/sticker-preview/${id}`;
+const _printUrl     = id  => `/api/item/{{ item.uuid }}/batches/sticker-print/${id}?batch_id={{ batch.id }}`;
+const _downloadName = ext => `{{ item.name|replace("'","")|replace(" ","_") }}_{{ batch.get_display_label()|replace(" ","_") }}.${ext}`;
+const _entityLabel  = ()  => `{{ batch.get_display_label() }} ({{ item.name }})`;
+{% endif %}
+{% endblock %}

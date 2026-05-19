@@ -3,11 +3,12 @@ QR/Barcode Sticker Template Routes - Blueprint
 """
 from flask import Blueprint, render_template, request, jsonify, send_file, redirect, url_for, flash, current_app, abort
 from flask_login import login_required, current_user
-from models import db, Item, Location, Rack, StickerTemplate
+from models import db, Item, Location, Rack, StickerTemplate, ItemBatch, BatchSerialNumber
 from qr_utils import (
-    get_item_data, get_location_data, get_rack_data,
+    get_item_data, get_location_data, get_rack_data, get_batch_data,
     render_template_to_svg, generate_single_sticker_pdf,
-    generate_batch_stickers_pdf, AVAILABLE_PLACEHOLDERS
+    generate_batch_stickers_pdf, generate_svg_zip, generate_table_sticker_pdf,
+    AVAILABLE_PLACEHOLDERS
 )
 from routes.settings import get_available_fonts
 from utils import log_audit, permission_required
@@ -203,6 +204,12 @@ def preview_qr_template(template_id):
                     data = get_session_data(sample_session)
                 else:
                     data = {ph.strip('{}') : f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('In-Out', [])}
+            elif template.template_type == 'Item Batch':
+                sample_batch = ItemBatch.query.first()
+                if sample_batch:
+                    data = get_batch_data(sample_batch)
+                else:
+                    data = {ph.strip('{}') : f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('Item Batch', [])}
             else:
                 data = {}
         
@@ -423,3 +430,167 @@ def api_get_icons():
         logger.error(f"Error reading Bootstrap Icons CSS: {e}")
         return jsonify([])
 
+
+
+# ─────────────────────────── Item Batch QR sticker routes ───────────────────────────
+
+def _parse_sn_ids(raw):
+    """Parse a comma-separated string of SN IDs into a list of ints."""
+    ids = []
+    for part in (raw or '').split(','):
+        part = part.strip()
+        if part.isdigit():
+            ids.append(int(part))
+    return ids
+
+
+@qr_template_bp.route('/item/<string:uuid>/batch/<int:batch_id>/qr-sticker')
+@login_required
+def batch_qr_sticker(uuid, batch_id):
+    """View and print QR stickers for an item batch (or specific serial numbers)."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        abort(403)
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    batch = ItemBatch.query.filter_by(id=batch_id, item_id=item.id).first_or_404()
+    sn_ids = _parse_sn_ids(request.args.get('sn_ids', ''))
+    templates = StickerTemplate.query.filter_by(template_type='Item Batch').all()
+    return render_template('batch_qr_sticker.html',
+                           item=item, batch=batch,
+                           sn_ids=sn_ids,
+                           templates=templates)
+
+
+@qr_template_bp.route('/api/item/<string:uuid>/batch/<int:batch_id>/sticker-preview/<int:template_id>')
+@login_required
+def api_batch_sticker_preview(uuid, batch_id, template_id):
+    """Generate SVG preview for an item batch sticker (optional ?sn_id=)."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    batch = ItemBatch.query.filter_by(id=batch_id, item_id=item.id).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'Item Batch':
+        return jsonify({'error': 'Template must be Item Batch type'}), 400
+    sn = None
+    sn_id = request.args.get('sn_id', '')
+    if sn_id.isdigit():
+        sn = BatchSerialNumber.query.filter_by(id=int(sn_id), batch_id=batch.id).first()
+    data = get_batch_data(batch, sn)
+    svg_data = render_template_to_svg(template, data)
+    return jsonify({
+        'svg': svg_data,
+        'width_mm': template.width_mm,
+        'height_mm': template.height_mm,
+        'template_name': template.name
+    })
+
+
+@qr_template_bp.route('/api/item/<string:uuid>/batches/sticker-print/<int:template_id>')
+@login_required
+def api_batch_sticker_print(uuid, template_id):
+    """Multi-page PDF: one page per SN (if sn_ids given) or one page for the batch."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'Item Batch':
+        return jsonify({'error': 'Template must be Item Batch type'}), 400
+    batch_id = request.args.get('batch_id', '')
+    if not batch_id.isdigit():
+        return jsonify({'error': 'Invalid batch_id'}), 400
+    batch = ItemBatch.query.filter_by(id=int(batch_id), item_id=item.id).first_or_404()
+    sn_ids = _parse_sn_ids(request.args.get('sn_ids', ''))
+    if sn_ids:
+        sns = BatchSerialNumber.query.filter(
+            BatchSerialNumber.id.in_(sn_ids),
+            BatchSerialNumber.batch_id == batch.id
+        ).all()
+        records = [(batch, sn) for sn in sns]
+    else:
+        records = [(batch, None)]
+    try:
+        output = generate_batch_stickers_pdf(template, records, lambda r: get_batch_data(r[0], r[1]))
+        log_audit(current_user.id, 'print', 'item', item.id,
+                  f'Printed batch sticker: {template.name} batch {batch.id}')
+        return send_file(output, mimetype='application/pdf', as_attachment=True,
+                         download_name=f'{item.name}_{batch.get_display_label()}_sticker.pdf')
+    except Exception as e:
+        logger.error(f"Error generating batch sticker PDF: {e}")
+        return jsonify({'error': 'Failed to generate PDF.'}), 500
+
+
+@qr_template_bp.route('/api/item/<string:uuid>/batches/sticker-svg-zip/<int:template_id>')
+@login_required
+def api_batch_sticker_svg_zip(uuid, template_id):
+    """Download SVG zip for batch stickers."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'Item Batch':
+        return jsonify({'error': 'Template must be Item Batch type'}), 400
+    batch_id = request.args.get('batch_id', '')
+    if not batch_id.isdigit():
+        return jsonify({'error': 'Invalid batch_id'}), 400
+    batch = ItemBatch.query.filter_by(id=int(batch_id), item_id=item.id).first_or_404()
+    sn_ids = _parse_sn_ids(request.args.get('sn_ids', ''))
+    if sn_ids:
+        sns = BatchSerialNumber.query.filter(
+            BatchSerialNumber.id.in_(sn_ids),
+            BatchSerialNumber.batch_id == batch.id
+        ).all()
+        pairs = [(f'{item.name}_{batch.get_display_label()}_sn{sn.id}', get_batch_data(batch, sn)) for sn in sns]
+    else:
+        pairs = [(f'{item.name}_{batch.get_display_label()}', get_batch_data(batch))]
+    try:
+        output = generate_svg_zip(template, pairs)
+        return send_file(output, mimetype='application/zip', as_attachment=True,
+                         download_name=f'{item.name}_{batch.get_display_label()}_stickers.zip')
+    except Exception as e:
+        logger.error(f"Error generating batch sticker SVG zip: {e}")
+        return jsonify({'error': 'Failed to generate ZIP.'}), 500
+
+
+@qr_template_bp.route('/api/item/<string:uuid>/batches/sticker-table-print/<int:template_id>')
+@login_required
+def api_batch_sticker_table_print(uuid, template_id):
+    """Grid-layout PDF for batch stickers."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'Item Batch':
+        return jsonify({'error': 'Template must be Item Batch type'}), 400
+    batch_id = request.args.get('batch_id', '')
+    if not batch_id.isdigit():
+        return jsonify({'error': 'Invalid batch_id'}), 400
+    batch = ItemBatch.query.filter_by(id=int(batch_id), item_id=item.id).first_or_404()
+    sn_ids = _parse_sn_ids(request.args.get('sn_ids', ''))
+    if sn_ids:
+        sns = BatchSerialNumber.query.filter(
+            BatchSerialNumber.id.in_(sn_ids),
+            BatchSerialNumber.batch_id == batch.id
+        ).all()
+        records = [(batch, sn) for sn in sns]
+    else:
+        records = [(batch, None)]
+    options = {
+        'paper_w':   float(request.args.get('paper_w',  210)),
+        'paper_h':   float(request.args.get('paper_h',  297)),
+        'margin_t':  float(request.args.get('margin_t',  10)),
+        'margin_b':  float(request.args.get('margin_b',  10)),
+        'margin_l':  float(request.args.get('margin_l',  10)),
+        'margin_r':  float(request.args.get('margin_r',  10)),
+        'spacing_v': float(request.args.get('spacing_v',  3)),
+        'spacing_h': float(request.args.get('spacing_h',  3)),
+        'border':    request.args.get('border', '0') == '1',
+        'border_w':  float(request.args.get('border_w',  0.3)),
+        'border_color': request.args.get('border_color', '#000000'),
+    }
+    try:
+        output = generate_table_sticker_pdf(template, records, lambda r: get_batch_data(r[0], r[1]), options)
+        return send_file(output, mimetype='application/pdf', as_attachment=True,
+                         download_name=f'{item.name}_{batch.get_display_label()}_table.pdf')
+    except Exception as e:
+        logger.error(f"Error generating batch table sticker PDF: {e}")
+        return jsonify({'error': 'Failed to generate PDF.'}), 500
