@@ -82,12 +82,14 @@ def save_project_file(file, project_id_str, attachment_type):
         return None, 'Invalid upload path.'
     os.makedirs(folder, exist_ok=True)
 
-    file_path = os.path.join(folder, filename)
+    file_path = os.path.abspath(os.path.join(folder, filename))
+    if not file_path.startswith(folder + os.sep):
+        return None, 'Invalid file path.'
     counter = 1
     base_name = filename.rsplit('.', 1)[0] if '.' in filename else filename
     while os.path.exists(file_path):
         new_filename = f"{base_name}_{counter}.{ext}"
-        file_path = os.path.join(folder, new_filename)
+        file_path = os.path.abspath(os.path.join(folder, new_filename))
         filename = new_filename
         counter += 1
 
