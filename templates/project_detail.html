@@ -219,6 +219,7 @@
                 <!-- Costing Summary -->
                 <hr>
                 <h5><i class="bi bi-coin"></i> Costing</h5>
+                {% set _bom_est = project.get_bom_total_cost() %}
                 {% set _bom_act = project.get_bom_actual_cost() %}
                 {% set _cpq    = project.get_cost_per_qty_total() %}
                 {% set _ov     = project.get_overall_cost_total() %}
@@ -232,8 +233,8 @@
                                 <strong class="fs-5">{{ _qty }}</strong>
                             </td>
                             <td class="text-center p-2 table-secondary" style="width:22%;">
-                                <small class="text-muted d-block">Actual BOM</small>
-                                <strong>{{ currency }} {{ '{:,.{}f}'.format(_bom_act, currency_decimal) }}</strong>
+                                <small class="text-muted d-block">Estimate BOM</small>
+                                <strong>{{ currency }} {{ '{:,.{}f}'.format(_bom_est, currency_decimal) }}</strong>
                             </td>
                             <td class="text-center p-2 table-secondary" style="width:22%;">
                                 <small class="text-muted d-block">Cost per Qty</small>
@@ -245,7 +246,11 @@
                             </td>
                         </tr>
                         <tr>
-                            <td class="text-center p-2 table-secondary" colspan="2">
+                            <td class="text-center p-2 table-secondary">
+                                <small class="text-muted d-block">Actual BOM</small>
+                                <strong>{{ currency }} {{ '{:,.{}f}'.format(_bom_act, currency_decimal) }}</strong>
+                            </td>
+                            <td class="text-center p-2 table-secondary">
                                 <small class="text-muted d-block">Overall Cost</small>
                                 <strong>{{ currency }} {{ '{:,.{}f}'.format(_ov, currency_decimal) }}</strong>
                             </td>
@@ -410,6 +415,7 @@
                 {% set total_cost = (bom_actual + cpq_total) * proj_qty + ov_total %}
                 {% set avg_cost = total_cost / proj_qty %}
                 <h5><i class="bi bi-bar-chart-line"></i> Cost Summary</h5>
+                <p class="text-muted small"><i class="bi bi-info-circle"></i> Formula: <code>((Actual BOM + Cost per Qty) × Quantity) + Overall Cost = Total Cost</code></p>
                 <div class="table-responsive mt-2">
                     <table class="table table-sm" style="max-width:480px;">
                         <tbody>
