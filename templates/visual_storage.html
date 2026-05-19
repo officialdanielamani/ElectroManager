@@ -1521,7 +1521,11 @@ function showSwapItemsModal() {
     document.getElementById('swap_rack_id').value = '0';
     document.getElementById('swap_drawer').value = '';
     document.getElementById('swap_drawer_grid_container').innerHTML = '';
-    new bootstrap.Modal(document.getElementById('swapItemsModal')).show();
+    const drawerModalEl = document.getElementById('drawerModal');
+    bootstrap.Modal.getInstance(drawerModalEl)?.hide();
+    drawerModalEl.addEventListener('hidden.bs.modal',
+        () => new bootstrap.Modal(document.getElementById('swapItemsModal')).show(),
+        { once: true });
 }
 
 function swapAllItems() {
@@ -1759,7 +1763,11 @@ function showMoveItemsModal() {
     document.getElementById('move_rack_id').value = '0';
     document.getElementById('move_drawer').value = '';
     document.getElementById('move_drawer_grid_container').innerHTML = '';
-    new bootstrap.Modal(document.getElementById('moveItemsModal')).show();
+    const drawerModalEl = document.getElementById('drawerModal');
+    bootstrap.Modal.getInstance(drawerModalEl)?.hide();
+    drawerModalEl.addEventListener('hidden.bs.modal',
+        () => new bootstrap.Modal(document.getElementById('moveItemsModal')).show(),
+        { once: true });
 }
 
 function moveAllItems() {
