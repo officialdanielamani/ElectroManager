@@ -495,7 +495,7 @@
             <div class="modal-body p-3">
                 <div class="text-center mb-3">
                     <img id="userPicModalImg" src="" alt="" class="img-fluid rounded" style="max-height:240px; display:none;">
-                    <div id="userPicModalPlaceholder" class="rounded-circle bg-secondary d-inline-flex align-items-center justify-content-center" style="width:80px;height:80px;display:none!important;">
+                    <div id="userPicModalPlaceholder" class="rounded-circle bg-secondary align-items-center justify-content-center" style="width:80px;height:80px;display:none;">
                         <i class="bi bi-person-fill text-white" style="font-size:2rem;"></i>
                     </div>
                 </div>
@@ -536,7 +536,7 @@ document.getElementById('userPicModal').addEventListener('show.bs.modal', functi
         placeholder.style.display = 'none';
     } else {
         img.style.display = 'none';
-        placeholder.style.display = 'inline-flex';
+        placeholder.style.display = 'flex';
     }
 
     let infoHtml = `<p class="fw-semibold mb-1">${name.replace(/</g,'&lt;')}</p>`;
