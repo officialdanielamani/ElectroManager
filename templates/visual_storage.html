@@ -375,9 +375,19 @@
 
                 <!-- Drawer Grid -->
                 <div class="mt-2 p-2 border rounded drawer-grid-container">
-                    <small class="text-muted d-block mb-2">Click to select target drawer:</small>
-                    <div id="swap_drawer_grid_container" style="display: inline-grid; gap: 4px; background: transparent;"></div>
+                    <small class="text-muted d-block mb-1">Click to select target drawer:</small>
                     <div class="mini-grid-legend">
+                        <span><span class="lg-swatch" style="background:var(--dc-normal-bg);border:1px solid var(--dc-normal-border);"></span>Empty</span>
+                        <span><span class="lg-swatch" style="background:var(--dc-items-bg-1);border:1px solid var(--dc-items-border);"></span>Has Items</span>
+                        <span><span class="lg-swatch" style="background:var(--dc-merged-bg-1);border:1px dashed var(--dc-merged-border);"></span>Merged</span>
+                        <span><span class="lg-swatch" style="background:var(--dc-gmaster-bg-1);border:1px dashed var(--dc-gmaster-border);"></span>Group</span>
+                        <span><span class="lg-swatch" style="background:var(--dc-unavail-bg-1);border:1px solid var(--dc-unavail-border);"></span>Unavailable</span>
+                        <span><span class="lg-swatch" style="background:var(--dc-selected-bg);border:2px dashed var(--dc-selected-border);"></span>Source</span>
+                    </div>
+                    <div id="swap_grid_info_top" class="mini-grid-drawer-info"></div>
+                    <div id="swap_drawer_grid_container" style="display: inline-grid; gap: 4px; background: transparent;"></div>
+                    <div id="swap_grid_info_bottom" class="mini-grid-drawer-info"></div>
+                    <div class="mini-grid-legend mt-1">
                         <span><span class="lg-swatch" style="background:var(--dc-normal-bg);border:1px solid var(--dc-normal-border);"></span>Empty</span>
                         <span><span class="lg-swatch" style="background:var(--dc-items-bg-1);border:1px solid var(--dc-items-border);"></span>Has Items</span>
                         <span><span class="lg-swatch" style="background:var(--dc-merged-bg-1);border:1px dashed var(--dc-merged-border);"></span>Merged</span>
@@ -463,9 +473,18 @@
                     
                     <!-- Drawer Grid -->
                     <div class="mt-2 p-2 border rounded drawer-grid-container">
-                        <small class="text-muted d-block mb-2">Click to select:</small>
-                        <div id="move_drawer_grid_container" style="display: inline-grid; gap: 4px; background: transparent;"></div>
+                        <small class="text-muted d-block mb-1">Click to select:</small>
                         <div class="mini-grid-legend">
+                            <span><span class="lg-swatch" style="background:var(--dc-normal-bg);border:1px solid var(--dc-normal-border);"></span>Empty</span>
+                            <span><span class="lg-swatch" style="background:var(--dc-items-bg-1);border:1px solid var(--dc-items-border);"></span>Has Items</span>
+                            <span><span class="lg-swatch" style="background:var(--dc-merged-bg-1);border:1px dashed var(--dc-merged-border);"></span>Merged</span>
+                            <span><span class="lg-swatch" style="background:var(--dc-gmaster-bg-1);border:1px dashed var(--dc-gmaster-border);"></span>Group</span>
+                            <span><span class="lg-swatch" style="background:var(--dc-unavail-bg-1);border:1px solid var(--dc-unavail-border);"></span>Unavailable</span>
+                        </div>
+                        <div id="move_grid_info_top" class="mini-grid-drawer-info"></div>
+                        <div id="move_drawer_grid_container" style="display: inline-grid; gap: 4px; background: transparent;"></div>
+                        <div id="move_grid_info_bottom" class="mini-grid-drawer-info"></div>
+                        <div class="mini-grid-legend mt-1">
                             <span><span class="lg-swatch" style="background:var(--dc-normal-bg);border:1px solid var(--dc-normal-border);"></span>Empty</span>
                             <span><span class="lg-swatch" style="background:var(--dc-items-bg-1);border:1px solid var(--dc-items-border);"></span>Has Items</span>
                             <span><span class="lg-swatch" style="background:var(--dc-merged-bg-1);border:1px dashed var(--dc-merged-border);"></span>Merged</span>
@@ -735,19 +754,16 @@
     opacity: 0.85;
     cursor: not-allowed;
 }
-.mini-cell-short-info {
-    font-size: 0.55rem;
+.mini-grid-drawer-info {
+    font-size: 0.8rem;
     font-style: italic;
-    width: 100%;
-    min-width: 0;
+    color: var(--bs-secondary-color, #6c757d);
+    min-height: 1.2em;
+    padding: 2px 4px;
+    text-align: center;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    text-align: center;
-    padding: 0 2px;
-    opacity: 0.85;
-    line-height: 1.2;
-    color: inherit;
 }
 .move-cell-label {
     font-size: 0.6rem;
@@ -1549,6 +1565,7 @@ function showSwapItemsModal() {
     document.getElementById('swap_rack_id').value = '0';
     document.getElementById('swap_drawer').value = '';
     document.getElementById('swap_drawer_grid_container').innerHTML = '';
+    _setGridInfo('swap_grid_info_top', 'swap_grid_info_bottom', null, null);
     const drawerModalEl = document.getElementById('drawerModal');
     bootstrap.Modal.getInstance(drawerModalEl)?.hide();
     drawerModalEl.addEventListener('hidden.bs.modal',
@@ -1702,13 +1719,10 @@ function _buildMiniGrid(container, rackId, rows, cols, mergedGroups, selfDrawerI
             else if (isGroupMaster) badgeHtml = `<span class="move-cell-span-badge">${grp.count} cells</span>`;
             else if (isGroupSlave)  badgeHtml = `<span class="move-cell-span-badge">→${grp.master}</span>`;
 
-            // Short info text — only on master/standalone, not on group slaves
+            // Short info stored on cell for tooltip only (displayed above/below grid on selection)
             const shortInfo = !isGroupSlave ? (drawerInfo[effectiveId] || '') : '';
-            const _si = shortInfo
-                ? `<div class="mini-cell-short-info" title="${shortInfo.replace(/"/g,'&quot;')}">${shortInfo.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`
-                : '';
 
-            // Status indicator (middle)
+            // Status indicator
             let statusHtml;
             if (isSelf) {
                 statusHtml = `<span class="move-cell-status" style="opacity:0.8;">◀ src</span>`;
@@ -1720,8 +1734,8 @@ function _buildMiniGrid(container, rackId, rows, cols, mergedGroups, selfDrawerI
                 statusHtml = `<span class="move-cell-status" style="opacity:0.45;">—</span>`;
             }
 
-            // Layout: short info top → label → status → short info bottom
-            cellDiv.innerHTML = `${_si}<div class="move-cell-label">${drawerId}${badgeHtml}</div>${statusHtml}${_si}`;
+            cellDiv.innerHTML = `<div class="move-cell-label">${drawerId}${badgeHtml}</div>${statusHtml}`;
+            if (shortInfo) cellDiv.setAttribute('data-short-info', shortInfo);
 
             // Tooltip
             const tips = [];
@@ -1746,12 +1760,21 @@ function _buildMiniGrid(container, rackId, rows, cols, mergedGroups, selfDrawerI
     }
 }
 
+function _setGridInfo(topId, bottomId, drawerId, info) {
+    const text = drawerId ? (info ? `Info: ${info}` : '') : '';
+    [topId, bottomId].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    });
+}
+
 function updateSwapDrawerGrid() {
     const select    = document.getElementById('swap_rack_id');
     const rackId    = select.value;
     const container = document.getElementById('swap_drawer_grid_container');
 
     document.getElementById('swap_drawer').value = '';
+    _setGridInfo('swap_grid_info_top', 'swap_grid_info_bottom', null, null);
 
     // Look up rack data from the server-embedded JS variable (mirrors item_form.html pattern)
     const rackData = allRacksData.find(r => r.uuid === rackId);
@@ -1766,6 +1789,7 @@ function updateSwapDrawerGrid() {
 
 function selectSwapDrawer(drawerId) {
     document.getElementById('swap_drawer').value = drawerId;
+    let selectedInfo = '';
     document.querySelectorAll('#swap_drawer_grid_container .move-drawer-cell').forEach(cell => {
         const d          = cell.getAttribute('data-drawer');
         const effective  = cell.getAttribute('data-effective-drawer') || d;
@@ -1774,9 +1798,12 @@ function selectSwapDrawer(drawerId) {
             cell.classList.add('source', 'selected');
         } else {
             cell.classList.remove('source');
-            cell.classList.toggle('selected', effective === drawerId);
+            const sel = effective === drawerId;
+            cell.classList.toggle('selected', sel);
+            if (sel && !selectedInfo) selectedInfo = cell.getAttribute('data-short-info') || '';
         }
     });
+    _setGridInfo('swap_grid_info_top', 'swap_grid_info_bottom', drawerId, selectedInfo);
 }
 
 function toggleMoveLocationType(type) {
@@ -1798,6 +1825,7 @@ function showMoveItemsModal() {
     document.getElementById('move_rack_id').value = '0';
     document.getElementById('move_drawer').value = '';
     document.getElementById('move_drawer_grid_container').innerHTML = '';
+    _setGridInfo('move_grid_info_top', 'move_grid_info_bottom', null, null);
     const drawerModalEl = document.getElementById('drawerModal');
     bootstrap.Modal.getInstance(drawerModalEl)?.hide();
     drawerModalEl.addEventListener('hidden.bs.modal',
@@ -1940,6 +1968,8 @@ function updateMoveDrawerGrid() {
     const rackId    = select.value;
     const container = document.getElementById('move_drawer_grid_container');
 
+    _setGridInfo('move_grid_info_top', 'move_grid_info_bottom', null, null);
+
     const rackData = allRacksData.find(r => r.uuid === rackId);
     if (!rackData) { container.innerHTML = ''; return; }
 
@@ -1951,10 +1981,14 @@ function updateMoveDrawerGrid() {
 
 function selectMoveDrawer(drawerId) {
     document.getElementById('move_drawer').value = drawerId;
+    let selectedInfo = '';
     document.querySelectorAll('#move_drawer_grid_container .move-drawer-cell').forEach(cell => {
         const effective = cell.getAttribute('data-effective-drawer') || cell.getAttribute('data-drawer');
-        cell.classList.toggle('selected', effective === drawerId);
+        const sel = effective === drawerId;
+        cell.classList.toggle('selected', sel);
+        if (sel && !selectedInfo) selectedInfo = cell.getAttribute('data-short-info') || '';
     });
+    _setGridInfo('move_grid_info_top', 'move_grid_info_bottom', drawerId, selectedInfo);
 }
 
 // Handle pending highlight after page load (for search results on different pages)
