@@ -990,9 +990,9 @@ function openDrawer(rackName, drawerId, rackId) {
             return response.json();
         })
         .then(data => {
-            let html = '';
+            let html = '<hr class="mt-0 mb-2">';
 
-            // Drawer Icon section (editable only with location_management.edit)
+            // Row: [Drawer Icon Option] | Short Info
             {% if current_user.has_permission('settings_sections.location_management', 'edit') %}
             {
                 const di = data.drawer_icon || {type: 'none', value: ''};
@@ -1006,48 +1006,46 @@ function openDrawer(rackName, drawerId, rackId) {
                     : hasFile
                     ? `<img src="${di.value.replace(/"/g,'&quot;')}" style="max-width:50px;max-height:50px;object-fit:contain;">${clearBtn}`
                     : `<i class="bi bi-image" style="font-size:24px;color:#adb5bd;"></i>`;
-                html += '<div class="mb-3">';
-                html += '<label class="form-label form-label-sm mb-1 fw-bold"><i class="bi bi-image"></i> Drawer Icon</label>';
-                html += '<div class="d-flex align-items-center gap-2">';
-                html += `<div id="di-preview" style="width:56px;height:56px;border:1px solid #dee2e6;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#f8f9fa;position:relative;overflow:visible;">${previewContent}</div>`;
-                html += '<div class="d-flex flex-column gap-1">';
-                html += '<button type="button" class="btn btn-sm btn-outline-primary" onclick="openDrawerIconPicker()"><i class="bi bi-star"></i> Icon</button>';
-                html += '<button type="button" class="btn btn-sm btn-outline-info" onclick="openDrawerFilePicker()"><i class="bi bi-folder"></i> Share Files</button>';
+                html += '<div class="d-flex gap-2 align-items-start mb-2">';
+                // Icon column
+                html += '<div class="flex-shrink-0">';
+                html += `<div id="di-preview" style="width:56px;height:56px;border:1px solid #dee2e6;border-radius:6px;display:flex;align-items:center;justify-content:center;background:#f8f9fa;position:relative;overflow:visible;">${previewContent}</div>`;
+                html += '<div class="d-flex gap-1 mt-1">';
+                html += '<button type="button" class="btn btn-sm btn-outline-primary px-1 py-0" onclick="openDrawerIconPicker()" title="Select icon"><i class="bi bi-star"></i></button>';
+                html += '<button type="button" class="btn btn-sm btn-outline-info px-1 py-0" onclick="openDrawerFilePicker()" title="Select from share files"><i class="bi bi-folder"></i></button>';
                 html += '</div>';
                 html += '</div>';
+                // Short Info column
+                html += '<div class="flex-grow-1">';
+                html += '<label class="form-label form-label-sm mb-1 fw-bold"><i class="bi bi-info-circle"></i> Short Info <small class="text-muted fw-normal">(max 128 chars)</small></label>';
+                html += `<div class="d-flex gap-1">`;
+                html += `<input type="text" class="form-control form-control-sm" id="drawerShortInfo" maxlength="128" placeholder="Optional note..." value="${(data.short_info || '').replace(/"/g, '&quot;')}">`;
+                html += `<button class="btn btn-sm btn-outline-primary text-nowrap" onclick="saveDrawerShortInfo()" title="Save short info"><i class="bi bi-save"></i></button>`;
+                html += `</div>`;
                 html += '</div>';
+                html += '</div>'; // end icon+info row
             }
-            {% endif %}
-
-            // Short Info section (always shown; editable only with location_management.edit)
-            {% if current_user.has_permission('settings_sections.location_management', 'edit') %}
-            html += '<div class="mb-2">';
-            html += '<label class="form-label form-label-sm mb-1 fw-bold"><i class="bi bi-info-circle"></i> Short Info <small class="text-muted fw-normal">(max 128 chars)</small></label>';
-            html += `<div class="d-flex gap-2">`;
-            html += `<input type="text" class="form-control form-control-sm" id="drawerShortInfo" maxlength="128" placeholder="Optional note for this drawer..." value="${(data.short_info || '').replace(/"/g, '&quot;')}">`;
-            html += `<button class="btn btn-sm btn-outline-primary text-nowrap" onclick="saveDrawerShortInfo()"><i class="bi bi-save"></i> Save</button>`;
-            html += `</div>`;
-            html += '</div>';
             {% else %}
             if (data.short_info) {
                 html += `<div class="mb-2 p-2 bg-light rounded small text-muted"><i class="bi bi-info-circle"></i> ${data.short_info.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
             }
             {% endif %}
 
-            {% if current_user.has_permission('settings_sections.location_management', 'edit') %}
-            // Controls section
-            html += '<div class="mb-3 p-2 bg-light rounded">';
-            html += '<div class="d-flex justify-content-between align-items-center">';
-            html += '<div class="form-check">';
-            html += `<input class="form-check-input" type="checkbox" id="drawerUnavailable" ${data.is_unavailable ? 'checked' : ''} onchange="toggleDrawerAvailability()">`;
-            html += '<label class="form-check-label" for="drawerUnavailable">Make this Drawer Unavailable</label>';
-            html += '</div>';
-            if (data.entries && data.entries.length > 0 && data.entries.some(function(e) { return e.type === 'item_main'; })) {
-                html += '<button class="btn btn-sm btn-warning" onclick="showMoveItemsModal()" title="Moves items whose main location is this drawer (batch overrides are not moved)"><i class="bi bi-arrow-right"></i> Move Main Items</button>';
+            // Controls row: Make this Drawer Unavailable | Move all items
+            {
+                let controlsHtml = '';
+                {% if current_user.has_permission('settings_sections.location_management', 'edit') %}
+                controlsHtml += `<div class="form-check mb-0"><input class="form-check-input" type="checkbox" id="drawerUnavailable" ${data.is_unavailable ? 'checked' : ''} onchange="toggleDrawerAvailability()"><label class="form-check-label" for="drawerUnavailable">Make this Drawer Unavailable</label></div>`;
+                {% endif %}
+                {% if current_user.has_permission('items', 'edit_info') %}
+                if (data.entries && data.entries.length > 0) {
+                    controlsHtml += '<button class="btn btn-sm btn-warning" onclick="showMoveItemsModal()"><i class="bi bi-arrow-right-circle"></i> Move all items</button>';
+                }
+                {% endif %}
+                if (controlsHtml) {
+                    html += `<div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">${controlsHtml}</div>`;
+                }
             }
-            html += '</div>';
-            html += '</div>';
-            {% endif %}
             
             var entries = data.entries || [];
             if (entries.length > 0) {

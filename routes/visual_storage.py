@@ -315,56 +315,64 @@ def update_drawer_icon():
 
 @visual_storage_bp.route('/api/drawer/move-items', methods=['POST'])
 @login_required
-@permission_required("settings_sections.location_management", "edit")
+@permission_required("items", "edit_info")
 def move_drawer_items():
-    """Move all items from a drawer to a new location"""
+    """Move all items and batch overrides from a drawer to a new location"""
     try:
         data = request.get_json()
-        rack_uuid = data.get('rack_id')  # Now receives UUID
+        rack_uuid = data.get('rack_id')
         drawer_id = data.get('drawer_id')
         location_type = data.get('location_type')  # 'general' or 'drawer'
-        
-        # Get rack by UUID to get ID for queries
+
         rack = Rack.query.filter_by(uuid=rack_uuid).first_or_404()
-        
-        # Get all items in the drawer
+
+        # Get all main-location items and all batch overrides in this drawer
         items = Item.query.filter_by(rack_id=rack.id, drawer=drawer_id).all()
-        
-        if not items:
+        batches = ItemBatch.query.filter_by(rack_id=rack.id, drawer=drawer_id, follow_main_location=False).all()
+
+        if not items and not batches:
             return jsonify({'success': False, 'error': 'No items in this drawer'})
-        
-        # Move items based on location type
+
         if location_type == 'general':
             new_location_uuid = data.get('location_id')
             if not new_location_uuid or new_location_uuid == 0:
                 return jsonify({'success': False, 'error': 'Please select a general location'})
-            
+
             new_location = Location.query.filter_by(uuid=new_location_uuid).first_or_404()
-            
+
             for item in items:
                 item.location_id = new_location.id
                 item.rack_id = None
                 item.drawer = None
+            for batch in batches:
+                batch.location_id = new_location.id
+                batch.rack_id = None
+                batch.drawer = None
         else:  # drawer
             new_rack_uuid = data.get('new_rack_id')
             new_drawer = data.get('new_drawer')
-            
+
             if not new_rack_uuid or new_rack_uuid == 0 or not new_drawer:
                 return jsonify({'success': False, 'error': 'Please select a rack and drawer'})
-            
+
             new_rack = Rack.query.filter_by(uuid=new_rack_uuid).first_or_404()
-            
+
             for item in items:
                 item.location_id = None
                 item.rack_id = new_rack.id
                 item.drawer = new_drawer
-        
-        db.session.commit()
-        
-        log_audit(current_user.id, 'bulk_update', 'item', None,
-                 f'Moved {len(items)} items from Rack {rack.uuid} Drawer {drawer_id}')
+            for batch in batches:
+                batch.location_id = None
+                batch.rack_id = new_rack.id
+                batch.drawer = new_drawer
 
-        return jsonify({'success': True, 'items_moved': len(items)})
+        db.session.commit()
+
+        total_moved = len(items) + len(batches)
+        log_audit(current_user.id, 'bulk_update', 'item', None,
+                  f'Moved {len(items)} items and {len(batches)} batch overrides from Rack {rack.uuid} Drawer {drawer_id}')
+
+        return jsonify({'success': True, 'items_moved': total_moved})
     except Exception as e:
         db.session.rollback()
         import traceback
