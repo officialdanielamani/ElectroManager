@@ -339,8 +339,16 @@
                 <p class="text-muted">Select the drawer to swap contents with. All items from both drawers will be exchanged.</p>
 
                 <!-- Source drawer info -->
-                <div class="alert alert-secondary py-2 mb-3" id="swap_source_label">
+                <div class="alert alert-secondary py-2 mb-2" id="swap_source_label">
                     <i class="bi bi-arrow-right-circle"></i> <strong>From:</strong> <span id="swap_source_text">—</span>
+                </div>
+
+                <!-- Swap meta toggle -->
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="swap_meta_toggle" checked>
+                    <label class="form-check-label" for="swap_meta_toggle">
+                        <i class="bi bi-image"></i> Swap Thumbnail &amp; Short Info
+                    </label>
                 </div>
 
                 <!-- Target drawer selector -->
@@ -428,17 +436,12 @@
                 <!-- General Location Section -->
                 <div id="move_general_section">
                     <label class="form-label">General Location</label>
-                    <div class="input-group">
-                        <select id="move_location_id" class="form-select">
-                            <option value="0">-- Select Location --</option>
-                            {% for location in locations %}
-                            <option value="{{ location.uuid }}">{{ location.name }}</option>
-                            {% endfor %}
-                        </select>
-                        <button type="button" class="btn btn-success" title="Add to this location">
-                            <i class="bi bi-plus-circle"></i>
-                        </button>
-                    </div>
+                    <select id="move_location_id" class="form-select">
+                        <option value="0">-- Select Location --</option>
+                        {% for location in locations %}
+                        <option value="{{ location.uuid }}">{{ location.name }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 
                 <!-- Drawer Storage Section - Compact Layout -->
@@ -1582,6 +1585,8 @@ function swapAllItems() {
         return;
     }
 
+    const swapMeta = document.getElementById('swap_meta_toggle')?.checked ?? true;
+
     fetch('/api/drawer/swap-items', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -1590,6 +1595,7 @@ function swapAllItems() {
             drawer_id: currentDrawerId,
             new_rack_id: rackId,
             new_drawer: drawer,
+            swap_meta: swapMeta,
         })
     })
     .then(r => r.json())

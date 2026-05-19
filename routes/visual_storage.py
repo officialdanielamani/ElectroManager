@@ -407,6 +407,7 @@ def swap_drawer_items():
         src_drawer_id = data.get('drawer_id')
         dst_rack_uuid = data.get('new_rack_id')
         dst_drawer_id = data.get('new_drawer')
+        swap_meta     = data.get('swap_meta', True)
 
         if not src_rack_uuid or not src_drawer_id or not dst_rack_uuid or not dst_drawer_id:
             return jsonify({'success': False, 'error': 'Please select a rack and drawer to swap with'})
@@ -437,6 +438,18 @@ def swap_drawer_items():
         for batch in dst_batches:
             batch.rack_id = src_rack.id
             batch.drawer = src_drawer_id
+
+        # Swap thumbnail (icon) and short info if requested
+        if swap_meta:
+            src_icon  = src_rack.get_drawer_icon(src_drawer_id)
+            dst_icon  = dst_rack.get_drawer_icon(dst_drawer_id)
+            src_rack.set_drawer_icon(src_drawer_id, dst_icon.get('type', 'none'), dst_icon.get('value', ''))
+            dst_rack.set_drawer_icon(dst_drawer_id, src_icon.get('type', 'none'), src_icon.get('value', ''))
+
+            src_info = src_rack.get_drawer_short_info(src_drawer_id)
+            dst_info = dst_rack.get_drawer_short_info(dst_drawer_id)
+            src_rack.set_drawer_short_info(src_drawer_id, dst_info)
+            dst_rack.set_drawer_short_info(dst_drawer_id, src_info)
 
         db.session.commit()
 
