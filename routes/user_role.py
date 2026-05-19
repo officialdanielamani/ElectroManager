@@ -556,7 +556,9 @@ def role_edit(id):
                 'view': 'projects_view' in request.form,
                 'create': 'projects_create' in request.form,
                 'edit': 'projects_edit' in request.form,
-                'delete': 'projects_delete' in request.form
+                'delete': 'projects_delete' in request.form,
+                'view_costing': 'projects_view_costing' in request.form,
+                'edit_costing': 'projects_edit_costing' in request.form,
             }
             
             # Settings sections permissions
