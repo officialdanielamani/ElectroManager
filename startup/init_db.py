@@ -8,7 +8,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app import app, db
 from models import User, Role, Setting
 import json
+import secrets
+import string
 
+
+
+def _generate_user_uid():
+    """Generate a unique UXXXXX identifier (U + 5 uppercase alphanumeric chars)."""
+    chars = string.ascii_uppercase + string.digits
+    return 'U' + ''.join(secrets.choice(chars) for _ in range(5))
 
 
 def _add_missing_columns():
@@ -19,6 +27,7 @@ def _add_missing_columns():
             ("batch_serial_numbers", "lend_note",           "VARCHAR(128)"),
             ("batch_serial_numbers", "lending_session_id",  "INTEGER"),
             ("batch_lend_records",   "lending_session_id",  "INTEGER"),
+            ("users",                "user_uid",             "VARCHAR(6)"),
         ]
         for table, col, col_type in additions:
             try:
@@ -27,6 +36,19 @@ def _add_missing_columns():
                 print(f"[OK] Added column {table}.{col}")
             except Exception:
                 pass  # column already exists
+
+    # Backfill user_uid for existing users that don't have one
+    users_without_uid = User.query.filter(User.user_uid == None).all()
+    if users_without_uid:
+        existing_uids = set(u.user_uid for u in User.query.filter(User.user_uid != None).all())
+        for user in users_without_uid:
+            uid = _generate_user_uid()
+            while uid in existing_uids:
+                uid = _generate_user_uid()
+            user.user_uid = uid
+            existing_uids.add(uid)
+        db.session.commit()
+        print(f"[OK] Backfilled user_uid for {len(users_without_uid)} existing user(s)")
 
 def init_db():
     with app.app_context():

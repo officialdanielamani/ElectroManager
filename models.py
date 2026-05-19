@@ -111,8 +111,9 @@ class Role(db.Model):
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
-    
+
     id = db.Column(db.Integer, primary_key=True)
+    user_uid = db.Column(db.String(6), unique=True, nullable=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
@@ -138,6 +139,12 @@ class User(UserMixin, db.Model):
     auto_unlock_enabled = db.Column(db.Boolean, default=True)
     auto_unlock_minutes = db.Column(db.Integer, default=15)
     
+    def __init__(self, **kwargs):
+        super(User, self).__init__(**kwargs)
+        if not self.user_uid:
+            chars = string.ascii_uppercase + string.digits
+            self.user_uid = 'U' + ''.join(secrets.choice(chars) for _ in range(5))
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
     
