@@ -380,6 +380,69 @@ def move_drawer_items():
         logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': 'An error occurred while moving drawer items.'})
 
+
+@visual_storage_bp.route('/api/drawer/swap-items', methods=['POST'])
+@login_required
+@permission_required("items", "edit_info")
+def swap_drawer_items():
+    """Swap all items and batch overrides between two drawers"""
+    try:
+        data = request.get_json()
+        src_rack_uuid = data.get('rack_id')
+        src_drawer_id = data.get('drawer_id')
+        dst_rack_uuid = data.get('new_rack_id')
+        dst_drawer_id = data.get('new_drawer')
+
+        if not src_rack_uuid or not src_drawer_id or not dst_rack_uuid or not dst_drawer_id:
+            return jsonify({'success': False, 'error': 'Please select a rack and drawer to swap with'})
+
+        src_rack = Rack.query.filter_by(uuid=src_rack_uuid).first_or_404()
+        dst_rack = Rack.query.filter_by(uuid=dst_rack_uuid).first_or_404()
+
+        if src_rack.id == dst_rack.id and src_drawer_id == dst_drawer_id:
+            return jsonify({'success': False, 'error': 'Source and destination drawer are the same'})
+
+        src_items = Item.query.filter_by(rack_id=src_rack.id, drawer=src_drawer_id).all()
+        src_batches = ItemBatch.query.filter_by(rack_id=src_rack.id, drawer=src_drawer_id, follow_main_location=False).all()
+        dst_items = Item.query.filter_by(rack_id=dst_rack.id, drawer=dst_drawer_id).all()
+        dst_batches = ItemBatch.query.filter_by(rack_id=dst_rack.id, drawer=dst_drawer_id, follow_main_location=False).all()
+
+        # Move source → destination
+        for item in src_items:
+            item.rack_id = dst_rack.id
+            item.drawer = dst_drawer_id
+        for batch in src_batches:
+            batch.rack_id = dst_rack.id
+            batch.drawer = dst_drawer_id
+
+        # Move destination → source
+        for item in dst_items:
+            item.rack_id = src_rack.id
+            item.drawer = src_drawer_id
+        for batch in dst_batches:
+            batch.rack_id = src_rack.id
+            batch.drawer = src_drawer_id
+
+        db.session.commit()
+
+        total = len(src_items) + len(src_batches) + len(dst_items) + len(dst_batches)
+        log_audit(current_user.id, 'bulk_update', 'item', None,
+                  f'Swapped drawers: Rack {src_rack.uuid} {src_drawer_id} ↔ Rack {dst_rack.uuid} {dst_drawer_id} '
+                  f'({len(src_items)+len(src_batches)} ↔ {len(dst_items)+len(dst_batches)} entries)')
+
+        return jsonify({
+            'success': True,
+            'items_swapped': total,
+            'src_count': len(src_items) + len(src_batches),
+            'dst_count': len(dst_items) + len(dst_batches),
+        })
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        logger.error(f"Error swapping drawer items: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({'success': False, 'error': 'An error occurred while swapping drawer items.'})
+
 def _parse_cell(cell):
     """Parse 'R{row}-C{col}' → (row, col) ints. Raises ValueError on bad input."""
     parts = cell[1:].split('-C')
