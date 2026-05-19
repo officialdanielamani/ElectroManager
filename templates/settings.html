@@ -107,7 +107,7 @@
     {% endif %}
 
     <!-- Contacts -->
-    {% if current_user.has_permission('settings_sections.contacts', 'view') %}
+    {% if current_user.has_permission('settings_sections.contacts', 'view_users') or current_user.has_permission('settings_sections.contacts', 'view_other') %}
     <div class="col-md-6 col-lg-4 mb-3">
         <div class="card h-100">
             <div class="card-body text-center">

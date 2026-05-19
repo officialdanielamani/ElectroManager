@@ -471,7 +471,7 @@ def role_new():
                     "users_delete": False
                 },
                 "backup_restore": {"view": False, "upload_export": False, "delete": False},
-                "contacts": {"view": False, "edit": False, "delete": False}
+                "contacts": {"view_users": False, "view_other": False, "edit": False, "delete": False}
             }
         }
         
@@ -624,7 +624,8 @@ def role_edit(id):
             }
 
             perms['settings_sections']['contacts'] = {
-                'view': 'settings_sections_contacts_view' in request.form,
+                'view_users': 'settings_sections_contacts_view_users' in request.form,
+                'view_other': 'settings_sections_contacts_view_other' in request.form,
                 'edit': 'settings_sections_contacts_edit' in request.form,
                 'delete': 'settings_sections_contacts_delete' in request.form
             }
