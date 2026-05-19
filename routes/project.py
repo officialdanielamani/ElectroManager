@@ -60,6 +60,18 @@ def save_project_file(file, project_id_str, attachment_type):
     if not project_id_str or not _SAFE_PROJECT_ID_RE.match(str(project_id_str)):
         return None, 'Invalid project id.'
 
+    safe_attachment_dirs = {
+        'picture': 'picture',
+        'document': 'document',
+        'schematic': 'schematic',
+        '2d_design': '2d_design',
+        '3d_design': '3d_design',
+        'program': 'program',
+    }
+    safe_attachment_dir = safe_attachment_dirs.get(attachment_type)
+    if not safe_attachment_dir:
+        return None, 'Invalid attachment type.'
+
     allowed_ext, max_size_mb = get_project_file_settings(attachment_type)
     filename = secure_filename(file.filename)
     if not filename:
@@ -76,20 +88,20 @@ def save_project_file(file, project_id_str, attachment_type):
     if file_size > max_size_mb * 1024 * 1024:
         return None, f'File too large. Max {max_size_mb}MB for {attachment_type}'
 
-    upload_root = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
-    folder = os.path.abspath(os.path.join(upload_root, 'projects', project_id_str, attachment_type))
-    if not folder.startswith(upload_root + os.sep) and folder != upload_root:
+    upload_root = os.path.realpath(current_app.config['UPLOAD_FOLDER'])
+    folder = os.path.realpath(os.path.join(upload_root, 'projects', str(project_id_str), safe_attachment_dir))
+    if os.path.commonpath([upload_root, folder]) != upload_root:
         return None, 'Invalid upload path.'
     os.makedirs(folder, exist_ok=True)
 
-    file_path = os.path.abspath(os.path.join(folder, filename))
-    if not file_path.startswith(folder + os.sep):
+    file_path = os.path.realpath(os.path.join(folder, filename))
+    if os.path.commonpath([folder, file_path]) != folder:
         return None, 'Invalid file path.'
     counter = 1
     base_name = filename.rsplit('.', 1)[0] if '.' in filename else filename
     while os.path.exists(file_path):
         new_filename = f"{base_name}_{counter}.{ext}"
-        file_path = os.path.abspath(os.path.join(folder, new_filename))
+        file_path = os.path.realpath(os.path.join(folder, new_filename))
         filename = new_filename
         counter += 1
 
