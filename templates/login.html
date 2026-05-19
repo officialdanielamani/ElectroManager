@@ -55,6 +55,9 @@
                     <div class="d-grid">
                         {{ form.submit(class="btn btn-primary") }}
                     </div>
+                    {% if demo_mode %}
+                    <div class="text-center mt-2"><small class="text-muted">Program is run in Demo Mode</small></div>
+                    {% endif %}
                 </form>
                 <hr>
                 <div class="text-center">

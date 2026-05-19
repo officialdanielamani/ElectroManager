@@ -117,12 +117,15 @@ def api_add_category():
         
         if not name:
             return jsonify({'success': False, 'error': 'Category name is required'})
-        
+
+        name = name[:128]
+        description = description[:512]
+
         # Check if exists
         existing = Category.query.filter_by(name=name).first()
         if existing:
             return jsonify({'success': False, 'error': 'Category already exists'})
-        
+
         category = Category(name=name, description=description, color=color)
         db.session.add(category)
         db.session.commit()

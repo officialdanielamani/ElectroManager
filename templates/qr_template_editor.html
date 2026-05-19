@@ -20,8 +20,13 @@
     }
 
     .toolbar {
-        padding: 1rem;
+        padding: 0.35rem 0.75rem;
+        position: sticky;
+        top: 0;
+        z-index: 1020;
     }
+    nav.navbar { display: none !important; }
+    .container-fluid.mt-4 { margin-top: 0 !important; }
 
     .panel-header-success {
         background-color: var(--editor-panel-bg-success) !important;
@@ -89,7 +94,6 @@
     }
 
     .element-box {
-        position: absolute;
         border: 2px dashed #007bff;
         cursor: move;
         box-sizing: border-box;
@@ -127,6 +131,36 @@
         border-top: 15px solid transparent;
         border-right: 15px solid #dc3545;
         border-bottom: 15px solid #dc3545;
+    }
+    .rotate-handle {
+        position: absolute;
+        top: -26px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 20px;
+        height: 20px;
+        background: #0d6efd;
+        border-radius: 50%;
+        cursor: grab;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 11px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        user-select: none;
+    }
+    .rotate-handle:active { cursor: grabbing; }
+    .rotate-line {
+        position: absolute;
+        top: -10px;
+        left: 50%;
+        width: 2px;
+        height: 10px;
+        background: #0d6efd;
+        transform: translateX(-50%);
+        z-index: 19;
     }
 
     /* Mobile optimizations */
@@ -316,7 +350,7 @@
                     <div class="card-header panel-toggle" data-panel="fields" style="cursor: pointer; padding: 10px;">
                         <h6 class="mb-0" style="cursor: pointer;"><i class="bi bi-plus-square"></i> Fields <span class="toggle-icon" style="float: right;">▼</span></h6>
                     </div>
-                    <div id="fields-content" class="panel-content" style="max-height: 200px; overflow-y: auto; padding: 10px; box-sizing: border-box;">
+                    <div id="fields-content" class="panel-content" style="max-height: 250px; overflow-y: auto; padding: 10px; box-sizing: border-box;">
                         <div class="d-grid gap-2">
                             <button id="btn-add-text" class="btn btn-sm btn-outline-primary">
                                 <i class="bi bi-type"></i> Text
@@ -325,10 +359,13 @@
                                 <i class="bi bi-qr-code"></i> QR
                             </button>
                             <button id="btn-add-barcode" class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-barcode"></i> Barcode
+                                <i class="bi bi-upc-scan"></i> Barcode
                             </button>
                             <button id="btn-add-icon" class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-image"></i> Icon
+                                <i class="bi bi-star"></i> Icon
+                            </button>
+                            <button id="btn-add-picture" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-image"></i> Picture
                             </button>
                         </div>
                     </div>
@@ -734,14 +771,16 @@ function renderLayers() {
         if (el.type === 'text') typeIcon = 'type';
         else if (el.type === 'qr') typeIcon = 'qr-code';
         else if (el.type === 'barcode') typeIcon = 'barcode';
-        else if (el.type === 'icon') typeIcon = 'image';
+        else if (el.type === 'icon') typeIcon = 'star';
+        else if (el.type === 'picture') typeIcon = 'card-image';
         else typeIcon = 'box';
-        
+
         let layerName;
         if (el.type === 'text') layerName = el.layer_name || `Text${idx + 1}`;
         else if (el.type === 'qr') layerName = el.layer_name || `QR${idx + 1}`;
         else if (el.type === 'barcode') layerName = el.layer_name || `Barcode${idx + 1}`;
         else if (el.type === 'icon') layerName = el.layer_name || `Icon${idx + 1}`;
+        else if (el.type === 'picture') layerName = el.layer_name || `Picture${idx + 1}`;
         else layerName = `Element${idx + 1}`;
         
         const isVisible = el.visible !== false; // Default to visible
@@ -866,44 +905,61 @@ function selectLayerByName(idx) {
 }
 
 function createElementDiv(element, index) {
-    const div = document.createElement('div');
-    div.className = 'element-box';
-    div.dataset.index = index;
-    
-    // Store the MM values for reference
-    div.dataset.xMm = element.x_mm;
-    div.dataset.yMm = element.y_mm;
-    div.dataset.wMm = element.width_mm;
-    div.dataset.hMm = element.height_mm;
-    
-    // Hide if not visible
+    // Handle invisible elements
     if (element.visible === false) {
-        div.style.display = 'none';
-        return div;
+        const hiddenWrapper = document.createElement('div');
+        hiddenWrapper.dataset.index = index;
+        hiddenWrapper.style.display = 'none';
+        return hiddenWrapper;
     }
-    
-    // Always use current MM_TO_PX - convert from MM to PX
+
     const x = element.x_mm * MM_TO_PX;
     const y = element.y_mm * MM_TO_PX;
     const w = element.width_mm * MM_TO_PX;
     const h = element.height_mm * MM_TO_PX;
-    
-    div.style.left = x + 'px';
-    div.style.top = y + 'px';
-    div.style.width = w + 'px';
-    div.style.height = h + 'px';
-    
+    const rotDeg = element.rotation_deg || 0;
+
+    // Outer wrapper: position, size, rotation
+    const wrapper = document.createElement('div');
+    wrapper.dataset.index = index;
+    wrapper.dataset.xMm = element.x_mm;
+    wrapper.dataset.yMm = element.y_mm;
+    wrapper.dataset.wMm = element.width_mm;
+    wrapper.dataset.hMm = element.height_mm;
+    wrapper.style.cssText = `position:absolute; left:${x}px; top:${y}px; width:${w}px; height:${h}px; transform:rotate(${rotDeg}deg); transform-origin:center center; overflow:visible;`;
+
+    // Rotate line (visual connector)
+    const rotLine = document.createElement('div');
+    rotLine.className = 'rotate-line';
+    rotLine.style.display = (selectedElement === index) ? 'block' : 'none';
+    wrapper.appendChild(rotLine);
+
+    // Rotate handle
+    const rotHandle = document.createElement('div');
+    rotHandle.className = 'rotate-handle';
+    rotHandle.innerHTML = '<i class="bi bi-arrow-clockwise"></i>';
+    rotHandle.style.display = (selectedElement === index) ? 'flex' : 'none';
+    wrapper.appendChild(rotHandle);
+
+    // Inner element box
+    const div = document.createElement('div');
+    div.className = 'element-box';
+    if (selectedElement === index) div.classList.add('selected');
+    div.style.cssText = 'position:absolute; left:0; top:0; width:100%; height:100%; overflow:hidden; box-sizing:border-box;';
+    wrapper.appendChild(div);
+
     if (element.type === 'text') {
         const fontSizeMm = element.font_size_mm || 4;
         const fontSizePx = fontSizeMm * MM_TO_PX;
         const textAlign = element.text_align || 'left';
         const fontFamily = element.font_family || 'Arial';
-        
-        // Remove flex properties and use proper text alignment
+
+        // Use block display and proper text alignment
         div.style.display = 'block';
         div.style.textAlign = textAlign;
-        
-        div.innerHTML = `<span style="font-size: ${fontSizePx}px; color: ${element.color || '#000'}; font-family: ${fontFamily}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; line-height: 1.2; display: inline-block;">${element.content || 'Text'}</span>`;
+
+        const safeContent = (element.content || 'Text').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        div.innerHTML = `<span style="font-size: ${fontSizePx}px; color: ${element.color || '#000'}; font-family: ${fontFamily}; font-weight: ${element.font_weight || 'normal'}; font-style: ${element.font_style || 'normal'}; white-space: pre-wrap; word-break: break-word; width: 100%; line-height: 1.2; display: block;">${safeContent}</span>`;
     } else if (element.type === 'qr') {
         // Restore flex for QR
         div.style.display = 'flex';
@@ -1025,19 +1081,36 @@ function createElementDiv(element, index) {
         div.style.display = 'flex';
         div.style.justifyContent = 'center';
         div.style.alignItems = 'center';
-        
+
         const iconColor = element.icon_color || '#000000';
-        
-        if (element.icon_name) {
+
+        if (element.use_target_icon) {
+            const containerSize = Math.min(w, h) * 0.8;
+            div.innerHTML = `<div style="width:100%;height:100%;border:2px dashed #0d6efd;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(13,110,253,0.05);gap:2px;"><i class="bi bi-bullseye" style="font-size:${containerSize * 0.6}px;color:#0d6efd;"></i><span style="font-size:${Math.max(6, Math.min(w,h)*0.12)}px;color:#0d6efd;">Target Icon</span></div>`;
+        } else if (element.icon_name) {
             // Has icon selected - scale to fit container (use 80% of container size)
             const containerSize = Math.min(w, h) * 0.8;
             div.innerHTML = `<i class="bi bi-${element.icon_name}" style="font-size: ${containerSize}px; color: ${iconColor};"></i>`;
         } else {
             // Empty - show placeholder
-            div.innerHTML = `<div style="width: 100%; height: 100%; border: 2px dashed #666; display: flex; align-items: center; justify-content: center; background: rgba(100,100,100,0.05); position: relative;"><i class="bi bi-image" style="font-size: ${Math.min(w, h) * 0.5}px; color: #666;"></i><span style="position: absolute; bottom: 2px; right: 2px; font-size: calc(${MM_TO_PX}px * 2); color: #666; background: white; padding: 1px 3px; border-radius: 2px;">Icon</span></div>`;
+            div.innerHTML = `<div style="width: 100%; height: 100%; border: 2px dashed #666; display: flex; align-items: center; justify-content: center; background: rgba(100,100,100,0.05); position: relative;"><i class="bi bi-star" style="font-size: ${Math.min(w, h) * 0.5}px; color: #666;"></i><span style="position: absolute; bottom: 2px; right: 2px; font-size: calc(${MM_TO_PX}px * 2); color: #666; background: white; padding: 1px 3px; border-radius: 2px;">Icon</span></div>`;
+        }
+    } else if (element.type === 'picture') {
+        div.style.display = 'flex';
+        div.style.justifyContent = 'center';
+        div.style.alignItems = 'center';
+
+        if (element.use_target_image) {
+            const minDim = Math.min(w, h);
+            div.innerHTML = `<div style="width:100%;height:100%;border:2px dashed #0d6efd;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(13,110,253,0.05);gap:2px;"><i class="bi bi-bullseye" style="font-size:${minDim*0.35}px;color:#0d6efd;"></i><span style="font-size:${Math.max(8,minDim*0.12)}px;color:#0d6efd;">Target Image</span></div>`;
+        } else if (element.picture_url) {
+            div.innerHTML = `<img src="${element.picture_url}" style="max-width:100%;max-height:100%;object-fit:contain;" draggable="false">`;
+        } else {
+            const minDim = Math.min(w, h);
+            div.innerHTML = `<div style="width:100%;height:100%;border:2px dashed #6610f2;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(102,16,242,0.05);gap:4px;"><i class="bi bi-image" style="font-size:${minDim*0.35}px;color:#6610f2;"></i><span style="font-size:${Math.max(8,minDim*0.12)}px;color:#6610f2;">Picture</span></div>`;
         }
     }
-    
+
     const resizeHandle = document.createElement('div');
     resizeHandle.className = 'resize-handle';
     // Hide resize handle if size is locked
@@ -1045,7 +1118,7 @@ function createElementDiv(element, index) {
         resizeHandle.style.display = 'none';
     }
     div.appendChild(resizeHandle);
-    
+
     // Add visual indicator for locked elements
     if (element.fix_position || element.fix_size) {
         div.style.opacity = '0.85';
@@ -1056,7 +1129,7 @@ function createElementDiv(element, index) {
         lockIcon.style.fontSize = '12px';
         lockIcon.style.color = '#dc3545';
         lockIcon.innerHTML = '<i class="bi bi-lock-fill"></i>';
-        
+
         if (element.fix_position && element.fix_size) {
             lockIcon.title = 'Position & Size Locked';
             lockIcon.innerHTML = '<i class="bi bi-lock-fill"></i>';
@@ -1069,29 +1142,42 @@ function createElementDiv(element, index) {
         }
         div.appendChild(lockIcon);
     }
-    
+
     div.addEventListener('click', (e) => {
         e.stopPropagation();
-        selectElement(index, div);
+        selectElement(index, wrapper);
     });
-    
+
     // Update cursor based on lock state
     if (element.fix_position) {
         div.style.cursor = 'not-allowed';
     } else {
         div.style.cursor = 'move';
     }
-    
-    makeDraggable(div, element, index);
-    makeResizable(div, element, index, resizeHandle);
-    
-    return div;
+
+    makeDraggable(wrapper, element, index);
+    makeResizable(wrapper, element, index, resizeHandle);
+    makeRotatable(wrapper, element, index, rotHandle);
+
+    return wrapper;
 }
 
-function selectElement(index, element) {
+function selectElement(index, wrapperDiv) {
     selectedElement = index;
+    // Remove selected from all element boxes
     document.querySelectorAll('.element-box').forEach(el => el.classList.remove('selected'));
-    if (element) element.classList.add('selected');
+    // Hide all rotate handles and lines
+    document.querySelectorAll('.rotate-handle').forEach(h => h.style.display = 'none');
+    document.querySelectorAll('.rotate-line').forEach(l => l.style.display = 'none');
+
+    if (wrapperDiv) {
+        const box = wrapperDiv.querySelector('.element-box');
+        if (box) box.classList.add('selected');
+        const rh = wrapperDiv.querySelector('.rotate-handle');
+        if (rh) rh.style.display = 'flex';
+        const rl = wrapperDiv.querySelector('.rotate-line');
+        if (rl) rl.style.display = 'block';
+    }
     updatePropertiesPanel(index);
 }
 
@@ -1099,6 +1185,8 @@ canvas.addEventListener('click', (e) => {
     if (e.target === canvas) {
         selectedElement = null;
         document.querySelectorAll('.element-box').forEach(el => el.classList.remove('selected'));
+        document.querySelectorAll('.rotate-handle').forEach(h => h.style.display = 'none');
+        document.querySelectorAll('.rotate-line').forEach(l => l.style.display = 'none');
         document.getElementById('properties-panel').innerHTML = '<p class="text-muted mb-0" style="font-size: 13px;"><i class="bi bi-hand-index"></i> Select element to edit</p>';
     }
 });
@@ -1107,38 +1195,78 @@ function updatePropertiesPanel(index) {
     const panel = document.getElementById('properties-panel');
     const element = layout[index];
     
-    let html = `<div class="mb-2"><h6 class="text-primary" style="font-size: 14px;"><i class="bi bi-${element.type === 'text' ? 'type' : element.type === 'qr' ? 'qr-code' : 'barcode'}"></i> ${element.type.toUpperCase()}</h6></div>`;
+    let typeIconName;
+    if (element.type === 'text') typeIconName = 'type';
+    else if (element.type === 'qr') typeIconName = 'qr-code';
+    else if (element.type === 'barcode') typeIconName = 'barcode';
+    else if (element.type === 'icon') typeIconName = 'star';
+    else if (element.type === 'picture') typeIconName = 'card-image';
+    else typeIconName = 'box';
+    let html = `<div class="mb-2"><h6 class="text-primary" style="font-size: 14px;"><i class="bi bi-${typeIconName}"></i> ${element.type.toUpperCase()}</h6></div>`;
 
     // Define placeholders based on template type context
     const placeholders = {
         item: [
-            { label: '{ItemUUID} - Item UUID', value: '{ItemUUID}' },
-            { label: '{ItemName} - Product name', value: '{ItemName}' },
-            { label: '{SKU} - Stock code', value: '{SKU}' },
-            { label: '{Price} - Price', value: '{Price}' },
-            { label: '{Quantity} - Stock quantity', value: '{Quantity}' },
-            { label: '{Category} - Category name', value: '{Category}' },
-            { label: '{LocationName} - Location', value: '{LocationName}' },
-            { label: '{RackName} - Rack name', value: '{RackName}' },
-            { label: '{Drawer} - Drawer cell (e.g. R1-C2)', value: '{Drawer}' },
-            { label: '{Description} - Description', value: '{Description}' },
-            { label: '{MinQuantity} - Min stock', value: '{MinQuantity}' }
+            { label: '{ItemUUID} - UUID', value: '{ItemUUID}' },
+            { label: '{ItemName} - Item name', value: '{ItemName}' },
+            { label: '{ItemType} - Type / Model name', value: '{ItemType}' },
+            { label: '{ItemSKU} - Stock code', value: '{ItemSKU}' },
+            { label: '{ItemInfo} - Short Info', value: '{ItemInfo}' },
+            { label: '{ItemCat} - Category name', value: '{ItemCat}' },
+            { label: '{ItemFoot} - Footprint name', value: '{ItemFoot}' },
+            { label: '{ItemTPrice} - Total Price', value: '{ItemTPrice}' },
+            { label: '{ItemMOvrQty} - Overall Quantity', value: '{ItemMOvrQty}' },
+            { label: '{ItemMinQty} - Min stock', value: '{ItemMinQty}' },
+            { label: '{ItemMLocName} - Main Location name', value: '{ItemMLocName}' },
+            { label: '{ItemMLocUUID} - Main Location UUID', value: '{ItemMLocUUID}' },
+            { label: '{ItemMRackName} - Rack name', value: '{ItemMRackName}' },
+            { label: '{ItemMRackUUID} - Rack UUID', value: '{ItemMRackUUID}' },
+            { label: '{ItemMDrawLoc} - Drawer (RXX-CXX)', value: '{ItemMDrawLoc}' }
         ],
         location: [
-            { label: '{LocationUUID} - Location UUID', value: '{LocationUUID}' },
-            { label: '{LocationName} - Name', value: '{LocationName}' },
-            { label: '{LocationInfo} - Info field', value: '{LocationInfo}' },
-            { label: '{Description} - Description', value: '{Description}' },
-            { label: '{ItemCount} - # of items', value: '{ItemCount}' }
+            { label: '{LocUUID} - UUID', value: '{LocUUID}' },
+            { label: '{LocName} - Location name', value: '{LocName}' },
+            { label: '{LocInfo} - Info field', value: '{LocInfo}' },
+            { label: '{LocICount} - # of items', value: '{LocICount}' }
         ],
         rack: [
+            { label: '{RackUUID} - UUID', value: '{RackUUID}' },
+            { label: '{RackName} - Rack name', value: '{RackName}' },
+            { label: '{RackInfo} - Short Info', value: '{RackInfo}' },
+            { label: '{RackLoc} - General Location', value: '{RackLoc}' },
+            { label: '{RackCap} - Total slots', value: '{RackCap}' },
+            { label: '{RackICount} - # of items', value: '{RackICount}' },
+            { label: '{RackSize} - Size (e.g. 10X05)', value: '{RackSize}' }
+        ],
+        drawer: [
             { label: '{RackUUID} - Rack UUID', value: '{RackUUID}' },
-            { label: '{RackName} - Name', value: '{RackName}' },
-            { label: '{Description} - Description', value: '{Description}' },
-            { label: '{Capacity} - Total slots', value: '{Capacity}' },
-            { label: '{ItemCount} - # of items', value: '{ItemCount}' },
-            { label: '{Rows} - # rows', value: '{Rows}' },
-            { label: '{Cols} - # columns', value: '{Cols}' }
+            { label: '{RackName} - Rack name', value: '{RackName}' },
+            { label: '{RackInfo} - Rack Short Info', value: '{RackInfo}' },
+            { label: '{RackLoc} - Rack General Location', value: '{RackLoc}' },
+            { label: '{RackCap} - Rack Total slots', value: '{RackCap}' },
+            { label: '{RackICount} - Rack # of items', value: '{RackICount}' },
+            { label: '{RackSize} - Rack Size (e.g. 10X05)', value: '{RackSize}' },
+            { label: '{DrawInfo} - Drawer Short Info', value: '{DrawInfo}' },
+            { label: '{DrawLoc} - Drawer ID (e.g. R2-C3)', value: '{DrawLoc}' },
+            { label: '{DrawSize} - Drawer Size (e.g. 02X01)', value: '{DrawSize}' },
+            { label: '{DrawICount} - Drawer # of items', value: '{DrawICount}' },
+            { label: '{DrawStatus} - Drawer Status', value: '{DrawStatus}' },
+            { label: '{DrawGroup} - Drawer Group master', value: '{DrawGroup}' }
+        ],
+        inout: [
+            { label: '{SessionID} - Session ID', value: '{SessionID}' },
+            { label: '{LendBy} - Who is lending (contact)', value: '{LendBy}' },
+            { label: '{LendStDate} - Lend Start Date (YYYYMMDD)', value: '{LendStDate}' },
+            { label: '{LendStTime} - Lend Start Time (HH:mm)', value: '{LendStTime}' },
+            { label: '{LendEndDate} - Lend End Date (YYYYMMDD)', value: '{LendEndDate}' },
+            { label: '{LendEndTime} - Lend End Time (HH:mm)', value: '{LendEndTime}' },
+            { label: '{LendRealSt} - Lending submitted timestamp', value: '{LendRealSt}' },
+            { label: '{LendUser} - Who submitted lending', value: '{LendUser}' },
+            { label: '{ReturnDate} - Return Date (YYYYMMDD)', value: '{ReturnDate}' },
+            { label: '{ReturnTime} - Return Time (HH:mm)', value: '{ReturnTime}' },
+            { label: '{ReturnStat} - Return Status (Late/On Time)', value: '{ReturnStat}' },
+            { label: '{ReturnReal} - Return submitted timestamp', value: '{ReturnReal}' },
+            { label: '{ReturnUser} - Who submitted return', value: '{ReturnUser}' }
         ]
     };
 
@@ -1151,8 +1279,12 @@ function updatePropertiesPanel(index) {
         console.log(`%c[TEXT FILTER] templateType="${templateType}"`, 'color: #00ff00');
         if (templateType.includes('location')) {
             placeholderOptions += `<optgroup label="Locations">${placeholders.location.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else if (templateType.includes('drawer')) {
+            placeholderOptions += `<optgroup label="Drawer">${placeholders.drawer.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else if (templateType.includes('rack')) {
             placeholderOptions += `<optgroup label="Racks">${placeholders.rack.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else if (templateType.includes('in-out')) {
+            placeholderOptions += `<optgroup label="In-Out">${placeholders.inout.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else {
             // Default to item template
             placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
@@ -1211,6 +1343,12 @@ function updatePropertiesPanel(index) {
                     <button class="btn btn-sm ${element.text_align === 'right' ? 'btn-primary' : 'btn-outline-secondary'}" id="btn-align-right" type="button" style="font-size: 12px; padding: 4px 6px;" title="Align Right">
                         <i class="bi bi-text-right"></i>
                     </button>
+                    <button class="btn btn-sm ${element.font_weight === 'bold' ? 'btn-primary' : 'btn-outline-secondary'}" id="btn-bold" type="button" style="font-size: 12px; padding: 4px 6px;" title="Bold">
+                        <i class="bi bi-type-bold"></i>
+                    </button>
+                    <button class="btn btn-sm ${element.font_style === 'italic' ? 'btn-primary' : 'btn-outline-secondary'}" id="btn-italic" type="button" style="font-size: 12px; padding: 4px 6px;" title="Italic">
+                        <i class="bi bi-type-italic"></i>
+                    </button>
                 </div>
                 <div style="flex: 1; display: flex; gap: 6px;">
                     <div style="flex: 1;">
@@ -1232,8 +1370,12 @@ function updatePropertiesPanel(index) {
         console.log(`%c[QR FILTER] templateType="${templateType}"`, 'color: #00ff00');
         if (templateType.includes('location')) {
             placeholderOptions += `<optgroup label="Locations">${placeholders.location.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else if (templateType.includes('drawer')) {
+            placeholderOptions += `<optgroup label="Drawer">${placeholders.drawer.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else if (templateType.includes('rack')) {
             placeholderOptions += `<optgroup label="Racks">${placeholders.rack.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else if (templateType.includes('in-out')) {
+            placeholderOptions += `<optgroup label="In-Out">${placeholders.inout.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else {
             // Default to item template
             placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
@@ -1246,17 +1388,20 @@ function updatePropertiesPanel(index) {
         </div>
         <div class="mb-2">
             <label class="form-label" style="font-size: 12px;"><strong>Content</strong></label>
-            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
-                <input type="text" class="form-control form-control-sm" id="prop-source" value="${element.source_field || ''}" placeholder="" style="font-size: 12px; flex: 1;">
-                <button class="btn btn-sm btn-outline-primary" id="btn-add-placeholder" style="font-size: 12px; padding: 4px 10px;">
-                    <i class="bi bi-plus"></i>
+            <textarea class="form-control form-control-sm" rows="2" id="prop-source" style="font-size: 12px; font-family: monospace;">${element.source_field || ''}</textarea>
+            <small class="text-muted" style="font-size: 11px;">Use placeholders from dropdown</small>
+        </div>
+        <div class="mb-2">
+            <label class="form-label" style="font-size: 12px;"><strong>Placeholder</strong></label>
+            <div style="display: flex; gap: 6px;">
+                <select class="form-select form-select-sm" id="prop-placeholder" style="font-size: 12px; flex: 1;">
+                    <option value="">Select placeholder...</option>
+                    ${placeholderOptions}
+                </select>
+                <button class="btn btn-sm btn-outline-primary" id="btn-add-placeholder" style="font-size: 12px; padding: 4px 10px; white-space: nowrap;">
+                    <i class="bi bi-plus"></i> Add
                 </button>
             </div>
-            <select class="form-select form-select-sm" id="prop-placeholder" style="font-size: 12px;">
-                <option value="">Select placeholder to add...</option>
-                ${placeholderOptions}
-            </select>
-            <small class="text-muted" style="font-size: 11px;">Type text or add placeholders</small>
         </div>
         <div class="mb-2">
             <label class="form-label" style="font-size: 12px;"><strong>Error Correction</strong></label>
@@ -1275,8 +1420,12 @@ function updatePropertiesPanel(index) {
         console.log(`%c[BARCODE FILTER] templateType="${templateType}"`, 'color: #00ff00');
         if (templateType.includes('location')) {
             placeholderOptions += `<optgroup label="Locations">${placeholders.location.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else if (templateType.includes('drawer')) {
+            placeholderOptions += `<optgroup label="Drawer">${placeholders.drawer.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else if (templateType.includes('rack')) {
             placeholderOptions += `<optgroup label="Racks">${placeholders.rack.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else if (templateType.includes('in-out')) {
+            placeholderOptions += `<optgroup label="In-Out">${placeholders.inout.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else {
             // Default to item template
             placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
@@ -1289,17 +1438,20 @@ function updatePropertiesPanel(index) {
         </div>
         <div class="mb-2">
             <label class="form-label" style="font-size: 12px;"><strong>Content</strong></label>
-            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
-                <input type="text" class="form-control form-control-sm" id="prop-source" value="${element.source_field || ''}" placeholder="" style="font-size: 12px; flex: 1;">
-                <button class="btn btn-sm btn-outline-primary" id="btn-add-placeholder" style="font-size: 12px; padding: 4px 10px;">
-                    <i class="bi bi-plus"></i>
+            <textarea class="form-control form-control-sm" rows="2" id="prop-source" style="font-size: 12px; font-family: monospace;">${element.source_field || ''}</textarea>
+            <small class="text-muted" style="font-size: 11px;">Use placeholders from dropdown</small>
+        </div>
+        <div class="mb-2">
+            <label class="form-label" style="font-size: 12px;"><strong>Placeholder</strong></label>
+            <div style="display: flex; gap: 6px;">
+                <select class="form-select form-select-sm" id="prop-placeholder" style="font-size: 12px; flex: 1;">
+                    <option value="">Select placeholder...</option>
+                    ${placeholderOptions}
+                </select>
+                <button class="btn btn-sm btn-outline-primary" id="btn-add-placeholder" style="font-size: 12px; padding: 4px 10px; white-space: nowrap;">
+                    <i class="bi bi-plus"></i> Add
                 </button>
             </div>
-            <select class="form-select form-select-sm" id="prop-placeholder" style="font-size: 12px;">
-                <option value="">Select placeholder to add...</option>
-                ${placeholderOptions}
-            </select>
-            <small class="text-muted" style="font-size: 11px;">Type text or add placeholders</small>
         </div>
         <div class="mb-2">
             <label class="form-label" style="font-size: 12px;"><strong>Format</strong></label>
@@ -1327,15 +1479,21 @@ function updatePropertiesPanel(index) {
             <input type="text" class="form-control form-control-sm" id="prop-layername" value="${layerName}" style="font-size: 12px;">
         </div>
         
+        <!-- Use Target Icon -->
+        <div class="mb-2 form-check">
+            <input type="checkbox" class="form-check-input" id="prop-use-target-icon" ${element.use_target_icon ? 'checked' : ''}>
+            <label class="form-check-label" for="prop-use-target-icon" style="font-size: 12px;">Use target icon <small class="text-muted">(uses the icon set on the target entity, e.g. drawer icon)</small></label>
+        </div>
+
         <!-- Icon Search -->
-        <div class="mb-2">
+        <div class="mb-2" id="prop-icon-picker-section" style="display: ${element.use_target_icon ? 'none' : 'block'}">
             <label class="form-label" style="font-size: 12px;"><strong>Search Icons</strong></label>
             <input type="text" class="form-control form-control-sm" id="prop-icon-search" placeholder="Search Bootstrap Icons..." style="font-size: 12px;">
             <small class="text-muted" style="font-size: 11px;">Bootstrap Icons bundled with ElectroManager</small>
         </div>
 
         <!-- Icon Preview Grid -->
-        <div class="mb-2">
+        <div class="mb-2" id="prop-icon-grid-section" style="display: ${element.use_target_icon ? 'none' : 'block'}">
             <label class="form-label" style="font-size: 12px;"><strong>Icon Preview</strong></label>
             <div id="prop-icon-grid" class="icon-picker-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; max-height: 250px; overflow-y: auto; padding: 8px; border-radius: 4px;">
                 <p class="text-muted mb-0" style="font-size: 11px; grid-column: 1/-1; text-align: center; padding: 20px 0;">Loading icons…</p>
@@ -1356,6 +1514,34 @@ function updatePropertiesPanel(index) {
             <label class="form-label" style="font-size: 12px;"><strong>Icon Size (mm)</strong></label>
             <input type="number" class="form-control form-control-sm" id="prop-icon-size" value="${element.icon_size_mm || 10}" step="0.5" min="1" style="font-size: 12px;">
         </div>`;
+    } else if (element.type === 'picture') {
+        const layerName = element.layer_name || `Picture${index + 1}`;
+        html += `
+    <div class="mb-2">
+        <label class="form-label" style="font-size: 12px;"><strong>Layer Name</strong></label>
+        <input type="text" class="form-control form-control-sm" id="prop-layername" value="${layerName}" style="font-size: 12px;">
+    </div>
+
+    <!-- Use Target Image -->
+    <div class="mb-2 form-check">
+        <input type="checkbox" class="form-check-input" id="prop-use-target-image" ${element.use_target_image ? 'checked' : ''}>
+        <label class="form-check-label" for="prop-use-target-image" style="font-size: 12px;">Use target image <small class="text-muted">(uses the image set on the target entity, e.g. drawer icon)</small></label>
+    </div>
+
+    <!-- Selected preview -->
+    <div class="mb-2" id="picture-selected-preview" style="display: ${element.use_target_image ? 'none' : (element.picture_url ? 'block' : 'none')};">
+        <label class="form-label" style="font-size: 12px;"><strong>Selected Image</strong></label>
+        <div style="text-align:center; padding:6px; border:1px solid #28a745; border-radius:4px; background:rgba(40,167,69,0.05);">
+            <img src="${element.picture_url || ''}" style="max-width:80px;max-height:60px;object-fit:contain;" id="picture-preview-img">
+        </div>
+    </div>
+
+    <!-- Browse button -->
+    <div class="mb-2" id="picture-browse-section" style="display: ${element.use_target_image ? 'none' : 'block'};">
+        <button type="button" class="btn btn-sm btn-outline-secondary w-100" onclick="openShareFilePicker()" ${element.use_target_image ? 'disabled' : ''}>
+            <i class="bi bi-folder2-open"></i> Browse Share Files
+        </button>
+    </div>`;
     }
 
     html += `
@@ -1366,13 +1552,17 @@ function updatePropertiesPanel(index) {
     <div class="mb-2">
         <label style="font-size: 11px; font-weight: 500; display: block; margin-bottom: 6px;">Position (mm)</label>
         <div class="row g-2 mb-2">
-            <div class="col-6">
+            <div class="col-4">
                 <label class="form-label" style="font-size: 11px;">X</label>
                 <input type="number" class="form-control form-control-sm" id="prop-x" value="${element.x_mm.toFixed(1)}" step="0.1" style="font-size: 12px;">
             </div>
-            <div class="col-6">
+            <div class="col-4">
                 <label class="form-label" style="font-size: 11px;">Y</label>
                 <input type="number" class="form-control form-control-sm" id="prop-y" value="${element.y_mm.toFixed(1)}" step="0.1" style="font-size: 12px;">
+            </div>
+            <div class="col-4">
+                <label class="form-label" style="font-size: 11px;">Rotation (°)</label>
+                <input type="number" class="form-control form-control-sm" id="prop-rotation" value="${(element.rotation_deg || 0).toFixed(1)}" step="1" style="font-size: 12px;">
             </div>
         </div>
         <div style="display: flex; gap: 8px;">
@@ -1421,7 +1611,7 @@ function attachPropertyListeners(index) {
     const el = layout[index];
 
     const updateProp = (prop, value, skipRender = false) => {
-        if (prop.includes('_mm') || prop === 'font_size_mm') {
+        if (prop.includes('_mm') || prop === 'font_size_mm' || prop === 'rotation_deg') {
             el[prop] = parseFloat(value);
         } else {
             el[prop] = value;
@@ -1438,7 +1628,7 @@ function attachPropertyListeners(index) {
 
     const updatePropOnly = (prop, value) => {
         // Update only - no re-render
-        if (prop.includes('_mm') || prop === 'font_size_mm') {
+        if (prop.includes('_mm') || prop === 'font_size_mm' || prop === 'rotation_deg') {
             el[prop] = parseFloat(value);
         } else {
             el[prop] = value;
@@ -1471,10 +1661,18 @@ function attachPropertyListeners(index) {
         e.preventDefault();
         updateProp('text_align', 'right');
     });
+    document.getElementById('btn-bold')?.addEventListener('click', e => {
+        e.preventDefault();
+        updateProp('font_weight', el.font_weight === 'bold' ? 'normal' : 'bold');
+    });
+    document.getElementById('btn-italic')?.addEventListener('click', e => {
+        e.preventDefault();
+        updateProp('font_style', el.font_style === 'italic' ? 'normal' : 'italic');
+    });
 
     // Position and size fields - only re-render on blur or Enter (not on every keystroke)
-    const positionSizeFields = ['prop-x', 'prop-y', 'prop-w', 'prop-h'];
-    const fieldMap = { 'prop-x': 'x_mm', 'prop-y': 'y_mm', 'prop-w': 'width_mm', 'prop-h': 'height_mm' };
+    const positionSizeFields = ['prop-x', 'prop-y', 'prop-rotation', 'prop-w', 'prop-h'];
+    const fieldMap = { 'prop-x': 'x_mm', 'prop-y': 'y_mm', 'prop-rotation': 'rotation_deg', 'prop-w': 'width_mm', 'prop-h': 'height_mm' };
     
     positionSizeFields.forEach(fieldId => {
         const field = document.getElementById(fieldId);
@@ -1682,8 +1880,37 @@ function attachPropertyListeners(index) {
         });
     }
 
+    // Use target icon toggle
+    const useTargetIconCb = document.getElementById('prop-use-target-icon');
+    if (useTargetIconCb) {
+        useTargetIconCb.addEventListener('change', (e) => {
+            const checked = e.target.checked;
+            updateProp('use_target_icon', checked);
+            const pickerSection = document.getElementById('prop-icon-picker-section');
+            const gridSection = document.getElementById('prop-icon-grid-section');
+            if (pickerSection) pickerSection.style.display = checked ? 'none' : 'block';
+            if (gridSection) gridSection.style.display = checked ? 'none' : 'block';
+        });
+    }
+
+    // Use target image toggle
+    const useTargetImageCb = document.getElementById('prop-use-target-image');
+    if (useTargetImageCb) {
+        useTargetImageCb.addEventListener('change', (e) => {
+            const checked = e.target.checked;
+            updateProp('use_target_image', checked);
+            const browseSection = document.getElementById('picture-browse-section');
+            const previewSection = document.getElementById('picture-selected-preview');
+            if (browseSection) browseSection.style.display = checked ? 'none' : 'block';
+            if (previewSection) previewSection.style.display = checked ? 'none' : (el.picture_url ? 'block' : 'none');
+        });
+    }
+
     // Load Bootstrap Icons catalogue
-    loadBootstrapIcons(el);
+    if (!useTargetIconCb || !useTargetIconCb.checked) {
+        loadBootstrapIcons(el);
+    }
+
 }
 
 // Bootstrap Icons catalogue (cached across calls in this page)
@@ -1752,6 +1979,107 @@ function filterIconGrid(searchText, element) {
     }
 }
 
+let _sfPickerCache = null;
+let _sfPickerView = 'card';
+
+function openShareFilePicker() {
+    const modal = new bootstrap.Modal(document.getElementById('sfPickerModal'));
+    modal.show();
+}
+
+async function _sfLoadFiles() {
+    if (_sfPickerCache) { _sfRender(_sfPickerCache); return; }
+    const cardView = document.getElementById('sfpCardView');
+    const listView = document.getElementById('sfpListView');
+    cardView.innerHTML = '<p class="text-muted text-center py-4">Loading…</p>';
+    listView.querySelector('tbody').innerHTML = '<tr><td colspan="3" class="text-center text-muted py-4">Loading…</td></tr>';
+    try {
+        const resp = await fetch('/api/qr-template/shared-media');
+        _sfPickerCache = await resp.json();
+        _sfRender(_sfPickerCache);
+    } catch (e) {
+        cardView.innerHTML = '<p class="text-danger text-center py-4">Error loading files.</p>';
+    }
+}
+
+function _sfRender(files) {
+    const currentUrl = (selectedElement !== null && layout[selectedElement]) ? layout[selectedElement].picture_url : null;
+    const query = document.getElementById('sfpSearch').value.toLowerCase();
+    const filtered = query ? files.filter(f => f.name.toLowerCase().includes(query) || f.category.toLowerCase().includes(query)) : files;
+    const _escSq = s => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+    // Card view
+    const cardView = document.getElementById('sfpCardView');
+    if (!filtered.length) {
+        cardView.innerHTML = '<p class="text-muted text-center py-4 col-span-all" style="grid-column:1/-1;">No files found.</p>';
+    } else {
+        cardView.innerHTML = filtered.map(f => {
+            const sel = f.url === currentUrl;
+            return `<div class="col">
+                <div class="card h-100 sfp-item ${sel ? 'border-success border-2' : ''}" style="cursor:pointer;" onclick="_sfSelect(${f.id},'${_escSq(f.url)}','${_escSq(f.category)}','${_escSq(f.name)}')">
+                    <div style="aspect-ratio:1;overflow:hidden;padding:8px;display:flex;align-items:center;justify-content:center;">
+                        <img src="${f.url}" style="max-width:100%;max-height:100%;object-fit:contain;">
+                    </div>
+                    <div class="card-body p-1 text-center">
+                        <small class="text-truncate d-block" style="font-size:11px;" title="${f.name}">${f.name}</small>
+                        <small class="badge bg-secondary" style="font-size:9px;">${f.category}</small>
+                    </div>
+                    ${sel ? '<div class="position-absolute top-0 start-0 m-1"><i class="bi bi-check-circle-fill text-success"></i></div>' : ''}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // List view
+    const tbody = document.getElementById('sfpListView').querySelector('tbody');
+    tbody.innerHTML = filtered.map(f => {
+        const sel = f.url === currentUrl;
+        return `<tr class="sfp-item ${sel ? 'table-success' : ''}" style="cursor:pointer;" onclick="_sfSelect(${f.id},'${_escSq(f.url)}','${_escSq(f.category)}','${_escSq(f.name)}')">
+            <td style="width:50px;"><img src="${f.url}" style="width:40px;height:40px;object-fit:contain;"></td>
+            <td>${f.name}</td>
+            <td><span class="badge bg-secondary">${f.category}</span></td>
+        </tr>`;
+    }).join('');
+}
+
+function _sfSelect(id, url, category, name) {
+    if (selectedElement === null) return;
+    const el = layout[selectedElement];
+    el.picture_url = url;
+    el.share_file_id = id;
+    el.share_file_category = category;
+    // Update properties panel preview
+    const preview = document.getElementById('picture-selected-preview');
+    if (preview) {
+        preview.style.display = 'block';
+        const img = document.getElementById('picture-preview-img');
+        if (img) img.src = url;
+    }
+    renderCanvas();
+    debounceAutoSave();
+    bootstrap.Modal.getInstance(document.getElementById('sfPickerModal')).hide();
+}
+
+function _sfSetView(view) {
+    _sfPickerView = view;
+    document.getElementById('sfpCardView').classList.toggle('d-none', view !== 'card');
+    document.getElementById('sfpListView').classList.toggle('d-none', view !== 'list');
+    document.getElementById('sfpBtnCard').classList.toggle('active', view === 'card');
+    document.getElementById('sfpBtnList').classList.toggle('active', view === 'list');
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('sfPickerModal');
+    if (modal) {
+        modal.addEventListener('show.bs.modal', _sfLoadFiles);
+        document.getElementById('sfpSearch').addEventListener('input', function () {
+            if (_sfPickerCache) _sfRender(_sfPickerCache);
+        });
+        document.getElementById('sfpBtnCard').addEventListener('click', () => _sfSetView('card'));
+        document.getElementById('sfpBtnList').addEventListener('click', () => _sfSetView('list'));
+    }
+});
+
 function selectIcon(iconName) {
     if (selectedElement !== null) {
         const element = layout[selectedElement];
@@ -1769,6 +2097,7 @@ function makeDraggable(element, layoutElement, index) {
 
     element.addEventListener('mousedown', (e) => {
         if (e.target.classList.contains('resize-handle')) return;
+        if (e.target.closest && e.target.closest('.rotate-handle')) return;
         // Check if position is locked
         if (layoutElement.fix_position) return;
         isDragging = true;
@@ -1885,6 +2214,55 @@ function makeResizable(element, layoutElement, index, handle) {
     });
 }
 
+function makeRotatable(wrapper, layoutElement, index, handle) {
+    let isRotating = false;
+    let startAngle = 0;
+    let startRotation = 0;
+
+    function getAngle(e) {
+        const rect = wrapper.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        return Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI;
+    }
+
+    handle.addEventListener('mousedown', (e) => {
+        isRotating = true;
+        startAngle = getAngle(e);
+        startRotation = layoutElement.rotation_deg || 0;
+        e.stopPropagation();
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isRotating || selectedElement !== index) return;
+        const currentAngle = getAngle(e);
+        let delta = currentAngle - startAngle;
+        let newRot = startRotation + delta;
+        // Snap to 15° increments when Shift held
+        if (e.shiftKey) newRot = Math.round(newRot / 15) * 15;
+        layoutElement.rotation_deg = newRot;
+        wrapper.style.transform = `rotate(${newRot}deg)`;
+        // Live-update properties panel rotation field
+        const propRot = document.getElementById('prop-rotation');
+        if (propRot) propRot.value = newRot.toFixed(1);
+        clearTimeout(dragDebounceTimer);
+        dragDebounceTimer = setTimeout(() => renderCanvas(), DEBOUNCE_DELAY);
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isRotating) {
+            isRotating = false;
+            clearTimeout(dragDebounceTimer);
+            renderCanvas();
+            setTimeout(() => {
+                const elementDiv = document.querySelector(`[data-index="${index}"]`);
+                if (elementDiv) selectElement(index, elementDiv);
+            }, 10);
+        }
+    });
+}
+
 function deleteElement(index) {
     if (confirm('Delete this element?')) {
         layout.splice(index, 1);
@@ -1907,7 +2285,10 @@ document.getElementById('btn-add-text').addEventListener('click', () => {
         font_size_mm: 4,
         color: '#000000',
         font_family: 'Arial',
-        text_align: 'left'
+        text_align: 'left',
+        font_weight: 'normal',
+        font_style: 'normal',
+        rotation_deg: 0
     });
     renderCanvas();
     renderLayers();
@@ -1927,7 +2308,8 @@ document.getElementById('btn-add-qr').addEventListener('click', () => {
         y_mm: templateHeight - size - 2,
         width_mm: size,
         height_mm: size,
-        error_correction: 'M'
+        error_correction: 'M',
+        rotation_deg: 0
     });
     renderCanvas();
     renderLayers();
@@ -1947,7 +2329,8 @@ document.getElementById('btn-add-barcode').addEventListener('click', () => {
         width_mm: Math.max(15, templateWidth * 0.5),
         height_mm: Math.max(8, templateHeight * 0.2),
         format: 'CODE128',
-        show_label: false
+        show_label: false,
+        rotation_deg: 0
     });
     renderCanvas();
     renderLayers();
@@ -1967,7 +2350,8 @@ document.getElementById('btn-add-icon').addEventListener('click', () => {
         width_mm: Math.max(15, templateWidth * 0.3),
         height_mm: Math.max(15, templateHeight * 0.3),
         icon_size_mm: 10,
-        icon_color: '#000000'
+        icon_color: '#000000',
+        rotation_deg: 0
     });
     renderCanvas();
     renderLayers();
@@ -1976,6 +2360,33 @@ document.getElementById('btn-add-icon').addEventListener('click', () => {
         if (elementDiv) selectElement(layout.length - 1, elementDiv);
     }, 50);
 });
+
+document.getElementById('btn-add-picture').addEventListener('click', () => {
+    layout.push({
+        id: 'picture-' + Date.now(),
+        type: 'picture',
+        share_file_id: null,
+        share_file_category: null,
+        picture_url: null,
+        x_mm: 2,
+        y_mm: 2,
+        width_mm: Math.max(15, templateWidth * 0.3),
+        height_mm: Math.max(15, templateHeight * 0.3),
+        rotation_deg: 0
+    });
+    renderCanvas();
+    renderLayers();
+    setTimeout(() => {
+        const elementDiv = document.querySelector(`[data-index="${layout.length - 1}"]`);
+        if (elementDiv) selectElement(layout.length - 1, elementDiv);
+    }, 50);
+});
+
+let autoSaveTimer = null;
+function debounceAutoSave() {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(() => saveTemplate(), 2000);
+}
 
 async function saveTemplate() {
     try {
@@ -2088,7 +2499,6 @@ document.querySelectorAll('.panel-toggle').forEach(toggle => {
 // User can click "Fit" button if they want to recalculate after resizing
 // This prevents unwanted recalculations from font loading or layout shifts
 
-loadTemplate();
 function renderGrid() {
     const canvas = document.getElementById('canvas');
     const gridCanvas = document.getElementById('grid-canvas');
@@ -2283,4 +2693,59 @@ document.getElementById('btnSaveSettings').addEventListener('click', async () =>
 
 loadTemplate();
 </script>
+
+<!-- Share Files Picker Modal -->
+<div class="modal fade" id="sfPickerModal" tabindex="-1" aria-labelledby="sfPickerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="sfPickerModalLabel"><i class="bi bi-images me-2"></i>Select Share File</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Toolbar -->
+                <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                    <div class="input-group input-group-sm flex-grow-1" style="max-width:320px;">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" id="sfpSearch" class="form-control" placeholder="Search files…">
+                        <button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('sfpSearch').value='';_sfPickerCache&&_sfRender(_sfPickerCache);">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button id="sfpBtnCard" type="button" class="btn btn-outline-secondary active" title="Card view">
+                            <i class="bi bi-grid"></i>
+                        </button>
+                        <button id="sfpBtnList" type="button" class="btn btn-outline-secondary" title="List view">
+                            <i class="bi bi-list-ul"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Card View -->
+                <div id="sfpCardView" class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3 position-relative">
+                    <p class="text-muted text-center py-4 w-100">Loading…</p>
+                </div>
+
+                <!-- List View -->
+                <div id="sfpListView" class="d-none">
+                    <table class="table table-sm table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:56px;">Preview</th>
+                                <th>Name</th>
+                                <th style="width:90px;">Category</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}

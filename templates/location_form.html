@@ -65,20 +65,52 @@
 
                         <div class="col-md-6 mb-3">
                             {{ form.picture.label(class="form-label") }}
-                            {{ form.picture(class="form-control") }}
-                            <small class="text-muted">Upload a picture (PNG, JPG, max {{ max_file_size_mb }}MB)</small>
+
+                            <!-- Current picture preview -->
                             {% if location and location.picture %}
-                            <div class="mt-2">
-                                <img src="{{ url_for('location_rack.location_picture', filepath=location.picture) }}" 
-                                     alt="{{ location.name }}" 
-                                     style="width: 200px; height: 200px; object-fit: cover; border-radius: 8px; border: 2px solid #dee2e6; cursor: pointer;"
-                                     onclick="showImageModal('{{ url_for('location_rack.location_picture', filepath=location.picture) }}', '{{ location.name }}')">
-                                <div class="form-check mt-2">
-                                    <input type="checkbox" class="form-check-input" id="delete_picture" name="delete_picture">
-                                    <label class="form-check-label small" for="delete_picture">Delete current picture</label>
-                                </div>
+                            <div class="mb-2 position-relative" id="locPicPreviewWrap" style="display:inline-block">
+                                <img id="locPicPreview"
+                                     src="{{ url_for('location_rack.location_picture', filepath=location.picture) }}"
+                                     alt="{{ location.name }}"
+                                     style="width:150px;height:150px;object-fit:cover;border-radius:8px;border:2px solid #dee2e6;cursor:pointer;"
+                                     onclick="showImageModal(this.src, '{{ location.name }}')">
+                                <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 p-0 lh-1"
+                                        style="width:22px;height:22px;border-radius:50%;font-size:0.75rem;"
+                                        onclick="clearLocPic()" title="Remove picture">
+                                    <i class="bi bi-x"></i>
+                                </button>
                             </div>
+                            <input type="hidden" id="deletePicFlag" name="delete_picture" value="">
+                            {% else %}
+                            <div class="mb-2 position-relative" id="locPicPreviewWrap" style="display:none">
+                                <img id="locPicPreview" src="" alt="Preview"
+                                     style="width:150px;height:150px;object-fit:cover;border-radius:8px;border:2px solid #dee2e6;">
+                                <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 p-0 lh-1"
+                                        style="width:22px;height:22px;border-radius:50%;font-size:0.75rem;"
+                                        onclick="clearLocPic()" title="Remove picture">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                            <input type="hidden" id="deletePicFlag" name="delete_picture" value="">
                             {% endif %}
+
+                            <!-- Share file indicator -->
+                            <div id="locShareIndicator" class="mb-1" style="display:none;">
+                                <span class="badge bg-info text-dark"><i class="bi bi-folder-fill"></i> Icon: <span id="locShareName"></span></span>
+                            </div>
+
+                            <!-- Hidden field for selected icon share file -->
+                            <input type="hidden" name="share_icon_file" id="shareIconFile" value="">
+
+                            <!-- Upload + Share Files buttons -->
+                            <div class="d-flex gap-2 flex-wrap align-items-center mb-1">
+                                {{ form.picture(class="form-control form-control-sm", id="locPicInput", accept=".jpg,.jpeg,.png,.webp") }}
+                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                        data-bs-toggle="modal" data-bs-target="#iconShareModal">
+                                    <i class="bi bi-folder2-open"></i> Share Files
+                                </button>
+                            </div>
+                            <small class="text-muted">PNG, JPG or WebP (max {{ max_file_size_mb }}MB). Or pick from Share Files icons.</small>
                         </div>
                     </div>
 
@@ -163,7 +195,90 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     initColorPicker('cp_main', 'ch_main', 'cs_main');
+
+    // Picture file input — show preview
+    const picInput = document.getElementById('locPicInput');
+    if (picInput) {
+        picInput.addEventListener('change', function() {
+            const file = this.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                showLocPicPreview(e.target.result);
+                document.getElementById('shareIconFile').value = '';
+                document.getElementById('locShareIndicator').style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        });
+    }
 });
+
+function showLocPicPreview(src) {
+    const wrap = document.getElementById('locPicPreviewWrap');
+    const img  = document.getElementById('locPicPreview');
+    if (img)  img.src = src;
+    if (wrap) wrap.style.display = 'inline-block';
+}
+
+function clearLocPic() {
+    const wrap  = document.getElementById('locPicPreviewWrap');
+    const flag  = document.getElementById('deletePicFlag');
+    const input = document.getElementById('locPicInput');
+    const share = document.getElementById('shareIconFile');
+    const ind   = document.getElementById('locShareIndicator');
+    if (wrap)  wrap.style.display = 'none';
+    if (flag)  flag.value = '1';
+    if (input) input.value = '';
+    if (share) share.value = '';
+    if (ind)   ind.style.display = 'none';
+}
+
+function selectLocIcon(filename, name, url) {
+    document.getElementById('shareIconFile').value = filename;
+    document.getElementById('locShareName').textContent = name;
+    document.getElementById('locShareIndicator').style.display = '';
+    showLocPicPreview(url);
+    document.getElementById('deletePicFlag').value = '';
+    const input = document.getElementById('locPicInput');
+    if (input) input.value = '';
+    const modal = bootstrap.Modal.getInstance(document.getElementById('iconShareModal'));
+    if (modal) modal.hide();
+}
 </script>
+
+<!-- Icon Share Files Modal -->
+<div class="modal fade" id="iconShareModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-folder2-open"></i> Choose Icon from Share Files</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                {% if icon_share_files %}
+                <div class="row g-3">
+                    {% for sf in icon_share_files %}
+                    <div class="col-4 col-md-3 col-lg-2">
+                        <div class="card h-100 border" style="cursor:pointer;"
+                             onclick="selectLocIcon('{{ sf.filename }}', '{{ sf.name | e }}', '{{ url_for('share.share_serve', category='icon', filename=sf.filename) }}')">
+                            <img src="{{ url_for('share.share_serve', category='icon', filename=sf.filename) }}"
+                                 class="card-img-top" style="height:80px;object-fit:contain;padding:4px;" alt="{{ sf.name }}">
+                            <div class="card-body p-1 text-center">
+                                <small class="text-muted text-truncate d-block">{{ sf.name }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">No icons in Share Files yet.<br>Upload images to the "Icon" category in Share Files management.</p>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 {% endblock %}

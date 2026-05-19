@@ -14,9 +14,21 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
 import os
 import json
+import re
 import secrets
 import string
 import logging
+
+_COLOR_RE = re.compile(r'^#[0-9A-Fa-f]{6}$')
+
+def _sanitize_color(value, default='#6c757d'):
+    """Return value if valid hex color, else default."""
+    v = (value or '').strip()
+    return v if _COLOR_RE.match(v) else default
+
+def _sanitize_name(value, max_len=128):
+    """Strip and truncate a name field."""
+    return (value or '').strip()[:max_len]
 
 logger = logging.getLogger(__name__)
 
@@ -90,25 +102,24 @@ def location_new():
         db.session.add(location)
         db.session.commit()
         
-        # Handle picture upload with UUID-based path structure
-        if form.picture.data:
+        # Handle share icon file selection (takes priority over upload)
+        share_icon = request.form.get('share_icon_file', '').strip()
+        if share_icon and not form.picture.data:
+            location.picture = f'share/icon/{share_icon}'
+            db.session.commit()
+        elif form.picture.data:
+            # Handle picture upload with UUID-based path structure
             file = form.picture.data
-            
-            # Check file size against system settings
-            max_size_mb = 10  # fixed for location/rack pictures
+            max_size_mb = 10
             max_size_bytes = max_size_mb * 1024 * 1024
-            
             file.seek(0, 2)
             file_size = file.tell()
             file.seek(0)
-            
             if file_size > max_size_bytes:
                 flash('Location/rack pictures must be smaller than 10MB.', 'danger')
                 db.session.delete(location)
                 db.session.commit()
                 return render_template('location_form.html', form=form, location=None)
-            
-            # Only allow PNG and JPEG
             if file.filename and allowed_file(file.filename):
                 ext = file.filename.rsplit('.', 1)[1].lower()
                 if ext not in ['png', 'jpg', 'jpeg', 'webp']:
@@ -116,13 +127,11 @@ def location_new():
                     db.session.delete(location)
                     db.session.commit()
                     return render_template('location_form.html', form=form, location=None)
-                
                 if ext == 'jpg':
                     ext = 'jpeg'
                 filename = f"{location.uuid}.{ext}"
                 location_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations', location.uuid)
                 os.makedirs(location_dir, exist_ok=True)
-                # Remove any old picture with a different extension
                 for old_ext in ['png', 'jpeg', 'webp']:
                     old_f = os.path.join(location_dir, f"{location.uuid}.{old_ext}")
                     if old_f != os.path.join(location_dir, filename) and os.path.exists(old_f):
@@ -130,13 +139,16 @@ def location_new():
                 file.save(os.path.join(location_dir, filename))
                 location.picture = f"{location.uuid}/{filename}"
                 db.session.commit()
-        
+
         log_audit(current_user.id, 'create', 'location', location.id, f'Created location: {location.name}')
         flash(f'Location "{location.name}" created successfully!', 'success')
         return redirect(url_for('location_rack.location_management'))
     
+    from models import SharedFile
     max_file_size_mb = int(Setting.get('max_file_size_mb', '10'))
-    return render_template('location_form.html', form=form, location=None, max_file_size_mb=max_file_size_mb)
+    icon_share_files = SharedFile.query.filter_by(category='icon').order_by(SharedFile.created_at.desc()).all()
+    return render_template('location_form.html', form=form, location=None,
+                           max_file_size_mb=max_file_size_mb, icon_share_files=icon_share_files)
 
 
 
@@ -160,41 +172,35 @@ def location_edit(uuid):
         
         # Handle picture deletion
         if request.form.get('delete_picture'):
-            if location.picture:
-                # Path is {location_uuid}/{picture_uuid}.ext
+            if location.picture and not location.picture.startswith('share/'):
                 old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations', location.picture)
                 if is_safe_file_path(old_path) and os.path.exists(old_path):
                     os.remove(old_path)
-                location.picture = None
-        
-        # Handle new picture upload
-        if form.picture.data:
+            location.picture = None
+
+        # Handle share icon file selection (takes priority over upload)
+        share_icon = request.form.get('share_icon_file', '').strip()
+        if share_icon and not form.picture.data:
+            location.picture = f'share/icon/{share_icon}'
+        elif form.picture.data:
             file = form.picture.data
             if hasattr(file, 'filename') and file.filename and allowed_file(file.filename):
-                # Check file size against system settings
-                max_size_mb = 10  # fixed for location/rack pictures
+                max_size_mb = 10
                 max_size_bytes = max_size_mb * 1024 * 1024
-                
                 file.seek(0, 2)
                 file_size = file.tell()
                 file.seek(0)
-                
                 if file_size > max_size_bytes:
                     flash('Location/rack pictures must be smaller than 10MB.', 'danger')
                     return render_template('location_form.html', form=form, location=location)
-                
-                # Only allow PNG and JPEG
                 ext = file.filename.rsplit('.', 1)[1].lower()
                 if ext not in ['png', 'jpg', 'jpeg', 'webp']:
                     flash('Only PNG, JPEG, and WebP images are allowed.', 'danger')
                     return render_template('location_form.html', form=form, location=location)
-                
-                # Delete old picture if exists
-                if location.picture:
+                if location.picture and not location.picture.startswith('share/'):
                     old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations', location.picture)
                     if is_safe_file_path(old_path) and os.path.exists(old_path):
                         os.remove(old_path)
-                
                 if ext == 'jpg':
                     ext = 'jpeg'
                 filename = f"{location.uuid}.{ext}"
@@ -206,15 +212,18 @@ def location_edit(uuid):
                         os.remove(old_f)
                 file.save(os.path.join(location_dir, filename))
                 location.picture = f"{location.uuid}/{filename}"
-        
+
         db.session.commit()
-        
+
         log_audit(current_user.id, 'update', 'location', location.id, f'Updated location: {location.name}')
         flash(f'Location "{location.name}" updated successfully!', 'success')
         return redirect(url_for('location_rack.location_detail', uuid=location.uuid))
-    
+
+    from models import SharedFile
     max_file_size_mb = int(Setting.get('max_file_size_mb', '10'))
-    return render_template('location_form.html', form=form, location=location, max_file_size_mb=max_file_size_mb)
+    icon_share_files = SharedFile.query.filter_by(category='icon').order_by(SharedFile.created_at.desc()).all()
+    return render_template('location_form.html', form=form, location=location,
+                           max_file_size_mb=max_file_size_mb, icon_share_files=icon_share_files)
 
 
 
@@ -255,26 +264,33 @@ def location_delete(uuid):
 @location_rack_bp.route('/location-picture/<path:filepath>', endpoint='location_picture')
 @login_required
 def location_picture(filepath):
-    """Serve location pictures from UUID-based paths
-    filepath format: {location_uuid}/{picture_uuid}.ext
+    """Serve location pictures.  filepath may be:
+      - {location_uuid}/{filename}.ext  — uploaded file
+      - share/icon/{filename}           — icon from Share Files
     """
+    if filepath.startswith('share/icon/'):
+        from routes.share import share_serve
+        filename = filepath[len('share/icon/'):]
+        return share_serve('icon', filename)
     location_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations')
-    # Prevent path traversal attacks
     safe_path = safe_join(location_dir, filepath)
     if safe_path is None or not os.path.exists(safe_path):
         abort(404)
     return send_from_directory(location_dir, filepath)
 
 
-
 @location_rack_bp.route('/rack-picture/<path:filepath>')
 @login_required
 def rack_picture(filepath):
-    """Serve rack pictures from UUID-based paths
-    filepath format: {rack_uuid}/{picture_uuid}.ext
+    """Serve rack pictures.  filepath may be:
+      - {rack_uuid}/{filename}.ext  — uploaded file
+      - share/icon/{filename}       — icon from Share Files
     """
+    if filepath.startswith('share/icon/'):
+        from routes.share import share_serve
+        filename = filepath[len('share/icon/'):]
+        return share_serve('icon', filename)
     rack_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks')
-    # Prevent path traversal attacks
     safe_path = safe_join(rack_dir, filepath)
     if safe_path is None or not os.path.exists(safe_path):
         abort(404)
@@ -302,13 +318,16 @@ def rack_management():
 def rack_new():
     """Create new rack with form"""
     if request.method == 'POST':
-        name = request.form.get('name')
-        
+        name = _sanitize_name(request.form.get('name', ''))
+        if not name:
+            flash('Rack name is required.', 'danger')
+            return redirect(url_for('location_rack.rack_new'))
+
         # Allow duplicate names - UUID ensures uniqueness
         short_info = request.form.get('short_info', '')[:128] or None
         description = request.form.get('description')
         location_id = request.form.get('location_id')
-        color = request.form.get('color', '#6c757d')
+        color = _sanitize_color(request.form.get('color', ''))
         rows = int(request.form.get('rows', 5))
         cols = int(request.form.get('cols', 5))
 
@@ -337,28 +356,26 @@ def rack_new():
         db.session.commit()
         
         # Handle picture upload with UUID-based path structure
-        if request.files.get('picture'):
+        # Handle share icon file selection (takes priority over upload)
+        share_icon = request.form.get('share_icon_file', '').strip()
+        if share_icon and not request.files.get('picture'):
+            rack.picture = f'share/icon/{share_icon}'
+            db.session.commit()
+        elif request.files.get('picture'):
             file = request.files['picture']
-            
-            # Check file size against system settings
-            max_size_mb = 10  # fixed for location/rack pictures
+            max_size_mb = 10
             max_size_bytes = max_size_mb * 1024 * 1024
-            
             file.seek(0, 2)
             file_size = file.tell()
             file.seek(0)
-            
             if file_size > max_size_bytes:
                 flash('Location/rack pictures must be smaller than 10MB.', 'danger')
                 return redirect(url_for('location_rack.rack_new'))
-            
-            # Only allow PNG and JPEG
             if file.filename and allowed_file(file.filename):
                 ext = file.filename.rsplit('.', 1)[1].lower()
                 if ext not in ['png', 'jpg', 'jpeg', 'webp']:
                     flash('Only PNG, JPEG, and WebP images are allowed.', 'danger')
                     return redirect(url_for('location_rack.rack_new'))
-                
                 if ext == 'jpg':
                     ext = 'jpeg'
                 filename = f"{rack.uuid}.{ext}"
@@ -371,19 +388,21 @@ def rack_new():
                 file.save(os.path.join(rack_dir, filename))
                 rack.picture = f"{rack.uuid}/{filename}"
                 db.session.commit()
-        
+
         log_audit(current_user.id, 'create', 'rack', rack.id, f'Created rack: {name}')
         flash(f'Rack "{name}" created successfully!', 'success')
         return redirect(url_for('location_rack.location_management'))
-    
+
     # GET - show form
+    from models import SharedFile
     locations = Location.query.order_by(Location.name).all()
     max_drawer_rows = int(Setting.get('max_drawer_rows', '10'))
     max_drawer_cols = int(Setting.get('max_drawer_cols', '10'))
     max_file_size_mb = int(Setting.get('max_file_size_mb', '10'))
-    return render_template('rack_form.html', rack=None, locations=locations, 
+    icon_share_files = SharedFile.query.filter_by(category='icon').order_by(SharedFile.created_at.desc()).all()
+    return render_template('rack_form.html', rack=None, locations=locations,
                          max_drawer_rows=max_drawer_rows, max_drawer_cols=max_drawer_cols,
-                         max_file_size_mb=max_file_size_mb)
+                         max_file_size_mb=max_file_size_mb, icon_share_files=icon_share_files)
 
 
 
@@ -395,13 +414,16 @@ def rack_edit(uuid):
     rack = Rack.query.filter_by(uuid=uuid).first_or_404()
     
     if request.method == 'POST':
-        new_name = request.form.get('name')
-        
+        new_name = _sanitize_name(request.form.get('name', ''))
+        if not new_name:
+            flash('Rack name is required.', 'danger')
+            return redirect(url_for('location_rack.rack_edit', uuid=uuid))
+
         # Allow duplicate names - UUID ensures uniqueness
         rack.name = new_name
         rack.short_info = request.form.get('short_info', '')[:128] or None
         rack.description = request.form.get('description')
-        rack.color = request.form.get('color', '#6c757d')
+        rack.color = _sanitize_color(request.form.get('color', ''))
         location_id = request.form.get('location_id')
         rack.location_id = int(location_id) if location_id and location_id != '0' else None
         
@@ -468,40 +490,35 @@ def rack_edit(uuid):
         
         # Handle picture deletion
         if request.form.get('delete_picture'):
-            if rack.picture:
+            if rack.picture and not rack.picture.startswith('share/'):
                 old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks', rack.picture)
                 if is_safe_file_path(old_path) and os.path.exists(old_path):
                     os.remove(old_path)
-                rack.picture = None
-        
-        # Handle new picture upload
-        if request.files.get('picture'):
+            rack.picture = None
+
+        # Handle share icon file selection (takes priority over upload)
+        share_icon = request.form.get('share_icon_file', '').strip()
+        if share_icon and not request.files.get('picture'):
+            rack.picture = f'share/icon/{share_icon}'
+        elif request.files.get('picture'):
             file = request.files['picture']
             if hasattr(file, 'filename') and file.filename and allowed_file(file.filename):
-                # Check file size against system settings
-                max_size_mb = 10  # fixed for location/rack pictures
+                max_size_mb = 10
                 max_size_bytes = max_size_mb * 1024 * 1024
-                
                 file.seek(0, 2)
                 file_size = file.tell()
                 file.seek(0)
-                
                 if file_size > max_size_bytes:
                     flash('Location/rack pictures must be smaller than 10MB.', 'danger')
                     return redirect(url_for('location_rack.rack_edit', uuid=uuid))
-                
-                # Only allow PNG and JPEG
                 ext = file.filename.rsplit('.', 1)[1].lower()
                 if ext not in ['png', 'jpg', 'jpeg', 'webp']:
                     flash('Only PNG, JPEG, and WebP images are allowed.', 'danger')
                     return redirect(url_for('location_rack.rack_edit', uuid=uuid))
-                
-                # Delete old picture if exists
-                if rack.picture:
+                if rack.picture and not rack.picture.startswith('share/'):
                     old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks', rack.picture)
                     if is_safe_file_path(old_path) and os.path.exists(old_path):
                         os.remove(old_path)
-                
                 if ext == 'jpg':
                     ext = 'jpeg'
                 filename = f"{rack.uuid}.{ext}"
@@ -513,21 +530,23 @@ def rack_edit(uuid):
                         os.remove(old_f)
                 file.save(os.path.join(rack_dir, filename))
                 rack.picture = f"{rack.uuid}/{filename}"
-        
+
         db.session.commit()
-        
+
         log_audit(current_user.id, 'update', 'rack', rack.id, f'Updated rack: {rack.name} (size: {rows}x{cols})')
         flash(f'Rack "{rack.name}" updated successfully!', 'success')
         return redirect(url_for('location_rack.rack_detail', uuid=rack.uuid))
-    
+
     # GET - show form
+    from models import SharedFile
     locations = Location.query.order_by(Location.name).all()
     max_drawer_rows = int(Setting.get('max_drawer_rows', '10'))
     max_drawer_cols = int(Setting.get('max_drawer_cols', '10'))
     max_file_size_mb = int(Setting.get('max_file_size_mb', '10'))
+    icon_share_files = SharedFile.query.filter_by(category='icon').order_by(SharedFile.created_at.desc()).all()
     return render_template('rack_form.html', rack=rack, locations=locations,
                          max_drawer_rows=max_drawer_rows, max_drawer_cols=max_drawer_cols,
-                         max_file_size_mb=max_file_size_mb)
+                         max_file_size_mb=max_file_size_mb, icon_share_files=icon_share_files)
 
 
 
@@ -606,10 +625,10 @@ def api_add_location():
     """API endpoint to add location from item form"""
     try:
         data = request.get_json()
-        name = data.get('name', '').strip()
-        info = data.get('info', '').strip()
-        description = data.get('description', '').strip()
-        color = data.get('color', '#6c757d')
+        name = data.get('name', '').strip()[:128]
+        info = data.get('info', '').strip()[:128]
+        description = data.get('description', '').strip()[:512]
+        color = _sanitize_color(data.get('color', ''))
         
         if not name:
             return jsonify({'success': False, 'error': 'Location name is required'})
@@ -637,7 +656,10 @@ def api_add_location():
 @permission_required("settings_sections.location_management", "edit")
 def add_rack():
     """Add a new rack"""
-    name = request.form.get('name')
+    name = _sanitize_name(request.form.get('name', ''))
+    if not name:
+        flash('Rack name is required.', 'danger')
+        return redirect(url_for('location_rack.rack_management'))
     short_info = request.form.get('short_info', '')[:128] or None
     description = request.form.get('description')
     location = request.form.get('location')
@@ -672,7 +694,8 @@ def edit_rack():
         flash('Rack not found', 'danger')
         return redirect(url_for('location_rack.rack_management'))
     
-    rack.name = request.form.get('name', rack.name)
+    new_inline_name = _sanitize_name(request.form.get('name', ''))
+    rack.name = new_inline_name if new_inline_name else rack.name
     rack.short_info = request.form.get('short_info', '')[:128] or None
     rack.description = request.form.get('description', rack.description)
     rack.location_id = request.form.get('location') or None
@@ -729,6 +752,8 @@ def rack_qr_svg(uuid):
 @login_required
 def location_qr_sticker(uuid):
     """Display QR sticker generation page for location"""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        abort(403)
     from models import Location
     from qr_utils import get_location_data
     
@@ -747,6 +772,8 @@ def api_location_sticker_preview(uuid, template_id):
     Generate sticker preview for a location with a specific template
     Returns: SVG image
     """
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
     from models import Location
     from qr_utils import get_location_data, render_template_to_svg
     
@@ -778,6 +805,8 @@ def api_location_sticker_print(uuid, template_id):
     Generate printable sticker for a location
     Returns: PDF file download
     """
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
     from models import Location
     from qr_utils import get_location_data, generate_single_sticker_pdf
     
@@ -807,6 +836,8 @@ def api_location_sticker_print(uuid, template_id):
 @login_required
 def rack_qr_sticker(uuid):
     """Display QR sticker generation page for rack"""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        abort(403)
     from models import Rack
     from qr_utils import get_rack_data
     
@@ -825,6 +856,8 @@ def api_rack_sticker_preview(uuid, template_id):
     Generate sticker preview for a rack with a specific template
     Returns: SVG image
     """
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
     from models import Rack
     from qr_utils import get_rack_data, render_template_to_svg
     
@@ -856,6 +889,8 @@ def api_rack_sticker_print(uuid, template_id):
     Generate printable sticker for a rack
     Returns: PDF file download
     """
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
     from models import Rack
     from qr_utils import get_rack_data, generate_single_sticker_pdf
     
@@ -880,3 +915,169 @@ def api_rack_sticker_print(uuid, template_id):
         download_name=f'{template.name}_{rack.uuid}.pdf'
     )
 
+
+@location_rack_bp.route('/rack/<string:uuid>/drawer/<string:drawer_id>/qr-sticker', endpoint='drawer_qr_sticker')
+@login_required
+def drawer_qr_sticker(uuid, drawer_id):
+    """Display QR sticker page for a single rack drawer (backward compat)."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        abort(403)
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
+    templates = StickerTemplate.query.filter_by(template_type='Drawer').all()
+    return render_template('drawer_qr_sticker.html',
+                           rack=rack,
+                           drawer_ids=[drawer_id],
+                           templates=templates)
+
+
+@location_rack_bp.route('/rack/<string:uuid>/drawers/qr-sticker', endpoint='drawers_qr_sticker')
+@login_required
+def drawers_qr_sticker(uuid):
+    """Display QR sticker page for one or more rack drawers."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        abort(403)
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
+    raw = request.args.get('drawers', '')
+    drawer_ids = [d.strip() for d in raw.split(',') if d.strip()]
+    if not drawer_ids:
+        abort(400)
+    templates = StickerTemplate.query.filter_by(template_type='Drawer').all()
+    return render_template('drawer_qr_sticker.html',
+                           rack=rack,
+                           drawer_ids=drawer_ids,
+                           templates=templates)
+
+
+@location_rack_bp.route('/api/rack/<string:uuid>/drawer/<string:drawer_id>/sticker-preview/<int:template_id>')
+@login_required
+def api_drawer_sticker_preview(uuid, drawer_id, template_id):
+    """Generate sticker preview SVG for a rack drawer"""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
+    from qr_utils import get_drawer_data, render_template_to_svg
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'Drawer':
+        return jsonify({'error': 'Template must be Drawer type'}), 400
+    data = get_drawer_data(rack, drawer_id)
+    svg_data = render_template_to_svg(template, data)
+    return jsonify({
+        'svg': svg_data,
+        'width_mm': template.width_mm,
+        'height_mm': template.height_mm,
+        'template_name': template.name
+    })
+
+
+@location_rack_bp.route('/api/rack/<string:uuid>/drawer/<string:drawer_id>/sticker-print/<int:template_id>')
+@login_required
+def api_drawer_sticker_print(uuid, drawer_id, template_id):
+    """Generate PDF sticker for a rack drawer"""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
+    if not re.match(r'^[A-Za-z0-9_-]+$', drawer_id):
+        return jsonify({'error': 'Invalid drawer ID'}), 400
+    from qr_utils import get_drawer_data, generate_single_sticker_pdf
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'Drawer':
+        return jsonify({'error': 'Template must be Drawer type'}), 400
+    data = get_drawer_data(rack, drawer_id)
+    output = generate_single_sticker_pdf(template, data, f"{rack.uuid}_{drawer_id}")
+    log_audit(current_user.id, 'print', 'rack', rack.id,
+              f'Printed drawer sticker: {template.name} drawer {drawer_id}')
+    return send_file(
+        output,
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f'{template.name}_{rack.uuid}_{drawer_id}.pdf'
+    )
+
+
+@location_rack_bp.route('/api/rack/<string:uuid>/drawers/sticker-print/<int:template_id>')
+@login_required
+def api_drawers_sticker_print(uuid, template_id):
+    """Generate multi-page PDF for multiple rack drawers."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
+    from qr_utils import get_drawer_data, generate_batch_stickers_pdf
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'Drawer':
+        return jsonify({'error': 'Template must be Drawer type'}), 400
+    raw = request.args.get('drawers', '')
+    drawer_ids = [d.strip() for d in raw.split(',') if d.strip()]
+    if not drawer_ids:
+        return jsonify({'error': 'No drawers specified'}), 400
+    drawer_ids = [d for d in drawer_ids if re.match(r'^[A-Za-z0-9_-]+$', d)]
+    if not drawer_ids:
+        return jsonify({'error': 'No valid drawer IDs'}), 400
+    output = generate_batch_stickers_pdf(template, drawer_ids, lambda did: get_drawer_data(rack, did))
+    log_audit(current_user.id, 'print', 'rack', rack.id,
+              f'Printed drawer stickers: {template.name} drawers {",".join(drawer_ids)}')
+    return send_file(output, mimetype='application/pdf', as_attachment=True,
+                     download_name=f'{rack.name}_drawers_{template.name}.pdf')
+
+
+@location_rack_bp.route('/api/rack/<string:uuid>/drawers/sticker-svg-zip/<int:template_id>')
+@login_required
+def api_drawers_sticker_svg_zip(uuid, template_id):
+    """Generate a zip of SVG stickers for multiple rack drawers."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
+    from qr_utils import get_drawer_data, generate_svg_zip
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'Drawer':
+        return jsonify({'error': 'Template must be Drawer type'}), 400
+    raw = request.args.get('drawers', '')
+    drawer_ids = [d.strip() for d in raw.split(',') if d.strip()]
+    if not drawer_ids:
+        return jsonify({'error': 'No drawers specified'}), 400
+    safe_rack = rack.name.replace("'", "").replace(" ", "_")
+    pairs = [(f"{safe_rack}_{did}", get_drawer_data(rack, did)) for did in drawer_ids]
+    zip_buf = generate_svg_zip(template, pairs)
+    return send_file(zip_buf, mimetype='application/zip', as_attachment=True,
+                     download_name=f'{safe_rack}_drawers_svg.zip')
+
+
+@location_rack_bp.route('/api/rack/<string:uuid>/drawers/sticker-table-print/<int:template_id>')
+@login_required
+def api_drawers_sticker_table_print(uuid, template_id):
+    """Generate a table-layout PDF (grid of stickers) for multiple rack drawers."""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
+    from qr_utils import get_drawer_data, generate_table_sticker_pdf
+    rack = Rack.query.filter_by(uuid=uuid).first_or_404()
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'Drawer':
+        return jsonify({'error': 'Template must be Drawer type'}), 400
+    raw = request.args.get('drawers', '')
+    drawer_ids = [d.strip() for d in raw.split(',') if d.strip()]
+    if not drawer_ids:
+        return jsonify({'error': 'No drawers specified'}), 400
+
+    def _f(key, default):
+        try:    return float(request.args.get(key, default))
+        except: return float(default)
+
+    options = {
+        'paper_w':     _f('paper_w',  210),
+        'paper_h':     _f('paper_h',  297),
+        'margin_t':    _f('margin_t',  10),
+        'margin_b':    _f('margin_b',  10),
+        'margin_l':    _f('margin_l',  10),
+        'margin_r':    _f('margin_r',  10),
+        'spacing_v':   _f('spacing_v',  3),
+        'spacing_h':   _f('spacing_h',  3),
+        'border':      request.args.get('border', '0') == '1',
+        'border_w':    _f('border_w',  0.3),
+        'border_color': request.args.get('border_color', '#000000'),
+    }
+
+    output = generate_table_sticker_pdf(template, drawer_ids, lambda did: get_drawer_data(rack, did), options)
+    safe_rack = rack.name.replace("'", "").replace(" ", "_")
+    log_audit(current_user.id, 'print', 'rack', rack.id,
+              f'Printed table sticker PDF: {template.name} drawers {",".join(drawer_ids)}')
+    return send_file(output, mimetype='application/pdf', as_attachment=True,
+                     download_name=f'{safe_rack}_drawers_table.pdf')

@@ -1,7 +1,7 @@
 """
 QR/Barcode Sticker Template Routes - Blueprint
 """
-from flask import Blueprint, render_template, request, jsonify, send_file, redirect, url_for, flash, current_app
+from flask import Blueprint, render_template, request, jsonify, send_file, redirect, url_for, flash, current_app, abort
 from flask_login import login_required, current_user
 from models import db, Item, Location, Rack, StickerTemplate
 from qr_utils import (
@@ -174,18 +174,35 @@ def preview_qr_template(template_id):
                     data = get_item_data(sample_item)
                 else:
                     data = {ph: f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('Items', [])}
-            elif template.template_type == 'Locations':
+            elif template.template_type == 'Location':
                 sample_location = Location.query.first()
                 if sample_location:
                     data = get_location_data(sample_location)
                 else:
-                    data = {ph: f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('Locations', [])}
+                    data = {ph: f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('Location', [])}
             elif template.template_type == 'Racks':
                 sample_rack = Rack.query.first()
                 if sample_rack:
                     data = get_rack_data(sample_rack)
                 else:
                     data = {ph: f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('Racks', [])}
+            elif template.template_type == 'Drawer':
+                from qr_utils import get_drawer_data
+                sample_rack = Rack.query.first()
+                if sample_rack:
+                    # Use the first drawer of the sample rack
+                    first_drawer = f'R1-C1'
+                    data = get_drawer_data(sample_rack, first_drawer)
+                else:
+                    data = {ph.strip('{}') : f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('Drawer', [])}
+            elif template.template_type == 'In-Out':
+                from models import LendingSession
+                from qr_utils import get_session_data
+                sample_session = LendingSession.query.first()
+                if sample_session:
+                    data = get_session_data(sample_session)
+                else:
+                    data = {ph.strip('{}') : f'Sample {ph}' for ph in AVAILABLE_PLACEHOLDERS.get('In-Out', [])}
             else:
                 data = {}
         
@@ -199,6 +216,8 @@ def preview_qr_template(template_id):
 @login_required
 def api_item_sticker_preview(uuid, template_id):
     """Generate sticker preview for an item"""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
     
@@ -219,6 +238,8 @@ def api_item_sticker_preview(uuid, template_id):
 @login_required
 def api_item_sticker_print(uuid, template_id):
     """Generate printable sticker PDF"""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
     
@@ -235,6 +256,8 @@ def api_item_sticker_print(uuid, template_id):
 @login_required
 def item_qr_sticker(uuid):
     """View and print QR stickers for an item"""
+    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        abort(403)
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     templates = StickerTemplate.query.filter_by(template_type='Items').all()
     return render_template('item_qr_sticker.html', item=item, templates=templates)
@@ -338,6 +361,51 @@ def delete_qr_template(template_id):
 def api_available_fonts():
     """Get list of available fonts (system + project)"""
     return jsonify(get_available_fonts())
+
+@qr_template_bp.route('/api/qr-template/shared-media', methods=['GET'])
+@login_required
+def api_qr_shared_media():
+    """API: List sticker and icon shared files for Picture element media picker."""
+    from models import SharedFile
+    from flask import url_for
+    files = SharedFile.query.filter(
+        SharedFile.category.in_(['sticker', 'icon'])
+    ).order_by(SharedFile.category, SharedFile.name).all()
+    result = []
+    for f in files:
+        if not f.is_image:
+            continue
+        result.append({
+            'id': f.id,
+            'name': f.name,
+            'filename': f.filename,
+            'category': f.category,
+            'url': url_for('share.share_serve', category=f.category, filename=f.filename)
+        })
+    return jsonify(result)
+
+
+@qr_template_bp.route('/api/item-thumb-media')
+@login_required
+def api_item_thumb_media():
+    """API: List item + icon share files for item thumbnail Share Files picker."""
+    from models import SharedFile
+    files = SharedFile.query.filter(
+        SharedFile.category.in_(['item', 'icon'])
+    ).order_by(SharedFile.category, SharedFile.name).all()
+    result = []
+    for f in files:
+        if not f.is_image:
+            continue
+        result.append({
+            'id': f.id,
+            'name': f.name,
+            'filename': f.filename,
+            'category': f.category,
+            'url': url_for('share.share_serve', category=f.category, filename=f.filename)
+        })
+    return jsonify(result)
+
 
 @qr_template_bp.route('/api/icons')
 def api_get_icons():

@@ -9,7 +9,7 @@
             <h2><i class="bi bi-grid-3x3"></i> {{ rack.name }}</h2>
             <div class="d-flex gap-2 flex-wrap">
                 <a href="{{ url_for('location_rack.rack_qr_sticker', uuid=rack.uuid) }}" class="btn btn-primary">
-                    <i class="bi bi-qr-code"></i> Print QR
+                    <i class="bi bi-qr-code"></i> Print QR Rack
                 </a>
                 <a href="{{ url_for('visual_storage.visual_storage', rack=rack.uuid) }}" class="btn btn-info">
                     <i class="bi bi-eye"></i> Visual View
@@ -95,6 +95,17 @@
                 {% set skip_cells, cell_spans, group_cells = rack.compute_merge_layout() %}
                 {% set unavailable_drawers = rack.get_unavailable_drawers() %}
                 {% set drawer_info_map = rack.get_drawer_info() %}
+
+                <!-- Selection controls (top) -->
+                <div class="d-flex gap-2 mb-2" id="drawerControlsTop">
+                    <button class="btn btn-sm btn-outline-secondary d-none" id="clearSelectionBtnTop" onclick="clearDrawerSelection()">
+                        <i class="bi bi-x-circle"></i> Clear Selection
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" onclick="printQRDrawer()">
+                        <i class="bi bi-qr-code"></i> Print QR Drawer
+                    </button>
+                </div>
+
                 <div class="rack-view-grid"
                      style="display:grid;grid-template-columns:repeat({{ rack.cols }},minmax(0,1fr));gap:4px;max-width:{{ rack.cols * 72 }}px;">
                     {% for row in range(rack.rows) %}
@@ -137,6 +148,16 @@
                     <small><span class="legend-swatch" style="background:var(--dc-merged-bg-1);border:1px solid var(--dc-merged-border);"></span> Merged</small>
                     <small><span class="legend-swatch" style="background:var(--dc-gmaster-bg-1);border:1px solid var(--dc-gmaster-border);"></span> Group</small>
                     <small><span class="legend-swatch" style="background:var(--dc-unavail-bg-1);border:1px solid var(--dc-unavail-border);"></span> Unavailable</small>
+                </div>
+
+                <!-- Selection controls (bottom) -->
+                <div class="d-flex gap-2 mt-2" id="drawerControlsBottom">
+                    <button class="btn btn-sm btn-outline-secondary d-none" id="clearSelectionBtnBottom" onclick="clearDrawerSelection()">
+                        <i class="bi bi-x-circle"></i> Clear Selection
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" onclick="printQRDrawer()">
+                        <i class="bi bi-qr-code"></i> Print QR Drawer
+                    </button>
                 </div>
             </div>
         </div>
@@ -340,47 +361,65 @@
 </style>
 
 <script>
-let activeDrawer = null;
+const rackUuid = '{{ rack.uuid }}';
+const selectedDrawers = new Set();
 
 function highlightDrawer(drawerId) {
-    // Toggle off if clicking same drawer again
-    if (activeDrawer === drawerId) {
-        clearHighlight();
-        return;
+    // Toggle selection
+    if (selectedDrawers.has(drawerId)) {
+        selectedDrawers.delete(drawerId);
+        document.querySelectorAll(`.rack-view-cell[data-effective="${drawerId}"]`)
+            .forEach(c => c.classList.remove('cell-active'));
+    } else {
+        selectedDrawers.add(drawerId);
+        document.querySelectorAll(`.rack-view-cell[data-effective="${drawerId}"]`)
+            .forEach(c => c.classList.add('cell-active'));
     }
-    activeDrawer = drawerId;
 
-    // Grid: clear then highlight
-    document.querySelectorAll('.rack-view-cell').forEach(c => c.classList.remove('cell-active'));
-    document.querySelectorAll(`.rack-view-cell[data-effective="${drawerId}"]`).forEach(c => {
-        c.classList.add('cell-active');
-    });
-
-    // Table: clear then highlight
+    // Table rows: highlight all selected drawers
     document.querySelectorAll('.item-row').forEach(row => {
-        row.classList.remove('row-active');
-        if (row.dataset.drawer === drawerId) {
-            row.classList.add('row-active');
-        }
+        row.classList.toggle('row-active', selectedDrawers.has(row.dataset.drawer));
     });
 
     // Badge
     const badge = document.getElementById('selectedDrawerBadge');
-    badge.textContent = 'Selected: ' + drawerId;
-    badge.classList.remove('d-none');
+    if (selectedDrawers.size > 0) {
+        badge.textContent = selectedDrawers.size === 1
+            ? 'Selected: ' + [...selectedDrawers][0]
+            : selectedDrawers.size + ' drawers selected';
+        badge.classList.remove('d-none');
+    } else {
+        badge.classList.add('d-none');
+    }
 
-    // Scroll table to first matching row
-    const firstMatch = document.querySelector(`.item-row[data-drawer="${drawerId}"]`);
-    if (firstMatch) {
-        firstMatch.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // Show/hide Clear Selection buttons (only when 2+ selected)
+    const showClear = selectedDrawers.size >= 2;
+    document.getElementById('clearSelectionBtnTop').classList.toggle('d-none', !showClear);
+    document.getElementById('clearSelectionBtnBottom').classList.toggle('d-none', !showClear);
+
+    // Scroll table to first matching row when single selection
+    if (selectedDrawers.size === 1) {
+        const firstMatch = document.querySelector(`.item-row[data-drawer="${drawerId}"]`);
+        if (firstMatch) firstMatch.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 }
 
-function clearHighlight() {
-    activeDrawer = null;
+function clearDrawerSelection() {
+    selectedDrawers.clear();
     document.querySelectorAll('.rack-view-cell').forEach(c => c.classList.remove('cell-active'));
     document.querySelectorAll('.item-row').forEach(r => r.classList.remove('row-active'));
     document.getElementById('selectedDrawerBadge').classList.add('d-none');
+    document.getElementById('clearSelectionBtnTop').classList.add('d-none');
+    document.getElementById('clearSelectionBtnBottom').classList.add('d-none');
+}
+
+function printQRDrawer() {
+    if (selectedDrawers.size === 0) {
+        alert('Please select a drawer first.');
+        return;
+    }
+    const ids = [...selectedDrawers].join(',');
+    window.location.href = `/rack/${rackUuid}/drawers/qr-sticker?drawers=${encodeURIComponent(ids)}`;
 }
 
 function showImageModal(imageSrc, rackName) {

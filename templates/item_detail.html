@@ -81,14 +81,16 @@
             </div>
             <div class="card-body">
                 <!-- Header with QR Code and Thumbnail -->
-                <div class="mb-3 d-flex justify-content-start align-items-flex-start gap-4">
+                <div class="mb-3 d-flex justify-content-start align-items-start gap-3 flex-wrap">
                     <div style="flex-shrink:0; background-color:white; padding:8px; border-radius:4px; display:inline-block;">
-                        <img src="{{ url_for('item.item_qr_svg', uuid=item.uuid) }}" alt="QR Code" width="160" height="160" style="border:2px solid #ddd; padding:5px; border-radius:4px; display:block;">
+                        <img src="{{ url_for('item.item_qr_svg', uuid=item.uuid) }}" alt="QR Code" width="140" height="140" style="border:2px solid #ddd; padding:5px; border-radius:4px; display:block; max-width:100%;">
                     </div>
                     {% if item.thumbnail %}
                     <div style="flex-shrink:0; background-color:white; padding:8px; border-radius:4px; display:inline-block;">
-                        <div style="width:160px;height:160px;border:2px solid #ddd;border-radius:4px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#f8f9fa;">
-                            {% if item.thumbnail.startswith('share:') %}
+                        <div style="width:140px;height:140px;border:2px solid #ddd;border-radius:4px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#f8f9fa;">
+                            {% if item.thumbnail.startswith('biicon:') %}
+                            <i class="bi bi-{{ item.thumbnail[7:] }}" style="font-size:4rem;color:#333;"></i>
+                            {% elif item.thumbnail.startswith('share:') %}
                             <img src="{{ url_for('share.share_serve', category='item', filename=item.thumbnail[6:]) }}"
                                  alt="Thumbnail" style="width:100%;height:100%;object-fit:cover;">
                             {% elif item.thumbnail.startswith('icon:') %}
@@ -244,36 +246,35 @@
                     <!-- Batch Cards -->
                     {% for batch in item.batches %}
                     <div class="card batch-card">
-                        <div class="card-header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#batchCollapse{{ batch.id }}">
-                            <div>
+                        <div class="card-header d-flex justify-content-between align-items-start gap-2 flex-wrap" data-bs-toggle="collapse" data-bs-target="#batchCollapse{{ batch.id }}">
+                            <div class="d-flex flex-wrap align-items-center gap-1" style="min-width:0;flex:1;">
                                 <strong><i class="bi bi-box-seam"></i> {{ batch.get_display_label() }}</strong>
-                                <span class="badge bg-primary ms-2">Qty: {{ batch.quantity }}</span>
+                                <span class="badge bg-primary">Qty: {{ batch.quantity }}</span>
                                 {% if batch.sn_tracking_enabled %}
-                                <span class="badge bg-dark ms-1"><i class="bi bi-upc-scan"></i> Tracking</span>
+                                <span class="badge bg-dark"><i class="bi bi-upc-scan"></i> Tracking</span>
                                 {% endif %}
-                                <span class="badge bg-success ms-1">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.price_per_unit) }}/unit</span>
-                                <span class="badge bg-info ms-1">Price: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_price()) }}</span>
-                                <span class="badge bg-secondary ms-1">Value: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_value()) }}</span>
+                                <span class="badge bg-success">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.price_per_unit) }}/unit</span>
+                                <span class="badge bg-info">Price: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_price()) }}</span>
                                 {% if not batch.follow_main_location %}
-                                <span class="badge ms-1" style="background-color: {{ batch.get_effective_location_color() }};"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>
+                                <span class="badge" style="background-color: {{ batch.get_effective_location_color() }};"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>
                                 {% endif %}
                                 {% if batch.get_project_used_quantity() > 0 %}
-                                <span class="badge bg-info ms-1"><i class="bi bi-diagram-3"></i> In Project</span>
+                                <span class="badge bg-info"><i class="bi bi-diagram-3"></i> In Project</span>
                                 {% endif %}
                                 {% if batch.get_lend_quantity() > 0 %}
-                                <span class="badge ms-1" style="background-color:#c9a227; color:#fff;"><i class="bi bi-hand-index-thumb"></i> On Lend</span>
+                                <span class="badge" style="background-color:#c9a227; color:#fff;"><i class="bi bi-hand-index-thumb"></i> On Lend</span>
+                                {% endif %}
+                                {% if batch.lend_disabled %}
+                                <span class="badge bg-danger"><i class="bi bi-slash-circle"></i> Lend Disable</span>
                                 {% endif %}
                                 {% if batch.purchase_date %}
-                                <small class="text-muted ms-2"><i class="bi bi-calendar"></i> {{ batch.purchase_date.strftime('%d/%m/%Y') }}</small>
+                                <small class="text-muted"><i class="bi bi-calendar"></i> {{ batch.purchase_date.strftime('%d/%m/%Y') }}</small>
                                 {% endif %}
                                 {% if batch.note %}
-                                <small class="text-muted ms-2"><i class="bi bi-sticky"></i> {{ batch.note }}</small>
+                                <small class="text-muted"><i class="bi bi-sticky"></i> {{ batch.note }}</small>
                                 {% endif %}
                             </div>
-                            <div class="d-flex align-items-center gap-2">
-                                <button class="btn btn-outline-secondary btn-sm" onclick="event.stopPropagation()" title="Print QR Batch">
-                                    <i class="bi bi-qr-code"></i> Print QR Batch
-                                </button>
+                            <div class="d-flex align-items-center gap-2 flex-shrink-0">
                                 <i class="bi bi-chevron-down"></i>
                             </div>
                         </div>
@@ -310,6 +311,13 @@
                                         {% endif %}
                                     </div>
                                 </div>
+                                {% if not batch.sn_tracking_enabled %}
+                                <div class="mb-2">
+                                    <button class="btn btn-outline-secondary btn-sm" title="Print QR Batch">
+                                        <i class="bi bi-qr-code"></i> Print QR Batch
+                                    </button>
+                                </div>
+                                {% endif %}
                                 {% set proj_names = batch.get_project_names_for_batch() %}
                                 {% if proj_names %}
                                 <div class="mb-2">
@@ -324,13 +332,13 @@
                                     </table>
                                 </div>
                                 {% endif %}
-                                {% if not batch.sn_tracking_enabled and batch.lend_records %}
+                                {% if not batch.sn_tracking_enabled and batch.get_lend_quantity() > 0 %}
                                 <div class="mb-2">
                                     <strong>Lending <small class="text-muted">({{ batch.get_lend_quantity() }} total)</small></strong>
                                     <table class="table table-sm table-bordered mt-1 mb-0 small">
                                         <thead><tr><th>Lend To</th><th class="text-center">Qty</th><th>Start</th><th>Due Date</th><th class="text-center">Notify</th></tr></thead>
                                         <tbody>
-                                        {% for rec in batch.lend_records %}
+                                        {% for rec in batch.lend_records if rec.returned_at is none %}
                                         <tr>
                                             <td>{{ rec.get_lend_to_display() or '—' }}</td>
                                             <td class="text-center">{{ rec.quantity }}</td>
@@ -347,8 +355,13 @@
                                 <!-- Serial Numbers Table (if enabled) -->
                                 {% if batch.sn_tracking_enabled and batch.serial_numbers|length > 0 %}
                                 <hr>
-                                <div class="mb-2">
+                                <div class="mb-1">
                                     <strong><i class="bi bi-upc-scan"></i> Serial Numbers</strong>
+                                </div>
+                                <div class="mb-2">
+                                    <button class="btn btn-outline-secondary btn-sm" title="Print QR Batch">
+                                        <i class="bi bi-qr-code"></i> Print QR Batch
+                                    </button>
                                 </div>
                                 <div class="table-responsive">
                                     <table class="table table-sm table-bordered sn-table" id="snTable{{ batch.id }}">
@@ -384,18 +397,18 @@
                                                     {% else %}-{% endif %}
                                                 </td>
                                                 <td>
-                                                    {% if not sn.is_deleted %}
+                                                    {% if not sn.is_deleted and sn.lend_to_id and sn.returned_at is none %}
                                                         {% if sn_project_used %}<span class="text-muted" style="opacity:0.5">{{ sn.get_lend_to_display() or '-' }}</span>
                                                         {% else %}{{ sn.get_lend_to_display() or '-' }}{% endif %}
                                                     {% else %}-{% endif %}
                                                 </td>
-                                                <td class="small">{% if not sn.is_deleted and sn.lend_start %}{{ sn.lend_start.strftime('%d/%m/%Y') }}{% if sn.lend_start.hour or sn.lend_start.minute %} {{ sn.lend_start.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
-                                                <td class="small">{% if not sn.is_deleted and sn.lend_end %}{{ sn.lend_end.strftime('%d/%m/%Y') }}{% if sn.lend_end.hour or sn.lend_end.minute %} {{ sn.lend_end.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
+                                                <td class="small">{% if not sn.is_deleted and sn.lend_to_id and sn.returned_at is none and sn.lend_start %}{{ sn.lend_start.strftime('%d/%m/%Y') }}{% if sn.lend_start.hour or sn.lend_start.minute %} {{ sn.lend_start.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
+                                                <td class="small">{% if not sn.is_deleted and sn.lend_to_id and sn.returned_at is none and sn.lend_end %}{{ sn.lend_end.strftime('%d/%m/%Y') }}{% if sn.lend_end.hour or sn.lend_end.minute %} {{ sn.lend_end.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
                                                 <td>
                                                     {% if sn.is_deleted %}
                                                     <span class="badge bg-danger" title="Removed by {{ sn.deleted_by.username if sn.deleted_by else 'unknown' }} on {{ sn.deleted_at.strftime('%Y-%m-%d %H:%M') if sn.deleted_at else '?' }}{% if sn.deleted_reason %} — {{ sn.deleted_reason }}{% endif %}">Removed</span>
                                                     {% if sn.deleted_reason %}<div class="text-muted" style="font-size:0.72rem">{{ sn.deleted_reason[:40] }}{% if sn.deleted_reason|length > 40 %}…{% endif %}</div>{% endif %}
-                                                    {% elif sn.lend_to_id %}
+                                                    {% elif sn.lend_to_id and sn.returned_at is none %}
                                                     <span class="badge bg-warning text-dark">Lending</span>
                                                     {% else %}
                                                     <span class="badge bg-success">Active</span>

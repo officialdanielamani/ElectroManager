@@ -10,14 +10,29 @@ from datetime import datetime, timezone
 # Available placeholders for each template type
 AVAILABLE_PLACEHOLDERS = {
     'Items': [
-        '{ItemUUID}', '{ItemName}', '{SKU}', '{Price}',
-        '{Quantity}', '{Category}', '{LocationName}', '{RackName}', '{Drawer}'
+        '{ItemUUID}', '{ItemName}', '{ItemType}', '{ItemSKU}', '{ItemInfo}',
+        '{ItemCat}', '{ItemFoot}', '{ItemTPrice}', '{ItemMOvrQty}', '{ItemMinQty}',
+        '{ItemMLocName}', '{ItemMLocUUID}', '{ItemMRackName}', '{ItemMRackUUID}', '{ItemMDrawLoc}'
     ],
     'Location': [
-        '{LocationUUID}', '{LocationName}', '{LocationInfo}', '{ItemCount}'
+        '{LocUUID}', '{LocName}', '{LocInfo}', '{LocICount}'
     ],
     'Racks': [
-        '{RackUUID}', '{RackName}', '{Capacity}', '{ItemCount}'
+        '{RackUUID}', '{RackName}', '{RackInfo}', '{RackLoc}',
+        '{RackCap}', '{RackICount}', '{RackSize}'
+    ],
+    'Drawer': [
+        '{RackUUID}', '{RackName}', '{RackInfo}', '{RackLoc}',
+        '{RackCap}', '{RackICount}', '{RackSize}',
+        '{DrawInfo}', '{DrawLoc}', '{DrawSize}', '{DrawICount}',
+        '{DrawStatus}', '{DrawGroup}'
+    ],
+    'In-Out': [
+        '{SessionID}', '{LendBy}',
+        '{LendStDate}', '{LendStTime}', '{LendEndDate}', '{LendEndTime}',
+        '{LendRealSt}', '{LendUser}',
+        '{ReturnDate}', '{ReturnTime}', '{ReturnStat}',
+        '{ReturnReal}', '{ReturnUser}'
     ]
 }
 
@@ -43,16 +58,53 @@ def validate_bootstrap_icons():
 
 def get_item_data(item):
     """Extract printable data from Item"""
+    # Determine main location: rack's physical location takes priority over general location
+    if item.rack_id and item.rack and item.rack.physical_location:
+        main_loc_name = item.rack.physical_location.name
+        main_loc_uuid = item.rack.physical_location.uuid
+    elif item.location_id and item.general_location:
+        main_loc_name = item.general_location.name
+        main_loc_uuid = item.general_location.uuid
+    else:
+        main_loc_name = ''
+        main_loc_uuid = ''
+
+    rack_name = item.rack.name if item.rack else ''
+    rack_uuid = item.rack.uuid if item.rack else ''
+    draw_loc  = item.drawer if (item.rack_id and item.drawer) else ''
+
+    total_price = item.get_overall_total_price()
+
+    # Derive _item_icon from thumbnail value
+    thumb = item.thumbnail or ''
+    if thumb.startswith('biicon:'):
+        item_icon = {'type': 'icon', 'value': thumb[7:]}
+    elif thumb.startswith('share:'):
+        item_icon = {'type': 'file', 'value': f'/uploads/share/item/{thumb[6:]}'}
+    elif thumb.startswith('icon:'):
+        item_icon = {'type': 'file', 'value': f'/uploads/share/icon/{thumb[5:]}'}
+    elif thumb:
+        item_icon = {'type': 'file', 'value': f'/uploads/{thumb}'}
+    else:
+        item_icon = {'type': 'none', 'value': ''}
+
     return {
-        'ItemUUID': item.uuid,
-        'ItemName': item.name,
-        'SKU': item.sku or '',
-        'Price': f"${item.get_average_price():.2f}" if item.get_average_price() else '',
-        'Quantity': str(item.get_overall_quantity()),
-        'Category': item.category.name if item.category else '',
-        'LocationName': item.general_location.name if item.general_location else '',
-        'RackName': item.rack.name if item.rack else '',
-        'Drawer': item.drawer or ''
+        'ItemUUID':     item.uuid,
+        'ItemName':     item.name,
+        'ItemType':     item.info or '',
+        'ItemSKU':      item.sku or '',
+        'ItemInfo':     item.short_info or '',
+        'ItemCat':      item.category.name if item.category else '',
+        'ItemFoot':     item.footprint.name if item.footprint else '',
+        'ItemTPrice':   f"{total_price:.2f}" if total_price else '',
+        'ItemMOvrQty':  str(item.get_overall_quantity()),
+        'ItemMinQty':   str(item.min_quantity or 0),
+        'ItemMLocName': main_loc_name,
+        'ItemMLocUUID': main_loc_uuid,
+        'ItemMRackName': rack_name,
+        'ItemMRackUUID': rack_uuid,
+        'ItemMDrawLoc':  draw_loc,
+        '_item_icon':   item_icon,
     }
 
 def get_location_data(location):
@@ -60,22 +112,161 @@ def get_location_data(location):
     from models import Item
     item_count = Item.query.filter_by(location_id=location.id).count()
     return {
-        'LocationUUID': location.uuid,
-        'LocationName': location.name,
-        'LocationInfo': location.info or '',
-        'ItemCount': str(item_count)
+        'LocUUID':   location.uuid,
+        'LocName':   location.name,
+        'LocInfo':   location.info or '',
+        'LocICount': str(item_count),
     }
 
 def get_rack_data(rack):
     """Extract printable data from Rack"""
     from models import Item
     item_count = Item.query.filter_by(rack_id=rack.id).count()
+    loc_name = rack.physical_location.name if rack.physical_location else ''
+    rack_size = f"{rack.rows}X{rack.cols:02d}"
     return {
-        'RackUUID': rack.uuid,
-        'RackName': rack.name,
-        'Capacity': str(rack.rows * rack.cols),
-        'ItemCount': str(item_count)
+        'RackUUID':   rack.uuid,
+        'RackName':   rack.name,
+        'RackInfo':   rack.short_info or '',
+        'RackLoc':    loc_name,
+        'RackCap':    str(rack.rows * rack.cols),
+        'RackICount': str(item_count),
+        'RackSize':   rack_size,
     }
+
+def get_drawer_data(rack, drawer_id):
+    """Extract printable data for a specific drawer in a rack."""
+    from models import Item
+    import re
+
+    rack_data = get_rack_data(rack)
+
+    # Drawer short info
+    draw_info = rack.get_drawer_short_info(drawer_id)
+
+    # Drawer item count — items stored in this exact drawer
+    draw_item_count = Item.query.filter_by(rack_id=rack.id, drawer=drawer_id).count()
+
+    # Drawer status
+    if rack.is_drawer_unavailable(drawer_id):
+        draw_status = 'Unavailable'
+    elif draw_item_count > 0:
+        draw_status = 'Available'
+    else:
+        draw_status = 'Empty'
+
+    # Drawer size — 01X01 for single cell; rowspan×colspan for merged rectangular cells
+    skip_cells, cell_spans, group_cells = rack.compute_merge_layout()
+    master_id = rack.get_master_cell(drawer_id)
+    span = cell_spans.get(master_id)
+    if span:
+        draw_size = f"{span['rowspan']:02d}X{span['colspan']:02d}"
+    else:
+        draw_size = '01X01'
+
+    # Group drawer master (for non-rectangular groups)
+    grp = group_cells.get(drawer_id)
+    draw_group = grp['master'] if grp else ''
+
+    drawer_icon = rack.get_drawer_icon(drawer_id)
+
+    return {
+        **rack_data,
+        'DrawInfo':    draw_info,
+        'DrawLoc':     drawer_id,
+        'DrawSize':    draw_size,
+        'DrawICount':  str(draw_item_count),
+        'DrawStatus':  draw_status,
+        'DrawGroup':   draw_group,
+        '_drawer_icon': drawer_icon,
+    }
+
+def get_session_data(session):
+    """Extract printable data from a LendingSession for In-Out template type."""
+    def _fmt_date(dt):
+        return dt.strftime('%Y%m%d') if dt else ''
+    def _fmt_time(dt):
+        return dt.strftime('%H:%M') if dt else ''
+    def _fmt_real(dt):
+        return dt.strftime('%Y%m%d-%H:%M:%S') if dt else ''
+
+    is_lend = session.mode == 'lend'
+
+    if is_lend:
+        lend_by   = session.get_lend_to_display()
+        lend_st   = session.lend_start
+        lend_end  = session.lend_end
+        lend_real = session.created_at
+        lend_user = session.creator.username if session.creator else ''
+        ret_date = ret_time = ret_stat = ret_real = ret_user = ''
+    else:
+        lend_by = lend_st = lend_end = lend_real = lend_user = ''
+        ret_real = session.created_at
+        ret_user = session.creator.username if session.creator else ''
+
+        # Determine Late/On Time from associated returned records
+        all_returned = list(session.returned_lend_records) + list(session.returned_sn_records)
+        if all_returned:
+            late = any(
+                r.lend_end and r.returned_at and r.returned_at > r.lend_end
+                for r in all_returned
+            )
+            ret_stat = 'Late' if late else 'On Time'
+        else:
+            ret_stat = ''
+
+        ret_date = _fmt_date(ret_real)
+        ret_time = _fmt_time(ret_real)
+        ret_real = _fmt_real(ret_real)
+
+    return {
+        'SessionID':  session.lending_id,
+        'LendBy':     lend_by if lend_by else '',
+        'LendStDate': _fmt_date(lend_st),
+        'LendStTime': _fmt_time(lend_st),
+        'LendEndDate': _fmt_date(lend_end),
+        'LendEndTime': _fmt_time(lend_end),
+        'LendRealSt': _fmt_real(lend_real),
+        'LendUser':   lend_user,
+        'ReturnDate': ret_date,
+        'ReturnTime': ret_time,
+        'ReturnStat': ret_stat,
+        'ReturnReal': ret_real,
+        'ReturnUser': ret_user,
+    }
+
+
+def generate_session_qr_svg(lending_id, size_px=120):
+    """Generate a compact QR SVG for a session ID (for inline use)."""
+    try:
+        import qrcode
+        from qrcode.image.svg import SvgPathImage
+        qr = qrcode.QRCode(
+            version=None,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=10,
+            border=1,
+        )
+        qr.add_data(lending_id)
+        qr.make(fit=True)
+        img = qr.make_image(image_factory=SvgPathImage)
+        buf = BytesIO()
+        img.save(buf)
+        svg_bytes = buf.getvalue()
+        svg_str = svg_bytes.decode('utf-8')
+        # Set explicit width/height so it renders at size_px
+        import re
+        svg_str = re.sub(
+            r'<svg([^>]*?)width="[^"]*"([^>]*?)height="[^"]*"',
+            f'<svg\\1width="{size_px}"\\2height="{size_px}"',
+            svg_str
+        )
+        if f'width="{size_px}"' not in svg_str:
+            svg_str = svg_str.replace('<svg', f'<svg width="{size_px}" height="{size_px}"', 1)
+        return svg_str
+    except Exception:
+        return f'<svg xmlns="http://www.w3.org/2000/svg" width="{size_px}" height="{size_px}"><rect width="100%" height="100%" fill="#eee"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" font-size="10">QR Error</text></svg>'
+
 
 def replace_placeholders(text, data_dict):
     """Replace {Placeholder} with actual values"""
@@ -111,16 +302,25 @@ def render_template_to_svg(template, data):
     print(f"[SVG] Layout elements: {len(template.get_layout())}")
     print(f"[SVG] Data keys: {list(data.keys())}")
     
-    # Collect fonts used in this template (for text elements only)
-    # Icon fonts are no longer needed as icons are rendered as SVG paths
+    # Collect fonts used in this template
     text_fonts_used = set()
+    has_icons = False
     layout = template.get_layout()
     for element in layout:
+        if element.get('visible') is False:
+            continue
         if element.get('type') == 'text':
             font = element.get('font_family', 'Arial')
             if font:
                 text_fonts_used.add(font)
-    
+        elif element.get('type') == 'icon':
+            if element.get('icon_name'):
+                has_icons = True
+            elif element.get('use_target_icon'):
+                _ti = data.get('_drawer_icon') or data.get('_item_icon') or {}
+                if _ti.get('type') == 'icon':
+                    has_icons = True
+
     # Build font-face rules for SVG with embedded fonts for project fonts
     font_styles = ''
     fonts_dir = os.path.join(current_app.root_path, 'static', 'fonts')
@@ -153,7 +353,37 @@ def render_template_to_svg(template, data):
                         break
                     except Exception as e:
                         print(f"[SVG] Failed to embed text font {font_name}: {e}")
-    
+
+    # Embed Bootstrap Icons font once at SVG level (must be top-level, not inside <g>)
+    if has_icons:
+        icons_dir = os.path.join(current_app.root_path, 'static', 'icons')
+        fonts_subdir = os.path.join(icons_dir, 'fonts')
+        bi_font_path = None
+        bi_font_ext = None
+        for ext in ['.woff', '.woff2', '.ttf', '.otf']:
+            for search_dir in [fonts_subdir, icons_dir]:
+                candidate = os.path.join(search_dir, 'bootstrap-icons' + ext)
+                if os.path.exists(candidate):
+                    bi_font_path = candidate
+                    bi_font_ext = ext
+                    break
+            if bi_font_path:
+                break
+        if bi_font_path:
+            fmt_map = {'.woff': 'woff', '.woff2': 'woff2', '.ttf': 'truetype', '.otf': 'opentype'}
+            bi_fmt = fmt_map.get(bi_font_ext, 'woff')
+            if bi_font_path not in _icon_font_b64_cache:
+                with open(bi_font_path, 'rb') as f:
+                    _icon_font_b64_cache[bi_font_path] = base64.b64encode(f.read()).decode('utf-8')
+            bi_b64 = _icon_font_b64_cache[bi_font_path]
+            font_styles += (
+                f'<style>@font-face{{font-family:"bootstrap-icons";'
+                f'src:url("data:font/{bi_fmt};base64,{bi_b64}") format("{bi_fmt}");}}</style>\n'
+            )
+            print(f"[SVG] Embedded Bootstrap Icons font ({bi_fmt}) at SVG level")
+        else:
+            print("[SVG] Bootstrap Icons font not found — icons may render as boxes")
+
     svg = f'<svg width="{width_px}" height="{height_px}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width_px} {height_px}">\n'
     svg += font_styles
     svg += f'  <rect width="{width_px}" height="{height_px}" fill="white" stroke="black" stroke-width="0.5"/>\n'
@@ -161,41 +391,40 @@ def render_template_to_svg(template, data):
     layout = template.get_layout()
     
     for idx, element in enumerate(layout):
+        if element.get('visible') is False:
+            continue
+
         x_px = element['x_mm'] * MM_TO_PX
         y_px = element['y_mm'] * MM_TO_PX
         w_px = element.get('width_mm', 10) * MM_TO_PX
         h_px = element.get('height_mm', 10) * MM_TO_PX
-        
+        rot_deg = element.get('rotation_deg', 0) or 0
+        cx_px = x_px + w_px / 2
+        cy_px = y_px + h_px / 2
+
+        # Open rotation wrapper if needed
+        if rot_deg:
+            svg += f'  <g transform="rotate({rot_deg}, {cx_px}, {cy_px})">\n'
+
         if element['type'] == 'text':
             # Get content, handle missing field
             content = element.get('content', '')
             content = replace_placeholders(content, data)
             print(f"[SVG] Element {idx}: TEXT = '{content}' (template: '{element.get('content', '')}')")
-            # Escape XML special characters
-            content = content.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
-            
-            # Use font_size_mm if available, otherwise fallback to old font_size in pixels
+
             font_size_mm = element.get('font_size_mm', 4)
-            if font_size_mm:
-                font_size = font_size_mm * MM_TO_PX  # Convert mm to pixels
-            else:
-                font_size = element.get('font_size', 12)  # Fallback to old px value
-            
+            font_size = (font_size_mm * MM_TO_PX) if font_size_mm else element.get('font_size', 12)
+            line_height = font_size * 1.2
+
             color = element.get('color', '#000000')
             text_align = element.get('text_align', 'left')
-            # Get font family with fallback to Arial if not found or empty
             font_family = element.get('font_family') or 'Arial'
             if not font_family or font_family == 'default':
                 font_family = 'Arial'
-            
-            # For fonts with spaces, ensure they're quoted in CSS/SVG
-            if ' ' in font_family:
-                font_family_quoted = f"'{font_family}'"
-            else:
-                font_family_quoted = font_family
-            
-            print(f"[SVG] Element {idx}: Font = '{font_family}' (quoted: '{font_family_quoted}')")
-            
+            font_family_quoted = f"'{font_family}'" if ' ' in font_family else font_family
+            font_weight = element.get('font_weight', 'normal') or 'normal'
+            font_style = element.get('font_style', 'normal') or 'normal'
+
             anchor = 'start'
             x_text = x_px
             if text_align == 'center':
@@ -204,70 +433,117 @@ def render_template_to_svg(template, data):
             elif text_align == 'right':
                 anchor = 'end'
                 x_text = x_px + w_px
-            
-            # Use inline style for font-family to prevent CSS override from base.html
-            svg += f'  <text x="{x_text}" y="{y_px}" font-size="{font_size}" '
-            svg += f'fill="{color}" text-anchor="{anchor}" '
-            svg += f'dominant-baseline="hanging" word-wrap="break-word" '
-            svg += f'style="font-family: {font_family_quoted};">'
-            svg += f'{content}</text>\n'
-        
+
+            print(f"[SVG] Element {idx}: Font = '{font_family}', weight={font_weight}, style={font_style}")
+
+            # Split on newlines; render each line as a <tspan>
+            lines = content.split('\n') if '\n' in content else [content]
+            # Escape XML in each line
+            escaped = [
+                l.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
+                for l in lines
+            ]
+
+            svg += (
+                f'  <text x="{x_text}" y="{y_px}" font-size="{font_size}" '
+                f'fill="{color}" text-anchor="{anchor}" dominant-baseline="hanging" '
+                f'font-weight="{font_weight}" font-style="{font_style}" '
+                f'style="font-family: {font_family_quoted};">\n'
+            )
+            for i, line in enumerate(escaped):
+                dy = 0 if i == 0 else line_height
+                svg += f'    <tspan x="{x_text}" dy="{dy}">{line}</tspan>\n'
+            svg += '  </text>\n'
+
         elif element['type'] == 'qr':
             source_field = element['source_field']
             qr_data = replace_placeholders(source_field, data)
             print(f"[SVG] Element {idx}: QR = '{qr_data}' (template: '{source_field}')")
-            
-            # Generate QR code SVG
             try:
                 qr_svg = generate_qr_svg(qr_data, int(w_px), int(h_px))
                 svg += f'  <g transform="translate({x_px}, {y_px})">{qr_svg}</g>\n'
             except Exception as e:
                 print(f"[SVG] QR generation error: {e}")
-                # Fallback: just show a placeholder
-                svg += f'  <rect x="{x_px}" y="{y_px}" width="{w_px}" height="{h_px}" '
-                svg += f'fill="lightgray" stroke="red" stroke-width="1"/>\n'
-                svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" '
-                svg += f'text-anchor="middle">QR Error</text>\n'
-        
+                svg += f'  <rect x="{x_px}" y="{y_px}" width="{w_px}" height="{h_px}" fill="lightgray" stroke="red" stroke-width="1"/>\n'
+                svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" text-anchor="middle">QR Error</text>\n'
+
         elif element['type'] == 'barcode':
             source_field = element['source_field']
             barcode_data = replace_placeholders(source_field, data)
             print(f"[SVG] Element {idx}: BARCODE = '{barcode_data}' (template: '{source_field}')")
             barcode_format = element.get('format', 'CODE128')
             show_label = element.get('show_label', False)
-            
-            # Generate barcode SVG
             try:
                 barcode_svg = generate_barcode_svg(barcode_data, barcode_format, int(w_px), int(h_px), show_label=show_label)
                 svg += f'  <g transform="translate({x_px}, {y_px})">{barcode_svg}</g>\n'
             except Exception as e:
                 print(f"[SVG] Barcode generation error: {e}")
-                # Fallback: just show a placeholder
-                svg += f'  <rect x="{x_px}" y="{y_px}" width="{w_px}" height="{h_px}" '
-                svg += f'fill="lightgray" stroke="red" stroke-width="1"/>\n'
-                svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" '
-                svg += f'text-anchor="middle">Barcode Error</text>\n'
-        
+                svg += f'  <rect x="{x_px}" y="{y_px}" width="{w_px}" height="{h_px}" fill="lightgray" stroke="red" stroke-width="1"/>\n'
+                svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" text-anchor="middle">Barcode Error</text>\n'
+
         elif element['type'] == 'icon':
-            icon_name = element.get('icon_name', '')
             icon_color = element.get('icon_color', '#000000')
-
-            # Scale icon to fit container (80% of container size)
+            if element.get('use_target_icon'):
+                di = data.get('_drawer_icon') or data.get('_item_icon') or {}
+                icon_name = di.get('value', '') if di.get('type') == 'icon' else ''
+            else:
+                icon_name = element.get('icon_name', '')
             icon_size_px = min(w_px, h_px) * 0.8
-
             if icon_name:
                 print(f"[SVG] Element {idx}: ICON = '{icon_name}' (container: {w_px}×{h_px}px, scaled size: {icon_size_px}px, color: {icon_color})")
                 try:
-                    icon_svg = generate_icon_svg(icon_name, int(icon_size_px), icon_color, int(w_px), int(h_px))
+                    icon_svg = generate_icon_svg(icon_name, int(icon_size_px), icon_color, int(w_px), int(h_px), include_defs=False)
                     svg += f'  <g transform="translate({x_px}, {y_px})">{icon_svg}</g>\n'
                 except Exception as e:
                     print(f"[SVG] Icon generation error: {e}")
-                    svg += f'  <rect x="{x_px}" y="{y_px}" width="{w_px}" height="{h_px}" '
-                    svg += f'fill="lightgray" stroke="red" stroke-width="1"/>\n'
-                    svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" '
-                    svg += f'text-anchor="middle">Icon Error</text>\n'
+                    svg += f'  <rect x="{x_px}" y="{y_px}" width="{w_px}" height="{h_px}" fill="lightgray" stroke="red" stroke-width="1"/>\n'
+                    svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" text-anchor="middle">Icon Error</text>\n'
             else:
                 print(f"[SVG] Element {idx}: ICON - No icon name specified")
+
+        elif element['type'] == 'picture':
+            if element.get('use_target_image'):
+                di = data.get('_drawer_icon') or data.get('_item_icon') or {}
+                picture_url = di.get('value', '') if di.get('type') == 'file' else ''
+            else:
+                picture_url = element.get('picture_url') or ''
+            print(f"[SVG] Element {idx}: PICTURE url='{picture_url}'")
+            img_b64 = None
+            mime = 'image/png'
+            if picture_url:
+                try:
+                    # picture_url is like /uploads/share/<category>/<filename>
+                    # or /uploads/<relative_path> for item attachments
+                    parts = picture_url.strip('/').split('/')
+                    if len(parts) >= 2 and parts[0] == 'uploads':
+                        rel_path = '/'.join(parts[1:])
+                        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], rel_path)
+                        upload_root = os.path.realpath(current_app.config['UPLOAD_FOLDER'])
+                        real_file_path = os.path.realpath(file_path)
+                        if not real_file_path.startswith(upload_root + os.sep):
+                            print(f"[SVG] PICTURE path outside upload folder, skipping")
+                        else:
+                            ext = os.path.splitext(rel_path)[1].lower()
+                            mime_map = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+                                        '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml'}
+                            mime = mime_map.get(ext, 'image/png')
+                            if os.path.exists(real_file_path):
+                                with open(real_file_path, 'rb') as f:
+                                    img_b64 = base64.b64encode(f.read()).decode('utf-8')
+                                print(f"[SVG] PICTURE loaded {len(img_b64)} b64 chars from {real_file_path}")
+                            else:
+                                print(f"[SVG] PICTURE file not found: {real_file_path}")
+                except Exception as e:
+                    print(f"[SVG] PICTURE load error: {e}")
+            if img_b64:
+                svg += f'  <image x="{x_px}" y="{y_px}" width="{w_px}" height="{h_px}" href="data:{mime};base64,{img_b64}" preserveAspectRatio="xMidYMid meet"/>\n'
+            else:
+                svg += f'  <rect x="{x_px}" y="{y_px}" width="{w_px}" height="{h_px}" fill="#f0e8ff" stroke="#6610f2" stroke-width="1" stroke-dasharray="3,2"/>\n'
+                svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" text-anchor="middle" dominant-baseline="middle" fill="#6610f2">Picture</text>\n'
+
+        # Close rotation wrapper
+        if rot_deg:
+            svg += '  </g>\n'
     
     svg += '</svg>\n'
     print(f"[SVG] Complete! SVG size: {len(svg)} bytes")
@@ -432,10 +708,12 @@ def generate_barcode_svg(data, format_type, width, height, show_label=False):
         print(f"[BARCODE] Returning placeholder")
         return placeholder
 
-def generate_icon_svg(icon_name, icon_size, icon_color, container_width, container_height):
-    """Generate an icon SVG fragment by embedding the Bootstrap Icons font and rendering
-    the glyph as a <text> element.  Works in browser preview, SVG/PNG download, and
-    WeasyPrint PDF without requiring fontTools.
+def generate_icon_svg(icon_name, icon_size, icon_color, container_width, container_height, include_defs=True):
+    """Generate an icon SVG fragment using the Bootstrap Icons font.
+
+    When include_defs=False the @font-face <defs> block is omitted — use this
+    when the caller already embeds the font at the top-level SVG so the font
+    declaration is not buried inside a <g> element (which breaks most renderers).
     """
     import os
     import base64
@@ -483,12 +761,6 @@ def generate_icon_svg(icon_name, icon_size, icon_color, container_width, contain
         codepoint = ord(icon_unicode_char)
         unicode_escape = f'&#x{codepoint:04X};'
 
-        font_face = (
-            f'<defs><style>'
-            f'@font-face{{font-family:"bootstrap-icons";'
-            f'src:url("data:font/{font_format};base64,{font_b64}") format("{font_format}");}}'
-            f'</style></defs>'
-        )
         text_el = (
             f'<text x="{center_x}" y="{center_y}" '
             f'font-family="bootstrap-icons" font-size="{icon_size}" '
@@ -496,8 +768,17 @@ def generate_icon_svg(icon_name, icon_size, icon_color, container_width, contain
             f'{unicode_escape}</text>'
         )
 
-        svg = font_face + text_el
-        print(f"[ICON] Success! Generated embedded-font icon SVG, {len(svg)} bytes")
+        if include_defs:
+            font_face = (
+                f'<defs><style>'
+                f'@font-face{{font-family:"bootstrap-icons";'
+                f'src:url("data:font/{font_format};base64,{font_b64}") format("{font_format}");}}'
+                f'</style></defs>'
+            )
+            svg = font_face + text_el
+        else:
+            svg = text_el
+        print(f"[ICON] Success! Generated icon SVG (include_defs={include_defs}), {len(svg)} bytes")
         return svg
 
     except Exception as e:
@@ -663,3 +944,101 @@ def generate_batch_stickers_pdf(template, records, data_getter):
     doc.write_pdf(pdf_output)
     pdf_output.seek(0)
     return pdf_output
+
+
+def generate_svg_zip(template, name_data_pairs):
+    """Generate a zip containing one SVG sticker per (filename, data_dict) pair."""
+    import zipfile
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for fname, data in name_data_pairs:
+            svg = render_template_to_svg(template, data)
+            zf.writestr(f"{fname}.svg", svg)
+    buf.seek(0)
+    return buf
+
+
+def generate_table_sticker_pdf(template, records, data_getter, options):
+    """
+    Generate a PDF with stickers arranged in a grid (table layout) on each page.
+    options: dict with paper_w, paper_h, margin_t, margin_b, margin_l, margin_r,
+             spacing_v, spacing_h, border (bool), border_w (mm), border_color (hex)
+    """
+    try:
+        from weasyprint import HTML
+    except ImportError:
+        raise ImportError("WeasyPrint not installed")
+
+    import base64
+    M = 1 / 25.4  # mm → inches
+
+    sw  = float(template.width_mm)
+    sh  = float(template.height_mm)
+    pw  = float(options.get('paper_w',  210))
+    ph  = float(options.get('paper_h',  297))
+    mt  = float(options.get('margin_t',  10))
+    mb  = float(options.get('margin_b',  10))
+    ml  = float(options.get('margin_l',  10))
+    mr  = float(options.get('margin_r',  10))
+    sv  = float(options.get('spacing_v',  3))
+    sph = float(options.get('spacing_h',  3))
+    border      = bool(options.get('border', False))
+    border_w    = float(options.get('border_w', 0.3))
+    border_color = str(options.get('border_color', '#000000'))
+
+    cw = pw - ml - mr   # content width
+    ch = ph - mt - mb   # content height
+
+    cols          = max(1, int((cw + sph) / (sw + sph)))
+    rows_per_page = max(1, int((ch + sv)  / (sh + sv)))
+
+    # Render all stickers to base64 SVGs
+    stickers = []
+    for record in records:
+        data = data_getter(record)
+        svg  = render_template_to_svg(template, data)
+        stickers.append(base64.b64encode(svg.encode()).decode())
+
+    if not stickers:
+        raise ValueError("No stickers to render")
+
+    border_css = f'border:{border_w * M:.5f}in solid {border_color};box-sizing:border-box;' if border else ''
+
+    # Build one <div> per PDF page using absolute positioning
+    pages_html = []
+    idx = 0
+    total = len(stickers)
+    while idx < total:
+        divs = []
+        for row_i in range(rows_per_page):
+            if idx >= total:
+                break
+            for col_i in range(cols):
+                if idx >= total:
+                    break
+                x = col_i * (sw + sph)
+                y = row_i * (sh  + sv)
+                divs.append(
+                    f'<div style="position:absolute;left:{x*M:.5f}in;top:{y*M:.5f}in;'
+                    f'width:{sw*M:.5f}in;height:{sh*M:.5f}in;{border_css}">'
+                    f'<img src="data:image/svg+xml;base64,{stickers[idx]}" style="width:100%;height:100%;display:block;"/>'
+                    f'</div>'
+                )
+                idx += 1
+        pages_html.append(
+            f'<div style="position:relative;width:{cw*M:.5f}in;height:{ch*M:.5f}in;page-break-after:always;">'
+            + ''.join(divs) + '</div>'
+        )
+
+    html = (
+        f'<!DOCTYPE html><html><head><meta charset="UTF-8"><style>'
+        f'@page{{size:{pw*M:.5f}in {ph*M:.5f}in;margin:{mt*M:.5f}in {mr*M:.5f}in {mb*M:.5f}in {ml*M:.5f}in;}}'
+        f'*{{margin:0;padding:0;box-sizing:border-box;}}body{{margin:0;padding:0;}}'
+        f'</style></head><body>' + ''.join(pages_html) + '</body></html>'
+    )
+
+    doc = HTML(string=html)
+    buf = BytesIO()
+    doc.write_pdf(buf)
+    buf.seek(0)
+    return buf

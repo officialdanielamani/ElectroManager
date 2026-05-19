@@ -227,11 +227,12 @@ def save_ui_preference():
 @login_required
 def save_account_info():
     """Save display name and short info for own account"""
-    name = (request.form.get('name', '').strip()[:64])
-    if not name:
-        flash('Name is required.', 'danger')
-        return redirect(url_for('settings.settings_general'))
-    current_user.name = name
+    if getattr(current_user, 'allow_change_name', True):
+        name = (request.form.get('name', '').strip()[:64])
+        if not name:
+            flash('Name is required.', 'danger')
+            return redirect(url_for('settings.settings_general'))
+        current_user.name = name
     if getattr(current_user, 'allow_change_short_info', True):
         current_user.short_info = (request.form.get('short_info', '').strip()[:128]) or None
     db.session.commit()

@@ -48,14 +48,14 @@ class Location(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     uuid = db.Column(db.String(12), unique=True, nullable=False)
-    name = db.Column(db.String(100), nullable=False)
-    info = db.Column(db.String(500))
-    description = db.Column(db.Text)
+    name = db.Column(db.String(128), nullable=False)
+    info = db.Column(db.String(128))
+    description = db.Column(db.String(512))
     picture = db.Column(db.String(200))
     color = db.Column(db.String(7), default='#6c757d')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    
+
     racks = db.relationship('Rack', backref='physical_location', lazy=True, foreign_keys='Rack.location_id')
     items = db.relationship('Item', backref='general_location', lazy=True, foreign_keys='Item.location_id')
     
@@ -73,8 +73,8 @@ class Role(db.Model):
     __tablename__ = 'roles'
     
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(50), unique=True, nullable=False)
-    description = db.Column(db.Text)
+    name = db.Column(db.String(64), unique=True, nullable=False)
+    description = db.Column(db.String(512))
     is_system_role = db.Column(db.Boolean, default=False)
     permissions = db.Column(db.Text, default='{}', nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -130,6 +130,7 @@ class User(UserMixin, db.Model):
     allow_password_reset = db.Column(db.Boolean, default=True)
     profile_photo = db.Column(db.String(255))
     allow_profile_picture_change = db.Column(db.Boolean, default=True)
+    allow_change_name       = db.Column(db.Boolean, default=True)
     allow_change_short_info = db.Column(db.Boolean, default=True)
     profile_picture_source = db.Column(db.String(10), default='share')  # 'upload', 'share', 'both'
     failed_login_attempts = db.Column(db.Integer, default=0)
@@ -189,8 +190,8 @@ class User(UserMixin, db.Model):
 class Category(db.Model):
     __tablename__ = 'categories'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    description = db.Column(db.Text)
+    name = db.Column(db.String(128), unique=True, nullable=False)
+    description = db.Column(db.String(512))
     color = db.Column(db.String(7), default='#6c757d')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -202,8 +203,8 @@ class Category(db.Model):
 class Footprint(db.Model):
     __tablename__ = 'footprints'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    description = db.Column(db.Text)
+    name = db.Column(db.String(128), unique=True, nullable=False)
+    description = db.Column(db.String(512))
     color = db.Column(db.String(7), default='#6c757d')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -215,8 +216,8 @@ class Footprint(db.Model):
 class Tag(db.Model):
     __tablename__ = 'tags'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    description = db.Column(db.Text)
+    name = db.Column(db.String(128), unique=True, nullable=False)
+    description = db.Column(db.String(512))
     color = db.Column(db.String(7), default='#6c757d')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -228,9 +229,9 @@ class Rack(db.Model):
     __tablename__ = 'racks'
     id = db.Column(db.Integer, primary_key=True)
     uuid = db.Column(db.String(12), unique=True, nullable=False)
-    name = db.Column(db.String(100), nullable=False)
+    name = db.Column(db.String(128), nullable=False)
     short_info = db.Column(db.String(128))
-    description = db.Column(db.Text)
+    description = db.Column(db.String(512))
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
     picture = db.Column(db.String(200))
     color = db.Column(db.String(7), default='#6c757d')
@@ -238,7 +239,9 @@ class Rack(db.Model):
     cols = db.Column(db.Integer, default=5)
     unavailable_drawers = db.Column(db.Text)
     merged_cells = db.Column(db.Text, default='[]')
-    drawer_info = db.Column(db.Text)  # JSON dict: {drawer_id: short_info_text}
+    drawer_info = db.Column(db.Text)   # JSON dict: {drawer_id: short_info_text}
+    drawer_icons = db.Column(db.Text)  # JSON dict: {drawer_id: {type: 'icon'|'file'|'none', value: '...'}}
+    rack_icon = db.Column(db.Text)     # JSON: {type: 'icon'|'file'|'none', value: '...'}
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     items = db.relationship('Item', backref='rack', lazy=True)
@@ -284,6 +287,39 @@ class Rack(db.Model):
         elif drawer_id in info:
             del info[drawer_id]
         self.drawer_info = json.dumps(info) if info else None
+
+    def get_rack_icon(self):
+        if not self.rack_icon:
+            return {'type': 'none', 'value': ''}
+        try:
+            return json.loads(self.rack_icon)
+        except (json.JSONDecodeError, TypeError):
+            return {'type': 'none', 'value': ''}
+
+    def set_rack_icon(self, icon_type, icon_value):
+        if icon_type == 'none':
+            self.rack_icon = None
+        else:
+            self.rack_icon = json.dumps({'type': icon_type, 'value': icon_value})
+
+    def get_drawer_icons(self):
+        if not self.drawer_icons:
+            return {}
+        try:
+            return json.loads(self.drawer_icons)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+
+    def get_drawer_icon(self, drawer_id):
+        return self.get_drawer_icons().get(drawer_id, {'type': 'none', 'value': ''})
+
+    def set_drawer_icon(self, drawer_id, icon_type, icon_value):
+        icons = self.get_drawer_icons()
+        if icon_type == 'none':
+            icons.pop(drawer_id, None)
+        else:
+            icons[drawer_id] = {'type': icon_type, 'value': icon_value}
+        self.drawer_icons = json.dumps(icons) if icons else None
 
     def get_merge_group(self, cell_id):
         for group in self.get_merged_cells():
@@ -368,7 +404,7 @@ class Item(db.Model):
     name = db.Column(db.String(200), nullable=False)
     sku = db.Column(db.String(100))
     short_info = db.Column(db.String(128))
-    info = db.Column(db.String(500))
+    info = db.Column(db.String(128))
     description = db.Column(db.Text)
 
     quantity = db.Column(db.Integer, default=0)
@@ -383,7 +419,7 @@ class Item(db.Model):
     footprint_id = db.Column(db.Integer, db.ForeignKey('footprints.id'))
     tags = db.Column(db.Text)
     
-    datasheet_urls = db.Column(db.Text)
+    datasheet_urls = db.Column(db.String(2048))
     no_stock_warning = db.Column(db.Boolean, default=True)
     thumbnail = db.Column(db.String(300))
 
@@ -525,6 +561,7 @@ class ItemBatch(db.Model):
     purchase_date = db.Column(db.Date)
     note = db.Column(db.String(128))
     sn_tracking_enabled = db.Column(db.Boolean, default=False)
+    lend_disabled = db.Column(db.Boolean, default=False)
 
     follow_main_location = db.Column(db.Boolean, default=True)
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
@@ -590,12 +627,14 @@ class ItemBatch(db.Model):
         """Total lend quantity across all lend records (or per-SN count for tracked batches)."""
         if self.sn_tracking_enabled:
             return sum(1 for sn in self.serial_numbers if sn.lend_to_id and not sn.is_deleted)
-        return sum(r.quantity for r in self.lend_records)
+        return sum(r.quantity for r in self.lend_records if r.returned_at is None)
 
     def get_lend_records_data(self):
-        """Serialise lend records to a list of dicts for JS embedding."""
+        """Serialise active (not yet returned) lend records for JS embedding."""
         result = []
         for r in self.lend_records:
+            if r.returned_at is not None:
+                continue
             result.append({
                 'id': r.id,
                 'type': r.lend_to_type or '',
@@ -735,13 +774,17 @@ class BatchSerialNumber(db.Model):
     serial_number = db.Column(db.String(200), default='')
     internal_serial_number = db.Column(db.String(200), nullable=False)
     info = db.Column(db.String(32), default='')
-    lend_to_type = db.Column(db.String(20), default='')
+    lend_to_type = db.Column(db.String(32), default='')
     lend_to_id = db.Column(db.Integer, nullable=True)
     lend_start = db.Column(db.DateTime, nullable=True)
     lend_end = db.Column(db.DateTime, nullable=True)
     lend_notify_enabled = db.Column(db.Boolean, default=False)
     lend_notify_before_days = db.Column(db.Integer, default=3)
     lend_note = db.Column(db.String(128), nullable=True)
+    lending_session_id = db.Column(db.Integer, db.ForeignKey('lending_sessions.id'), nullable=True)
+    return_session_id  = db.Column(db.Integer, db.ForeignKey('lending_sessions.id'), nullable=True)
+    returned_at        = db.Column(db.DateTime, nullable=True)
+    returned_from_label = db.Column(db.String(128), nullable=True)
     is_deleted = db.Column(db.Boolean, default=False)
     deleted_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     deleted_at = db.Column(db.DateTime, nullable=True)
@@ -749,6 +792,8 @@ class BatchSerialNumber(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     deleted_by = db.relationship('User', foreign_keys=[deleted_by_id])
+    lending_session = db.relationship('LendingSession', foreign_keys=[lending_session_id], backref=db.backref('serial_number_records', lazy=True))
+    return_session  = db.relationship('LendingSession', foreign_keys=[return_session_id],  backref=db.backref('returned_sn_records',    lazy=True))
 
     def get_lend_to_display(self):
         if not self.lend_to_id or not self.lend_to_type:
@@ -780,7 +825,7 @@ class BatchLendRecord(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     batch_id = db.Column(db.Integer, db.ForeignKey('item_batches.id'), nullable=False)
-    lend_to_type = db.Column(db.String(20), default='')
+    lend_to_type = db.Column(db.String(32), default='')
     lend_to_id = db.Column(db.Integer, nullable=True)
     quantity = db.Column(db.Integer, default=1)
     lend_start = db.Column(db.DateTime, nullable=True)
@@ -788,7 +833,13 @@ class BatchLendRecord(db.Model):
     lend_notify_enabled = db.Column(db.Boolean, default=False)
     lend_notify_before_days = db.Column(db.Integer, default=3)
     lend_note = db.Column(db.String(128), nullable=True)
+    lending_session_id = db.Column(db.Integer, db.ForeignKey('lending_sessions.id'), nullable=True)
+    return_session_id  = db.Column(db.Integer, db.ForeignKey('lending_sessions.id'), nullable=True)
+    returned_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    lending_session = db.relationship('LendingSession', foreign_keys=[lending_session_id], backref=db.backref('lend_records',          lazy=True))
+    return_session  = db.relationship('LendingSession', foreign_keys=[return_session_id],  backref=db.backref('returned_lend_records',  lazy=True))
 
     def get_lend_to_display(self):
         if not self.lend_to_id or not self.lend_to_type:
@@ -812,6 +863,58 @@ class BatchLendRecord(db.Model):
 
     def __repr__(self):
         return f'<BatchLendRecord batch={self.batch_id} to={self.lend_to_type}:{self.lend_to_id}>'
+
+
+def _generate_lending_id():
+    """Generate a unique lending session ID: YYYYMMDD-XXXXXX (6 uppercase alphanumeric chars)."""
+    chars = string.ascii_uppercase + string.digits
+    while True:
+        date_str = datetime.now().strftime('%Y%m%d')
+        rand_part = ''.join(secrets.choice(chars) for _ in range(6))
+        candidate = f"{date_str}-{rand_part}"
+        if not LendingSession.query.filter_by(lending_id=candidate).first():
+            return candidate
+
+
+class LendingSession(db.Model):
+    """Groups multiple lending/return records under a single session ID."""
+    __tablename__ = 'lending_sessions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    lending_id = db.Column(db.String(20), unique=True, nullable=False)
+    mode = db.Column(db.String(16), nullable=False)  # 'lend' or 'return'
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    lend_to_type = db.Column(db.String(32), default='')
+    lend_to_id = db.Column(db.Integer, nullable=True)
+    lend_start = db.Column(db.DateTime, nullable=True)
+    lend_end = db.Column(db.DateTime, nullable=True)
+    notes = db.Column(db.String(256), nullable=True)
+
+    creator = db.relationship('User', foreign_keys=[created_by_id])
+
+    def get_lend_to_display(self):
+        if not self.lend_to_id or not self.lend_to_type:
+            return ''
+        try:
+            if self.lend_to_type == 'user':
+                obj = User.query.get(self.lend_to_id)
+                return obj.username if obj else f'User #{self.lend_to_id}'
+            elif self.lend_to_type == 'person':
+                obj = ContactPerson.query.get(self.lend_to_id)
+                return obj.name if obj else f'Person #{self.lend_to_id}'
+            elif self.lend_to_type == 'organization':
+                obj = ContactOrganization.query.get(self.lend_to_id)
+                return obj.name if obj else f'Org #{self.lend_to_id}'
+            elif self.lend_to_type == 'group':
+                obj = ContactGroup.query.get(self.lend_to_id)
+                return obj.name if obj else f'Group #{self.lend_to_id}'
+        except Exception:
+            pass
+        return ''
+
+    def __repr__(self):
+        return f'<LendingSession {self.lending_id}>'
 
 
 class Attachment(db.Model):
@@ -846,9 +949,9 @@ class AuditLog(db.Model):
 class MagicParameter(db.Model):
     __tablename__ = 'magic_parameters'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), unique=True, nullable=False)
+    name = db.Column(db.String(256), unique=True, nullable=False)
     param_type = db.Column(db.String(50), nullable=False)
-    description = db.Column(db.Text)
+    description = db.Column(db.String(512))
     notify_enabled = db.Column(db.Boolean, default=False)
     is_whole_number = db.Column(db.Boolean, default=True)
     number_min = db.Column(db.Float)
@@ -986,7 +1089,7 @@ class ItemParameter(db.Model):
     value2 = db.Column(db.String(200))
     unit = db.Column(db.String(50))
     string_option = db.Column(db.String(128))
-    description = db.Column(db.Text)
+    description = db.Column(db.String(512))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     item = db.relationship('Item', backref=db.backref('magic_parameters', cascade='all, delete-orphan', lazy=True))
@@ -1078,7 +1181,7 @@ class ProjectParameter(db.Model):
     value = db.Column(db.String(200))
     value2 = db.Column(db.String(200))
     unit = db.Column(db.String(50))
-    description = db.Column(db.Text)
+    description = db.Column(db.String(512))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     project = db.relationship('Project', backref=db.backref('magic_parameters', cascade='all, delete-orphan', lazy=True))
@@ -1131,8 +1234,8 @@ class ProjectParameter(db.Model):
 class ParameterTemplate(db.Model):
     __tablename__ = 'parameter_templates'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), unique=True, nullable=False)
-    description = db.Column(db.Text)
+    name = db.Column(db.String(256), unique=True, nullable=False)
+    description = db.Column(db.String(512))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     template_parameters = db.relationship('TemplateParameter', backref='template', lazy=True, cascade='all, delete-orphan')
@@ -1219,8 +1322,8 @@ class StickerTemplate(db.Model):
 class ProjectCategory(db.Model):
     __tablename__ = 'project_categories'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    description = db.Column(db.Text)
+    name = db.Column(db.String(128), unique=True, nullable=False)
+    description = db.Column(db.String(512))
     color = db.Column(db.String(7), default='#6c757d')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -1228,8 +1331,8 @@ class ProjectCategory(db.Model):
 class ProjectTag(db.Model):
     __tablename__ = 'project_tags'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    description = db.Column(db.Text)
+    name = db.Column(db.String(128), unique=True, nullable=False)
+    description = db.Column(db.String(512))
     color = db.Column(db.String(7), default='#6c757d')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -1237,9 +1340,9 @@ class ProjectTag(db.Model):
 class ProjectStatus(db.Model):
     __tablename__ = 'project_statuses'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
+    name = db.Column(db.String(128), unique=True, nullable=False)
     color = db.Column(db.String(7), default='#6c757d')
-    description = db.Column(db.Text)
+    description = db.Column(db.String(512))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
@@ -1282,13 +1385,13 @@ class ProjectGroupMember(db.Model):
 class ContactOrganization(db.Model):
     __tablename__ = 'contact_organizations'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False)
-    email = db.Column(db.String(200))
-    tel = db.Column(db.String(50))
-    url = db.Column(db.String(500))
+    name = db.Column(db.String(256), nullable=False)
+    email = db.Column(db.String(256))
+    tel = db.Column(db.String(64))
+    url = db.Column(db.String(512))
     address = db.Column(db.String(256))
-    zip_code = db.Column(db.String(20))
-    info = db.Column(db.Text)
+    zip_code = db.Column(db.String(16))
+    info = db.Column(db.String(128))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     persons = db.relationship('ContactPerson', backref='organization', lazy=True)
@@ -1296,9 +1399,9 @@ class ContactOrganization(db.Model):
 class ContactPerson(db.Model):
     __tablename__ = 'contact_persons'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False)
-    email = db.Column(db.String(200))
-    tel = db.Column(db.String(50))
+    name = db.Column(db.String(256), nullable=False)
+    email = db.Column(db.String(256))
+    tel = db.Column(db.String(64))
     organization_id = db.Column(db.Integer, db.ForeignKey('contact_organizations.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -1306,8 +1409,8 @@ class ContactPerson(db.Model):
 class ContactGroup(db.Model):
     __tablename__ = 'contact_groups'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), unique=True, nullable=False)
-    description = db.Column(db.Text)
+    name = db.Column(db.String(256), unique=True, nullable=False)
+    description = db.Column(db.String(512))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     members = db.relationship('ContactGroupMember', backref='group', lazy=True, cascade='all, delete-orphan')
@@ -1333,8 +1436,8 @@ class Project(db.Model):
     __tablename__ = 'projects'
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(db.String(12), unique=True, nullable=False)
-    name = db.Column(db.String(300), nullable=False)
-    info = db.Column(db.String(500))
+    name = db.Column(db.String(512), nullable=False)
+    info = db.Column(db.String(128))
     description = db.Column(db.Text)
     category_id = db.Column(db.Integer, db.ForeignKey('project_categories.id'))
     tags = db.Column(db.Text)
@@ -1345,6 +1448,7 @@ class Project(db.Model):
     users = db.Column(db.Text)
     persons = db.Column(db.Text)
     organizations = db.Column(db.Text)
+    thumbnail = db.Column(db.String(300))
     enable_dateline_notification = db.Column(db.Boolean, default=False)
     notify_before_days = db.Column(db.Integer, default=3)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -1356,6 +1460,7 @@ class Project(db.Model):
     creator = db.relationship('User', foreign_keys=[created_by], backref='projects_created')
     updater = db.relationship('User', foreign_keys=[updated_by], backref='projects_updated')
     bom_items = db.relationship('ProjectBOMItem', backref='project', lazy=True, cascade='all, delete-orphan')
+    cost_items = db.relationship('ProjectCostItem', backref='project', lazy=True, cascade='all, delete-orphan', order_by='ProjectCostItem.sort_order')
     attachments = db.relationship('ProjectAttachment', backref='project', lazy=True, cascade='all, delete-orphan')
     urls = db.relationship('ProjectURL', backref='project', lazy=True, cascade='all, delete-orphan')
     linked_share_files = db.relationship('SharedFile', secondary=project_share_files, lazy='subquery', backref=db.backref('linked_projects', lazy=True))
@@ -1398,6 +1503,10 @@ class Project(db.Model):
         return self.get_bom_total_cost() * (self.quantity or 1)
     def get_project_actual_cost(self):
         return self.get_bom_actual_cost() * (self.quantity or 1)
+    def get_cost_per_qty_total(self):
+        return sum(i.total for i in self.cost_items if i.cost_type == 'per_qty')
+    def get_overall_cost_total(self):
+        return sum(i.total for i in self.cost_items if i.cost_type == 'overall')
 
 class ProjectBOMItem(db.Model):
     __tablename__ = 'project_bom_items'
@@ -1409,6 +1518,7 @@ class ProjectBOMItem(db.Model):
     used_quantity = db.Column(db.Integer, default=0)
     serial_numbers = db.Column(db.Text)
     item_name_snapshot = db.Column(db.String(300))
+    sort_order = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     item = db.relationship('Item', backref=db.backref('bom_uses'))
@@ -1432,6 +1542,23 @@ class ProjectBOMItem(db.Model):
     def get_actual_cost(self):
         """Actual cost based on used quantity"""
         return self.get_cost_per_unit() * (self.used_quantity or 0)
+
+class ProjectCostItem(db.Model):
+    __tablename__ = 'project_cost_items'
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    cost_type = db.Column(db.String(20), nullable=False)  # 'per_qty' or 'overall'
+    name = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.String(255))
+    price = db.Column(db.Float, default=0.0)
+    unit_label = db.Column(db.String(50))
+    quantity = db.Column(db.Float, default=1.0)
+    sort_order = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    @property
+    def total(self):
+        return (self.price or 0.0) * (self.quantity or 1.0)
 
 class ProjectAttachment(db.Model):
     __tablename__ = 'project_attachments'
