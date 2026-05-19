@@ -2734,9 +2734,12 @@ function _doLoadLog() {
                 return '<span class="badge bg-secondary">' + _esc(action) + '</span>';
             };
             entries.forEach(function(e) {
+                var userLabel = e.user_uid
+                    ? '<a href="/settings/contacts" class="fw-semibold text-decoration-none ms-1" title="ID: ' + _esc(e.user_uid) + '">' + _esc(e.username) + '</a>'
+                    : '<span class="ms-1 fw-semibold">' + _esc(e.username) + '</span>';
                 frag += '<div class="border-bottom pb-2 mb-2 small">' +
                     actionBadge(e.action) +
-                    '<span class="ms-1 fw-semibold">' + _esc(e.username) + '</span>' +
+                    userLabel +
                     '<span class="text-muted ms-1">' + _esc(e.timestamp) + '</span>' +
                     (e.display ? '<div class="text-muted mt-1" style="font-size:0.78rem;word-break:break-word;">' + _esc(e.display) + '</div>' : '') +
                     '</div>';
