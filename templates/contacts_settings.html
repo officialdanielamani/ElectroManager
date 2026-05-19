@@ -3,58 +3,27 @@
 {% block title %}Contacts - Electro Manager{% endblock %}
 
 {% block content %}
-<div class="row mb-3">
-    <div class="col">
+<div class="row mb-4">
+    <div class="col-md-12">
         <h2><i class="bi bi-person-lines-fill"></i> Contacts</h2>
-        <p class="text-muted mb-0">Manage users, external persons, organizations, and contact groups</p>
+        <p class="text-muted">Manage users, external persons, organizations, and contact groups</p>
     </div>
 </div>
 
-<!-- Tab Navigation -->
-<ul class="nav nav-tabs mb-3" id="contactsTabs">
-    {% if can_view_users %}
-    <li class="nav-item" style="min-width: 0; flex: 1 1 0;">
-        <a class="nav-link {% if can_view_users %}active{% endif %} text-center py-2"
-           id="tab-users" href="#" onclick="switchTab('users'); return false;">
-            <i class="bi bi-person-badge"></i> <small>Users</small>
-        </a>
-    </li>
-    {% endif %}
-    {% if can_view_users and can_view_other %}
-    <li class="nav-item d-flex align-items-center px-1" style="flex: 0 0 auto;">
-        <div style="width:1px; height:1.5rem; background: var(--bs-border-color, #dee2e6);"></div>
-    </li>
-    {% endif %}
-    {% if can_view_other %}
-    <li class="nav-item" style="min-width: 0; flex: 1 1 0;">
-        <a class="nav-link {% if not can_view_users %}active{% endif %} text-center py-2"
-           id="tab-persons" href="#" onclick="switchTab('persons'); return false;">
-            <i class="bi bi-person"></i> Persons
-        </a>
-    </li>
-    <li class="nav-item" style="min-width: 0; flex: 1 1 0;">
-        <a class="nav-link text-center py-2"
-           id="tab-orgs" href="#" onclick="switchTab('orgs'); return false;">
-            <i class="bi bi-building"></i> Organizations
-        </a>
-    </li>
-    <li class="nav-item" style="min-width: 0; flex: 1 1 0;">
-        <a class="nav-link text-center py-2"
-           id="tab-groups" href="#" onclick="switchTab('groups'); return false;">
-            <i class="bi bi-people"></i> Groups
-        </a>
-    </li>
-    {% endif %}
-</ul>
+<div class="row">
 
-<!-- ==================== USERS TAB ==================== -->
-{% if can_view_users %}
-<div id="pane-users" class="tab-pane-content">
-    <div class="row g-3">
-        {% for u in users %}
-        <div class="col-6 col-md-4 col-lg-3">
-            <div class="card h-100 text-center p-2">
-                <div class="d-flex flex-column align-items-center pt-2">
+    <!-- ==================== USERS ==================== -->
+    {% if can_view_users %}
+    <div class="col-lg-3 col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-dark text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-person-badge"></i> Users <span class="badge bg-secondary">{{ users|length }}</span></h5>
+                </div>
+            </div>
+            <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                {% for u in users %}
+                <div class="d-flex align-items-center gap-2 mb-2 p-1 border rounded">
                     {% if u.profile_photo %}
                         {% if u.profile_photo.startswith('share/') %}
                             {% set _upic = url_for('share.share_serve', category='profile', filename=u.profile_photo[6:]) %}
@@ -62,396 +31,390 @@
                             {% set _upic = url_for('user_role.serve_user_picture', filename=u.profile_photo) %}
                         {% endif %}
                         <img src="{{ _upic }}" alt="{{ u.name or u.username }}"
-                             class="rounded-circle mb-2"
-                             style="width:56px;height:56px;object-fit:cover;">
+                             class="rounded-circle flex-shrink-0"
+                             style="width:38px;height:38px;object-fit:cover;">
                     {% else %}
-                        <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center mb-2"
-                             style="width:56px;height:56px;">
-                            <i class="bi bi-person-fill text-white" style="font-size:1.6rem;"></i>
+                        <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center flex-shrink-0"
+                             style="width:38px;height:38px;">
+                            <i class="bi bi-person-fill text-white" style="font-size:1.1rem;"></i>
                         </div>
                     {% endif %}
-                    <div class="fw-semibold">{{ u.name or u.username }}</div>
-                    {% if u.short_info %}
-                    <small class="text-muted">{{ u.short_info }}</small>
-                    {% endif %}
-                    <small class="text-secondary mt-1"><i class="bi bi-at"></i>{{ u.username }}</small>
+                    <div style="min-width:0;">
+                        <div class="fw-semibold text-truncate" title="{{ u.name or u.username }}">{{ u.name or u.username }}</div>
+                        {% if u.short_info %}
+                        <small class="text-muted text-truncate d-block" title="{{ u.short_info }}">{{ u.short_info }}</small>
+                        {% endif %}
+                    </div>
                 </div>
+                {% endfor %}
+                {% if not users %}<p class="text-center text-muted">No active users.</p>{% endif %}
             </div>
         </div>
-        {% endfor %}
-        {% if not users %}
-        <div class="col-12"><p class="text-muted text-center">No active users.</p></div>
-        {% endif %}
     </div>
-</div>
-{% endif %}
+    {% endif %}
 
-<!-- ==================== PERSONS TAB ==================== -->
-{% if can_view_other %}
-<div id="pane-persons" class="tab-pane-content" style="display:none;">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="mb-0"><i class="bi bi-person"></i> Persons (External) <span class="badge bg-secondary">{{ persons|length }}</span></h5>
-        {% if can_edit %}
-        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addPersonModal">
-            <i class="bi bi-plus-circle"></i> Add Person
-        </button>
-        {% endif %}
-    </div>
-    <div class="row g-2">
-        {% for p in persons %}
-        <div class="col-md-6 col-lg-4">
-            <div class="card border">
-                <div class="card-body p-2">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <strong>{{ p.name }}</strong>
-                            {% if p.organization %}<br><small class="text-muted"><i class="bi bi-building"></i> {{ p.organization.name }}</small>{% endif %}
-                            {% if p.email %}<br><small><i class="bi bi-envelope"></i> {{ p.email }}</small>{% endif %}
-                            {% if p.tel %}<br><small><i class="bi bi-telephone"></i> {{ p.tel }}</small>{% endif %}
-                        </div>
-                        <div class="ms-2 text-nowrap">
-                            <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#viewPerson{{ p.id }}"><i class="bi bi-eye"></i></button>
-                            {% if can_edit %}
-                            <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editPerson{{ p.id }}"><i class="bi bi-pencil"></i></button>
-                            {% endif %}
-                            {% if can_delete %}
-                            <form method="POST" action="{{ url_for('contacts.contact_person_delete', id=p.id) }}" style="display:inline;">
-                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete {{ p.name }}?')"><i class="bi bi-trash"></i></button>
-                            </form>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- View Person Modal -->
-        <div class="modal fade" id="viewPerson{{ p.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
-            <div class="modal-header bg-secondary text-white">
-                <h5 class="modal-title"><i class="bi bi-person"></i> {{ p.name }}</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <table class="table table-sm table-borderless mb-0">
-                    <tr><th style="width:35%">Name</th><td>{{ p.name }}</td></tr>
-                    <tr><th>Organization</th><td>{{ p.organization.name if p.organization else '—' }}</td></tr>
-                    <tr><th>Email</th><td>{% if p.email %}<a href="mailto:{{ p.email }}">{{ p.email }}</a>{% else %}—{% endif %}</td></tr>
-                    <tr><th>Tel</th><td>{{ p.tel or '—' }}</td></tr>
-                </table>
-            </div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
-        </div></div></div>
-        {% if can_edit %}
-        <!-- Edit Person Modal -->
-        <div class="modal fade" id="editPerson{{ p.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
-            <form method="POST" action="{{ url_for('contacts.contact_person_edit', id=p.id) }}">
-                <div class="modal-header"><h5 class="modal-title">Edit Person</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body">
-                    <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
-                    <div class="mb-3"><label class="form-label required">Name</label><input type="text" class="form-control" name="name" value="{{ p.name }}" required></div>
-                    <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email" value="{{ p.email or '' }}"></div>
-                    <div class="mb-3"><label class="form-label">Tel</label><input type="text" class="form-control" name="tel" value="{{ p.tel or '' }}"></div>
-                    <div class="mb-3">
-                        <label class="form-label">Organization</label>
-                        <select class="form-select" name="organization_id">
-                            <option value="">— None —</option>
-                            {% for org in organizations %}
-                            <option value="{{ org.id }}" {% if p.organization_id == org.id %}selected{% endif %}>{{ org.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
-            </form>
-        </div></div></div>
-        {% endif %}
-        {% endfor %}
-        {% if not persons %}<p class="text-muted">No persons added yet.</p>{% endif %}
-    </div>
-</div>
-
-<!-- ==================== ORGANIZATIONS TAB ==================== -->
-<div id="pane-orgs" class="tab-pane-content" style="display:none;">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="mb-0"><i class="bi bi-building"></i> Organizations <span class="badge bg-info text-dark">{{ organizations|length }}</span></h5>
-        {% if can_edit %}
-        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addOrgModal">
-            <i class="bi bi-plus-circle"></i> Add Organization
-        </button>
-        {% endif %}
-    </div>
-    <div class="row g-2">
-        {% for org in organizations %}
-        <div class="col-md-6 col-lg-4">
-            <div class="card border">
-                <div class="card-body p-2">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <strong>{{ org.name }}</strong>
-                            {% if org.email %}<br><small><i class="bi bi-envelope"></i> {{ org.email }}</small>{% endif %}
-                            {% if org.tel %}<br><small><i class="bi bi-telephone"></i> {{ org.tel }}</small>{% endif %}
-                            {% if org.url %}<br><small><i class="bi bi-link-45deg"></i> <a href="{{ org.url }}" target="_blank" rel="noopener">{{ org.url }}</a></small>{% endif %}
-                            {% if org.address %}<br><small><i class="bi bi-geo-alt"></i> {{ org.address }}{% if org.zip_code %} {{ org.zip_code }}{% endif %}</small>{% elif org.zip_code %}<br><small><i class="bi bi-geo-alt"></i> {{ org.zip_code }}</small>{% endif %}
-                            {% if org.info %}<br><small class="text-muted">{{ org.info }}</small>{% endif %}
-                            {% if org.persons %}
-                            <div class="mt-1">
-                                {% for pp in org.persons %}<span class="badge bg-light text-dark border me-1">{{ pp.name }}</span>{% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-                        <div class="ms-2 text-nowrap">
-                            <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#viewOrg{{ org.id }}"><i class="bi bi-eye"></i></button>
-                            {% if can_edit %}
-                            <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editOrg{{ org.id }}"><i class="bi bi-pencil"></i></button>
-                            {% endif %}
-                            {% if can_delete %}
-                            <form method="POST" action="{{ url_for('contacts.contact_org_delete', id=org.id) }}" style="display:inline;">
-                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete {{ org.name }}?')"><i class="bi bi-trash"></i></button>
-                            </form>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- View Org Modal -->
-        <div class="modal fade" id="viewOrg{{ org.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
-            <div class="modal-header bg-info text-white">
-                <h5 class="modal-title"><i class="bi bi-building"></i> {{ org.name }}</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <table class="table table-sm table-borderless mb-0">
-                    <tr><th style="width:35%">Name</th><td>{{ org.name }}</td></tr>
-                    <tr><th>Email</th><td>{% if org.email %}<a href="mailto:{{ org.email }}">{{ org.email }}</a>{% else %}—{% endif %}</td></tr>
-                    <tr><th>Tel</th><td>{{ org.tel or '—' }}</td></tr>
-                    <tr><th>URL</th><td>{% if org.url %}<a href="{{ org.url }}" target="_blank" rel="noopener">{{ org.url }}</a>{% else %}—{% endif %}</td></tr>
-                    <tr><th>Address</th><td>{{ org.address or '—' }}</td></tr>
-                    <tr><th>Zip Code</th><td>{{ org.zip_code or '—' }}</td></tr>
-                    <tr><th>Info</th><td>{{ org.info or '—' }}</td></tr>
-                </table>
-                {% if org.persons %}
-                <hr class="my-2">
-                <strong class="small">Persons in this organization:</strong>
-                <div class="mt-2">
-                    {% for pp in org.persons %}
-                    <div class="d-flex align-items-center mb-1">
-                        <i class="bi bi-person me-2 text-muted"></i>
-                        <span>{{ pp.name }}</span>
-                        {% if pp.email %}<small class="text-muted ms-2">— {{ pp.email }}</small>{% endif %}
-                        {% if pp.tel %}<small class="text-muted ms-2"><i class="bi bi-telephone"></i> {{ pp.tel }}</small>{% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <hr class="my-2">
-                <small class="text-muted">No persons linked to this organization.</small>
-                {% endif %}
-            </div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
-        </div></div></div>
-        {% if can_edit %}
-        <!-- Edit Org Modal -->
-        <div class="modal fade" id="editOrg{{ org.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
-            <form method="POST" action="{{ url_for('contacts.contact_org_edit', id=org.id) }}">
-                <div class="modal-header"><h5 class="modal-title">Edit Organization</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body">
-                    <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
-                    <div class="mb-3"><label class="form-label required">Name</label><input type="text" class="form-control" name="name" value="{{ org.name }}" required></div>
-                    <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email" value="{{ org.email or '' }}"></div>
-                    <div class="mb-3"><label class="form-label">Tel</label><input type="text" class="form-control" name="tel" value="{{ org.tel or '' }}"></div>
-                    <div class="mb-3"><label class="form-label">URL</label><input type="url" class="form-control" name="url" value="{{ org.url or '' }}"></div>
-                    <div class="mb-3"><label class="form-label">Address</label><textarea class="form-control" name="address" rows="3" maxlength="256">{{ org.address or '' }}</textarea></div>
-                    <div class="mb-3"><label class="form-label">Zip Code</label><input type="text" class="form-control" name="zip_code" value="{{ org.zip_code or '' }}"></div>
-                    <div class="mb-3"><label class="form-label">Info</label><textarea class="form-control" name="info" rows="3">{{ org.info or '' }}</textarea></div>
-                </div>
-                <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
-            </form>
-        </div></div></div>
-        {% endif %}
-        {% endfor %}
-        {% if not organizations %}<p class="text-muted">No organizations added yet.</p>{% endif %}
-    </div>
-</div>
-
-<!-- ==================== GROUPS TAB ==================== -->
-<div id="pane-groups" class="tab-pane-content" style="display:none;">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="mb-0"><i class="bi bi-people"></i> Groups <span class="badge bg-primary">{{ groups|length }}</span></h5>
-        {% if can_edit %}
-        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addGroupModal">
-            <i class="bi bi-plus-circle"></i> Create Group
-        </button>
-        {% endif %}
-    </div>
-    <div class="row g-3">
-        {% for grp in groups %}
-        <div class="col-md-6 col-lg-4">
-            <div class="card border">
-                <div class="card-body p-2">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div>
-                            <strong>{{ grp.name }}</strong>
-                            {% if grp.description %}<br><small class="text-muted">{{ grp.description }}</small>{% endif %}
-                        </div>
-                        <div class="ms-2 text-nowrap">
-                            <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#viewGrp{{ grp.id }}"><i class="bi bi-eye"></i></button>
-                            {% if can_edit %}
-                            <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editGrp{{ grp.id }}"><i class="bi bi-pencil"></i></button>
-                            {% endif %}
-                            {% if can_delete %}
-                            <form method="POST" action="{{ url_for('contacts.contact_group_delete', id=grp.id) }}" style="display:inline;">
-                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete group {{ grp.name }}?')"><i class="bi bi-trash"></i></button>
-                            </form>
-                            {% endif %}
-                        </div>
-                    </div>
-
-                    <!-- Users -->
-                    <div class="mb-1"><small class="fw-bold text-muted">Users:</small></div>
-                    <div class="mb-2">
-                        {% for m in grp.get_users() %}
-                        <span class="badge bg-primary me-1 mb-1">
-                            {{ m.user.username }}
-                            {% if can_edit %}
-                            <form method="POST" action="{{ url_for('contacts.contact_group_remove_member', member_id=m.id) }}" style="display:inline;">
-                                <button type="submit" class="btn-close btn-close-white ms-1" style="font-size:0.5rem;" onclick="return confirm('Remove?')"></button>
-                            </form>
-                            {% endif %}
-                        </span>
-                        {% endfor %}
-                        {% if not grp.get_users() %}<small class="text-muted">None</small>{% endif %}
-                    </div>
-
-                    <!-- Persons -->
-                    <div class="mb-1"><small class="fw-bold text-muted">Persons:</small></div>
-                    <div class="mb-2">
-                        {% for m in grp.get_persons() %}
-                        <span class="badge bg-secondary me-1 mb-1" title="{% if m.person.organization %}{{ m.person.organization.name }}{% endif %}{% if m.person.email %} · {{ m.person.email }}{% endif %}">
-                            {{ m.person.name }}{% if m.person.organization %} <small>({{ m.person.organization.name }})</small>{% endif %}
-                            {% if can_edit %}
-                            <form method="POST" action="{{ url_for('contacts.contact_group_remove_member', member_id=m.id) }}" style="display:inline;">
-                                <button type="submit" class="btn-close btn-close-white ms-1" style="font-size:0.5rem;" onclick="return confirm('Remove?')"></button>
-                            </form>
-                            {% endif %}
-                        </span>
-                        {% endfor %}
-                        {% if not grp.get_persons() %}<small class="text-muted">None</small>{% endif %}
-                    </div>
-
-                    <!-- Organizations -->
-                    <div class="mb-1"><small class="fw-bold text-muted">Organizations:</small></div>
-                    <div class="mb-2">
-                        {% for m in grp.get_organizations() %}
-                        <span class="badge bg-info text-dark me-1 mb-1">
-                            {{ m.org.name }}{% if m.org.email %} <small>({{ m.org.email }})</small>{% endif %}
-                            {% if can_edit %}
-                            <form method="POST" action="{{ url_for('contacts.contact_group_remove_member', member_id=m.id) }}" style="display:inline;">
-                                <button type="submit" class="btn-close ms-1" style="font-size:0.5rem;" onclick="return confirm('Remove?')"></button>
-                            </form>
-                            {% endif %}
-                        </span>
-                        {% endfor %}
-                        {% if not grp.get_organizations() %}<small class="text-muted">None</small>{% endif %}
-                    </div>
-
+    <!-- ==================== PERSONS ==================== -->
+    {% if can_view_other %}
+    <div class="col-lg-3 col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-secondary text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-person"></i> Persons <span class="badge bg-dark">{{ persons|length }}</span></h5>
                     {% if can_edit %}
-                    <!-- Add Member -->
-                    <div class="border-top pt-2 mt-1">
-                        <form method="POST" action="{{ url_for('contacts.contact_group_add_member', id=grp.id) }}" class="row g-1 align-items-end">
-                            <div class="col-4">
-                                <select class="form-select form-select-sm" name="member_type" onchange="toggleContactSelect(this, {{ grp.id }})">
-                                    <option value="user">User</option>
-                                    <option value="person">Person</option>
-                                    <option value="organization">Org</option>
-                                </select>
-                            </div>
-                            <div class="col-5">
-                                <select class="form-select form-select-sm" id="cUserSel{{ grp.id }}" name="member_id">
-                                    {% for u in users %}<option value="{{ u.id }}">{{ u.username }}</option>{% endfor %}
-                                </select>
-                                <select class="form-select form-select-sm" id="cPersonSel{{ grp.id }}" name="member_id" style="display:none;" disabled>
-                                    {% for p in persons %}<option value="{{ p.id }}">{{ p.name }}{% if p.organization %} ({{ p.organization.name }}){% endif %}</option>{% endfor %}
-                                </select>
-                                <select class="form-select form-select-sm" id="cOrgSel{{ grp.id }}" name="member_id" style="display:none;" disabled>
-                                    {% for o in organizations %}<option value="{{ o.id }}">{{ o.name }}</option>{% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-3">
-                                <button type="submit" class="btn btn-sm btn-success w-100"><i class="bi bi-plus"></i></button>
-                            </div>
-                        </form>
-                    </div>
+                    <button class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#addPersonModal"><i class="bi bi-plus-circle"></i> Add</button>
                     {% endif %}
                 </div>
             </div>
+            <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                {% for p in persons %}
+                <div class="card mb-2 border">
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>{{ p.name }}</strong>
+                                {% if p.organization %}<br><small class="text-muted"><i class="bi bi-building"></i> {{ p.organization.name }}</small>{% endif %}
+                                {% if p.email %}<br><small><i class="bi bi-envelope"></i> {{ p.email }}</small>{% endif %}
+                                {% if p.tel %}<br><small><i class="bi bi-telephone"></i> {{ p.tel }}</small>{% endif %}
+                            </div>
+                            <div class="ms-2 text-nowrap">
+                                <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#viewPerson{{ p.id }}"><i class="bi bi-eye"></i></button>
+                                {% if can_edit %}
+                                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editPerson{{ p.id }}"><i class="bi bi-pencil"></i></button>
+                                {% endif %}
+                                {% if can_delete %}
+                                <form method="POST" action="{{ url_for('contacts.contact_person_delete', id=p.id) }}" style="display:inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete {{ p.name }}?')"><i class="bi bi-trash"></i></button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- View Person Modal -->
+                <div class="modal fade" id="viewPerson{{ p.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+                    <div class="modal-header bg-secondary text-white">
+                        <h5 class="modal-title"><i class="bi bi-person"></i> {{ p.name }}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <table class="table table-sm table-borderless mb-0">
+                            <tr><th style="width:35%">Name</th><td>{{ p.name }}</td></tr>
+                            <tr><th>Organization</th><td>{{ p.organization.name if p.organization else '—' }}</td></tr>
+                            <tr><th>Email</th><td>{% if p.email %}<a href="mailto:{{ p.email }}">{{ p.email }}</a>{% else %}—{% endif %}</td></tr>
+                            <tr><th>Tel</th><td>{{ p.tel or '—' }}</td></tr>
+                        </table>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+                </div></div></div>
+                <!-- Edit Person Modal -->
+                <div class="modal fade" id="editPerson{{ p.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+                    <form method="POST" action="{{ url_for('contacts.contact_person_edit', id=p.id) }}">
+                        <div class="modal-header"><h5 class="modal-title">Edit Person</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                        <div class="modal-body">
+                            <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
+                            <div class="mb-3"><label class="form-label required">Name</label><input type="text" class="form-control" name="name" value="{{ p.name }}" required></div>
+                            <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email" value="{{ p.email or '' }}"></div>
+                            <div class="mb-3"><label class="form-label">Tel</label><input type="text" class="form-control" name="tel" value="{{ p.tel or '' }}"></div>
+                            <div class="mb-3">
+                                <label class="form-label">Organization</label>
+                                <select class="form-select" name="organization_id">
+                                    <option value="">— None —</option>
+                                    {% for org in organizations %}
+                                    <option value="{{ org.id }}" {% if p.organization_id == org.id %}selected{% endif %}>{{ org.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
+                    </form>
+                </div></div></div>
+                {% endfor %}
+                {% if not persons %}<p class="text-center text-muted">No persons added yet</p>{% endif %}
+            </div>
         </div>
-
-        <!-- View Group Modal -->
-        <div class="modal fade" id="viewGrp{{ grp.id }}" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-people"></i> {{ grp.name }}</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                {% if grp.description %}<p class="text-muted mb-3">{{ grp.description }}</p>{% endif %}
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <h6 class="text-primary"><i class="bi bi-person-badge"></i> Users</h6>
-                        {% for m in grp.get_users() %}
-                        <div class="d-flex align-items-center mb-1">
-                            <i class="bi bi-person-circle me-2 text-muted"></i>
-                            <span>{{ m.user.username }}</span>
-                            {% if m.user.email %}<small class="text-muted ms-1">— {{ m.user.email }}</small>{% endif %}
-                        </div>
-                        {% endfor %}
-                        {% if not grp.get_users() %}<small class="text-muted">None</small>{% endif %}
-                    </div>
-                    <div class="col-md-4">
-                        <h6 class="text-secondary"><i class="bi bi-person"></i> Persons</h6>
-                        {% for m in grp.get_persons() %}
-                        <div class="mb-1">
-                            <div><i class="bi bi-person me-1 text-muted"></i><strong>{{ m.person.name }}</strong></div>
-                            {% if m.person.organization %}<small class="text-muted ms-3"><i class="bi bi-building"></i> {{ m.person.organization.name }}</small>{% endif %}
-                            {% if m.person.email %}<br><small class="text-muted ms-3"><i class="bi bi-envelope"></i> {{ m.person.email }}</small>{% endif %}
-                            {% if m.person.tel %}<br><small class="text-muted ms-3"><i class="bi bi-telephone"></i> {{ m.person.tel }}</small>{% endif %}
-                        </div>
-                        {% endfor %}
-                        {% if not grp.get_persons() %}<small class="text-muted">None</small>{% endif %}
-                    </div>
-                    <div class="col-md-4">
-                        <h6 class="text-info"><i class="bi bi-building"></i> Organizations</h6>
-                        {% for m in grp.get_organizations() %}
-                        <div class="mb-1">
-                            <div><i class="bi bi-building me-1 text-muted"></i><strong>{{ m.org.name }}</strong></div>
-                            {% if m.org.email %}<br><small class="text-muted ms-3"><i class="bi bi-envelope"></i> {{ m.org.email }}</small>{% endif %}
-                            {% if m.org.tel %}<br><small class="text-muted ms-3"><i class="bi bi-telephone"></i> {{ m.org.tel }}</small>{% endif %}
-                        </div>
-                        {% endfor %}
-                        {% if not grp.get_organizations() %}<small class="text-muted">None</small>{% endif %}
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
-        </div></div></div>
-        {% if can_edit %}
-        <!-- Edit Group Modal -->
-        <div class="modal fade" id="editGrp{{ grp.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
-            <form method="POST" action="{{ url_for('contacts.contact_group_edit', id=grp.id) }}">
-                <div class="modal-header"><h5 class="modal-title">Edit Group</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body">
-                    <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
-                    <div class="mb-3"><label class="form-label required">Group Name</label><input type="text" class="form-control" name="name" value="{{ grp.name }}" required></div>
-                    <div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" rows="2">{{ grp.description or '' }}</textarea></div>
-                </div>
-                <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
-            </form>
-        </div></div></div>
-        {% endif %}
-        {% endfor %}
-        {% if not groups %}<p class="text-muted">No groups created yet.</p>{% endif %}
     </div>
+
+    <!-- ==================== ORGANIZATIONS ==================== -->
+    <div class="col-lg-3 col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-info text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-building"></i> Organizations <span class="badge bg-dark">{{ organizations|length }}</span></h5>
+                    {% if can_edit %}
+                    <button class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#addOrgModal"><i class="bi bi-plus-circle"></i> Add</button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                {% for org in organizations %}
+                <div class="card mb-2 border">
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>{{ org.name }}</strong>
+                                {% if org.email %}<br><small><i class="bi bi-envelope"></i> {{ org.email }}</small>{% endif %}
+                                {% if org.tel %}<br><small><i class="bi bi-telephone"></i> {{ org.tel }}</small>{% endif %}
+                                {% if org.url %}<br><small><i class="bi bi-link-45deg"></i> <a href="{{ org.url }}" target="_blank" rel="noopener">{{ org.url }}</a></small>{% endif %}
+                                {% if org.address %}<br><small><i class="bi bi-geo-alt"></i> {{ org.address }}{% if org.zip_code %} {{ org.zip_code }}{% endif %}</small>{% elif org.zip_code %}<br><small><i class="bi bi-geo-alt"></i> {{ org.zip_code }}</small>{% endif %}
+                                {% if org.info %}<br><small class="text-muted">{{ org.info }}</small>{% endif %}
+                                {% if org.persons %}
+                                <div class="mt-1">
+                                    {% for pp in org.persons %}<span class="badge bg-light text-dark border me-1">{{ pp.name }}</span>{% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="ms-2 text-nowrap">
+                                <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#viewOrg{{ org.id }}"><i class="bi bi-eye"></i></button>
+                                {% if can_edit %}
+                                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editOrg{{ org.id }}"><i class="bi bi-pencil"></i></button>
+                                {% endif %}
+                                {% if can_delete %}
+                                <form method="POST" action="{{ url_for('contacts.contact_org_delete', id=org.id) }}" style="display:inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete {{ org.name }}?')"><i class="bi bi-trash"></i></button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- View Org Modal -->
+                <div class="modal fade" id="viewOrg{{ org.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+                    <div class="modal-header bg-info text-white">
+                        <h5 class="modal-title"><i class="bi bi-building"></i> {{ org.name }}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <table class="table table-sm table-borderless mb-0">
+                            <tr><th style="width:35%">Name</th><td>{{ org.name }}</td></tr>
+                            <tr><th>Email</th><td>{% if org.email %}<a href="mailto:{{ org.email }}">{{ org.email }}</a>{% else %}—{% endif %}</td></tr>
+                            <tr><th>Tel</th><td>{{ org.tel or '—' }}</td></tr>
+                            <tr><th>URL</th><td>{% if org.url %}<a href="{{ org.url }}" target="_blank" rel="noopener">{{ org.url }}</a>{% else %}—{% endif %}</td></tr>
+                            <tr><th>Address</th><td>{{ org.address or '—' }}</td></tr>
+                            <tr><th>Zip Code</th><td>{{ org.zip_code or '—' }}</td></tr>
+                            <tr><th>Info</th><td>{{ org.info or '—' }}</td></tr>
+                        </table>
+                        {% if org.persons %}
+                        <hr class="my-2">
+                        <strong class="small">Persons in this organization:</strong>
+                        <div class="mt-2">
+                            {% for pp in org.persons %}
+                            <div class="d-flex align-items-center mb-1">
+                                <i class="bi bi-person me-2 text-muted"></i>
+                                <span>{{ pp.name }}</span>
+                                {% if pp.email %}<small class="text-muted ms-2">— {{ pp.email }}</small>{% endif %}
+                                {% if pp.tel %}<small class="text-muted ms-2"><i class="bi bi-telephone"></i> {{ pp.tel }}</small>{% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <hr class="my-2">
+                        <small class="text-muted">No persons linked to this organization.</small>
+                        {% endif %}
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+                </div></div></div>
+                <!-- Edit Org Modal -->
+                <div class="modal fade" id="editOrg{{ org.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+                    <form method="POST" action="{{ url_for('contacts.contact_org_edit', id=org.id) }}">
+                        <div class="modal-header"><h5 class="modal-title">Edit Organization</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                        <div class="modal-body">
+                            <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
+                            <div class="mb-3"><label class="form-label required">Name</label><input type="text" class="form-control" name="name" value="{{ org.name }}" required></div>
+                            <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email" value="{{ org.email or '' }}"></div>
+                            <div class="mb-3"><label class="form-label">Tel</label><input type="text" class="form-control" name="tel" value="{{ org.tel or '' }}"></div>
+                            <div class="mb-3"><label class="form-label">URL</label><input type="url" class="form-control" name="url" value="{{ org.url or '' }}"></div>
+                            <div class="mb-3"><label class="form-label">Address</label><textarea class="form-control" name="address" rows="3" maxlength="256">{{ org.address or '' }}</textarea></div>
+                            <div class="mb-3"><label class="form-label">Zip Code</label><input type="text" class="form-control" name="zip_code" value="{{ org.zip_code or '' }}"></div>
+                            <div class="mb-3"><label class="form-label">Info</label><textarea class="form-control" name="info" rows="3">{{ org.info or '' }}</textarea></div>
+                        </div>
+                        <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
+                    </form>
+                </div></div></div>
+                {% endfor %}
+                {% if not organizations %}<p class="text-center text-muted">No organizations added yet</p>{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== GROUPS ==================== -->
+    <div class="col-lg-3 col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-people"></i> Groups <span class="badge bg-dark">{{ groups|length }}</span></h5>
+                    {% if can_edit %}
+                    <button class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#addGroupModal"><i class="bi bi-plus-circle"></i> Add</button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                {% for grp in groups %}
+                <div class="card mb-3 border">
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <strong>{{ grp.name }}</strong>
+                                {% if grp.description %}<br><small class="text-muted">{{ grp.description }}</small>{% endif %}
+                            </div>
+                            <div class="ms-2 text-nowrap">
+                                <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#viewGrp{{ grp.id }}"><i class="bi bi-eye"></i></button>
+                                {% if can_edit %}
+                                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editGrp{{ grp.id }}"><i class="bi bi-pencil"></i></button>
+                                {% endif %}
+                                {% if can_delete %}
+                                <form method="POST" action="{{ url_for('contacts.contact_group_delete', id=grp.id) }}" style="display:inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete group {{ grp.name }}?')"><i class="bi bi-trash"></i></button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Users -->
+                        <div class="mb-1"><small class="fw-bold text-muted">Users:</small></div>
+                        <div class="mb-2">
+                            {% for m in grp.get_users() %}
+                            <span class="badge bg-primary me-1 mb-1">
+                                {{ m.user.username }}
+                                {% if can_edit %}
+                                <form method="POST" action="{{ url_for('contacts.contact_group_remove_member', member_id=m.id) }}" style="display:inline;">
+                                    <button type="submit" class="btn-close btn-close-white ms-1" style="font-size:0.5rem;" onclick="return confirm('Remove?')"></button>
+                                </form>
+                                {% endif %}
+                            </span>
+                            {% endfor %}
+                            {% if not grp.get_users() %}<small class="text-muted">None</small>{% endif %}
+                        </div>
+
+                        <!-- Persons -->
+                        <div class="mb-1"><small class="fw-bold text-muted">Persons:</small></div>
+                        <div class="mb-2">
+                            {% for m in grp.get_persons() %}
+                            <span class="badge bg-secondary me-1 mb-1" title="{% if m.person.organization %}{{ m.person.organization.name }}{% endif %}{% if m.person.email %} · {{ m.person.email }}{% endif %}">
+                                {{ m.person.name }}{% if m.person.organization %} <small>({{ m.person.organization.name }})</small>{% endif %}
+                                {% if can_edit %}
+                                <form method="POST" action="{{ url_for('contacts.contact_group_remove_member', member_id=m.id) }}" style="display:inline;">
+                                    <button type="submit" class="btn-close btn-close-white ms-1" style="font-size:0.5rem;" onclick="return confirm('Remove?')"></button>
+                                </form>
+                                {% endif %}
+                            </span>
+                            {% endfor %}
+                            {% if not grp.get_persons() %}<small class="text-muted">None</small>{% endif %}
+                        </div>
+
+                        <!-- Organizations -->
+                        <div class="mb-1"><small class="fw-bold text-muted">Organizations:</small></div>
+                        <div class="mb-2">
+                            {% for m in grp.get_organizations() %}
+                            <span class="badge bg-info text-dark me-1 mb-1">
+                                {{ m.org.name }}{% if m.org.email %} <small>({{ m.org.email }})</small>{% endif %}
+                                {% if can_edit %}
+                                <form method="POST" action="{{ url_for('contacts.contact_group_remove_member', member_id=m.id) }}" style="display:inline;">
+                                    <button type="submit" class="btn-close ms-1" style="font-size:0.5rem;" onclick="return confirm('Remove?')"></button>
+                                </form>
+                                {% endif %}
+                            </span>
+                            {% endfor %}
+                            {% if not grp.get_organizations() %}<small class="text-muted">None</small>{% endif %}
+                        </div>
+
+                        {% if can_edit %}
+                        <!-- Add Member -->
+                        <div class="border-top pt-2 mt-1">
+                            <form method="POST" action="{{ url_for('contacts.contact_group_add_member', id=grp.id) }}" class="row g-1 align-items-end">
+                                <div class="col-4">
+                                    <select class="form-select form-select-sm" name="member_type" onchange="toggleContactSelect(this, {{ grp.id }})">
+                                        <option value="user">User</option>
+                                        <option value="person">Person</option>
+                                        <option value="organization">Org</option>
+                                    </select>
+                                </div>
+                                <div class="col-5">
+                                    <select class="form-select form-select-sm" id="cUserSel{{ grp.id }}" name="member_id">
+                                        {% for u in users %}<option value="{{ u.id }}">{{ u.username }}</option>{% endfor %}
+                                    </select>
+                                    <select class="form-select form-select-sm" id="cPersonSel{{ grp.id }}" name="member_id" style="display:none;" disabled>
+                                        {% for p in persons %}<option value="{{ p.id }}">{{ p.name }}{% if p.organization %} ({{ p.organization.name }}){% endif %}</option>{% endfor %}
+                                    </select>
+                                    <select class="form-select form-select-sm" id="cOrgSel{{ grp.id }}" name="member_id" style="display:none;" disabled>
+                                        {% for o in organizations %}<option value="{{ o.id }}">{{ o.name }}</option>{% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-3">
+                                    <button type="submit" class="btn btn-sm btn-success w-100"><i class="bi bi-plus"></i></button>
+                                </div>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- View Group Modal -->
+                <div class="modal fade" id="viewGrp{{ grp.id }}" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title"><i class="bi bi-people"></i> {{ grp.name }}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        {% if grp.description %}<p class="text-muted mb-3">{{ grp.description }}</p>{% endif %}
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <h6 class="text-primary"><i class="bi bi-person-badge"></i> Users</h6>
+                                {% for m in grp.get_users() %}
+                                <div class="d-flex align-items-center mb-1">
+                                    <i class="bi bi-person-circle me-2 text-muted"></i>
+                                    <span>{{ m.user.username }}</span>
+                                    {% if m.user.email %}<small class="text-muted ms-1">— {{ m.user.email }}</small>{% endif %}
+                                </div>
+                                {% endfor %}
+                                {% if not grp.get_users() %}<small class="text-muted">None</small>{% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="text-secondary"><i class="bi bi-person"></i> Persons</h6>
+                                {% for m in grp.get_persons() %}
+                                <div class="mb-1">
+                                    <div><i class="bi bi-person me-1 text-muted"></i><strong>{{ m.person.name }}</strong></div>
+                                    {% if m.person.organization %}<small class="text-muted ms-3"><i class="bi bi-building"></i> {{ m.person.organization.name }}</small>{% endif %}
+                                    {% if m.person.email %}<br><small class="text-muted ms-3"><i class="bi bi-envelope"></i> {{ m.person.email }}</small>{% endif %}
+                                    {% if m.person.tel %}<br><small class="text-muted ms-3"><i class="bi bi-telephone"></i> {{ m.person.tel }}</small>{% endif %}
+                                </div>
+                                {% endfor %}
+                                {% if not grp.get_persons() %}<small class="text-muted">None</small>{% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="text-info"><i class="bi bi-building"></i> Organizations</h6>
+                                {% for m in grp.get_organizations() %}
+                                <div class="mb-1">
+                                    <div><i class="bi bi-building me-1 text-muted"></i><strong>{{ m.org.name }}</strong></div>
+                                    {% if m.org.email %}<br><small class="text-muted ms-3"><i class="bi bi-envelope"></i> {{ m.org.email }}</small>{% endif %}
+                                    {% if m.org.tel %}<br><small class="text-muted ms-3"><i class="bi bi-telephone"></i> {{ m.org.tel }}</small>{% endif %}
+                                </div>
+                                {% endfor %}
+                                {% if not grp.get_organizations() %}<small class="text-muted">None</small>{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+                </div></div></div>
+                <!-- Edit Group Modal -->
+                <div class="modal fade" id="editGrp{{ grp.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+                    <form method="POST" action="{{ url_for('contacts.contact_group_edit', id=grp.id) }}">
+                        <div class="modal-header"><h5 class="modal-title">Edit Group</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                        <div class="modal-body">
+                            <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
+                            <div class="mb-3"><label class="form-label required">Group Name</label><input type="text" class="form-control" name="name" value="{{ grp.name }}" required></div>
+                            <div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" rows="2">{{ grp.description or '' }}</textarea></div>
+                        </div>
+                        <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
+                    </form>
+                </div></div></div>
+                {% endfor %}
+                {% if not groups %}<p class="text-center text-muted">No groups created yet</p>{% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
 </div>
-{% endif %}
 
 <!-- ==================== ADD MODALS ==================== -->
 {% if can_view_other and can_edit %}
@@ -507,25 +470,6 @@
 {% endif %}
 
 <script>
-const _activeTab = { current: '{{ "users" if can_view_users else "persons" }}' };
-function switchTab(name) {
-    document.querySelectorAll('.tab-pane-content').forEach(function(p) { p.style.display = 'none'; });
-    document.querySelectorAll('#contactsTabs .nav-link').forEach(function(a) { a.classList.remove('active'); });
-    const pane = document.getElementById('pane-' + name);
-    const tab = document.getElementById('tab-' + name);
-    if (pane) pane.style.display = '';
-    if (tab) tab.classList.add('active');
-    _activeTab.current = name;
-    try { localStorage.setItem('contacts_tab', name); } catch(e) {}
-}
-// Restore last tab from localStorage
-(function() {
-    try {
-        const saved = localStorage.getItem('contacts_tab');
-        if (saved) switchTab(saved);
-    } catch(e) {}
-})();
-
 function toggleContactSelect(sel, grpId) {
     const uSel = document.getElementById('cUserSel' + grpId);
     const pSel = document.getElementById('cPersonSel' + grpId);
