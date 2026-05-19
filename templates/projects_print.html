@@ -36,7 +36,7 @@
                     {% if col == 'tags' %}<th>Tags</th>{% endif %}
                     {% if col == 'date_start' %}<th>Date Start</th>{% endif %}
                     {% if col == 'dateline' %}<th>Dateline</th>{% endif %}
-                    {% if col == 'total_cost' %}<th>Total Cost</th>{% endif %}
+                    {% if col == 'total_cost' and can_view_costing %}<th>Total Cost</th>{% endif %}
                     {% if col == 'status' %}<th>Status</th>{% endif %}
                     {% if col == 'users' %}<th>Users</th>{% endif %}
                     {% if col == 'group' %}<th>Group</th>{% endif %}
@@ -55,7 +55,7 @@
                     {% if col == 'tags' %}<td>{% for t in project.get_tags_list() %}{{ t.name }}{% if not loop.last %}, {% endif %}{% endfor %}</td>{% endif %}
                     {% if col == 'date_start' %}<td>{{ project.date_start.strftime('%Y-%m-%d') if project.date_start else '' }}</td>{% endif %}
                     {% if col == 'dateline' %}<td>{{ project.date_end.strftime('%Y-%m-%d') if project.date_end else '' }}</td>{% endif %}
-                    {% if col == 'total_cost' %}<td>{{ currency }} {{ '{:,.{}f}'.format(project.get_project_total_cost(), currency_decimal) }}</td>{% endif %}
+                    {% if col == 'total_cost' and can_view_costing %}<td>{{ currency }} {{ '{:,.{}f}'.format(project.get_project_total_cost(), currency_decimal) }}</td>{% endif %}
                     {% if col == 'status' %}<td>{{ project.status.name if project.status else '' }}</td>{% endif %}
                     {% if col == 'users' %}<td>{% for u in project.get_users_list() %}{{ u.username }}{% if not loop.last %}, {% endif %}{% endfor %}</td>{% endif %}
                     {% if col == 'group' %}<td>{{ project.group.name if project.group else '' }}</td>{% endif %}

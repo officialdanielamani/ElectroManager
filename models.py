@@ -1507,9 +1507,11 @@ class Project(db.Model):
         """Actual BOM cost based on used_quantity"""
         return sum(b.get_actual_cost() for b in self.bom_items)
     def get_project_total_cost(self):
-        return self.get_bom_total_cost() * (self.quantity or 1)
+        qty = self.quantity or 1
+        return (self.get_bom_total_cost() + self.get_cost_per_qty_total()) * qty + self.get_overall_cost_total()
     def get_project_actual_cost(self):
-        return self.get_bom_actual_cost() * (self.quantity or 1)
+        qty = self.quantity or 1
+        return (self.get_bom_actual_cost() + self.get_cost_per_qty_total()) * qty + self.get_overall_cost_total()
     def get_cost_per_qty_total(self):
         return sum(i.total for i in self.cost_items if i.cost_type == 'per_qty')
     def get_overall_cost_total(self):

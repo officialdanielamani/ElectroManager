@@ -160,6 +160,8 @@ def projects():
     currency = Setting.get('currency', 'USD')
     currency_decimal = int(Setting.get('currency_decimal_places', '2'))
 
+    can_view_costing = current_user.has_permission('projects', 'view_costing')
+
     return render_template('projects.html',
                            projects=project_list,
                            pagination=pagination,
@@ -175,7 +177,8 @@ def projects():
                            user_columns=user_columns,
                            per_page=per_page,
                            currency=currency,
-                           currency_decimal=currency_decimal)
+                           currency_decimal=currency_decimal,
+                           can_view_costing=can_view_costing)
 
 
 # ==================== ADD PROJECT ====================
@@ -281,7 +284,9 @@ def project_new():
 
     return render_template('project_form.html', title='New Project', project=None,
                            categories=categories, tags=tags, statuses=statuses,
-                           users=users, contact_persons=contact_persons, contact_orgs=contact_orgs)
+                           users=users, contact_persons=contact_persons, contact_orgs=contact_orgs,
+                           can_view_costing=current_user.has_permission('projects', 'view_costing'),
+                           can_edit_costing=current_user.has_permission('projects', 'edit_costing'))
 
 
 # ==================== PROJECT DETAIL ====================
@@ -311,6 +316,7 @@ def project_detail(project_id):
 
     can_edit = current_user.has_permission('projects', 'edit')
     can_delete = current_user.has_permission('projects', 'delete')
+    can_view_costing = current_user.has_permission('projects', 'view_costing')
 
     return render_template('project_detail.html',
                            project=project,
@@ -322,6 +328,7 @@ def project_detail(project_id):
                            currency_decimal=currency_decimal,
                            can_edit=can_edit,
                            can_delete=can_delete,
+                           can_view_costing=can_view_costing,
                            download_all_project_attachments=Setting.get('download_all_project_attachments', True),
                            download_all_project_share_files=Setting.get('download_all_project_share_files', True))
 
@@ -427,7 +434,9 @@ def project_edit(project_id):
                            attachments={atype: ProjectAttachment.query.filter_by(project_id=project.id, attachment_type=atype).all() for atype in ['picture', 'document', 'schematic', '2d_design', '3d_design', 'program']},
                            share_files_project=SharedFile.query.filter_by(category='project').order_by(SharedFile.name).all(),
                            currency=Setting.get('currency', 'USD'),
-                           currency_decimal=int(Setting.get('currency_decimal_places', '2')))
+                           currency_decimal=int(Setting.get('currency_decimal_places', '2')),
+                           can_view_costing=current_user.has_permission('projects', 'view_costing'),
+                           can_edit_costing=current_user.has_permission('projects', 'edit_costing'))
 
 
 # ==================== PROJECT MAGIC PARAMETERS ====================
@@ -747,7 +756,7 @@ def bom_available_sns(project_id, bom_id):
 @project_bp.route('/project/<project_id>/bom/add', endpoint='bom_add', methods=['POST'])
 @login_required
 def bom_add(project_id):
-    if not current_user.has_permission('projects', 'edit'):
+    if not current_user.has_permission('projects', 'edit_costing'):
         return jsonify({'error': 'No permission'}), 403
 
     project = Project.query.filter_by(project_id=project_id).first_or_404()
@@ -790,7 +799,7 @@ def bom_add(project_id):
 @project_bp.route('/project/<project_id>/bom/<int:bom_id>/edit', endpoint='bom_edit', methods=['POST'])
 @login_required
 def bom_edit(project_id, bom_id):
-    if not current_user.has_permission('projects', 'edit'):
+    if not current_user.has_permission('projects', 'edit_costing'):
         return jsonify({'error': 'No permission'}), 403
 
     bom = ProjectBOMItem.query.get_or_404(bom_id)
@@ -838,7 +847,7 @@ def bom_edit(project_id, bom_id):
 @project_bp.route('/project/<project_id>/bom/<int:bom_id>/delete', endpoint='bom_delete', methods=['POST'])
 @login_required
 def bom_delete(project_id, bom_id):
-    if not current_user.has_permission('projects', 'edit'):
+    if not current_user.has_permission('projects', 'edit_costing'):
         return jsonify({'error': 'No permission'}), 403
 
     bom = ProjectBOMItem.query.get_or_404(bom_id)
@@ -850,7 +859,7 @@ def bom_delete(project_id, bom_id):
 @project_bp.route('/project/<project_id>/bom/<int:bom_id>/move', endpoint='project_bom_move', methods=['POST'])
 @login_required
 def project_bom_move(project_id, bom_id):
-    if not current_user.has_permission('projects', 'edit'):
+    if not current_user.has_permission('projects', 'edit_costing'):
         return jsonify({'error': 'No permission'}), 403
     project = Project.query.filter_by(project_id=project_id).first_or_404()
     data = request.get_json()
@@ -877,7 +886,7 @@ def project_bom_move(project_id, bom_id):
 @project_bp.route('/project/<project_id>/cost/add', endpoint='cost_item_add', methods=['POST'])
 @login_required
 def cost_item_add(project_id):
-    if not current_user.has_permission('projects', 'edit'):
+    if not current_user.has_permission('projects', 'edit_costing'):
         return jsonify({'error': 'No permission'}), 403
 
     project = Project.query.filter_by(project_id=project_id).first_or_404()
@@ -917,7 +926,7 @@ def cost_item_add(project_id):
 @project_bp.route('/project/<project_id>/cost/<int:cost_id>/edit', endpoint='cost_item_edit', methods=['POST'])
 @login_required
 def cost_item_edit(project_id, cost_id):
-    if not current_user.has_permission('projects', 'edit'):
+    if not current_user.has_permission('projects', 'edit_costing'):
         return jsonify({'error': 'No permission'}), 403
 
     project = Project.query.filter_by(project_id=project_id).first_or_404()
@@ -947,7 +956,7 @@ def cost_item_edit(project_id, cost_id):
 @project_bp.route('/project/<project_id>/cost/<int:cost_id>/delete', endpoint='cost_item_delete', methods=['POST'])
 @login_required
 def cost_item_delete(project_id, cost_id):
-    if not current_user.has_permission('projects', 'edit'):
+    if not current_user.has_permission('projects', 'edit_costing'):
         return jsonify({'error': 'No permission'}), 403
 
     project = Project.query.filter_by(project_id=project_id).first_or_404()
@@ -960,7 +969,7 @@ def cost_item_delete(project_id, cost_id):
 @project_bp.route('/project/<project_id>/cost/<int:cost_id>/move', endpoint='cost_item_move', methods=['POST'])
 @login_required
 def cost_item_move(project_id, cost_id):
-    if not current_user.has_permission('projects', 'edit'):
+    if not current_user.has_permission('projects', 'edit_costing'):
         return jsonify({'error': 'No permission'}), 403
 
     project = Project.query.filter_by(project_id=project_id).first_or_404()
@@ -1363,7 +1372,8 @@ def projects_print():
                            projects=projects_list,
                            user_columns=user_columns,
                            currency=currency,
-                           currency_decimal=currency_decimal)
+                           currency_decimal=currency_decimal,
+                           can_view_costing=current_user.has_permission('projects', 'view_costing'))
 
 
 # ==================== SAVE PROJECT TABLE COLUMNS ====================

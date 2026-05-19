@@ -160,7 +160,8 @@ def settings_general():
                          current_font=current_font,
                          available_themes=available_themes,
                          available_fonts=available_fonts,
-                         demo_mode=current_app.config.get('DEMO_MODE', False))
+                         demo_mode=current_app.config.get('DEMO_MODE', False),
+                         can_view_costing=current_user.has_permission('projects', 'view_costing'))
 
 
 
