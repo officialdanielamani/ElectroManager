@@ -144,6 +144,8 @@ def visual_storage():
             'cols': r.cols,
             'location_uuid': r.physical_location.uuid if r.physical_location else '',
             'merged_cells': r.get_merged_cells(),
+            'drawer_info': r.get_drawer_info(),
+            'unavailable_drawers': r.get_unavailable_drawers(),
         }
         for r in all_racks_for_dropdown
     ]
