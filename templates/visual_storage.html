@@ -703,6 +703,14 @@
     border-color: var(--dc-gmaster-border);
     color: var(--dc-items-color);
 }
+.move-drawer-cell.group-slave {
+    border-color: var(--dc-gslave-border);
+    border-style: dashed;
+    background: var(--dc-gslave-bg);
+    color: var(--dc-gslave-color);
+    opacity: 0.8;
+    cursor: pointer;
+}
 .move-cell-label {
     font-size: 0.6rem;
     font-weight: bold;
@@ -1548,33 +1556,43 @@ function updateSwapRackSelect() {
     rackSelect.value = '0';
 }
 
-// Shared mini grid builder for Swap and Move modals
+// Shared mini grid builder for Swap and Move modals.
+// Mirrors Python compute_merge_layout() — rectangular merges get grid-span,
+// non-rectangular groups render each cell individually with master/slave roles.
 function _buildMiniGrid(container, rackId, rows, cols, mergedGroups, selfDrawerId, onClickFn) {
     container.innerHTML = '';
     if (!rows || !cols) return;
 
     const rackSection = document.querySelector(`[data-rack-id="${rackId}"]`);
 
-    // Collect rectangular merge spans
-    const skipCells = new Set();
-    const cellSpans = {};
+    // Mirror compute_merge_layout(): classify rectangular vs group merges
+    const skipCells  = new Set();   // rectangular slaves — not rendered
+    const cellSpans  = {};          // master → {rowspan, colspan}
+    const groupCells = {};          // cell → {role, master, count}
+
     mergedGroups.forEach(group => {
         const master = group.master;
-        const cells = group.cells || [];
-        const rowNums = cells.map(c => parseInt(c.split('-')[0].replace('R',''))).filter(n => !isNaN(n));
-        const colNums = cells.map(c => parseInt(c.split('-')[1].replace('C',''))).filter(n => !isNaN(n));
-        if (rowNums.length && colNums.length) {
-            cellSpans[master] = {
-                rowspan: Math.max(...rowNums) - Math.min(...rowNums) + 1,
-                colspan: Math.max(...colNums) - Math.min(...colNums) + 1
-            };
-        }
-        cells.forEach(c => { if (c !== master) skipCells.add(c); });
-    });
+        const cells  = group.cells || [];
+        const rowsUsed = new Set(), colsUsed = new Set();
+        cells.forEach(c => {
+            try {
+                const parts = c.substring(1).split('-C');
+                rowsUsed.add(parseInt(parts[0]));
+                colsUsed.add(parseInt(parts[1]));
+            } catch(e) {}
+        });
+        if (!rowsUsed.size || !colsUsed.size) return;
 
-    // Collect group slave cells from DOM (non-rectangular groups)
-    const slaveCells = new Set();
-    rackSection?.querySelectorAll('.drawer-cell.group-slave').forEach(c => slaveCells.add(c.dataset.drawer));
+        const isRectangular = cells.length === rowsUsed.size * colsUsed.size;
+        if (isRectangular) {
+            cellSpans[master] = { rowspan: rowsUsed.size, colspan: colsUsed.size };
+            cells.forEach(c => { if (c !== master) skipCells.add(c); });
+        } else {
+            cells.forEach(c => {
+                groupCells[c] = { role: c === master ? 'master' : 'slave', master, count: cells.length };
+            });
+        }
+    });
 
     container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
     container.style.maxWidth = `${cols * 48}px`;
@@ -1582,43 +1600,54 @@ function _buildMiniGrid(container, rackId, rows, cols, mergedGroups, selfDrawerI
     for (let r = 1; r <= rows; r++) {
         for (let c = 1; c <= cols; c++) {
             const drawerId = 'R' + r + '-C' + c;
-            if (skipCells.has(drawerId) || slaveCells.has(drawerId)) continue;
+            if (skipCells.has(drawerId)) continue;   // rectangular slave — skip
 
-            const rawCell = rackSection?.querySelector(`.drawer-cell[data-drawer="${drawerId}"]`);
+            const grp          = groupCells[drawerId];
+            const isGroupSlave = grp?.role === 'slave';
+            const isGroupMaster= grp?.role === 'master';
+            const effectiveId  = isGroupSlave ? grp.master : drawerId;
+            const span         = cellSpans[drawerId];
+            const isSelf       = effectiveId === selfDrawerId || drawerId === selfDrawerId;
+
+            // Read live state from the already-rendered main rack cells
+            const rawCell     = rackSection?.querySelector(`.drawer-cell[data-drawer="${drawerId}"]`);
+            // For group slaves, item count lives on the master cell
+            const dataCell    = isGroupSlave
+                ? rackSection?.querySelector(`.drawer-cell[data-drawer="${grp.master}"]`)
+                : rawCell;
             const isUnavailable = rawCell?.classList.contains('unavailable') || false;
-            const hasItems      = rawCell?.classList.contains('has-items') || false;
-            const isMergedCell  = rawCell?.classList.contains('merged-cell') || false;
-            const isGroupMaster = rawCell?.classList.contains('group-master') || false;
-            const isSelf        = drawerId === selfDrawerId;
-            const span          = cellSpans[drawerId];
+            const hasItems      = dataCell?.classList.contains('has-items')  || false;
 
-            // Item count from the actual badge in the rendered cell
             let itemCount = 0;
-            const badge = rawCell?.querySelector('.badge.bg-success, .badge.bg-info');
+            const badge = dataCell?.querySelector('.badge.bg-success, .badge.bg-info');
             if (badge) itemCount = parseInt(badge.textContent) || 0;
 
             // Build class list
             let cls = 'move-drawer-cell';
-            if (isSelf)            cls += ' source selected';
-            else if (isUnavailable) cls += ' unavailable';
-            else if (hasItems)      cls += ' has-items';
-            if (span || isMergedCell) cls += ' merged';
-            if (isGroupMaster)    cls += ' group-master';
+            if (isSelf)              cls += ' source selected';
+            else if (isUnavailable)  cls += ' unavailable';
+            else if (hasItems)       cls += ' has-items';
+            if (span)                cls += ' merged';
+            if (isGroupMaster)       cls += ' group-master';
+            if (isGroupSlave)        cls += ' group-slave';
 
             const cellDiv = document.createElement('div');
             cellDiv.className = cls;
             cellDiv.setAttribute('data-drawer', drawerId);
+            // Effective drawer used for selection highlighting
+            cellDiv.setAttribute('data-effective-drawer', effectiveId);
 
-            // Grid span for rectangular merges
             if (span) {
                 cellDiv.style.gridRow    = `span ${span.rowspan}`;
                 cellDiv.style.gridColumn = `span ${span.colspan}`;
                 cellDiv.style.minHeight  = `${span.rowspan * 52 + (span.rowspan - 1) * 4}px`;
             }
 
-            // Label: drawer ID + optional span/group badge
-            const spanBadge = span ? `<span class="move-cell-span-badge">${span.rowspan}×${span.colspan}</span>`
-                            : isGroupMaster ? `<span class="move-cell-span-badge">grp</span>` : '';
+            // Label badge (span size / group count / slave arrow)
+            let badgeHtml = '';
+            if (span)            badgeHtml = `<span class="move-cell-span-badge">${span.rowspan}×${span.colspan}</span>`;
+            else if (isGroupMaster) badgeHtml = `<span class="move-cell-span-badge">${grp.count} cells</span>`;
+            else if (isGroupSlave)  badgeHtml = `<span class="move-cell-span-badge">→${grp.master}</span>`;
 
             // Status indicator
             let statusHtml;
@@ -1626,26 +1655,29 @@ function _buildMiniGrid(container, rackId, rows, cols, mergedGroups, selfDrawerI
                 statusHtml = `<span class="move-cell-status" style="opacity:0.8;">◀ src</span>`;
             } else if (isUnavailable) {
                 statusHtml = `<span class="move-cell-status">✕</span>`;
-            } else if (itemCount > 0) {
+            } else if (itemCount > 0 && !isGroupSlave) {
                 statusHtml = `<span class="badge bg-success" style="font-size:0.5rem;padding:1px 3px;">${itemCount}</span>`;
             } else {
                 statusHtml = `<span class="move-cell-status" style="opacity:0.45;">—</span>`;
             }
 
-            cellDiv.innerHTML = `<div class="move-cell-label">${drawerId}${spanBadge}</div><div class="move-cell-status">${statusHtml}</div>`;
+            cellDiv.innerHTML = `<div class="move-cell-label">${drawerId}${badgeHtml}</div>${statusHtml}`;
 
             // Tooltip
             const tips = [];
-            if (isSelf)            tips.push('Source (current)');
-            if (isUnavailable)     tips.push('Unavailable');
-            if (span)              tips.push(`Merged ${span.rowspan}×${span.colspan}`);
-            if (isGroupMaster)     tips.push('Group');
-            if (itemCount > 0)     tips.push(`${itemCount} item(s)`);
+            if (isSelf)          tips.push('Source (current)');
+            if (isUnavailable)   tips.push('Unavailable');
+            if (span)            tips.push(`Merged ${span.rowspan}×${span.colspan}`);
+            if (isGroupMaster)   tips.push(`Group master (${grp.count} cells)`);
+            if (isGroupSlave)    tips.push(`Group slave → ${grp.master}`);
+            if (itemCount > 0)   tips.push(`${itemCount} item(s)`);
             else if (!isUnavailable && !isSelf) tips.push('Empty');
             cellDiv.title = tips.join(' · ') || drawerId;
 
             if (!isUnavailable && !isSelf && onClickFn) {
-                cellDiv.onclick = e => { e.preventDefault(); onClickFn(drawerId, cellDiv); };
+                // Group slaves delegate selection to their master
+                const clickId = isGroupSlave ? grp.master : drawerId;
+                cellDiv.onclick = e => { e.preventDefault(); onClickFn(clickId); };
             }
 
             container.appendChild(cellDiv);
@@ -1675,13 +1707,14 @@ function updateSwapDrawerGrid() {
 function selectSwapDrawer(drawerId) {
     document.getElementById('swap_drawer').value = drawerId;
     document.querySelectorAll('#swap_drawer_grid_container .move-drawer-cell').forEach(cell => {
-        const d = cell.getAttribute('data-drawer');
-        const isSource = d === currentDrawerId && document.getElementById('swap_rack_id').value === currentRackId;
+        const d          = cell.getAttribute('data-drawer');
+        const effective  = cell.getAttribute('data-effective-drawer') || d;
+        const isSource   = d === currentDrawerId && document.getElementById('swap_rack_id').value === currentRackId;
         if (isSource) {
             cell.classList.add('source', 'selected');
         } else {
             cell.classList.remove('source');
-            cell.classList.toggle('selected', d === drawerId);
+            cell.classList.toggle('selected', effective === drawerId);
         }
     });
 }
@@ -1867,7 +1900,8 @@ function updateMoveDrawerGrid() {
 function selectMoveDrawer(drawerId) {
     document.getElementById('move_drawer').value = drawerId;
     document.querySelectorAll('#move_drawer_grid_container .move-drawer-cell').forEach(cell => {
-        cell.classList.toggle('selected', cell.getAttribute('data-drawer') === drawerId);
+        const effective = cell.getAttribute('data-effective-drawer') || cell.getAttribute('data-drawer');
+        cell.classList.toggle('selected', effective === drawerId);
     });
 }
 
