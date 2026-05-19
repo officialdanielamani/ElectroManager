@@ -646,8 +646,8 @@
     color: var(--bs-body-color);
 }
 .move-drawer-cell {
-    min-width: 0;        /* let grid control width; enables grid-column:span N */
-    min-height: 52px;
+    width: 44px;
+    height: 52px;
     border: 1px solid var(--dc-normal-border);
     border-radius: 4px;
     display: flex;
@@ -696,10 +696,14 @@
     cursor: not-allowed;
 }
 .move-drawer-cell.merged {
+    width: 100%;       /* override fixed width so grid-column:span N stretches the cell */
     border-color: var(--dc-merged-border);
     border-style: dashed;
     background: linear-gradient(145deg, var(--dc-merged-bg-1), var(--dc-merged-bg-2));
     color: var(--dc-merged-color);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 .move-drawer-cell.has-items.merged {
     background: linear-gradient(145deg, var(--dc-items-bg-1), var(--dc-items-bg-2));
@@ -1518,27 +1522,11 @@ function _updateRackThumbDom(rackUuid, type, value) {
 }
 
 function showSwapItemsModal() {
-    // Populate source info first (before any modal hide/show)
-    document.getElementById('swap_source_text').textContent = `${currentRackName || currentRackId} — ${currentDrawerId}`;
-
-    // Reset target form
     document.getElementById('swap_location_filter').value = '';
     document.getElementById('swap_rack_id').value = '0';
     document.getElementById('swap_drawer').value = '';
     document.getElementById('swap_drawer_grid_container').innerHTML = '';
-
-    const swapModalEl  = document.getElementById('swapItemsModal');
-    const swapModal    = bootstrap.Modal.getOrCreateInstance(swapModalEl);
-    const drawerModalEl = document.getElementById('drawerModal');
-    const drawerModal  = bootstrap.Modal.getInstance(drawerModalEl);
-
-    if (drawerModal && drawerModalEl.classList.contains('show')) {
-        // Show swap modal only after drawer modal is fully hidden to avoid Bootstrap conflicts
-        drawerModalEl.addEventListener('hidden.bs.modal', () => swapModal.show(), { once: true });
-        drawerModal.hide();
-    } else {
-        swapModal.show();
-    }
+    new bootstrap.Modal(document.getElementById('swapItemsModal')).show();
 }
 
 function swapAllItems() {
@@ -1632,10 +1620,10 @@ function _buildMiniGrid(container, rackId, rows, cols, mergedGroups, selfDrawerI
         }
     });
 
-    // Set explicit width so 1fr columns resolve to a fixed size and grid-column:span N works
-    const cellW = 44, gapPx = 4;
-    container.style.gridTemplateColumns = `repeat(${cols}, ${cellW}px)`;
-    container.style.width = `${cols * cellW + (cols - 1) * gapPx}px`;
+    // Use 1fr columns; cells have a fixed width but merged cells override with width:100%
+    // so grid-column:span N stretches them across multiple tracks (same as item_form.html)
+    container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    container.style.width = `${cols * 44 + (cols - 1) * 4}px`;
 
     for (let r = 1; r <= rows; r++) {
         for (let c = 1; c <= cols; c++) {
@@ -1680,6 +1668,8 @@ function _buildMiniGrid(container, rackId, rows, cols, mergedGroups, selfDrawerI
             if (span) {
                 cellDiv.style.gridRow    = `span ${span.rowspan}`;
                 cellDiv.style.gridColumn = `span ${span.colspan}`;
+                // Explicit height so the cell fills multi-row spans (mirrors item_form.html)
+                cellDiv.style.height = `${span.rowspan * 52 + (span.rowspan - 1) * 4}px`;
             }
 
             // Label badge (span size / group count / slave arrow)
@@ -1769,7 +1759,6 @@ function toggleMoveLocationType(type) {
 }
 
 function showMoveItemsModal() {
-    // Reset form to "General Location" by default
     document.getElementById('move_type_general').checked = true;
     document.getElementById('move_general_section').style.display = 'block';
     document.getElementById('move_drawer_section').style.display = 'none';
@@ -1778,18 +1767,7 @@ function showMoveItemsModal() {
     document.getElementById('move_rack_id').value = '0';
     document.getElementById('move_drawer').value = '';
     document.getElementById('move_drawer_grid_container').innerHTML = '';
-
-    const moveModalEl   = document.getElementById('moveItemsModal');
-    const moveModal     = bootstrap.Modal.getOrCreateInstance(moveModalEl);
-    const drawerModalEl = document.getElementById('drawerModal');
-    const drawerModal   = bootstrap.Modal.getInstance(drawerModalEl);
-
-    if (drawerModal && drawerModalEl.classList.contains('show')) {
-        drawerModalEl.addEventListener('hidden.bs.modal', () => moveModal.show(), { once: true });
-        drawerModal.hide();
-    } else {
-        moveModal.show();
-    }
+    new bootstrap.Modal(document.getElementById('moveItemsModal')).show();
 }
 
 function moveAllItems() {
@@ -1974,6 +1952,12 @@ document.addEventListener('DOMContentLoaded', function() {
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('diIconPickerModal')?.addEventListener('show.bs.modal', _diLoadIcons);
     document.getElementById('diFilePickerModal')?.addEventListener('show.bs.modal', _diLoadFiles);
+
+    // Populate "From:" label when swap/move modals are about to show (safe: fires after DOM is ready)
+    document.getElementById('swapItemsModal')?.addEventListener('show.bs.modal', function() {
+        const el = document.getElementById('swap_source_text');
+        if (el) el.textContent = `${currentRackName || currentRackId} — ${currentDrawerId}`;
+    });
 });
 
 document.addEventListener('DOMContentLoaded', function() {
