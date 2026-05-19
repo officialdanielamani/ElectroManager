@@ -580,6 +580,10 @@ def render_template_to_svg(template, data):
                     print(f"[SVG] Icon generation error: {e}")
                     svg += f'  <rect x="{x_px}" y="{y_px}" width="{w_px}" height="{h_px}" fill="lightgray" stroke="red" stroke-width="1"/>\n'
                     svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" text-anchor="middle">Icon Error</text>\n'
+            elif element.get('use_target_icon'):
+                # target icon set but not resolved in this data (design/preview mode)
+                svg += f'  <rect x="{x_px}" y="{y_px}" width="{w_px}" height="{h_px}" fill="#e8f0ff" stroke="#0d6efd" stroke-width="1" stroke-dasharray="3,2"/>\n'
+                svg += f'  <text x="{x_px + w_px/2}" y="{y_px + h_px/2}" font-size="8" text-anchor="middle" dominant-baseline="middle" fill="#0d6efd">Target Icon</text>\n'
             else:
                 print(f"[SVG] Element {idx}: ICON - No icon name specified")
 
