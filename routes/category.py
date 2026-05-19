@@ -106,7 +106,7 @@ def category_delete(id):
 
 @category_bp.route('/api/category/add', methods=['POST'])
 @login_required
-@permission_required("settings_sections.location_management", "edit")
+@permission_required("settings_sections.item_management", "edit")
 def api_add_category():
     """API endpoint to add category from item form"""
     try:

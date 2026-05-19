@@ -25,7 +25,7 @@ footprint_tag_bp = Blueprint('footprint_tag', __name__)
 
 @footprint_tag_bp.route('/api/footprint/add', methods=['POST'])
 @login_required
-@permission_required("settings_sections.location_management", "edit")
+@permission_required("settings_sections.item_management", "edit")
 def api_add_footprint():
     """API endpoint to add footprint from item form"""
     try:
@@ -64,7 +64,7 @@ def api_add_footprint():
 
 @footprint_tag_bp.route('/api/tag/add', methods=['POST'])
 @login_required
-@permission_required("settings_sections.location_management", "edit")
+@permission_required("settings_sections.item_management", "edit")
 def api_add_tag():
     """API endpoint to add tag from item form"""
     try:
