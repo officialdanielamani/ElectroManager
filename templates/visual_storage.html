@@ -378,6 +378,14 @@
                 <div class="mt-2 p-2 border rounded drawer-grid-container">
                     <small class="text-muted d-block mb-2">Click to select target drawer:</small>
                     <div id="swap_drawer_grid_container" style="display: inline-grid; gap: 4px; background: transparent;"></div>
+                    <div class="mini-grid-legend">
+                        <span><span class="lg-swatch" style="background:var(--dc-normal-bg);border:1px solid var(--dc-normal-border);"></span>Empty</span>
+                        <span><span class="lg-swatch" style="background:var(--dc-items-bg-1);border:1px solid var(--dc-items-border);"></span>Has Items</span>
+                        <span><span class="lg-swatch" style="background:var(--dc-merged-bg-1);border:1px dashed var(--dc-merged-border);"></span>Merged</span>
+                        <span><span class="lg-swatch" style="background:var(--dc-gmaster-bg-1);border:1px dashed var(--dc-gmaster-border);"></span>Group</span>
+                        <span><span class="lg-swatch" style="background:var(--dc-unavail-bg-1);border:1px solid var(--dc-unavail-border);"></span>Unavailable</span>
+                        <span><span class="lg-swatch" style="background:var(--dc-selected-bg);border:2px dashed var(--dc-selected-border);"></span>Source</span>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -459,6 +467,13 @@
                     <div class="mt-2 p-2 border rounded drawer-grid-container">
                         <small class="text-muted d-block mb-2">Click to select:</small>
                         <div id="move_drawer_grid_container" style="display: inline-grid; gap: 4px; background: transparent;"></div>
+                        <div class="mini-grid-legend">
+                            <span><span class="lg-swatch" style="background:var(--dc-normal-bg);border:1px solid var(--dc-normal-border);"></span>Empty</span>
+                            <span><span class="lg-swatch" style="background:var(--dc-items-bg-1);border:1px solid var(--dc-items-border);"></span>Has Items</span>
+                            <span><span class="lg-swatch" style="background:var(--dc-merged-bg-1);border:1px dashed var(--dc-merged-border);"></span>Merged</span>
+                            <span><span class="lg-swatch" style="background:var(--dc-gmaster-bg-1);border:1px dashed var(--dc-gmaster-border);"></span>Group</span>
+                            <span><span class="lg-swatch" style="background:var(--dc-unavail-bg-1);border:1px solid var(--dc-unavail-border);"></span>Unavailable</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -631,7 +646,7 @@
     color: var(--bs-body-color);
 }
 .move-drawer-cell {
-    width: 44px;
+    min-width: 0;        /* let grid control width; enables grid-column:span N */
     min-height: 52px;
     border: 1px solid var(--dc-normal-border);
     border-radius: 4px;
@@ -731,6 +746,22 @@
     font-size: 0.55rem;
     text-align: center;
     line-height: 1;
+}
+.mini-grid-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+    font-size: 0.75rem;
+    color: var(--bs-body-color);
+}
+.mini-grid-legend .lg-swatch {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-right: 2px;
 }
 
 .drawer-label {
@@ -1487,10 +1518,7 @@ function _updateRackThumbDom(rackUuid, type, value) {
 }
 
 function showSwapItemsModal() {
-    const drawerModal = bootstrap.Modal.getInstance(document.getElementById('drawerModal'));
-    if (drawerModal) drawerModal.hide();
-
-    // Show source info
+    // Populate source info first (before any modal hide/show)
     document.getElementById('swap_source_text').textContent = `${currentRackName || currentRackId} — ${currentDrawerId}`;
 
     // Reset target form
@@ -1499,8 +1527,18 @@ function showSwapItemsModal() {
     document.getElementById('swap_drawer').value = '';
     document.getElementById('swap_drawer_grid_container').innerHTML = '';
 
-    const swapModal = new bootstrap.Modal(document.getElementById('swapItemsModal'));
-    swapModal.show();
+    const swapModalEl  = document.getElementById('swapItemsModal');
+    const swapModal    = bootstrap.Modal.getOrCreateInstance(swapModalEl);
+    const drawerModalEl = document.getElementById('drawerModal');
+    const drawerModal  = bootstrap.Modal.getInstance(drawerModalEl);
+
+    if (drawerModal && drawerModalEl.classList.contains('show')) {
+        // Show swap modal only after drawer modal is fully hidden to avoid Bootstrap conflicts
+        drawerModalEl.addEventListener('hidden.bs.modal', () => swapModal.show(), { once: true });
+        drawerModal.hide();
+    } else {
+        swapModal.show();
+    }
 }
 
 function swapAllItems() {
@@ -1594,8 +1632,10 @@ function _buildMiniGrid(container, rackId, rows, cols, mergedGroups, selfDrawerI
         }
     });
 
-    container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-    container.style.maxWidth = `${cols * 48}px`;
+    // Set explicit width so 1fr columns resolve to a fixed size and grid-column:span N works
+    const cellW = 44, gapPx = 4;
+    container.style.gridTemplateColumns = `repeat(${cols}, ${cellW}px)`;
+    container.style.width = `${cols * cellW + (cols - 1) * gapPx}px`;
 
     for (let r = 1; r <= rows; r++) {
         for (let c = 1; c <= cols; c++) {
@@ -1640,7 +1680,6 @@ function _buildMiniGrid(container, rackId, rows, cols, mergedGroups, selfDrawerI
             if (span) {
                 cellDiv.style.gridRow    = `span ${span.rowspan}`;
                 cellDiv.style.gridColumn = `span ${span.colspan}`;
-                cellDiv.style.minHeight  = `${span.rowspan * 52 + (span.rowspan - 1) * 4}px`;
             }
 
             // Label badge (span size / group count / slave arrow)
@@ -1730,12 +1769,6 @@ function toggleMoveLocationType(type) {
 }
 
 function showMoveItemsModal() {
-    // Close drawer modal
-    const drawerModal = bootstrap.Modal.getInstance(document.getElementById('drawerModal'));
-    if (drawerModal) {
-        drawerModal.hide();
-    }
-    
     // Reset form to "General Location" by default
     document.getElementById('move_type_general').checked = true;
     document.getElementById('move_general_section').style.display = 'block';
@@ -1745,10 +1778,18 @@ function showMoveItemsModal() {
     document.getElementById('move_rack_id').value = '0';
     document.getElementById('move_drawer').value = '';
     document.getElementById('move_drawer_grid_container').innerHTML = '';
-    
-    // Show move items modal
-    const moveModal = new bootstrap.Modal(document.getElementById('moveItemsModal'));
-    moveModal.show();
+
+    const moveModalEl   = document.getElementById('moveItemsModal');
+    const moveModal     = bootstrap.Modal.getOrCreateInstance(moveModalEl);
+    const drawerModalEl = document.getElementById('drawerModal');
+    const drawerModal   = bootstrap.Modal.getInstance(drawerModalEl);
+
+    if (drawerModal && drawerModalEl.classList.contains('show')) {
+        drawerModalEl.addEventListener('hidden.bs.modal', () => moveModal.show(), { once: true });
+        drawerModal.hide();
+    } else {
+        moveModal.show();
+    }
 }
 
 function moveAllItems() {
