@@ -14,7 +14,7 @@
 
     <!-- ==================== USERS ==================== -->
     {% if can_view_users %}
-    <div class="col-lg-3 col-md-6 mb-4">
+    <div class="col-lg-2 col-md-5 mb-4">
         <div class="card h-100">
             <div class="card-header bg-dark text-white">
                 <div class="d-flex justify-content-between align-items-center">
@@ -31,8 +31,10 @@
                             {% set _upic = url_for('user_role.serve_user_picture', filename=u.profile_photo) %}
                         {% endif %}
                         <img src="{{ _upic }}" alt="{{ u.name or u.username }}"
-                             class="rounded-circle flex-shrink-0"
-                             style="width:38px;height:38px;object-fit:cover;">
+                             class="rounded-circle flex-shrink-0 user-pic-thumb"
+                             style="width:38px;height:38px;object-fit:cover;cursor:pointer;"
+                             data-fullsrc="{{ _upic }}" data-name="{{ u.name or u.username }}"
+                             data-bs-toggle="modal" data-bs-target="#userPicModal">
                     {% else %}
                         <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center flex-shrink-0"
                              style="width:38px;height:38px;">
@@ -53,9 +55,12 @@
     </div>
     {% endif %}
 
-    <!-- ==================== PERSONS ==================== -->
+    <!-- ==================== PERSONS / ORGS / GROUPS ==================== -->
     {% if can_view_other %}
-    <div class="col-lg-3 col-md-6 mb-4">
+    <div class="{% if can_view_users %}col-lg-10{% else %}col-12{% endif %}">
+        <div class="row">
+        <!-- Persons -->
+        <div class="col-lg-4 col-md-6 mb-4">
         <div class="card h-100">
             <div class="card-header bg-secondary text-white">
                 <div class="d-flex justify-content-between align-items-center">
@@ -132,10 +137,10 @@
                 {% if not persons %}<p class="text-center text-muted">No persons added yet</p>{% endif %}
             </div>
         </div>
-    </div>
+        </div><!-- /col Persons -->
 
-    <!-- ==================== ORGANIZATIONS ==================== -->
-    <div class="col-lg-3 col-md-6 mb-4">
+        <!-- ==================== ORGANIZATIONS ==================== -->
+        <div class="col-lg-4 col-md-6 mb-4">
         <div class="card h-100">
             <div class="card-header bg-info text-white">
                 <div class="d-flex justify-content-between align-items-center">
@@ -234,10 +239,10 @@
                 {% if not organizations %}<p class="text-center text-muted">No organizations added yet</p>{% endif %}
             </div>
         </div>
-    </div>
+        </div><!-- /col Organizations -->
 
-    <!-- ==================== GROUPS ==================== -->
-    <div class="col-lg-3 col-md-6 mb-4">
+        <!-- ==================== GROUPS ==================== -->
+        <div class="col-lg-4 col-md-12 mb-4">
         <div class="card h-100">
             <div class="card-header bg-primary text-white">
                 <div class="d-flex justify-content-between align-items-center">
@@ -411,7 +416,9 @@
                 {% if not groups %}<p class="text-center text-muted">No groups created yet</p>{% endif %}
             </div>
         </div>
-    </div>
+        </div><!-- /col Groups -->
+        </div><!-- /row inner -->
+    </div><!-- /col-lg-10 wrapper -->
     {% endif %}
 
 </div>
@@ -469,6 +476,21 @@
 </div></div></div>
 {% endif %}
 
+<!-- Profile picture lightbox -->
+<div class="modal fade" id="userPicModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title mb-0" id="userPicModalName"></h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-2 text-center">
+                <img id="userPicModalImg" src="" alt="" class="img-fluid rounded" style="max-height:320px;">
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 function toggleContactSelect(sel, grpId) {
     const uSel = document.getElementById('cUserSel' + grpId);
@@ -479,5 +501,12 @@ function toggleContactSelect(sel, grpId) {
     else if (sel.value === 'person')  { pSel.style.display = ''; pSel.disabled = false; pSel.name = 'member_id'; }
     else                              { oSel.style.display = ''; oSel.disabled = false; oSel.name = 'member_id'; }
 }
+
+document.getElementById('userPicModal').addEventListener('show.bs.modal', function(e) {
+    const thumb = e.relatedTarget;
+    document.getElementById('userPicModalImg').src = thumb.dataset.fullsrc;
+    document.getElementById('userPicModalImg').alt = thumb.dataset.name;
+    document.getElementById('userPicModalName').textContent = thumb.dataset.name;
+});
 </script>
 {% endblock %}
