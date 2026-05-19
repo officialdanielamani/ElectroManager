@@ -359,10 +359,9 @@
                         <select id="swap_rack_id" class="form-select form-select-sm" onchange="updateSwapDrawerGrid()">
                             <option value="0">Select</option>
                             {% for rack in all_racks %}
-                            <option value="{{ rack.uuid }}" data-rows="{{ rack.rows }}" data-cols="{{ rack.cols }}"
+                            <option value="{{ rack.uuid }}"
                                     data-location="{{ rack.physical_location.uuid if rack.physical_location else '' }}"
-                                    data-name="{{ rack.name }}"
-                                    data-merged-cells="{{ rack.get_merged_cells()|tojson|e }}">
+                                    data-name="{{ rack.name }}">
                                 {{ rack.name }}
                             </option>
                             {% endfor %}
@@ -449,9 +448,8 @@
                             <select id="move_rack_id" class="form-select form-select-sm" onchange="updateMoveDrawerGrid()">
                                 <option value="0">Select</option>
                                 {% for rack in all_racks %}
-                                <option value="{{ rack.uuid }}" data-rows="{{ rack.rows }}" data-cols="{{ rack.cols }}"
-                                        data-location="{{ rack.physical_location.uuid if rack.physical_location else '' }}"
-                                        data-merged-cells="{{ rack.get_merged_cells()|tojson|e }}">
+                                <option value="{{ rack.uuid }}"
+                                        data-location="{{ rack.physical_location.uuid if rack.physical_location else '' }}">
                                     {{ rack.name }}
                                 </option>
                                 {% endfor %}
@@ -917,6 +915,10 @@
 </style>
 
 <script>
+// All rack data including merged_cells — embedded as a JS variable (same pattern as item_form.html)
+// Using | tojson | safe inside <script> is safe and avoids HTML-attribute quote-escaping issues
+const allRacksData = {{ all_racks_data | tojson | safe }};
+
 // ========== SEARCH FUNCTIONALITY (DECLARE FIRST) ==========
 function handleSearchKeydown(event) {
     if (event.key === 'Enter') {
@@ -1712,18 +1714,17 @@ function _buildMiniGrid(container, rackId, rows, cols, mergedGroups, selfDrawerI
 
 function updateSwapDrawerGrid() {
     const select    = document.getElementById('swap_rack_id');
-    const selected  = select.options[select.selectedIndex];
-    const rows      = parseInt(selected.dataset.rows || 0);
-    const cols      = parseInt(selected.dataset.cols || 0);
     const rackId    = select.value;
     const container = document.getElementById('swap_drawer_grid_container');
 
     document.getElementById('swap_drawer').value = '';
 
-    if (!rows || !cols) { container.innerHTML = ''; return; }
+    // Look up rack data from the server-embedded JS variable (mirrors item_form.html pattern)
+    const rackData = allRacksData.find(r => r.uuid === rackId);
+    if (!rackData) { container.innerHTML = ''; return; }
 
-    let mergedGroups = [];
-    try { mergedGroups = JSON.parse(selected.dataset.mergedCells || '[]'); } catch(e) {}
+    const rows = rackData.rows, cols = rackData.cols;
+    const mergedGroups = rackData.merged_cells || [];
 
     const selfId = (rackId === currentRackId) ? currentDrawerId : null;
     _buildMiniGrid(container, rackId, rows, cols, mergedGroups, selfId, selectSwapDrawer);
@@ -1902,16 +1903,14 @@ function updateMoveRackSelect() {
 
 function updateMoveDrawerGrid() {
     const select    = document.getElementById('move_rack_id');
-    const selected  = select.options[select.selectedIndex];
-    const rows      = parseInt(selected.dataset.rows || 0);
-    const cols      = parseInt(selected.dataset.cols || 0);
     const rackId    = select.value;
     const container = document.getElementById('move_drawer_grid_container');
 
-    if (!rows || !cols) { container.innerHTML = ''; return; }
+    const rackData = allRacksData.find(r => r.uuid === rackId);
+    if (!rackData) { container.innerHTML = ''; return; }
 
-    let mergedGroups = [];
-    try { mergedGroups = JSON.parse(selected.dataset.mergedCells || '[]'); } catch(e) {}
+    const rows = rackData.rows, cols = rackData.cols;
+    const mergedGroups = rackData.merged_cells || [];
 
     _buildMiniGrid(container, rackId, rows, cols, mergedGroups, null, selectMoveDrawer);
 }

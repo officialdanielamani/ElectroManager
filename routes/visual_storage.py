@@ -135,12 +135,25 @@ def visual_storage():
     
     # For the dropdown, show all racks for location selection, but filtered by current location for rack selection
     all_racks_for_dropdown = racks_to_display
+    # Build JS-embeddable rack list (mirrors item_form.html racksData pattern)
+    all_racks_data = [
+        {
+            'uuid': r.uuid,
+            'name': r.name,
+            'rows': r.rows,
+            'cols': r.cols,
+            'location_uuid': r.physical_location.uuid if r.physical_location else '',
+            'merged_cells': r.get_merged_cells(),
+        }
+        for r in all_racks_for_dropdown
+    ]
     locations = Location.query.order_by(Location.name).all()
-    return render_template('visual_storage.html', 
-                          racks=rack_data, 
-                          all_racks=all_racks_for_dropdown, 
-                          locations=locations, 
-                          current_location_uuid=location_uuid, 
+    return render_template('visual_storage.html',
+                          racks=rack_data,
+                          all_racks=all_racks_for_dropdown,
+                          all_racks_data=all_racks_data,
+                          locations=locations,
+                          current_location_uuid=location_uuid,
                           current_rack_uuid=rack_uuid,
                           current_page=page,
                           total_pages=total_pages,
