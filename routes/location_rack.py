@@ -12,6 +12,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename, safe_join
 from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
+from io import BytesIO
 import os
 import json
 import re
@@ -984,6 +985,8 @@ def api_drawer_sticker_print(uuid, drawer_id, template_id):
         return jsonify({'error': 'Template must be Drawer type'}), 400
     data = get_drawer_data(rack, drawer_id)
     output = generate_single_sticker_pdf(template, data, f"{rack.uuid}_{drawer_id}")
+    if not isinstance(output, BytesIO):
+        return jsonify({'error': 'Failed to generate PDF'}), 500
     log_audit(current_user.id, 'print', 'rack', rack.id,
               f'Printed drawer sticker: {template.name} drawer {drawer_id}')
     return send_file(
