@@ -167,7 +167,7 @@
                     <script>
                     /* Search-and-select widget */
                     (function() {
-                        var usersData = [{% for u in users %}{"id":{{ u.id }},"label":"{{ (u.name or u.username)|e }}","extra":"{{ (u.short_info or '')|e }}"}{% if not loop.last %},{% endif %}{% endfor %}];
+                        var usersData = [{% for u in users %}{"id":{{ u.id }},"label":"{{ u.name|e }}","extra":"{{ (u.short_info or '')|e }}"}{% if not loop.last %},{% endif %}{% endfor %}];
                         var personsData = [{% for p in contact_persons %}{"id":{{ p.id }},"label":"{{ p.name }}{% if p.organization %} ({{ p.organization.name }}){% endif %}{% if p.email %} — {{ p.email }}{% endif %}"}{% if not loop.last %},{% endif %}{% endfor %}];
                         var orgsData = [{% for o in contact_orgs %}{"id":{{ o.id }},"label":"{{ o.name }}{% if o.email %} — {{ o.email }}{% endif %}"}{% if not loop.last %},{% endif %}{% endfor %}];
 

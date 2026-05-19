@@ -151,6 +151,7 @@ def register():
         
         user = User(
             username=form.username.data,
+            name=form.username.data,
             email=form.email.data,
             role_id=viewer_role.id
         )

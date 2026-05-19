@@ -360,7 +360,7 @@ def api_contacts_all():
 
     users = User.query.filter_by(is_active=True).order_by(User.username).all()
     for u in users:
-        display = u.name or u.user_uid or u.username
+        display = u.name
         if not q or q in u.username.lower() or q in display.lower() or (u.name and q in u.name.lower()):
             results.append({'id': u.id, 'type': 'user', 'label': display, 'extra': u.short_info or ''})
 

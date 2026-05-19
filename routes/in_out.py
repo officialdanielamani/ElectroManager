@@ -65,7 +65,7 @@ def _build_log_entries(page=1, can_view_log=True):
         user = User.query.get(log.user_id)
         entries.append({
             'log': log,
-            'username': (user.name or user.user_uid or user.username) if user else 'Unknown',
+            'username': (user.name) if user else 'Unknown',
             'user_uid': user.user_uid if user else '',
             'timestamp': log.timestamp.strftime('%d/%m/%Y %H:%M') if log.timestamp else '?',
             'display': _format_log_details(log.action, log.details),
@@ -108,7 +108,7 @@ def in_out():
                            scan_enabled=scan_enabled,
                            lr_settings=lr_settings,
                            current_user_id=current_user.id,
-                           current_user_label=current_user.name or current_user.user_uid or current_user.username,
+                           current_user_label=current_user.name,
                            currency=Setting.get('currency', '$'))
 
 
@@ -446,7 +446,7 @@ def in_out_logs_ajax():
         user = User.query.get(log.user_id)
         result.append({
             'action':    log.action,
-            'username':  (user.name or user.user_uid or user.username) if user else 'Unknown',
+            'username':  (user.name) if user else 'Unknown',
             'user_uid':  user.user_uid if user else '',
             'timestamp': log.timestamp.strftime('%d/%m/%Y %H:%M') if log.timestamp else '?',
             'display':   _format_log_details(log.action, log.details),
