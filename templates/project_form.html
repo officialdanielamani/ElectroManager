@@ -167,7 +167,7 @@
                     <script>
                     /* Search-and-select widget */
                     (function() {
-                        var usersData = [{% for u in users %}{"id":{{ u.id }},"label":"{{ u.username }}"}{% if not loop.last %},{% endif %}{% endfor %}];
+                        var usersData = [{% for u in users %}{"id":{{ u.id }},"label":"{{ (u.name or u.username)|e }}","extra":"{{ (u.short_info or '')|e }}"}{% if not loop.last %},{% endif %}{% endfor %}];
                         var personsData = [{% for p in contact_persons %}{"id":{{ p.id }},"label":"{{ p.name }}{% if p.organization %} ({{ p.organization.name }}){% endif %}{% if p.email %} — {{ p.email }}{% endif %}"}{% if not loop.last %},{% endif %}{% endfor %}];
                         var orgsData = [{% for o in contact_orgs %}{"id":{{ o.id }},"label":"{{ o.name }}{% if o.email %} — {{ o.email }}{% endif %}"}{% if not loop.last %},{% endif %}{% endfor %}];
 
@@ -214,7 +214,10 @@
                             function renderDropdown(q) {
                                 var q2 = q.toLowerCase();
                                 var matches = data.filter(function(d) {
-                                    return d.label.toLowerCase().indexOf(q2) !== -1 && !selected[d.id];
+                                    return !selected[d.id] && (
+                                        d.label.toLowerCase().indexOf(q2) !== -1 ||
+                                        (d.extra && d.extra.toLowerCase().indexOf(q2) !== -1)
+                                    );
                                 });
                                 dropEl.innerHTML = '';
                                 if (matches.length === 0) {
@@ -224,7 +227,16 @@
                                 matches.slice(0, 10).forEach(function(d) {
                                     var item = document.createElement('div');
                                     item.className = 'ss-dropdown-item';
-                                    item.textContent = d.label;
+                                    var nameEl = document.createElement('div');
+                                    nameEl.textContent = d.label;
+                                    item.appendChild(nameEl);
+                                    if (d.extra) {
+                                        var extraEl = document.createElement('div');
+                                        extraEl.className = 'text-muted';
+                                        extraEl.style.fontSize = '0.75rem';
+                                        extraEl.textContent = d.extra;
+                                        item.appendChild(extraEl);
+                                    }
                                     item.addEventListener('mousedown', function(e) {
                                         e.preventDefault();
                                         selected[d.id] = d.label;

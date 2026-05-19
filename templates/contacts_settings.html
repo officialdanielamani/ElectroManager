@@ -23,18 +23,29 @@
             </div>
             <div class="card-body" style="max-height: 600px; overflow-y: auto;">
                 {% for u in users %}
-                <div class="d-flex align-items-center gap-2 mb-2 p-1 border rounded">
-                    {% if u.profile_photo %}
-                        {% if u.profile_photo.startswith('share/') %}
-                            {% set _upic = url_for('share.share_serve', category='profile', filename=u.profile_photo[6:]) %}
-                        {% else %}
-                            {% set _upic = url_for('user_role.serve_user_picture', filename=u.profile_photo) %}
-                        {% endif %}
+                {% if u.profile_photo %}
+                    {% if u.profile_photo.startswith('share/') %}
+                        {% set _upic = url_for('share.share_serve', category='profile', filename=u.profile_photo[6:]) %}
+                    {% else %}
+                        {% set _upic = url_for('user_role.serve_user_picture', filename=u.profile_photo) %}
+                    {% endif %}
+                {% else %}
+                    {% set _upic = '' %}
+                {% endif %}
+                <div class="d-flex align-items-center gap-2 mb-2 p-1 border rounded" style="cursor:pointer;"
+                     data-bs-toggle="modal" data-bs-target="#userPicModal"
+                     data-fullsrc="{{ _upic }}"
+                     data-name="{{ u.name or u.username }}"
+                     data-short-info="{{ u.short_info or '' }}"
+                     {% if can_view_other %}
+                     data-username="{{ u.username }}"
+                     data-role="{{ u.user_role.name if u.user_role else '' }}"
+                     data-user-uid="{{ u.user_uid or '' }}"
+                     {% endif %}>
+                    {% if _upic %}
                         <img src="{{ _upic }}" alt="{{ u.name or u.username }}"
-                             class="rounded-circle flex-shrink-0 user-pic-thumb"
-                             style="width:38px;height:38px;object-fit:cover;cursor:pointer;"
-                             data-fullsrc="{{ _upic }}" data-name="{{ u.name or u.username }}"
-                             data-bs-toggle="modal" data-bs-target="#userPicModal">
+                             class="rounded-circle flex-shrink-0"
+                             style="width:38px;height:38px;object-fit:cover;">
                     {% else %}
                         <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center flex-shrink-0"
                              style="width:38px;height:38px;">
@@ -43,9 +54,6 @@
                     {% endif %}
                     <div style="min-width:0;">
                         <div class="fw-semibold text-truncate" title="{{ u.name or u.username }}">{{ u.name or u.username }}</div>
-                        {% if u.short_info %}
-                        <small class="text-muted text-truncate d-block" title="{{ u.short_info }}">{{ u.short_info }}</small>
-                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}
@@ -478,14 +486,20 @@
 
 <!-- Profile picture lightbox -->
 <div class="modal fade" id="userPicModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header py-2">
                 <h6 class="modal-title mb-0" id="userPicModalName"></h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-2 text-center">
-                <img id="userPicModalImg" src="" alt="" class="img-fluid rounded" style="max-height:320px;">
+            <div class="modal-body p-3">
+                <div class="text-center mb-3">
+                    <img id="userPicModalImg" src="" alt="" class="img-fluid rounded" style="max-height:240px; display:none;">
+                    <div id="userPicModalPlaceholder" class="rounded-circle bg-secondary d-inline-flex align-items-center justify-content-center" style="width:80px;height:80px;display:none!important;">
+                        <i class="bi bi-person-fill text-white" style="font-size:2rem;"></i>
+                    </div>
+                </div>
+                <div id="userPicModalInfo"></div>
             </div>
         </div>
     </div>
@@ -503,10 +517,38 @@ function toggleContactSelect(sel, grpId) {
 }
 
 document.getElementById('userPicModal').addEventListener('show.bs.modal', function(e) {
-    const thumb = e.relatedTarget;
-    document.getElementById('userPicModalImg').src = thumb.dataset.fullsrc;
-    document.getElementById('userPicModalImg').alt = thumb.dataset.name;
-    document.getElementById('userPicModalName').textContent = thumb.dataset.name;
+    const el = e.relatedTarget;
+    const name      = el.dataset.name      || '';
+    const fullsrc   = el.dataset.fullsrc   || '';
+    const shortInfo = el.dataset.shortInfo || '';
+    const username  = el.dataset.username  || '';
+    const role      = el.dataset.role      || '';
+    const userUid   = el.dataset.userUid   || '';
+
+    document.getElementById('userPicModalName').textContent = name;
+
+    const img         = document.getElementById('userPicModalImg');
+    const placeholder = document.getElementById('userPicModalPlaceholder');
+    if (fullsrc) {
+        img.src = fullsrc;
+        img.alt = name;
+        img.style.display = '';
+        placeholder.style.display = 'none';
+    } else {
+        img.style.display = 'none';
+        placeholder.style.display = 'inline-flex';
+    }
+
+    let infoHtml = `<p class="fw-semibold mb-1">${name.replace(/</g,'&lt;')}</p>`;
+    if (shortInfo) infoHtml += `<p class="text-muted small mb-2">${shortInfo.replace(/</g,'&lt;')}</p>`;
+    if (username || role || userUid) {
+        infoHtml += '<table class="table table-sm table-borderless mb-0 small">';
+        if (username) infoHtml += `<tr><th class="text-muted ps-0" style="width:35%">Username</th><td>${username.replace(/</g,'&lt;')}</td></tr>`;
+        if (role)     infoHtml += `<tr><th class="text-muted ps-0">Role</th><td>${role.replace(/</g,'&lt;')}</td></tr>`;
+        if (userUid)  infoHtml += `<tr><th class="text-muted ps-0">User ID</th><td><code>${userUid.replace(/</g,'&lt;')}</code></td></tr>`;
+        infoHtml += '</table>';
+    }
+    document.getElementById('userPicModalInfo').innerHTML = infoHtml;
 });
 </script>
 {% endblock %}

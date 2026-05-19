@@ -1094,20 +1094,21 @@ function openDrawer(rackName, drawerId, rackId) {
             }
             {% endif %}
 
-            // Controls row: Make this Drawer Unavailable | Move all items
+            // Controls row: Make this Drawer Unavailable | Swap / Move buttons
             {
-                let controlsHtml = '';
+                let leftHtml = '';
+                let rightHtml = '';
                 {% if current_user.has_permission('settings_sections.location_management', 'edit') %}
-                controlsHtml += `<div class="form-check mb-0"><input class="form-check-input" type="checkbox" id="drawerUnavailable" ${data.is_unavailable ? 'checked' : ''} onchange="toggleDrawerAvailability()"><label class="form-check-label" for="drawerUnavailable">Make this Drawer Unavailable</label></div>`;
+                leftHtml += `<div class="form-check mb-0"><input class="form-check-input" type="checkbox" id="drawerUnavailable" ${data.is_unavailable ? 'checked' : ''} onchange="toggleDrawerAvailability()"><label class="form-check-label" for="drawerUnavailable">Make this Drawer Unavailable</label></div>`;
                 {% endif %}
                 {% if current_user.has_permission('items', 'edit_info') %}
                 if (data.entries && data.entries.length > 0) {
-                    controlsHtml += '<button class="btn btn-sm btn-info me-1" onclick="showSwapItemsModal()"><i class="bi bi-arrow-left-right"></i> Swap all items</button>';
-                    controlsHtml += '<button class="btn btn-sm btn-warning" onclick="showMoveItemsModal()"><i class="bi bi-arrow-right-circle"></i> Move all items</button>';
+                    rightHtml += '<button class="btn btn-sm btn-info" onclick="showSwapItemsModal()"><i class="bi bi-arrow-left-right"></i> Swap all items</button>';
+                    rightHtml += '<button class="btn btn-sm btn-warning" onclick="showMoveItemsModal()"><i class="bi bi-arrow-right-circle"></i> Move all items</button>';
                 }
                 {% endif %}
-                if (controlsHtml) {
-                    html += `<div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">${controlsHtml}</div>`;
+                if (leftHtml || rightHtml) {
+                    html += `<div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded gap-2"><div>${leftHtml}</div><div class="d-flex gap-1">${rightHtml}</div></div>`;
                 }
             }
             
@@ -1155,13 +1156,11 @@ function openDrawer(rackName, drawerId, rackId) {
 
             let canCreate = {{ 'true' if current_user.has_permission('items', 'create') else 'false' }};
             if (canCreate) {
-            html += `
-                <div class="mt-3">
+                html += `<div class="mt-3" id="drawerAddItemDiv"${data.is_unavailable ? ' style="display:none;"' : ''}>
                     <a href="/item/new?rack_id=${rackId}&drawer=${encodeURIComponent(drawerId)}" class="btn btn-success">
                         <i class="bi bi-plus-circle"></i> Add Item Here
                     </a>
-                </div>
-            `;
+                </div>`;
             }
             {# endif #}
             
