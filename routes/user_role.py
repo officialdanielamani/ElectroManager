@@ -175,6 +175,15 @@ def user_new():
         flash(f'User "{user.username}" created successfully!', 'success')
         return redirect(url_for('user_role.users'))
     
+    # Pre-select Viewer role for new users (safest default)
+    if request.method == 'GET':
+        viewer = Role.query.filter_by(name='Viewer').first()
+        if viewer is None:
+            # Fall back to any non-superadmin system role
+            viewer = Role.query.filter_by(is_system_role=True, is_superadmin=False).order_by(Role.id).first()
+        if viewer:
+            form.role_id.data = viewer.id
+
     return render_template('user_form.html', form=form, title='New User', profile_share_files=SharedFile.query.filter_by(category='profile').order_by(SharedFile.created_at.desc()).all())
 
 
@@ -421,58 +430,46 @@ def role_new():
             flash(f'Role "{form.name.data}" already exists!', 'danger')
             return render_template('role_form.html', form=form, title='New Role', role=None)
         
-        # Create new role with default permissions (all false)
+        # Create new role with default permissions (all false — mirrors _ADMIN_PERMS structure)
         default_perms = {
-            # Item Management (simplified schema grouped by concern)
             "items": {
-                # Component
-                "view": False,
-                "create": False,
-                "delete": False,
-                # Item Info
-                "view_info": False,
-                "edit_info": False,
-                # Batch creation
+                "view": False, "create": False, "delete": False,
+                "view_info": False, "edit_info": False,
+                "edit_batch": False, "edit_quantity": False,
                 "create_batch": False,
-                # Advance Info
-                "view_advance": False,
-                "edit_advance": False,
-                "delete_advance": False,
+                "view_advance": False, "edit_advance": False, "delete_advance": False,
             },
-            # Lending & Return permissions
             "lending_return": {
-                "view_page": False,
-                "view_log": False,
-                "edit_batch": False,
-                "delete_batch": False,
-                "edit_lending": False,
-                "delete_lending": False,
+                "view_page": False, "only_self_lending": False, "view_log": False,
+                "edit_batch": False, "delete_batch": False,
+                "edit_lending": False, "delete_lending": False,
             },
-            # Page Permissions
             "pages": {
-                "visual_storage": {"view": False},
-                "notifications": {"view": False}
+                "visual_storage": {"view": False, "edit": False},
+                "notifications":  {"view": False, "edit": False},
+                "settings":       {"view": False, "edit": False},
             },
-            # Settings Page Sections
+            "projects": {
+                "view": False, "create": False, "edit": False, "delete": False,
+                "view_costing": False, "edit_costing": False,
+            },
             "settings_sections": {
-                "system_settings": {"view": False, "edit": False},
-                "reports": {"view": False},
-                "item_management": {"view": False, "edit": False, "delete": False},
-                "magic_parameters": {"view": False, "edit": False, "delete": False},
-                "location_management": {"view": False, "edit": False, "delete": False},
-                "qr_templates": {"print_qr": False, "view": False, "edit": False, "delete": False},
+                "system_settings":    {"view": False, "edit": False},
+                "reports":            {"view": False},
+                "item_management":    {"view": False, "edit": False, "delete": False},
+                "magic_parameters":   {"view": False, "edit": False, "delete": False},
+                "location_management":{"view": False, "edit": False, "delete": False},
+                "qr_templates":       {"view": False, "edit": False, "delete": False, "print_qr": False},
                 "users_roles": {
                     "view": False,
-                    "roles_create": False,
-                    "roles_edit": False,
-                    "roles_delete": False,
-                    "users_create": False,
-                    "users_edit": False,
-                    "users_delete": False
+                    "roles_create": False, "roles_edit": False, "roles_delete": False,
+                    "users_create": False, "users_edit": False, "users_delete": False,
                 },
-                "backup_restore": {"view": False, "upload_export": False, "delete": False},
-                "contacts": {"view_users": False, "view_other": False, "edit": False, "delete": False}
-            }
+                "project_settings":   {"view": False, "edit": False, "delete": False},
+                "backup_restore":     {"view": False, "upload_export": False, "delete": False},
+                "contacts":           {"view_users": False, "view_other": False, "edit": False, "delete": False},
+                "share_files":        {"view": False, "add": False, "edit": False, "delete": False},
+            },
         }
         
         role = Role(

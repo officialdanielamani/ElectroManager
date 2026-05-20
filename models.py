@@ -71,11 +71,12 @@ class Location(db.Model):
 
 class Role(db.Model):
     __tablename__ = 'roles'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(64), unique=True, nullable=False)
     description = db.Column(db.String(512))
     is_system_role = db.Column(db.Boolean, default=False)
+    is_superadmin = db.Column(db.Boolean, default=False)
     permissions = db.Column(db.Text, default='{}', nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -152,7 +153,7 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, password)
     
     def is_admin(self):
-        return self.user_role and self.user_role.name == 'Admin'
+        return bool(self.user_role and getattr(self.user_role, 'is_superadmin', False))
     
     def is_editor(self):
         if self.is_admin():
