@@ -223,7 +223,7 @@ def preview_qr_template(template_id):
 @login_required
 def api_item_sticker_preview(uuid, template_id):
     """Generate sticker preview for an item"""
-    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
         return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
@@ -245,7 +245,7 @@ def api_item_sticker_preview(uuid, template_id):
 @login_required
 def api_item_sticker_print(uuid, template_id):
     """Generate printable sticker PDF"""
-    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
         return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
@@ -263,7 +263,7 @@ def api_item_sticker_print(uuid, template_id):
 @login_required
 def item_qr_sticker(uuid):
     """View and print QR stickers for an item"""
-    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
         abort(403)
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     templates = StickerTemplate.query.filter_by(template_type='Items').all()
@@ -448,7 +448,7 @@ def _parse_sn_ids(raw):
 @login_required
 def batch_qr_sticker(uuid, batch_id):
     """View and print QR stickers for an item batch (or specific serial numbers)."""
-    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
         abort(403)
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     batch = ItemBatch.query.filter_by(id=batch_id, item_id=item.id).first_or_404()
@@ -464,7 +464,7 @@ def batch_qr_sticker(uuid, batch_id):
 @login_required
 def api_batch_sticker_preview(uuid, batch_id, template_id):
     """Generate SVG preview for an item batch sticker (optional ?sn_id=)."""
-    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
         return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     batch = ItemBatch.query.filter_by(id=batch_id, item_id=item.id).first_or_404()
@@ -489,7 +489,7 @@ def api_batch_sticker_preview(uuid, batch_id, template_id):
 @login_required
 def api_batch_sticker_print(uuid, template_id):
     """Multi-page PDF: one page per SN (if sn_ids given) or one page for the batch."""
-    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
         return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
@@ -523,7 +523,7 @@ def api_batch_sticker_print(uuid, template_id):
 @login_required
 def api_batch_sticker_svg_zip(uuid, template_id):
     """Download SVG zip for batch stickers."""
-    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
         return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
@@ -555,7 +555,7 @@ def api_batch_sticker_svg_zip(uuid, template_id):
 @login_required
 def api_batch_sticker_table_print(uuid, template_id):
     """Grid-layout PDF for batch stickers."""
-    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
         return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)

@@ -313,7 +313,7 @@
                                 </div>
                                 {% if not batch.sn_tracking_enabled %}
                                 <div class="mb-2">
-                                    {% if current_user.is_admin() or current_user.has_permission('settings_sections.qr_templates', 'print_qr') %}
+                                    {% if current_user.has_permission('settings_sections.qr_templates', 'print_qr') %}
                                     <a href="{{ url_for('qr_template.batch_qr_sticker', uuid=item.uuid, batch_id=batch.id) }}"
                                        class="btn btn-outline-secondary btn-sm" target="_blank">
                                         <i class="bi bi-qr-code"></i> Print QR Batch
@@ -362,7 +362,7 @@
                                     <strong><i class="bi bi-upc-scan"></i> Serial Numbers</strong>
                                 </div>
                                 <div class="mb-2">
-                                    {% if current_user.is_admin() or current_user.has_permission('settings_sections.qr_templates', 'print_qr') %}
+                                    {% if current_user.has_permission('settings_sections.qr_templates', 'print_qr') %}
                                     <button class="btn btn-outline-secondary btn-sm"
                                             onclick="printBatchQr({{ batch.id }}, '{{ item.uuid }}')">
                                         <i class="bi bi-qr-code"></i> Print QR (Selected SNs)

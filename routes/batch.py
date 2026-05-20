@@ -192,7 +192,7 @@ def edit_batch_location(uuid, batch_id):
     batch = ItemBatch.query.get_or_404(batch_id)
     if batch.item_id != item.id:
         return jsonify({'success': False, 'message': 'Batch does not belong to this item'}), 400
-    if not (current_user.is_admin() or current_user.has_permission('items', 'edit_info')):
+    if not current_user.has_permission('items', 'edit_info'):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
 
     follow_main = request.form.get('follow_main_location', '') == 'on'

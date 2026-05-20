@@ -151,20 +151,6 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
     
-    def is_admin(self):
-        # Permission-based: any role with full user management is treated as admin
-        return self.has_permission('settings_sections.users_roles', 'users_delete')
-
-    def is_editor(self):
-        return self.has_permission('items', 'view') and (
-            self.has_permission('items', 'create') or
-            self.has_permission('items', 'edit_info') or
-            self.has_permission('items', 'create_batch') or
-            self.has_permission('lending_return', 'edit_batch') or
-            self.has_permission('lending_return', 'edit_lending') or
-            self.has_permission('items', 'edit_advance')
-        )
-
     def has_permission(self, resource, action):
         return bool(self.user_role and self.user_role.has_permission(resource, action))
     
