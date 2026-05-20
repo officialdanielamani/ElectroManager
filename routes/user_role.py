@@ -179,8 +179,7 @@ def user_new():
     if request.method == 'GET':
         viewer = Role.query.filter_by(name='Viewer').first()
         if viewer is None:
-            # Fall back to any non-superadmin system role
-            viewer = Role.query.filter_by(is_system_role=True, is_superadmin=False).order_by(Role.id).first()
+            viewer = Role.query.filter_by(is_system_role=True).order_by(Role.id.desc()).first()
         if viewer:
             form.role_id.data = viewer.id
 

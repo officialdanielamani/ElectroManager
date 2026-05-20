@@ -28,7 +28,6 @@ def _add_missing_columns():
             ("batch_serial_numbers", "lending_session_id",  "INTEGER"),
             ("batch_lend_records",   "lending_session_id",  "INTEGER"),
             ("users",                "user_uid",             "VARCHAR(6)"),
-            ("roles",                "is_superadmin",        "INTEGER DEFAULT 0"),
         ]
         for table, col, col_type in additions:
             try:
@@ -51,12 +50,6 @@ def _add_missing_columns():
         db.session.commit()
         print(f"[OK] Backfilled user_uid for {len(users_without_uid)} existing user(s)")
 
-    # Backfill is_superadmin for the existing Admin role (one-time migration)
-    admin_role = Role.query.filter_by(name='Admin').first()
-    if admin_role and not admin_role.is_superadmin:
-        admin_role.is_superadmin = True
-        db.session.commit()
-        print("[OK] Backfilled is_superadmin=True for Admin role")
 
 def init_db():
     with app.app_context():
@@ -268,17 +261,16 @@ def _deep_merge_missing(target: dict, source: dict):
 def create_default_roles():
     """Create built-in system roles on first run. Skips roles that already exist."""
     role_specs = [
-        ('Admin',   'Full system access with all permissions',                                       True,  _ADMIN_PERMS),
-        ('Manager', 'Can manage most resources but cannot manage users or system settings',          False, _MANAGER_PERMS),
-        ('Viewer',  'Read-only access — can view items, projects and reports but cannot edit',       False, _VIEWER_PERMS),
+        ('Admin',   'Full system access with all permissions',                                 _ADMIN_PERMS),
+        ('Manager', 'Can manage most resources but cannot manage users or system settings',    _MANAGER_PERMS),
+        ('Viewer',  'Read-only access — can view items, projects and reports but cannot edit', _VIEWER_PERMS),
     ]
-    for name, desc, is_super, perms in role_specs:
+    for name, desc, perms in role_specs:
         if not Role.query.filter_by(name=name).first():
             role = Role(
                 name=name,
                 description=desc,
                 is_system_role=True,
-                is_superadmin=is_super,
                 permissions=json.dumps(perms),
             )
             db.session.add(role)
@@ -307,10 +299,6 @@ def update_system_roles():
         if _deep_merge_missing(perms, canon):
             role.set_permissions(perms)
             print(f"[OK] Patched missing permissions for role: {role.name}")
-        # Ensure is_superadmin flag is correct for the Admin role
-        if role.name == 'Admin' and not role.is_superadmin:
-            role.is_superadmin = True
-            print("[OK] Set is_superadmin=True for Admin role")
 
     db.session.commit()
 

@@ -76,7 +76,6 @@ class Role(db.Model):
     name = db.Column(db.String(64), unique=True, nullable=False)
     description = db.Column(db.String(512))
     is_system_role = db.Column(db.Boolean, default=False)
-    is_superadmin = db.Column(db.Boolean, default=False)
     permissions = db.Column(db.Text, default='{}', nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -153,11 +152,10 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, password)
     
     def is_admin(self):
-        return bool(self.user_role and getattr(self.user_role, 'is_superadmin', False))
-    
+        # Permission-based: any role with full user management is treated as admin
+        return self.has_permission('settings_sections.users_roles', 'users_delete')
+
     def is_editor(self):
-        if self.is_admin():
-            return True
         return self.has_permission('items', 'view') and (
             self.has_permission('items', 'create') or
             self.has_permission('items', 'edit_info') or
@@ -166,11 +164,9 @@ class User(UserMixin, db.Model):
             self.has_permission('lending_return', 'edit_lending') or
             self.has_permission('items', 'edit_advance')
         )
-    
+
     def has_permission(self, resource, action):
-        if self.is_admin():
-            return True
-        return self.user_role and self.user_role.has_permission(resource, action)
+        return bool(self.user_role and self.user_role.has_permission(resource, action))
     
     def get_table_columns(self):
         try:
