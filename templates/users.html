@@ -140,26 +140,22 @@
                                     {% endif %}
                                 </td>
                                 <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
-                                <td>
+                                <td class="text-nowrap">
+                                    <div class="d-flex gap-1 flex-nowrap flex-wrap">
                                     {% if can_edit_user %}
-                                    <a href="{{ url_for('user_role.user_edit', id=user.id) }}" class="btn btn-sm btn-warning">
-                                        <i class="bi bi-pencil"></i> Edit
-                                    </a>
+                                    <a href="{{ url_for('user_role.user_edit', id=user.id) }}" class="btn btn-sm btn-warning"><i class="bi bi-pencil"></i> Edit</a>
                                     {% endif %}
                                     {% if can_edit_user and user.account_locked_until %}
-                                    <form method="POST" action="{{ url_for('user_role.user_unlock', id=user.id) }}" style="display:inline">
-                                        <button type="submit" class="btn btn-sm btn-info">
-                                            <i class="bi bi-unlock"></i> Unlock
-                                        </button>
+                                    <form method="POST" action="{{ url_for('user_role.user_unlock', id=user.id) }}" style="display:contents">
+                                        <button type="submit" class="btn btn-sm btn-info"><i class="bi bi-unlock"></i> Unlock</button>
                                     </form>
                                     {% endif %}
                                     {% if can_delete_user and user.id != current_user.id %}
-                                    <form method="POST" action="{{ url_for('user_role.user_delete', id=user.id) }}" style="display:inline">
-                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this user?')">
-                                            <i class="bi bi-trash"></i> Delete
-                                        </button>
+                                    <form method="POST" action="{{ url_for('user_role.user_delete', id=user.id) }}" style="display:contents">
+                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this user?')"><i class="bi bi-trash"></i> Delete</button>
                                     </form>
                                     {% endif %}
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}

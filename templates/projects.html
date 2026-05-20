@@ -142,14 +142,16 @@
                                     {% if col == 'group' %}<td>{{ project.group.name if project.group else '' }}</td>{% endif %}
                                     {% if col == 'project_id' %}<td><code>{{ project.project_id }}</code></td>{% endif %}
                                 {% endfor %}
-                                <td>
+                                <td class="text-nowrap">
+                                    <div class="d-flex gap-1 flex-nowrap">
                                     <a href="{{ url_for('project.project_detail', project_id=project.project_id) }}" class="btn btn-sm btn-info" title="View"><i class="bi bi-eye"></i></a>
                                     {% if current_user.has_permission('projects', 'edit') %}
                                     <a href="{{ url_for('project.project_edit', project_id=project.project_id) }}" class="btn btn-sm btn-warning" title="Edit"><i class="bi bi-pencil"></i></a>
                                     {% endif %}
                                     {% if current_user.has_permission('projects', 'delete') %}
-                                    <form method="POST" action="{{ url_for('project.project_delete', project_id=project.project_id) }}" style="display:inline;"><button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')"><i class="bi bi-trash"></i></button></form>
+                                    <form method="POST" action="{{ url_for('project.project_delete', project_id=project.project_id) }}" style="display:contents;"><button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete?')"><i class="bi bi-trash"></i></button></form>
                                     {% endif %}
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}

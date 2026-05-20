@@ -392,9 +392,11 @@
                         <span><span class="lg-swatch" style="background:var(--dc-unavail-bg-1);border:1px solid var(--dc-unavail-border);"></span>Unavailable</span>
                         <span><span class="lg-swatch" style="background:var(--dc-selected-bg);border:2px dashed var(--dc-selected-border);"></span>Source</span>
                     </div>
+                    <div class="drawer-grid-scroll-inner">
                     <div id="swap_grid_info_top" class="mini-grid-drawer-info"></div>
                     <div id="swap_drawer_grid_container" style="display: inline-grid; gap: 4px; background: transparent;"></div>
                     <div id="swap_grid_info_bottom" class="mini-grid-drawer-info"></div>
+                    </div>
                     <div class="mini-grid-legend mt-1">
                         <span><span class="lg-swatch" style="background:var(--dc-normal-bg);border:1px solid var(--dc-normal-border);"></span>Empty</span>
                         <span><span class="lg-swatch" style="background:var(--dc-items-bg-1);border:1px solid var(--dc-items-border);"></span>Has Items</span>
@@ -484,9 +486,11 @@
                             <span><span class="lg-swatch" style="background:var(--dc-gmaster-bg-1);border:1px dashed var(--dc-gmaster-border);"></span>Group</span>
                             <span><span class="lg-swatch" style="background:var(--dc-unavail-bg-1);border:1px solid var(--dc-unavail-border);"></span>Unavailable</span>
                         </div>
+                        <div class="drawer-grid-scroll-inner">
                         <div id="move_grid_info_top" class="mini-grid-drawer-info"></div>
                         <div id="move_drawer_grid_container" style="display: inline-grid; gap: 4px; background: transparent;"></div>
                         <div id="move_grid_info_bottom" class="mini-grid-drawer-info"></div>
+                        </div>
                         <div class="mini-grid-legend mt-1">
                             <span><span class="lg-swatch" style="background:var(--dc-normal-bg);border:1px solid var(--dc-normal-border);"></span>Empty</span>
                             <span><span class="lg-swatch" style="background:var(--dc-items-bg-1);border:1px solid var(--dc-items-border);"></span>Has Items</span>
@@ -664,6 +668,11 @@
     border-color: var(--bs-border-color) !important;
     border: 1px solid var(--bs-border-color) !important;
     color: var(--bs-body-color);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.drawer-grid-scroll-inner {
+    min-width: max-content;
 }
 .move-drawer-cell {
     min-height: 52px;
@@ -1243,13 +1252,14 @@ function openDrawer(rackName, drawerId, rackId) {
                 }
                 {% endif %}
                 if (leftHtml || rightHtml) {
-                    html += `<div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded gap-2"><div>${leftHtml}</div><div class="d-flex gap-1">${rightHtml}</div></div>`;
+                    html += `<div class="d-flex flex-wrap justify-content-between align-items-center mb-2 p-2 bg-light rounded gap-2"><div>${leftHtml}</div><div class="d-flex gap-1 flex-nowrap">${rightHtml}</div></div>`;
                 }
             }
             
             var entries = data.entries || [];
             if (entries.length > 0) {
-                html += '<table class="table table-hover">';
+                html += '<div class="table-responsive">';
+                html += '<table class="table table-hover table-sm mb-0">';
                 html += '<thead><tr><th>Item</th><th>SKU</th><th>Batch</th><th>Qty</th><th>Available</th><th>Action</th></tr></thead>';
                 html += '<tbody>';
                 entries.forEach(function(entry) {
@@ -1288,6 +1298,7 @@ function openDrawer(rackName, drawerId, rackId) {
                     }
                 });
                 html += '</tbody></table>';
+                html += '</div>'; // end table-responsive
                 html += '<small class="text-muted"><i class="bi bi-info-circle"></i> <strong>Main</strong> = item\'s main location is this drawer (no batch-level override). Batches show their own quantity.</small>';
             } else {
                 html += '<div class="alert alert-info">This drawer is empty.</div>';
