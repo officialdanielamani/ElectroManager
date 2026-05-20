@@ -258,6 +258,23 @@ def _deep_merge_missing(target: dict, source: dict):
     return changed
 
 
+def _deep_sync(target: dict, source: dict):
+    """Recursively overwrite *target* with all values from *source*, adding missing keys too."""
+    changed = False
+    for key, val in source.items():
+        if isinstance(val, dict):
+            if not isinstance(target.get(key), dict):
+                target[key] = {}
+                changed = True
+            if _deep_sync(target[key], val):
+                changed = True
+        else:
+            if target.get(key) != val:
+                target[key] = val
+                changed = True
+    return changed
+
+
 def create_default_roles():
     """Create built-in system roles on first run. Skips roles that already exist."""
     role_specs = [
@@ -279,14 +296,13 @@ def create_default_roles():
 
 
 def update_system_roles():
-    """Add any missing permission keys to ALL system roles.
+    """Sync permissions for ALL system roles on every startup.
 
-    For the three built-in roles (Admin / Manager / Viewer) the canonical
-    permission dict is used so new keys get the correct default value.
-    Any other system role (custom but flagged is_system_role) receives
-    False for every missing key — a safe, least-privilege default.
+    Canonical roles (those in _ROLE_CANON) are fully synced to their canonical
+    dict — all values are updated, including ones previously set wrong.
+    Any other system role (custom but flagged is_system_role) only receives
+    False for missing keys — existing values are never overwritten.
     """
-    # Build a zero-valued template from the Admin canon (same structure, all False)
     def _false_template(d):
         return {k: (_false_template(v) if isinstance(v, dict) else False)
                 for k, v in d.items()}
@@ -294,11 +310,16 @@ def update_system_roles():
 
     all_system_roles = Role.query.filter_by(is_system_role=True).all()
     for role in all_system_roles:
-        canon = _ROLE_CANON.get(role.name, fallback)
         perms = role.get_permissions()
-        if _deep_merge_missing(perms, canon):
+        if role.name in _ROLE_CANON:
+            # Fully sync canonical reference roles so every value matches the canon
+            changed = _deep_sync(perms, _ROLE_CANON[role.name])
+        else:
+            # Unknown system roles: only fill missing keys with False
+            changed = _deep_merge_missing(perms, fallback)
+        if changed:
             role.set_permissions(perms)
-            print(f"[OK] Patched missing permissions for role: {role.name}")
+            print(f"[OK] Synced permissions for role: {role.name}")
 
     db.session.commit()
 
