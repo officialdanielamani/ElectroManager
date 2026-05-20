@@ -956,4 +956,10 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <script src="{{ url_for('static', filename='js/table-sorter.js') }}"></script>
+<style>
+/* Allow status dropdown to escape the horizontal-scroll container on wide screens */
+@media (min-width: 768px) {
+    #tableView { overflow: visible; }
+}
+</style>
 {% endblock %}

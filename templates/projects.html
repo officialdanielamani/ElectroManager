@@ -105,22 +105,22 @@
             <div class="card-body" style="min-height: 420px;">
                 {% if projects %}
                 <div class="table-responsive">
-                    <table class="table table-hover">
+                    <table class="table table-hover" id="projectTable">
                         <thead>
                             <tr>
                                 <th width="30"><input type="checkbox" id="selectAll"></th>
-                                <th>Project Name</th>
+                                <th><a href="#" class="text-decoration-none" title="Sort by Name">Project Name <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>
                                 {% for col in user_columns %}
-                                    {% if col == 'info' %}<th>Short Info</th>{% endif %}
+                                    {% if col == 'info' %}<th><a href="#" class="text-decoration-none" title="Sort by Short Info">Short Info <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>{% endif %}
                                     {% if col == 'categories' %}<th>Categories</th>{% endif %}
                                     {% if col == 'tags' %}<th>Tags</th>{% endif %}
-                                    {% if col == 'date_start' %}<th>Date Start</th>{% endif %}
-                                    {% if col == 'dateline' %}<th>Dateline</th>{% endif %}
-                                    {% if col == 'total_cost' and can_view_costing %}<th>Total Cost</th>{% endif %}
+                                    {% if col == 'date_start' %}<th><a href="#" class="text-decoration-none" title="Sort by Date Start">Date Start <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>{% endif %}
+                                    {% if col == 'dateline' %}<th><a href="#" class="text-decoration-none" title="Sort by Dateline">Dateline <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>{% endif %}
+                                    {% if col == 'total_cost' and can_view_costing %}<th><a href="#" class="text-decoration-none" title="Sort by Total Cost">Total Cost <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>{% endif %}
                                     {% if col == 'status' %}<th>Status</th>{% endif %}
                                     {% if col == 'users' %}<th>Users</th>{% endif %}
-                                    {% if col == 'group' %}<th>Group</th>{% endif %}
-                                    {% if col == 'project_id' %}<th>Project ID</th>{% endif %}
+                                    {% if col == 'group' %}<th><a href="#" class="text-decoration-none" title="Sort by Group">Group <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>{% endif %}
+                                    {% if col == 'project_id' %}<th><a href="#" class="text-decoration-none" title="Sort by Project ID">Project ID <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>{% endif %}
                                 {% endfor %}
                                 <th>Action</th>
                             </tr>
@@ -181,5 +181,9 @@
 <script>
 function changePerPage() { const url = new URL(window.location); url.searchParams.set('per_page', document.getElementById('itemsPerPage').value); url.searchParams.set('page', '1'); window.location = url; }
 function printProjectsList() { const url = new URL("{{ url_for('project.projects_print') }}", window.location.origin); url.searchParams.set('search', '{{ search_query }}'); url.searchParams.set('category', '{{ category_id }}'); url.searchParams.set('status', '{{ status_id }}'); window.open(url, '_blank'); }
+</script>
+<script src="{{ url_for('static', filename='js/table-sorter.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => { new TableSorter('projectTable'); });
 </script>
 {% endblock %}
