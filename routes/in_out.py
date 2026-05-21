@@ -344,8 +344,7 @@ def in_out_sessions_list():
         try:
             from datetime import timedelta
             end_dt = datetime.strptime(end_str, '%Y-%m-%d') + timedelta(days=1)
-            q = q.filter(db.or_(LendingSession.lend_end == None,
-                                 LendingSession.lend_end <= end_dt))
+            q = q.filter(LendingSession.lend_start <= end_dt)
         except ValueError:
             pass
 

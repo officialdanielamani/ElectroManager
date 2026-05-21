@@ -293,7 +293,7 @@
                           background:var(--bs-body-bg);display:none;font-size:0.82rem;"></div>
             </div>
             <button class="btn btn-outline-secondary btn-sm py-0 px-1 flex-shrink-0" style="font-size:0.75rem;"
-                    title="Filter to my sessions" onclick="selectSessContact('user', {{ current_user.id }}, {{ current_user.name | tojson }})">Me</button>
+                    title="Filter to my sessions" onclick="selectSessContact('user', _currentUserId, _currentUserLabel)">Me</button>
             <button class="btn btn-outline-secondary btn-sm py-0 px-1 flex-shrink-0" style="font-size:0.75rem;"
                     title="Show all sessions" onclick="clearSessContact()">All</button>
           </div>
