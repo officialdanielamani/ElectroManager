@@ -475,6 +475,75 @@
             </div>
             {% endif %}
 
+            <!-- Server API Settings -->
+            <div class="card mb-4" id="server-api-settings">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-plug-fill"></i> Server API</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info small mb-3">
+                        <i class="bi bi-info-circle"></i> These settings control the external API feature. The external API is currently <strong>in development</strong> — these toggles prepare the configuration for when it is released.
+                    </div>
+
+                    <!-- Rate Limit -->
+                    <div class="mb-4">
+                        <label for="api_rate_limit" class="form-label fw-semibold">Rate Limit <span class="text-danger">*</span></label>
+                        <div class="input-group" style="max-width:200px;">
+                            <input type="number" class="form-control" id="api_rate_limit" name="api_rate_limit"
+                                   value="{{ api_rate_limit }}" min="1" max="100" required>
+                            <span class="input-group-text">req / sec</span>
+                        </div>
+                        <div class="form-text"><i class="bi bi-speedometer2"></i> Maximum API requests per second per user (1–100). Default: 5. Exceeding this returns HTTP 429.</div>
+                    </div>
+
+                    <hr>
+
+                    <!-- API scope toggles -->
+                    <label class="form-label fw-semibold">Enable API Scopes</label>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="p-3 border rounded h-100">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="api_item_search_enabled"
+                                           name="api_item_search_enabled"
+                                           {% if api_item_search_enabled %}checked{% endif %}>
+                                    <label class="form-check-label fw-semibold" for="api_item_search_enabled">
+                                        <i class="bi bi-search text-primary"></i> Item Search &amp; Information
+                                    </label>
+                                </div>
+                                <small class="text-muted d-block mt-1">Allow users to search items and retrieve item details via API.</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 border rounded h-100">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="api_rack_drawer_enabled"
+                                           name="api_rack_drawer_enabled"
+                                           {% if api_rack_drawer_enabled %}checked{% endif %}>
+                                    <label class="form-check-label fw-semibold" for="api_rack_drawer_enabled">
+                                        <i class="bi bi-grid-3x3-gap text-success"></i> Rack &amp; Drawer System
+                                    </label>
+                                </div>
+                                <small class="text-muted d-block mt-1">Allow users to query and manage rack/drawer contents via API.</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 border rounded h-100">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="api_lending_return_enabled"
+                                           name="api_lending_return_enabled"
+                                           {% if api_lending_return_enabled %}checked{% endif %}>
+                                    <label class="form-check-label fw-semibold" for="api_lending_return_enabled">
+                                        <i class="bi bi-arrow-left-right text-warning"></i> Lending &amp; Return
+                                    </label>
+                                </div>
+                                <small class="text-muted d-block mt-1">Allow users to access lending and return operations via API.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Action Buttons -->
             <div class="card">
                 <div class="card-body">

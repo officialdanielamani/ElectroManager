@@ -28,6 +28,11 @@ def _add_missing_columns():
             ("batch_serial_numbers", "lending_session_id",  "INTEGER"),
             ("batch_lend_records",   "lending_session_id",  "INTEGER"),
             ("users",                "user_uid",             "VARCHAR(6)"),
+            ("users",                "api_enabled",          "BOOLEAN DEFAULT 0"),
+            ("users",                "api_key",              "VARCHAR(64)"),
+            ("users",                "api_item_search",      "BOOLEAN DEFAULT 0"),
+            ("users",                "api_rack_drawer",      "BOOLEAN DEFAULT 0"),
+            ("users",                "api_lending_return",   "BOOLEAN DEFAULT 0"),
         ]
         for table, col, col_type in additions:
             try:
@@ -153,6 +158,7 @@ _ADMIN_PERMS = {
         "contacts":           {"view_users": True, "view_other": True, "edit": True, "delete": True},
         "share_files":        {"view": True, "add": True, "edit": True, "delete": True},
     },
+    "users_api": {"view": True, "run": True},
 }
 
 _MANAGER_PERMS = {
@@ -194,6 +200,7 @@ _MANAGER_PERMS = {
         "contacts":           {"view_users": True, "view_other": True, "edit": True, "delete": False},
         "share_files":        {"view": True,  "add": True,   "edit": True,  "delete": False},
     },
+    "users_api": {"view": True, "run": True},
 }
 
 _VIEWER_PERMS = {
@@ -235,6 +242,7 @@ _VIEWER_PERMS = {
         "contacts":           {"view_users": False, "view_other": False, "edit": False, "delete": False},
         "share_files":        {"view": True,  "add": False,  "edit": False, "delete": False},
     },
+    "users_api": {"view": True, "run": False},
 }
 
 # Map role name → canonical permission set (used by both create and update)
@@ -340,6 +348,10 @@ def create_default_settings():
         ('lr_return_time_required', 'false', 'Return time is required (only if date required)'),
         ('lr_return_self_use_now', 'false', 'Only Self Lending must use current datetime for return'),
         ('lr_scan_enabled', 'false', 'Enable QR/Barcode camera scanning on In/Out page'),
+        ('api_rate_limit', '5', 'API requests per second limit (1–100)'),
+        ('api_item_search_enabled', 'false', 'Enable Item Search & Information API system-wide'),
+        ('api_rack_drawer_enabled', 'false', 'Enable Rack & Drawer API system-wide'),
+        ('api_lending_return_enabled', 'false', 'Enable Lending & Return API system-wide'),
     ]
     
     for key, value, description in default_settings:

@@ -635,7 +635,12 @@ def role_edit(id):
                 'edit':   'settings_sections_share_files_edit'   in request.form,
                 'delete': 'settings_sections_share_files_delete' in request.form,
             }
-            
+
+            perms['users_api'] = {
+                'view': 'users_api_view' in request.form,
+                'run':  'users_api_run'  in request.form,
+            }
+
             role.set_permissions(perms)
             db.session.commit()
             

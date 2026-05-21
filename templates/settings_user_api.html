@@ -1,0 +1,584 @@
+{% extends "base.html" %}
+
+{% block title %}User API — Electro Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h2 class="mb-1"><i class="bi bi-plug-fill"></i> User API</h2>
+            <p class="text-muted mb-0">Manage your personal API key and access scopes</p>
+        </div>
+        <a href="{{ url_for('settings.settings') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Settings
+        </a>
+    </div>
+</div>
+
+{% if not can_run %}
+<div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <strong>Read-only access.</strong> Your role permits viewing this page but not using the API.
+    Contact a server admin to grant <em>Run API</em> permission to your role.
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-md-8">
+
+        <!-- ── Enable/Disable ──────────────────────────────────────────── -->
+        <div class="card mb-4">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-power"></i> API Access</h5>
+                {% if current_user.api_enabled %}
+                    <span class="badge bg-success fs-6"><i class="bi bi-circle-fill me-1" style="font-size:.6rem"></i>Active</span>
+                {% else %}
+                    <span class="badge bg-secondary fs-6">Inactive</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="action" value="toggle_api">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" id="apiEnabled"
+                                   style="width:3rem;height:1.5rem;"
+                                   {% if current_user.api_enabled %}checked{% endif %}
+                                   {% if not can_run %}disabled{% endif %}
+                                   onchange="this.closest('form').submit()">
+                            <label class="form-check-label fw-semibold fs-6 ms-2" for="apiEnabled">
+                                {% if current_user.api_enabled %}
+                                    <span class="text-success">Enabled</span>
+                                {% else %}
+                                    <span class="text-muted">Disabled</span>
+                                {% endif %}
+                            </label>
+                        </div>
+                    </div>
+                </form>
+                <div class="form-text mt-2">
+                    <i class="bi bi-info-circle"></i>
+                    Enabling the API generates a personal key. Disabling it suspends all API calls for your account but preserves the key.
+                </div>
+            </div>
+        </div>
+
+        {% if current_user.api_enabled and can_run %}
+
+        <!-- ── API Key ──────────────────────────────────────────────────── -->
+        <div class="card mb-4">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0"><i class="bi bi-key-fill"></i> API Key</h5>
+                <!-- Active-scope chips -->
+                <div class="d-flex gap-1 flex-wrap">
+                    {% if current_user.api_item_search and sys_item_search_enabled %}
+                    <span class="badge bg-primary"><i class="bi bi-search"></i> Items</span>
+                    {% endif %}
+                    {% if current_user.api_rack_drawer and sys_rack_drawer_enabled %}
+                    <span class="badge bg-success"><i class="bi bi-grid-3x3-gap"></i> Rack</span>
+                    {% endif %}
+                    {% if current_user.api_lending_return and sys_lending_return_enabled %}
+                    <span class="badge bg-warning text-dark"><i class="bi bi-arrow-left-right"></i> Lending</span>
+                    {% endif %}
+                    {% if not (
+                        (current_user.api_item_search and sys_item_search_enabled) or
+                        (current_user.api_rack_drawer and sys_rack_drawer_enabled) or
+                        (current_user.api_lending_return and sys_lending_return_enabled)
+                    ) %}
+                    <span class="badge bg-light text-muted border">No active scopes</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                {% if current_user.api_key %}
+                <label class="form-label fw-semibold">Your API Key</label>
+                <div class="input-group mb-1">
+                    <input type="password" class="form-control font-monospace" id="apiKeyField"
+                           value="{{ current_user.api_key }}" readonly>
+                    <button class="btn btn-outline-secondary" type="button"
+                            id="toggleKeyVisBtn" onclick="toggleKeyVisibility()" title="Show/hide key">
+                        <i class="bi bi-eye" id="keyVisIcon"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary" type="button"
+                            id="copyKeyBtn" onclick="copyApiKey()" title="Copy to clipboard">
+                        <i class="bi bi-clipboard" id="copyKeyIcon"></i>
+                    </button>
+                </div>
+                <div class="form-text mb-3">
+                    <i class="bi bi-shield-lock"></i>
+                    Treat this key like a password — do not share it or commit it to version control.
+                </div>
+                <form method="POST" onsubmit="return confirm('Revoke this key and generate a new one?\nThe current key will stop working immediately.')">
+                    <input type="hidden" name="action" value="revoke_key">
+                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                        <i class="bi bi-arrow-clockwise"></i> Revoke &amp; Regenerate Key
+                    </button>
+                </form>
+                {% else %}
+                <p class="text-muted mb-0">No key generated yet. Toggle API on to generate your key.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ── Test Panel ───────────────────────────────────────────────── -->
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-terminal-fill"></i> Test API</h5>
+            </div>
+            <div class="card-body">
+
+                <!-- Endpoint selector -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Endpoint</label>
+                    <select class="form-select" id="endpointSelect" onchange="onEndpointChange()">
+                        <option value="">— Select an endpoint to test —</option>
+                        {% if current_user.api_item_search and sys_item_search_enabled %}
+                        <optgroup label="Item Search &amp; Information">
+                            <option value="search_item"
+                                    data-method="POST"
+                                    data-path="/api/search-item"
+                                    data-desc="Search items by name or UUID with optional location filter">
+                                POST /api/search-item
+                            </option>
+                        </optgroup>
+                        {% endif %}
+                        {% if current_user.api_rack_drawer and sys_rack_drawer_enabled %}
+                        <optgroup label="Rack &amp; Drawer System">
+                            <option value="drawer_contents"
+                                    data-method="GET"
+                                    data-path="/api/drawer/{rack_uuid}/{drawer_id}"
+                                    data-desc="Get items stored in a specific drawer">
+                                GET /api/drawer/&lt;rack_uuid&gt;/&lt;drawer_id&gt;
+                            </option>
+                            <option value="drawer_toggle"
+                                    data-method="POST"
+                                    data-path="/api/drawer/toggle-availability"
+                                    data-desc="Mark a drawer as available or unavailable">
+                                POST /api/drawer/toggle-availability
+                            </option>
+                        </optgroup>
+                        {% endif %}
+                        {% if current_user.api_lending_return and sys_lending_return_enabled %}
+                        <optgroup label="Lending &amp; Return">
+                            <option value="lr_sessions"
+                                    data-method="GET"
+                                    data-path="/in-out/sessions"
+                                    data-desc="List recent lending sessions">
+                                GET /in-out/sessions
+                            </option>
+                        </optgroup>
+                        {% endif %}
+                    </select>
+                    <div class="form-text mt-1" id="endpointDesc"></div>
+                </div>
+
+                <!-- Request body + dry-run toggle -->
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label fw-semibold mb-0">Request Body <span class="text-muted fw-normal">(JSON)</span></label>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" id="dryRunToggle" checked
+                                       onchange="onDryRunChange()">
+                                <label class="form-check-label small fw-semibold" for="dryRunToggle">
+                                    Dry Run
+                                    <span class="badge bg-info text-dark ms-1" id="dryRunBadge">ON</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <textarea class="form-control font-monospace" id="requestBody" rows="6"
+                              placeholder='{"search": "resistor"}'></textarea>
+                    <div class="form-text" id="dryRunNote">
+                        <i class="bi bi-info-circle text-info"></i>
+                        <strong>Dry Run ON</strong> — request is simulated and will not modify any data.
+                    </div>
+                </div>
+
+                <!-- curl snippet -->
+                <div class="mb-3" id="curlPanel" style="display:none;">
+                    <label class="form-label fw-semibold small text-muted">
+                        <i class="bi bi-terminal"></i> curl equivalent
+                    </label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control font-monospace" id="curlSnippet" readonly>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="copyCurl()" title="Copy curl">
+                            <i class="bi bi-clipboard" id="curlCopyIcon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="d-flex gap-2 mb-3">
+                    <button type="button" class="btn btn-primary" id="testBtn" onclick="testApi()">
+                        <i class="bi bi-play-fill"></i> Test
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="clearTest()">
+                        <i class="bi bi-x-circle"></i> Clear
+                    </button>
+                </div>
+
+                <!-- Response area -->
+                <div>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label fw-semibold mb-0">Response</label>
+                        <span class="badge" id="statusBadge" style="display:none;"></span>
+                    </div>
+                    <pre class="border rounded p-3 bg-light mb-1" id="responseArea"
+                         style="min-height:80px;font-size:.82rem;white-space:pre-wrap;word-break:break-all;"><span class="text-muted">Response will appear here…</span></pre>
+                </div>
+
+                <!-- Rate limit info -->
+                <div class="alert alert-secondary small mt-3 mb-0 d-flex align-items-center gap-2">
+                    <i class="bi bi-speedometer2 fs-5"></i>
+                    <span>Rate limit: <strong>{{ api_rate_limit }} request(s) / second</strong> (configured by server admin). Exceeding this returns HTTP&nbsp;429.</span>
+                </div>
+
+            </div>
+        </div>
+
+        {% else %}
+        {% if can_run %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            Enable the API above to configure your key, scopes, and test the connection.
+        </div>
+        {% endif %}
+        {% endif %}
+
+        <!-- ── Scope Settings ───────────────────────────────────────────── -->
+        {% if can_run %}
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-toggles2"></i> API Scopes</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    <i class="bi bi-info-circle"></i>
+                    Each scope must also be enabled server-wide by an admin. Your role permissions further restrict what each scope can do.
+                </p>
+
+                <form method="POST">
+                    <input type="hidden" name="action" value="save_scopes">
+
+                    <!-- Item Search -->
+                    {% if sys_item_search_enabled %}
+                    <div class="mb-3 p-3 border rounded {% if current_user.api_enabled and current_user.api_item_search %}border-primary bg-primary bg-opacity-10{% endif %}">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="apiItemSearch"
+                                   name="api_item_search"
+                                   {% if current_user.api_item_search %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="apiItemSearch">
+                                <i class="bi bi-search text-primary"></i> Item Search &amp; Information
+                            </label>
+                        </div>
+                        <small class="text-muted d-block mt-1 ms-4">
+                            Search items by name or UUID; retrieve item details, quantity, and location.
+                        </small>
+                    </div>
+                    {% else %}
+                    <div class="mb-3 p-3 border rounded bg-light">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-search text-muted"></i>
+                            <span class="fw-semibold text-muted">Item Search &amp; Information</span>
+                            <span class="badge bg-secondary"><i class="bi bi-lock-fill"></i> Server Admin Disabled</span>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Rack & Drawer -->
+                    {% if sys_rack_drawer_enabled %}
+                    <div class="mb-3 p-3 border rounded {% if current_user.api_enabled and current_user.api_rack_drawer %}border-success bg-success bg-opacity-10{% endif %}">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="apiRackDrawer"
+                                   name="api_rack_drawer"
+                                   {% if current_user.api_rack_drawer %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="apiRackDrawer">
+                                <i class="bi bi-grid-3x3-gap text-success"></i> Rack &amp; Drawer System
+                            </label>
+                        </div>
+                        <small class="text-muted d-block mt-1 ms-4">
+                            Query drawer contents, toggle availability, and move items between drawers.
+                        </small>
+                    </div>
+                    {% else %}
+                    <div class="mb-3 p-3 border rounded bg-light">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-grid-3x3-gap text-muted"></i>
+                            <span class="fw-semibold text-muted">Rack &amp; Drawer System</span>
+                            <span class="badge bg-secondary"><i class="bi bi-lock-fill"></i> Server Admin Disabled</span>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Lending & Return -->
+                    {% if sys_lending_return_enabled %}
+                    <div class="mb-3 p-3 border rounded {% if current_user.api_enabled and current_user.api_lending_return %}border-warning bg-warning bg-opacity-10{% endif %}">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="apiLendingReturn"
+                                   name="api_lending_return"
+                                   {% if current_user.api_lending_return %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="apiLendingReturn">
+                                <i class="bi bi-arrow-left-right" style="color:#f59f00;"></i> Lending &amp; Return
+                            </label>
+                        </div>
+                        <small class="text-muted d-block mt-1 ms-4">
+                            Access lending sessions, lend/return operations, and session history.
+                        </small>
+                    </div>
+                    {% else %}
+                    <div class="mb-3 p-3 border rounded bg-light">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-arrow-left-right text-muted"></i>
+                            <span class="fw-semibold text-muted">Lending &amp; Return</span>
+                            <span class="badge bg-secondary"><i class="bi bi-lock-fill"></i> Server Admin Disabled</span>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if current_user.api_enabled %}
+                    <button type="submit" class="btn btn-primary mt-1">
+                        <i class="bi bi-save"></i> Save Scope Settings
+                    </button>
+                    {% else %}
+                    <p class="text-muted small mt-2 mb-0">
+                        <i class="bi bi-info-circle"></i> Enable the API above before saving scope settings.
+                    </p>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <!-- ── Help / Info Panel ──────────────────────────────────────────────── -->
+    <div class="col-md-4">
+
+        <div class="card bg-light mb-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-question-circle"></i> How It Works</h6>
+            </div>
+            <div class="card-body small">
+                <h6 class="mt-0"><i class="bi bi-toggle-on text-success"></i> Enable API</h6>
+                <p>Toggling on generates a unique bearer token for your account. Toggling off suspends your key without deleting it.</p>
+
+                <h6><i class="bi bi-key-fill text-primary"></i> API Key</h6>
+                <p>Include this token in the <code>Authorization: Bearer &lt;key&gt;</code> header on every API request. Treat it like a password.</p>
+
+                <h6><i class="bi bi-toggles text-warning"></i> Scopes</h6>
+                <p>Scopes are additive — enable only what you need. Each scope is also subject to your role's underlying permissions and the admin's server-wide toggle.</p>
+
+                <h6><i class="bi bi-speedometer2 text-danger"></i> Rate Limit</h6>
+                <p>Current limit: <strong>{{ api_rate_limit }} req / sec</strong>. Requests over the limit receive HTTP <code>429 Too Many Requests</code>.</p>
+
+                <h6><i class="bi bi-terminal text-secondary"></i> Testing</h6>
+                <p>The Test panel sends a simulated request so you can preview the format. <strong>Dry Run ON</strong> is the default — no data is modified until you turn it off.</p>
+
+                <hr>
+                <div class="alert alert-warning small mb-0 p-2">
+                    <i class="bi bi-cone-striped"></i>
+                    <strong>In Development.</strong> External token-based API is not yet live. These settings prepare your configuration for when it launches.
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-list-check"></i> Scope Reference</h6>
+            </div>
+            <div class="card-body small p-2">
+                <table class="table table-sm table-borderless mb-0">
+                    <thead><tr><th>Scope</th><th>Unlocks</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge bg-primary">Items</span></td>
+                            <td><code>/api/search-item</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge bg-success">Rack</span></td>
+                            <td>
+                                <code>/api/drawer/…</code><br>
+                                <code>/api/rack/…</code>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge bg-warning text-dark">Lending</span></td>
+                            <td><code>/in-out/…</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+// ── Key visibility toggle ─────────────────────────────────────────────────────
+function toggleKeyVisibility() {
+    const field = document.getElementById('apiKeyField');
+    const icon  = document.getElementById('keyVisIcon');
+    if (field.type === 'password') {
+        field.type = 'text';
+        icon.className = 'bi bi-eye-slash';
+    } else {
+        field.type = 'password';
+        icon.className = 'bi bi-eye';
+    }
+}
+
+// ── Copy key to clipboard ─────────────────────────────────────────────────────
+function copyApiKey() {
+    const field = document.getElementById('apiKeyField');
+    navigator.clipboard.writeText(field.value).then(() => {
+        const icon = document.getElementById('copyKeyIcon');
+        icon.className = 'bi bi-check-lg text-success';
+        setTimeout(() => { icon.className = 'bi bi-clipboard'; }, 2000);
+    });
+}
+
+// ── Dry-run badge sync ────────────────────────────────────────────────────────
+function onDryRunChange() {
+    const on = document.getElementById('dryRunToggle').checked;
+    const badge = document.getElementById('dryRunBadge');
+    const note  = document.getElementById('dryRunNote');
+    badge.textContent = on ? 'ON' : 'OFF';
+    badge.className = on ? 'badge bg-info text-dark ms-1' : 'badge bg-secondary ms-1';
+    note.innerHTML = on
+        ? '<i class="bi bi-info-circle text-info"></i> <strong>Dry Run ON</strong> — request is simulated and will not modify any data.'
+        : '<i class="bi bi-exclamation-triangle text-warning"></i> <strong>Dry Run OFF</strong> — request may modify data when the external API is live.';
+}
+
+// ── Sample bodies per endpoint ────────────────────────────────────────────────
+const SAMPLES = {
+    search_item:      '{\n  "search": "resistor",\n  "exact_match": false\n}',
+    drawer_contents:  '',
+    drawer_toggle:    '{\n  "rack_uuid": "RACK_UUID_HERE",\n  "drawer_id": "R1-C1",\n  "available": false\n}',
+    lr_sessions:      '',
+};
+
+function onEndpointChange() {
+    const sel  = document.getElementById('endpointSelect');
+    const opt  = sel.options[sel.selectedIndex];
+    const key  = sel.value;
+
+    // Fill sample body
+    if (key && SAMPLES[key] !== undefined) {
+        document.getElementById('requestBody').value = SAMPLES[key];
+    }
+
+    // Show endpoint description
+    const desc = document.getElementById('endpointDesc');
+    desc.textContent = opt.dataset.desc || '';
+
+    // Update curl snippet
+    updateCurl();
+}
+
+function updateCurl() {
+    const sel  = document.getElementById('endpointSelect');
+    const opt  = sel.options[sel.selectedIndex];
+    if (!sel.value) { document.getElementById('curlPanel').style.display = 'none'; return; }
+
+    const method = opt.dataset.method || 'POST';
+    const path   = opt.dataset.path   || '';
+    const body   = document.getElementById('requestBody').value.trim();
+    const key    = document.getElementById('apiKeyField') ? document.getElementById('apiKeyField').value : '<YOUR_KEY>';
+
+    let cmd = `curl -X ${method} http://localhost:5000${path} \\\n  -H "Authorization: Bearer ${key}"`;
+    if (method === 'POST' && body) {
+        cmd += ` \\\n  -H "Content-Type: application/json" \\\n  -d '${body.replace(/\n/g, ' ')}'`;
+    }
+
+    document.getElementById('curlSnippet').value = cmd;
+    document.getElementById('curlPanel').style.display = '';
+}
+
+document.getElementById('requestBody')?.addEventListener('input', updateCurl);
+
+function copyCurl() {
+    const field = document.getElementById('curlSnippet');
+    navigator.clipboard.writeText(field.value).then(() => {
+        const icon = document.getElementById('curlCopyIcon');
+        icon.className = 'bi bi-check-lg text-success';
+        setTimeout(() => { icon.className = 'bi bi-clipboard'; }, 2000);
+    });
+}
+
+// ── Test ──────────────────────────────────────────────────────────────────────
+function testApi() {
+    const sel = document.getElementById('endpointSelect');
+    if (!sel.value) { setResponse('error', null, 'Select an endpoint first.'); return; }
+
+    const isDryRun = document.getElementById('dryRunToggle').checked;
+    const rawBody  = document.getElementById('requestBody').value.trim();
+    const opt      = sel.options[sel.selectedIndex];
+
+    let parsedBody = null;
+    if (rawBody) {
+        try { parsedBody = JSON.parse(rawBody); }
+        catch (_) { setResponse('error', null, 'Invalid JSON in request body.'); return; }
+    }
+
+    const btn = document.getElementById('testBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Testing…';
+    setResponse('loading', null, 'Sending request…');
+
+    setTimeout(() => {
+        const mock = {
+            status:       'ok',
+            dry_run:      isDryRun,
+            endpoint:     opt.dataset.path || '',
+            method:       opt.dataset.method || 'POST',
+            api_version:  'planned',
+            note:         'External API is not yet active. This is a simulated UI-only response.',
+            request_body: parsedBody,
+        };
+        setResponse('success', 200, JSON.stringify(mock, null, 2));
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-play-fill"></i> Test';
+    }, 650);
+}
+
+function setResponse(type, status, content) {
+    const area  = document.getElementById('responseArea');
+    const badge = document.getElementById('statusBadge');
+
+    if (status !== null) {
+        badge.style.display = '';
+        if (status >= 200 && status < 300) {
+            badge.className = 'badge bg-success fs-6';
+            badge.textContent = `HTTP ${status}`;
+        } else {
+            badge.className = 'badge bg-danger fs-6';
+            badge.textContent = `HTTP ${status}`;
+        }
+    } else {
+        badge.style.display = 'none';
+    }
+
+    if (type === 'error') {
+        area.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle"></i> ${escHtml(content)}</span>`;
+    } else if (type === 'loading') {
+        area.innerHTML = `<span class="text-muted"><i class="bi bi-hourglass-split"></i> ${escHtml(content)}</span>`;
+    } else {
+        area.textContent = content;
+    }
+}
+
+function clearTest() {
+    document.getElementById('responseArea').innerHTML = '<span class="text-muted">Response will appear here…</span>';
+    document.getElementById('requestBody').value = '';
+    document.getElementById('endpointSelect').value = '';
+    document.getElementById('endpointDesc').textContent = '';
+    document.getElementById('curlPanel').style.display = 'none';
+    document.getElementById('statusBadge').style.display = 'none';
+}
+
+function escHtml(t) {
+    return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+{% endblock %}
