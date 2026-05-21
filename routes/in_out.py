@@ -84,7 +84,7 @@ def in_out():
     can_edit_batch  = current_user.has_permission('lending_return', 'edit_batch')
     can_delete_batch= current_user.has_permission('lending_return', 'delete_batch')
     can_only_self   = (current_user.has_permission('lending_return', 'only_self_lending')
-                       and not current_user.has_permission('lending_return', 'edit_batch'))
+                       and not current_user.has_permission('lending_return', 'edit_lending'))
     scan_enabled    = Setting.get('lr_scan_enabled', False) is True
 
     log_page = request.args.get('log_page', 1, type=int)
@@ -322,7 +322,7 @@ def in_out_sessions_list():
         return jsonify({'sessions': []})
 
     can_only_self = (current_user.has_permission('lending_return', 'only_self_lending')
-                     and not current_user.has_permission('lending_return', 'edit_batch'))
+                     and not current_user.has_permission('lending_return', 'edit_lending'))
 
     start_str  = request.args.get('start_date', '').strip()
     end_str    = request.args.get('end_date',   '').strip()
@@ -372,6 +372,7 @@ def in_out_sessions_list():
             'lend_end':     s.lend_end.strftime('%d/%m/%y')   if s.lend_end   else '',
             'notes':        s.notes or '',
             'item_count':   item_count,
+            'is_api':       bool(s.is_api),
         }
 
     return jsonify({'sessions': [_list_json(s) for s in sessions],
@@ -387,7 +388,7 @@ def in_out_logs_ajax():
         return jsonify({'entries': [], 'has_more': False})
 
     can_only_self = (current_user.has_permission('lending_return', 'only_self_lending')
-                     and not current_user.has_permission('lending_return', 'edit_batch'))
+                     and not current_user.has_permission('lending_return', 'edit_lending'))
 
     start_str    = request.args.get('start_date',   '').strip()
     end_str      = request.args.get('end_date',     '').strip()
@@ -468,7 +469,7 @@ def in_out_submit_cart():
     now    = datetime.now(timezone.utc)
 
     can_only_self = (current_user.has_permission('lending_return', 'only_self_lending')
-                     and not current_user.has_permission('lending_return', 'edit_batch'))
+                     and not current_user.has_permission('lending_return', 'edit_lending'))
 
     global_notes = (detail.get('notes', '') or '').strip()[:256]
 
@@ -687,7 +688,7 @@ def in_out_lend():
     now        = datetime.now(timezone.utc)
 
     can_only_self = (current_user.has_permission('lending_return', 'only_self_lending')
-                     and not current_user.has_permission('lending_return', 'edit_batch'))
+                     and not current_user.has_permission('lending_return', 'edit_lending'))
 
     if batch.sn_tracking_enabled:
         sn_ids    = data.get('sn_ids', [])

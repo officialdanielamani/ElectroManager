@@ -885,6 +885,7 @@ class LendingSession(db.Model):
     lend_start = db.Column(db.DateTime, nullable=True)
     lend_end = db.Column(db.DateTime, nullable=True)
     notes = db.Column(db.String(256), nullable=True)
+    is_api = db.Column(db.Boolean, default=False, nullable=False)
 
     creator = db.relationship('User', foreign_keys=[created_by_id])
 

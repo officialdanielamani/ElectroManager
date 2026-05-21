@@ -282,14 +282,20 @@
                  style="min-width:120px;flex:1 1 120px;"
                  onchange="searchSessions()" title="Due date (lend_end ≤)">
           {% if not can_only_self %}
-          <div class="position-relative" style="min-width:130px;flex:2 1 130px;">
-            <input type="hidden" id="sessFilterContactId">
-            <input type="hidden" id="sessFilterContactType">
-            <input type="text" class="form-control form-control-sm" id="sessFilterContactInput"
-                   placeholder="Contact…" oninput="debounceSessContact()" autocomplete="off">
-            <div id="sessFilterContactDrop" class="border rounded shadow-sm position-absolute"
-                 style="top:100%;left:0;right:0;z-index:200;max-height:160px;overflow-y:auto;
-                        background:var(--bs-body-bg);display:none;font-size:0.82rem;"></div>
+          <div class="d-flex gap-1 align-items-center" style="min-width:130px;flex:2 1 130px;">
+            <div class="position-relative flex-grow-1">
+              <input type="hidden" id="sessFilterContactId">
+              <input type="hidden" id="sessFilterContactType">
+              <input type="text" class="form-control form-control-sm" id="sessFilterContactInput"
+                     placeholder="All contacts…" oninput="debounceSessContact()" autocomplete="off">
+              <div id="sessFilterContactDrop" class="border rounded shadow-sm position-absolute"
+                   style="top:100%;left:0;right:0;z-index:200;max-height:160px;overflow-y:auto;
+                          background:var(--bs-body-bg);display:none;font-size:0.82rem;"></div>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm py-0 px-1 flex-shrink-0" style="font-size:0.75rem;"
+                    title="Filter to my sessions" onclick="selectSessContact('user', {{ current_user.id }}, {{ current_user.name | tojson }})">Me</button>
+            <button class="btn btn-outline-secondary btn-sm py-0 px-1 flex-shrink-0" style="font-size:0.75rem;"
+                    title="Show all sessions" onclick="clearSessContact()">All</button>
           </div>
           {% endif %}
         </div>
@@ -2075,12 +2081,6 @@ function _sessInitDefaults() {
     };
     _setVal('sessFilterStart', fmt(past));
     _setVal('sessFilterEnd',   fmt(future));
-    /* Default contact to current user for non-self-only users */
-    if (!_canOnlySelf) {
-        _setVal('sessFilterContactId',    String(_currentUserId));
-        _setVal('sessFilterContactType',  'user');
-        _setVal('sessFilterContactInput', _currentUserLabel);
-    }
 }
 
 function searchSessions() {
@@ -2157,6 +2157,7 @@ function _renderSessions(sessions) {
             (s.lend_to_label ? '<span class="fw-semibold">' + _esc(s.lend_to_label) + '</span>' : '') +
             (dateRange ? ' <span class="text-muted">' + _esc(dateRange) + '</span>' : '') +
             '</div>' +
+            (s.is_api ? '<span class="badge bg-warning text-dark flex-shrink-0" style="font-size:0.62rem;" title="Created via external API">API</span>' : '') +
             '<span class="badge bg-secondary flex-shrink-0" style="font-size:0.65rem;">' + (s.item_count || 0) + ' item(s)</span>' +
             '</div>';
     });
@@ -2328,6 +2329,15 @@ function selectSessContact(type, id, label) {
     _setVal('sessFilterContactId',   id);
     _setVal('sessFilterContactType', type);
     _setVal('sessFilterContactInput', label);
+    var drop = document.getElementById('sessFilterContactDrop');
+    if (drop) drop.style.display = 'none';
+    searchSessions();
+}
+
+function clearSessContact() {
+    _setVal('sessFilterContactId',   '');
+    _setVal('sessFilterContactType', '');
+    _setVal('sessFilterContactInput', '');
     var drop = document.getElementById('sessFilterContactDrop');
     if (drop) drop.style.display = 'none';
     searchSessions();

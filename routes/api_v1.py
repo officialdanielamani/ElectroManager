@@ -400,6 +400,7 @@ def api_lend():
         lend_start    = lend_start,
         lend_end      = due_date,
         notes         = note or None,
+        is_api        = True,
     )
     db.session.add(session_obj)
     db.session.flush()
@@ -595,6 +596,7 @@ def api_return():
         mode          = 'return',
         created_by_id = user.id,
         notes         = note or None,
+        is_api        = True,
     )
     db.session.add(session_obj)
     db.session.flush()

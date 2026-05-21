@@ -278,6 +278,7 @@ def _apply_column_migrations():
         ("projects",             "thumbnail",            "VARCHAR(300)"),
         ("project_bom_items",    "sort_order",           "INTEGER DEFAULT 0"),
         ("users",                "user_uid",             "VARCHAR(6)"),
+        ("lending_sessions",     "is_api",               "BOOLEAN DEFAULT 0"),
     ]
     with db.engine.connect() as conn:
         for table, col, col_type in additions:
