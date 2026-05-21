@@ -1,7 +1,7 @@
 """
 Settings Routes Blueprint
 """
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file, abort, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file, abort, current_app, session
 from flask_login import login_required, current_user, login_user, logout_user
 from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate, SharedFile
 from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEditForm, AttachmentForm, 
@@ -888,6 +888,16 @@ def scan_share_files():
 
 
 
+def _generate_api_key(user):
+    """Generate a new hashed API key for *user*.  Returns the plain-text key (shown once)."""
+    import hashlib
+    plain  = 'em_' + secrets.token_urlsafe(32)
+    hashed = hashlib.sha256(plain.encode()).hexdigest()
+    user.api_key_hash   = hashed
+    user.api_key_prefix = plain[:12]   # "em_" + 9 chars for display hint
+    return plain
+
+
 @settings_bp.route('/settings/user-api', endpoint='user_api', methods=['GET', 'POST'])
 @login_required
 def user_api():
@@ -906,8 +916,9 @@ def user_api():
                 flash('You do not have permission to use the API.', 'danger')
                 return redirect(url_for('settings.user_api'))
             current_user.api_enabled = not current_user.api_enabled
-            if current_user.api_enabled and not current_user.api_key:
-                current_user.api_key = secrets.token_urlsafe(32)
+            if current_user.api_enabled and not current_user.api_key_hash:
+                plain = _generate_api_key(current_user)
+                session['new_api_key'] = plain
             db.session.commit()
             log_audit(current_user.id, 'update', 'user', current_user.id,
                       f'API {"enabled" if current_user.api_enabled else "disabled"}')
@@ -917,10 +928,11 @@ def user_api():
             if not can_run:
                 flash('You do not have permission to use the API.', 'danger')
                 return redirect(url_for('settings.user_api'))
-            current_user.api_key = secrets.token_urlsafe(32)
+            plain = _generate_api_key(current_user)
+            session['new_api_key'] = plain
             db.session.commit()
             log_audit(current_user.id, 'update', 'user', current_user.id, 'API key revoked and regenerated')
-            flash('API key revoked — a new key has been generated.', 'success')
+            flash('API key revoked — a new key has been generated. Copy it now.', 'success')
 
         elif action == 'save_scopes':
             if not can_run:
@@ -938,8 +950,10 @@ def user_api():
 
         return redirect(url_for('settings.user_api'))
 
+    new_key = session.pop('new_api_key', None)
     return render_template('settings_user_api.html',
                            can_run=can_run,
+                           new_key=new_key,
                            api_rate_limit=Setting.get('api_rate_limit', '5'),
                            sys_item_search_enabled=Setting.get('api_item_search_enabled', False),
                            sys_rack_drawer_enabled=Setting.get('api_rack_drawer_enabled', False),

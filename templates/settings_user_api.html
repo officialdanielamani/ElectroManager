@@ -90,25 +90,38 @@
                 </div>
             </div>
             <div class="card-body">
-                {% if current_user.api_key %}
-                <label class="form-label fw-semibold">Your API Key</label>
+
+                {% if new_key %}
+                <!-- One-time key display — shown only immediately after generation -->
+                <div class="alert alert-success d-flex align-items-start gap-3 mb-3" role="alert">
+                    <i class="bi bi-key-fill fs-4 flex-shrink-0 mt-1"></i>
+                    <div class="flex-grow-1">
+                        <strong>Copy your API key now — it will not be shown again.</strong>
+                        <div class="input-group mt-2">
+                            <input type="text" class="form-control font-monospace"
+                                   id="newKeyField" value="{{ new_key }}" readonly autocomplete="off">
+                            <button class="btn btn-success" type="button" onclick="copyNewKey()" title="Copy key">
+                                <i class="bi bi-clipboard" id="newKeyCopyIcon"></i>
+                            </button>
+                        </div>
+                        <div class="form-text text-success-emphasis mt-1">
+                            <i class="bi bi-info-circle"></i>
+                            The key is stored hashed and cannot be recovered. Revoke &amp; regenerate if you lose it.
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if current_user.api_key_hash %}
+                <label class="form-label fw-semibold">API Key</label>
                 <div class="input-group mb-1">
-                    <input type="text" class="form-control font-monospace" id="apiKeyField"
-                           value="{{ '•' * 32 }}"
-                           data-key="{{ current_user.api_key }}"
-                           readonly autocomplete="off">
-                    <button class="btn btn-outline-secondary" type="button"
-                            id="toggleKeyVisBtn" onclick="toggleKeyVisibility()" title="Show/hide key">
-                        <i class="bi bi-eye" id="keyVisIcon"></i>
-                    </button>
-                    <button class="btn btn-outline-secondary" type="button"
-                            id="copyKeyBtn" onclick="copyApiKey()" title="Copy to clipboard">
-                        <i class="bi bi-clipboard" id="copyKeyIcon"></i>
-                    </button>
+                    <span class="input-group-text"><i class="bi bi-shield-lock"></i></span>
+                    <input type="text" class="form-control font-monospace"
+                           value="{{ current_user.api_key_prefix }}••••••••••••••••••••••••••••••••••••"
+                           readonly autocomplete="off" title="Key is stored hashed — shown only at generation">
                 </div>
                 <div class="form-text mb-3">
-                    <i class="bi bi-shield-lock"></i>
-                    Treat this key like a password — do not share it or commit it to version control.
+                    Key is stored as a hash — only the prefix is shown. Revoke &amp; regenerate if you lose it.
                 </div>
                 <form method="POST" onsubmit="return confirm('Revoke this key and generate a new one?\nThe current key will stop working immediately.')">
                     <input type="hidden" name="action" value="revoke_key">
@@ -119,6 +132,7 @@
                 {% else %}
                 <p class="text-muted mb-0">No key generated yet. Toggle API on to generate your key.</p>
                 {% endif %}
+
             </div>
         </div>
 
@@ -128,6 +142,21 @@
                 <h5 class="mb-0"><i class="bi bi-terminal-fill"></i> Test API</h5>
             </div>
             <div class="card-body">
+
+                <!-- Key input for testing -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">
+                        <i class="bi bi-key"></i> API Key <span class="text-muted fw-normal">(paste here to enable test requests)</span>
+                    </label>
+                    <div class="input-group input-group-sm">
+                        <input type="password" class="form-control font-monospace" id="testApiKeyInput"
+                               placeholder="Paste your API key — not saved, used only for requests on this page"
+                               autocomplete="off" oninput="updateCurl()">
+                        <button class="btn btn-outline-secondary" type="button" onclick="toggleTestKeyVis()" title="Show/hide">
+                            <i class="bi bi-eye" id="testKeyVisIcon"></i>
+                        </button>
+                    </div>
+                </div>
 
                 <!-- Endpoint selector -->
                 <div class="mb-3">
@@ -457,30 +486,36 @@
 </div>
 
 <script>
-// ── Key visibility toggle (type="text" + dots masking — avoids browser native eye button) ──
-function toggleKeyVisibility() {
-    const field   = document.getElementById('apiKeyField');
-    const icon    = document.getElementById('keyVisIcon');
-    const realKey = field.dataset.key;
-    if (field.value === realKey) {
-        field.value       = '•'.repeat(32);
-        icon.className    = 'bi bi-eye';
-    } else {
-        field.value       = realKey;
-        icon.className    = 'bi bi-eye-slash';
-    }
-    updateCurl();
-}
-
-// ── Copy key to clipboard ──────────────────────────────────────────────────────
-function copyApiKey() {
-    const key = document.getElementById('apiKeyField').dataset.key;
-    navigator.clipboard.writeText(key).then(() => {
-        const icon = document.getElementById('copyKeyIcon');
-        icon.className = 'bi bi-check-lg text-success';
+// ── One-time key copy (shown immediately after generation) ─────────────────────
+function copyNewKey() {
+    const val = document.getElementById('newKeyField')?.value || '';
+    navigator.clipboard.writeText(val).then(() => {
+        const icon = document.getElementById('newKeyCopyIcon');
+        icon.className = 'bi bi-check-lg';
         setTimeout(() => { icon.className = 'bi bi-clipboard'; }, 2000);
     });
 }
+
+// ── Test-panel key show/hide ───────────────────────────────────────────────────
+function toggleTestKeyVis() {
+    const inp  = document.getElementById('testApiKeyInput');
+    const icon = document.getElementById('testKeyVisIcon');
+    if (inp.type === 'password') {
+        inp.type = 'text';
+        icon.className = 'bi bi-eye-slash';
+    } else {
+        inp.type = 'password';
+        icon.className = 'bi bi-eye';
+    }
+}
+
+// Pre-fill test key input from one-time display (if key was just generated)
+{% if new_key %}
+document.addEventListener('DOMContentLoaded', function () {
+    const inp = document.getElementById('testApiKeyInput');
+    if (inp) { inp.value = {{ new_key | tojson }}; updateCurl(); }
+});
+{% endif %}
 
 // ── Dry-run badge sync ─────────────────────────────────────────────────────────
 function onDryRunChange() {
@@ -527,7 +562,7 @@ function onEndpointChange() {
 }
 
 function _getApiKey() {
-    return document.getElementById('apiKeyField')?.dataset.key || '<YOUR_API_KEY>';
+    return document.getElementById('testApiKeyInput')?.value.trim() || '<YOUR_API_KEY>';
 }
 
 function updateCurl() {

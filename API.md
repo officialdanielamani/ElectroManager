@@ -21,6 +21,8 @@ Authorization: Bearer <api_key>
 
 The API key is tied to a specific user account. All operations performed through the API are recorded under that user.
 
+Keys are stored as SHA-256 hashes on the server — the plain-text key is shown only once at generation time and cannot be recovered. If a key is lost, revoke it and generate a new one.
+
 ---
 
 ### User, Roles & Permissions
@@ -750,9 +752,9 @@ Find item location
 3. **User: generate API key and enable scopes**
    - `Settings → User API`
    - Toggle **Enable API** to generate a personal API key
+   - **Copy the key immediately** — it is displayed only once and cannot be recovered (it is stored hashed, not in plain text)
    - Enable the scopes needed (must match what the admin enabled system-wide): Item Search, Lending & Return, and/or Location, Rack & Drawer
-   - Copy the API key — it is shown only once (use the Show button)
-   - To rotate: click **Revoke** then re-enable
+   - To rotate: click **Revoke & Regenerate Key** — the old key is invalidated instantly and a new one is shown once
 
 ---
 

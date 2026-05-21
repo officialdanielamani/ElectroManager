@@ -9,6 +9,7 @@ from models import (db, User, Item, ItemBatch, BatchSerialNumber,
                     _generate_lending_id, Setting)
 from utils import log_audit
 from datetime import datetime, timezone
+import hashlib
 import time
 import threading
 import re
@@ -67,7 +68,8 @@ def _authenticate(scope: str = None):
     if not key:
         return None, _err(401, 'INVALID_KEY', 'API key is empty')
 
-    user = User.query.filter_by(api_key=key, api_enabled=True).first()
+    key_hash = hashlib.sha256(key.encode()).hexdigest()
+    user = User.query.filter_by(api_key_hash=key_hash, api_enabled=True).first()
     if not user:
         return None, _err(401, 'INVALID_KEY', 'API key not found or disabled')
     if not user.is_active:
