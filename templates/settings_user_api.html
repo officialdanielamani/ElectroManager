@@ -93,8 +93,10 @@
                 {% if current_user.api_key %}
                 <label class="form-label fw-semibold">Your API Key</label>
                 <div class="input-group mb-1">
-                    <input type="password" class="form-control font-monospace" id="apiKeyField"
-                           value="{{ current_user.api_key }}" readonly>
+                    <input type="text" class="form-control font-monospace" id="apiKeyField"
+                           value="{{ '•' * 32 }}"
+                           data-key="{{ current_user.api_key }}"
+                           readonly autocomplete="off">
                     <button class="btn btn-outline-secondary" type="button"
                             id="toggleKeyVisBtn" onclick="toggleKeyVisibility()" title="Show/hide key">
                         <i class="bi bi-eye" id="keyVisIcon"></i>
@@ -133,38 +135,38 @@
                     <select class="form-select" id="endpointSelect" onchange="onEndpointChange()">
                         <option value="">— Select an endpoint to test —</option>
                         {% if current_user.api_item_search and sys_item_search_enabled %}
-                        <optgroup label="Item Search &amp; Information">
-                            <option value="search_item"
-                                    data-method="POST"
-                                    data-path="/api/search-item"
-                                    data-desc="Search items by name or UUID with optional location filter">
-                                POST /api/search-item
-                            </option>
-                        </optgroup>
-                        {% endif %}
-                        {% if current_user.api_rack_drawer and sys_rack_drawer_enabled %}
-                        <optgroup label="Rack &amp; Drawer System">
-                            <option value="drawer_contents"
+                        <optgroup label="Item Search">
+                            <option value="lookup_item"
                                     data-method="GET"
-                                    data-path="/api/drawer/{rack_uuid}/{drawer_id}"
-                                    data-desc="Get items stored in a specific drawer">
-                                GET /api/drawer/&lt;rack_uuid&gt;/&lt;drawer_id&gt;
-                            </option>
-                            <option value="drawer_toggle"
-                                    data-method="POST"
-                                    data-path="/api/drawer/toggle-availability"
-                                    data-desc="Mark a drawer as available or unavailable">
-                                POST /api/drawer/toggle-availability
+                                    data-type="get_query"
+                                    data-path="/api/v1/lookup"
+                                    data-desc="Validate a batch UID or ISN — returns item name, availability, and stock">
+                                GET /api/v1/lookup
                             </option>
                         </optgroup>
                         {% endif %}
                         {% if current_user.api_lending_return and sys_lending_return_enabled %}
                         <optgroup label="Lending &amp; Return">
-                            <option value="lr_sessions"
+                            <option value="session_get"
                                     data-method="GET"
-                                    data-path="/in-out/sessions"
-                                    data-desc="List recent lending sessions">
-                                GET /in-out/sessions
+                                    data-type="get_path"
+                                    data-path="/api/v1/session/{id}"
+                                    data-desc="Look up a lending or return session by its session ID">
+                                GET /api/v1/session/&lt;session_id&gt;
+                            </option>
+                            <option value="lend_cart"
+                                    data-method="POST"
+                                    data-type="post"
+                                    data-path="/api/v1/lend"
+                                    data-desc="Submit a lending cart — one or more items in a single transaction">
+                                POST /api/v1/lend
+                            </option>
+                            <option value="return_cart"
+                                    data-method="POST"
+                                    data-type="post"
+                                    data-path="/api/v1/return"
+                                    data-desc="Submit a return cart — one or more items in a single transaction">
+                                POST /api/v1/return
                             </option>
                         </optgroup>
                         {% endif %}
@@ -191,7 +193,7 @@
                               placeholder='{"search": "resistor"}'></textarea>
                     <div class="form-text" id="dryRunNote">
                         <i class="bi bi-info-circle text-info"></i>
-                        <strong>Dry Run ON</strong> — request is simulated and will not modify any data.
+                        <strong>Dry Run ON</strong> — <code>dry_run: true</code> is added to POST requests. No data will be modified.
                     </div>
                 </div>
 
@@ -373,13 +375,7 @@
                 <p>Current limit: <strong>{{ api_rate_limit }} req / sec</strong>. Requests over the limit receive HTTP <code>429 Too Many Requests</code>.</p>
 
                 <h6><i class="bi bi-terminal text-secondary"></i> Testing</h6>
-                <p>The Test panel sends a simulated request so you can preview the format. <strong>Dry Run ON</strong> is the default — no data is modified until you turn it off.</p>
-
-                <hr>
-                <div class="alert alert-warning small mb-0 p-2">
-                    <i class="bi bi-cone-striped"></i>
-                    <strong>In Development.</strong> External token-based API is not yet live. These settings prepare your configuration for when it launches.
-                </div>
+                <p>The Test panel sends a real request to <code>/api/v1/</code> using your key. <strong>Dry Run ON</strong> adds <code>dry_run: true</code> to POST requests so nothing is written until you turn it off.</p>
             </div>
         </div>
 
@@ -393,18 +389,16 @@
                     <tbody>
                         <tr>
                             <td><span class="badge bg-primary">Items</span></td>
-                            <td><code>/api/search-item</code></td>
-                        </tr>
-                        <tr>
-                            <td><span class="badge bg-success">Rack</span></td>
-                            <td>
-                                <code>/api/drawer/…</code><br>
-                                <code>/api/rack/…</code>
-                            </td>
+                            <td><code>GET /api/v1/lookup</code></td>
                         </tr>
                         <tr>
                             <td><span class="badge bg-warning text-dark">Lending</span></td>
-                            <td><code>/in-out/…</code></td>
+                            <td>
+                                <code>GET /api/v1/lookup</code><br>
+                                <code>GET /api/v1/session/&lt;id&gt;</code><br>
+                                <code>POST /api/v1/lend</code><br>
+                                <code>POST /api/v1/return</code>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -415,82 +409,107 @@
 </div>
 
 <script>
-// ── Key visibility toggle ─────────────────────────────────────────────────────
+// ── Key visibility toggle (type="text" + dots masking — avoids browser native eye button) ──
 function toggleKeyVisibility() {
-    const field = document.getElementById('apiKeyField');
-    const icon  = document.getElementById('keyVisIcon');
-    if (field.type === 'password') {
-        field.type = 'text';
-        icon.className = 'bi bi-eye-slash';
+    const field   = document.getElementById('apiKeyField');
+    const icon    = document.getElementById('keyVisIcon');
+    const realKey = field.dataset.key;
+    if (field.value === realKey) {
+        field.value       = '•'.repeat(32);
+        icon.className    = 'bi bi-eye';
     } else {
-        field.type = 'password';
-        icon.className = 'bi bi-eye';
+        field.value       = realKey;
+        icon.className    = 'bi bi-eye-slash';
     }
+    updateCurl();
 }
 
-// ── Copy key to clipboard ─────────────────────────────────────────────────────
+// ── Copy key to clipboard ──────────────────────────────────────────────────────
 function copyApiKey() {
-    const field = document.getElementById('apiKeyField');
-    navigator.clipboard.writeText(field.value).then(() => {
+    const key = document.getElementById('apiKeyField').dataset.key;
+    navigator.clipboard.writeText(key).then(() => {
         const icon = document.getElementById('copyKeyIcon');
         icon.className = 'bi bi-check-lg text-success';
         setTimeout(() => { icon.className = 'bi bi-clipboard'; }, 2000);
     });
 }
 
-// ── Dry-run badge sync ────────────────────────────────────────────────────────
+// ── Dry-run badge sync ─────────────────────────────────────────────────────────
 function onDryRunChange() {
-    const on = document.getElementById('dryRunToggle').checked;
+    const on    = document.getElementById('dryRunToggle').checked;
     const badge = document.getElementById('dryRunBadge');
     const note  = document.getElementById('dryRunNote');
     badge.textContent = on ? 'ON' : 'OFF';
-    badge.className = on ? 'badge bg-info text-dark ms-1' : 'badge bg-secondary ms-1';
-    note.innerHTML = on
-        ? '<i class="bi bi-info-circle text-info"></i> <strong>Dry Run ON</strong> — request is simulated and will not modify any data.'
-        : '<i class="bi bi-exclamation-triangle text-warning"></i> <strong>Dry Run OFF</strong> — request may modify data when the external API is live.';
-}
-
-// ── Sample bodies per endpoint ────────────────────────────────────────────────
-const SAMPLES = {
-    search_item:      '{\n  "search": "resistor",\n  "exact_match": false\n}',
-    drawer_contents:  '',
-    drawer_toggle:    '{\n  "rack_uuid": "RACK_UUID_HERE",\n  "drawer_id": "R1-C1",\n  "available": false\n}',
-    lr_sessions:      '',
-};
-
-function onEndpointChange() {
-    const sel  = document.getElementById('endpointSelect');
-    const opt  = sel.options[sel.selectedIndex];
-    const key  = sel.value;
-
-    // Fill sample body
-    if (key && SAMPLES[key] !== undefined) {
-        document.getElementById('requestBody').value = SAMPLES[key];
-    }
-
-    // Show endpoint description
-    const desc = document.getElementById('endpointDesc');
-    desc.textContent = opt.dataset.desc || '';
-
-    // Update curl snippet
+    badge.className   = on ? 'badge bg-info text-dark ms-1' : 'badge bg-secondary ms-1';
+    note.innerHTML    = on
+        ? '<i class="bi bi-info-circle text-info"></i> <strong>Dry Run ON</strong> — <code>dry_run: true</code> is added to POST requests. No data will be modified.'
+        : '<i class="bi bi-exclamation-triangle text-warning"></i> <strong>Dry Run OFF</strong> — POST requests will write real data.';
     updateCurl();
 }
 
+// ── Sample bodies per endpoint ─────────────────────────────────────────────────
+const SAMPLES = {
+    lookup_item:  '{\n  "q": "ISN-0042"\n}',
+    session_get:  '{\n  "session_id": "20250521-AB1234"\n}',
+    lend_cart:    '{\n  "items": [\n    {"batch_id": "XXXXXXXXXXXXXXXX-B01", "qty": 1}\n  ],\n  "due_date": "2025-12-31T23:59:59"\n}',
+    return_cart:  '{\n  "items": [\n    {"batch_id": "XXXXXXXXXXXXXXXX-B01", "qty": 1}\n  ]\n}',
+};
+
+function onEndpointChange() {
+    const sel = document.getElementById('endpointSelect');
+    const opt = sel.options[sel.selectedIndex];
+    const key = sel.value;
+
+    if (key && SAMPLES[key] !== undefined) {
+        document.getElementById('requestBody').value = SAMPLES[key];
+    }
+    document.getElementById('endpointDesc').textContent = opt.dataset.desc || '';
+
+    // Hide dry-run for GET endpoints (not applicable)
+    const isGet = (opt.dataset.method || 'GET') === 'GET';
+    document.getElementById('dryRunToggle').closest('.d-flex').style.opacity = isGet ? '0.4' : '';
+    document.getElementById('dryRunToggle').closest('.d-flex').title = isGet ? 'Dry Run does not apply to GET requests' : '';
+
+    updateCurl();
+}
+
+function _getApiKey() {
+    return document.getElementById('apiKeyField')?.dataset.key || '<YOUR_API_KEY>';
+}
+
 function updateCurl() {
-    const sel  = document.getElementById('endpointSelect');
-    const opt  = sel.options[sel.selectedIndex];
+    const sel = document.getElementById('endpointSelect');
+    const opt = sel.options[sel.selectedIndex];
     if (!sel.value) { document.getElementById('curlPanel').style.display = 'none'; return; }
 
-    const method = opt.dataset.method || 'POST';
-    const path   = opt.dataset.path   || '';
-    const body   = document.getElementById('requestBody').value.trim();
-    const key    = document.getElementById('apiKeyField') ? document.getElementById('apiKeyField').value : '<YOUR_KEY>';
+    const method   = opt.dataset.method || 'GET';
+    const eType    = opt.dataset.type   || 'post';
+    const basePath = opt.dataset.path   || '';
+    const rawBody  = document.getElementById('requestBody').value.trim();
+    const isDryRun = document.getElementById('dryRunToggle').checked;
+    const apiKey   = _getApiKey();
 
-    let cmd = `curl -X ${method} http://localhost:5000${path} \\\n  -H "Authorization: Bearer ${key}"`;
-    if (method === 'POST' && body) {
-        cmd += ` \\\n  -H "Content-Type: application/json" \\\n  -d '${body.replace(/\n/g, ' ')}'`;
+    let urlPath = basePath;
+    let curlBody = '';
+
+    if (method === 'GET') {
+        let parsed = {};
+        try { parsed = rawBody ? JSON.parse(rawBody) : {}; } catch (_) {}
+        if (eType === 'get_query') {
+            const params = new URLSearchParams(parsed);
+            if ([...params].length) urlPath += '?' + params.toString();
+        } else if (eType === 'get_path') {
+            urlPath = urlPath.replace('{id}', encodeURIComponent(parsed.session_id || '<session_id>'));
+        }
+    } else {
+        let parsed = {};
+        try { parsed = rawBody ? JSON.parse(rawBody) : {}; } catch (_) {}
+        if (isDryRun) parsed.dry_run = true;
+        const bodyStr = JSON.stringify(parsed);
+        curlBody = ` \\\n  -H "Content-Type: application/json" \\\n  -d '${bodyStr}'`;
     }
 
+    const cmd = `curl -X ${method} "http://localhost:5000${urlPath}" \\\n  -H "Authorization: Bearer ${apiKey}"${curlBody}`;
     document.getElementById('curlSnippet').value = cmd;
     document.getElementById('curlPanel').style.display = '';
 }
@@ -506,19 +525,35 @@ function copyCurl() {
     });
 }
 
-// ── Test ──────────────────────────────────────────────────────────────────────
-function testApi() {
+// ── Test — real fetch to /api/v1/ ──────────────────────────────────────────────
+async function testApi() {
     const sel = document.getElementById('endpointSelect');
     if (!sel.value) { setResponse('error', null, 'Select an endpoint first.'); return; }
 
+    const opt      = sel.options[sel.selectedIndex];
+    const method   = opt.dataset.method || 'GET';
+    const eType    = opt.dataset.type   || 'post';
+    const basePath = opt.dataset.path   || '';
     const isDryRun = document.getElementById('dryRunToggle').checked;
     const rawBody  = document.getElementById('requestBody').value.trim();
-    const opt      = sel.options[sel.selectedIndex];
+    const apiKey   = _getApiKey();
 
-    let parsedBody = null;
+    let parsed = null;
     if (rawBody) {
-        try { parsedBody = JSON.parse(rawBody); }
+        try { parsed = JSON.parse(rawBody); }
         catch (_) { setResponse('error', null, 'Invalid JSON in request body.'); return; }
+    }
+
+    // Build URL
+    let url = basePath;
+    if (method === 'GET') {
+        const p = parsed || {};
+        if (eType === 'get_query') {
+            const params = new URLSearchParams(p);
+            if ([...params].length) url += '?' + params.toString();
+        } else if (eType === 'get_path') {
+            url = url.replace('{id}', encodeURIComponent(p.session_id || ''));
+        }
     }
 
     const btn = document.getElementById('testBtn');
@@ -526,20 +561,28 @@ function testApi() {
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Testing…';
     setResponse('loading', null, 'Sending request…');
 
-    setTimeout(() => {
-        const mock = {
-            status:       'ok',
-            dry_run:      isDryRun,
-            endpoint:     opt.dataset.path || '',
-            method:       opt.dataset.method || 'POST',
-            api_version:  'planned',
-            note:         'External API is not yet active. This is a simulated UI-only response.',
-            request_body: parsedBody,
-        };
-        setResponse('success', 200, JSON.stringify(mock, null, 2));
+    try {
+        const headers = { 'Authorization': `Bearer ${apiKey}` };
+        let body = undefined;
+
+        if (method === 'POST') {
+            const payload = parsed ? { ...parsed } : {};
+            if (isDryRun) payload.dry_run = true;
+            headers['Content-Type'] = 'application/json';
+            body = JSON.stringify(payload);
+        }
+
+        const resp = await fetch(url, { method, headers, body });
+        const text = await resp.text();
+        let display = text;
+        try { display = JSON.stringify(JSON.parse(text), null, 2); } catch (_) {}
+        setResponse(resp.ok ? 'success' : 'error', resp.status, display);
+    } catch (e) {
+        setResponse('error', null, `Network error: ${e.message}`);
+    } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-play-fill"></i> Test';
-    }, 650);
+    }
 }
 
 function setResponse(type, status, content) {
@@ -548,13 +591,8 @@ function setResponse(type, status, content) {
 
     if (status !== null) {
         badge.style.display = '';
-        if (status >= 200 && status < 300) {
-            badge.className = 'badge bg-success fs-6';
-            badge.textContent = `HTTP ${status}`;
-        } else {
-            badge.className = 'badge bg-danger fs-6';
-            badge.textContent = `HTTP ${status}`;
-        }
+        badge.className     = (status >= 200 && status < 300) ? 'badge bg-success fs-6' : 'badge bg-danger fs-6';
+        badge.textContent   = `HTTP ${status}`;
     } else {
         badge.style.display = 'none';
     }
@@ -570,10 +608,10 @@ function setResponse(type, status, content) {
 
 function clearTest() {
     document.getElementById('responseArea').innerHTML = '<span class="text-muted">Response will appear here…</span>';
-    document.getElementById('requestBody').value = '';
-    document.getElementById('endpointSelect').value = '';
+    document.getElementById('requestBody').value      = '';
+    document.getElementById('endpointSelect').value   = '';
     document.getElementById('endpointDesc').textContent = '';
-    document.getElementById('curlPanel').style.display = 'none';
+    document.getElementById('curlPanel').style.display  = 'none';
     document.getElementById('statusBadge').style.display = 'none';
 }
 
