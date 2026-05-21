@@ -662,11 +662,11 @@ def _parse_cell(cell_id):
 
 def _batch_summary(batch):
     return {
-        'batch_uid':     batch.get_batch_uid(),
-        'batch_label':   batch.get_display_label(),
-        'total_qty':     batch.quantity,
-        'available_qty': batch.get_available_quantity(),
-        'sn_tracking':   batch.sn_tracking_enabled,
+        'batch_uid':   batch.get_batch_uid(),
+        'batch_label': batch.get_display_label(),
+        'quantity':    batch.quantity,
+        'available':   batch.get_available_quantity(),
+        'sn_tracking': batch.sn_tracking_enabled,
     }
 
 
@@ -704,7 +704,11 @@ def _batch_location(batch):
 
 
 def _drawer_entries(rack, cell_id):
-    """Return item entries for one drawer cell (main + batch-override)."""
+    """Return item entries for one drawer cell, matching visual-storage format.
+
+    item_main    → item whose main location is here; includes all follow_main batches.
+    batch_override → one entry PER batch that has overridden its location to here.
+    """
     items_main = Item.query.filter_by(rack_id=rack.id, drawer=cell_id).all()
     batches_ov = ItemBatch.query.filter_by(
         rack_id=rack.id, drawer=cell_id, follow_main_location=False).all()
@@ -713,30 +717,30 @@ def _drawer_entries(rack, cell_id):
     for item in items_main:
         batches = [b for b in item.batches if b.follow_main_location]
         result.append({
-            'source':     'item_main',
-            'item_name':  item.name,
+            'type':       'item_main',
             'item_uuid':  item.uuid,
+            'name':       item.name,
             'sku':        item.sku or '',
             'short_info': item.short_info or '',
             'batches':    [_batch_summary(b) for b in batches],
         })
 
-    by_item = {}
     for batch in batches_ov:
         iobj = batch.item
         if not iobj:
             continue
-        if iobj.id not in by_item:
-            by_item[iobj.id] = {
-                'source':     'batch_override',
-                'item_name':  iobj.name,
-                'item_uuid':  iobj.uuid,
-                'sku':        iobj.sku or '',
-                'short_info': iobj.short_info or '',
-                'batches':    [],
-            }
-        by_item[iobj.id]['batches'].append(_batch_summary(batch))
-    result.extend(by_item.values())
+        result.append({
+            'type':        'batch_override',
+            'item_uuid':   iobj.uuid,
+            'name':        iobj.name,
+            'sku':         iobj.sku or '',
+            'short_info':  iobj.short_info or '',
+            'batch_uid':   batch.get_batch_uid(),
+            'batch_label': batch.get_display_label(),
+            'quantity':    batch.quantity,
+            'available':   batch.get_available_quantity(),
+            'sn_tracking': batch.sn_tracking_enabled,
+        })
     return result
 
 
@@ -768,7 +772,7 @@ def api_location_search():
         batch = sn.batch
         item  = batch.item
         entry = {
-            'item_name':  item.name,
+            'name':       item.name,
             'item_uuid':  item.uuid,
             'sku':        item.sku or '',
             'short_info': item.short_info or '',
@@ -785,7 +789,7 @@ def api_location_search():
         if not err_d and batch:
             item = batch.item
             results.append({
-                'item_name':  item.name,
+                'name':       item.name,
                 'item_uuid':  item.uuid,
                 'sku':        item.sku or '',
                 'short_info': item.short_info or '',
@@ -803,7 +807,7 @@ def api_location_search():
             for b in item.batches:
                 locs.append({**_batch_summary(b), **_batch_location(b)})
             results.append({
-                'item_name':  item.name,
+                'name':       item.name,
                 'item_uuid':  item.uuid,
                 'sku':        item.sku or '',
                 'short_info': item.short_info or '',
@@ -823,7 +827,7 @@ def api_location_search():
         for item in items:
             locs = [{**_batch_summary(b), **_batch_location(b)} for b in item.batches]
             results.append({
-                'item_name':  item.name,
+                'name':       item.name,
                 'item_uuid':  item.uuid,
                 'sku':        item.sku or '',
                 'short_info': item.short_info or '',
@@ -881,16 +885,16 @@ def api_rack_info(rack_uuid):
         total_qty = sum(b.quantity for b in batches)
         avail_qty = sum(b.get_available_quantity() for b in batches)
         item_list.append({
-            'source':      'item_main',
-            'item_name':   item.name,
+            'type':        'item_main',
+            'name':        item.name,
             'item_uuid':   item.uuid,
             'sku':         item.sku or '',
             'short_info':  item.short_info or '',
             'drawer_cell': cell,
             'drawer_row':  row,
             'drawer_col':  col,
-            'total_qty':   total_qty,
-            'available_qty': avail_qty,
+            'quantity':    total_qty,
+            'available':   avail_qty,
         })
 
     by_item = {}
@@ -903,19 +907,19 @@ def api_rack_info(rack_uuid):
         key = (iobj.id, cell)
         if key not in by_item:
             by_item[key] = {
-                'source':      'batch_override',
-                'item_name':   iobj.name,
+                'type':        'batch_override',
+                'name':        iobj.name,
                 'item_uuid':   iobj.uuid,
                 'sku':         iobj.sku or '',
                 'short_info':  iobj.short_info or '',
                 'drawer_cell': cell,
                 'drawer_row':  row,
                 'drawer_col':  col,
-                'total_qty':   0,
-                'available_qty': 0,
+                'quantity':    0,
+                'available':   0,
             }
-        by_item[key]['total_qty']   += batch.quantity
-        by_item[key]['available_qty'] += batch.get_available_quantity()
+        by_item[key]['quantity']  += batch.quantity
+        by_item[key]['available'] += batch.get_available_quantity()
     item_list.extend(by_item.values())
 
     return jsonify({
@@ -974,8 +978,9 @@ def api_rack_layout(rack_uuid):
             item_count_map[d] = item_count_map.get(d, 0) + 1
 
     cells = []
-    for r in range(rack.rows):
-        for c in range(rack.cols):
+    # Cell IDs are 1-indexed (R1-C1 … R{rows}-C{cols}) matching visual-storage
+    for r in range(1, rack.rows + 1):
+        for c in range(1, rack.cols + 1):
             cid = f'R{r}-C{c}'
 
             if cid in unavailable:
@@ -1057,9 +1062,10 @@ def api_rack_drawer(rack_uuid, row, col):
     if not rack:
         return _err(404, 'RACK_NOT_FOUND', 'Rack not found')
 
-    if row < 0 or row >= rack.rows or col < 0 or col >= rack.cols:
+    if row < 1 or row > rack.rows or col < 1 or col > rack.cols:
         return _err(400, 'INVALID_POSITION',
-                    f'Position ({row},{col}) is outside rack bounds ({rack.rows}×{rack.cols})')
+                    f'Position ({row},{col}) is outside rack bounds '
+                    f'(rows 1–{rack.rows}, cols 1–{rack.cols})')
 
     cid = f'R{row}-C{col}'
 
