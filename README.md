@@ -8,7 +8,7 @@ A web-based inventory management system built with Flask, designed for individua
 
 ## Overview
 
-ElectroManager runs entirely in a web browser, making it accessible from any device on your network without client-side installations. It combines detailed component tracking (batches, serial numbers, datasheets) with project management and a flexible permission system, all backed by a local SQLite database.
+ElectroManager runs entirely in a web browser, making it accessible from any device on your network without client-side installations. It combines detailed component tracking (batches, serial numbers, datasheets) with project management, lending/return workflows, contact management, and a flexible permission system — all backed by a local SQLite database.
 
 ---
 
@@ -16,41 +16,76 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 
 ### Item Management
 - Create, edit, and delete items with name, SKU, type/model, description (Markdown supported), and datasheet URLs
-- **Batch system** — each item's stock is split into independent batches with their own quantity, price per unit, purchase date, note, and optional label
+- **Batch system** — each item's stock is split into independent batches with their own quantity, price per unit, purchase date, manufacturer, note, and optional label
+- **Per-batch location override** — each batch can follow the item's main location or be assigned its own rack/drawer or general location independently
 - **Serial number tracking** — enable per-batch SN tracking (up to 100 units); generate, edit, and transfer individual serial numbers; inline editing of SN, info, and lend-to fields; ISN remap
-- **Lending tracking** — mark items or individual serial numbers as lent to a person; available quantity is calculated after deducting lent and project-allocated stock
+- **Lending tracking** — mark items or individual serial numbers as lent; available quantity is calculated after deducting lent and project-allocated stock
 - **Pre-create batches** on the new-item form — add initial batches before saving the item
 - **"Save and Create New"** button — save the current item and immediately open a fresh form to enter the next one
 - Minimum quantity threshold with low-stock warnings (per item, toggleable)
 - Attach files (PDFs, images, documents) directly to items
 - Multiple datasheet URLs per item
+- Link shared library files to items (reuse the same file across multiple items without re-uploading)
+- Item thumbnail image
 
-### Organization
+### Organisation
 - **Categories** — name, description, color; quick-add modal directly from item form
-- **Footprints** — physical package types (DIP, QFP, etc.) with color coding
-- **Tags** — multi-tag support with custom colors for flexible cross-category labeling
+- **Footprints** — physical package types (DIP, QFP, etc.) with color coding; quick-add modal
+- **Tags** — multi-tag support with custom colors for flexible cross-category labeling; quick-add modal
 - **Magic Parameters** — define reusable custom attributes (numeric, date, string) with configurable units and predefined string options; apply parameter templates to items in bulk
 - Item filtering by category and stock status (OK / Low / No Stock)
 - Full-text search across name, SKU, and description
 
 ### Storage Locations
-- **General locations** — named storage areas with description and color
+- **General locations** — named storage areas with description, color, info field, and optional picture
 - **Rack / Drawer system** — define racks as row × column grids; each drawer tracks which item lives there
 - **Visual storage view** — graphical rack map with per-drawer item preview and pagination
+- **Rack icons and drawer icons** — assign Bootstrap icons or custom images to racks and individual drawers
+- **Drawer short info** — add a text label to each drawer slot visible in the visual view
+- **Cell merging** — merge adjacent rack cells into one logical slot (rectangular or non-rectangular groups); split merged cells back
 - Mark individual drawers as unavailable
 - Bulk-move drawer contents to another drawer or location
+- Swap contents between two drawers in one operation
 - Prefill location/drawer on item creation from the visual storage view
+- QR sticker generation for locations, racks, and individual drawer slots
+
+### In/Out — Lending & Returns
+- **Cart-based workflow** — search for items/batches, add them to a cart, then submit a single lending or return session
+- **Lending sessions** — each lend or return is grouped under a unique session ID (`YYYYMMDD-XXXXXX`), recorded with borrower, date range, and notes
+- **Lending to contacts** — lend to system users, contact persons, organizations, or contact groups
+- **Session history** — paginated list of all past lending and return sessions with filtering
+- **Audit log view** — per-item lending activity log (lend, return, update, delete actions)
+- **Session QR sticker** — generate a QR sticker PDF for a lending session for physical record-keeping
+- Return workflow supports partial returns; returned items restore available inventory quantity
+- Serial-number-level lending tracking integrated with batch SN management
+
+### Contacts
+- **Persons** — name, email, phone; associate with an organization
+- **Organizations** — name, email, phone, URL, address, zip code, short info
+- **Contact Groups** — named groups containing a mix of users, persons, and organizations
+- Contacts are used as lending targets in the In/Out system and as project assignees
+- Managed under **Settings → Contacts**
 
 ### Projects
-- Create and manage projects with name, info/description, status, category, tags, start/end dates, and assigned persons or groups
-- **Bill of Materials (BOM)** — link inventory items to a project with quantity or specific serial numbers; track used/unused status
+- Create and manage projects with name, info/description, status, category, tags, start/end dates, and assigned users, persons, organizations, or groups
+- **Bill of Materials (BOM)** — link inventory items (with optional specific batch) to a project with required and used quantities; track used/unused status; supports serial-number assignment
+- **Project cost tracking** — add extra cost line items per project: *per-quantity* costs (e.g. labour per unit) and *overall* costs (e.g. one-off fees); combined with BOM actual cost for a full project cost estimate
 - Available-for-BOM search excludes items already lent or assigned elsewhere
 - Project attachments with separate upload limits by category (pictures, documents, schematics, 2D/3D files)
-- Project reference URLs
+- Project reference URLs with optional title and description
+- Link shared library files to projects
 - **Dateline notifications** — configurable alerts (N days before end date) visible in the notification centre
-- Project-level status tracking (active, completed, overdue)
+- Project-level status tracking (active, completed, overdue; custom statuses supported)
 - Per-user column visibility for the project list table
+- Magic Parameters on projects (same parameter definitions as items)
 - Manage project categories, statuses, persons, and groups via settings
+
+### Shared File Library
+- Central file library (`Settings → Share Files`) for uploading files once and linking them to multiple items or projects
+- Categories: `item`, `profile`, `project`, `sticker`
+- Bulk delete and bulk download
+- Files are stored in a dedicated share folder separate from item/project attachments
+- Scan-and-register tool to import files dropped directly into the share folder on disk
 
 ### Reporting & Printing
 - Low-stock report (items below minimum quantity or fully out of stock)
@@ -61,9 +96,10 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 
 ### QR Codes & Sticker Labels
 - Automatic QR code on every item linking to its detail page
-- **Sticker template designer** — custom layout builder for QR/barcode stickers
-- Live sticker preview per item
-- PDF generation for single sticker layouts
+- **Sticker template designer** — custom layout builder for QR/barcode stickers; supports items, locations, racks, drawer slots, and lending sessions
+- Live sticker preview per entity
+- PDF generation for sticker layouts
+- Inline QR SVG endpoint for embedding in pages
 
 ### Import / Export
 - Database backup download and restore (previous backup kept automatically)
@@ -76,31 +112,92 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 - **Role-Based Access Control (RBAC)** — create roles with granular permissions across:
   - Items: view, create, delete, and individual edit permissions per field (name, SKU/type, description, datasheet, uploads, price, quantity, location, category, footprint, tags, parameters, batches, serial numbers, lending)
   - Projects: view, create, edit, delete
-  - Settings sections: backup/restore, location management, reports, project settings, magic parameters
+  - Lending & Returns: view page, lend, return
+  - Settings sections: backup/restore, location management, reports, project settings, magic parameters, contacts
   - Pages: notifications, visual storage
 - Admin users bypass all permission checks
-- Login-attempt limiting with automatic unlock; demo-user flag
-- Per-user profile photo upload
+- Login-attempt limiting with configurable auto-unlock timeout; demo-user flag
+- Per-user profile photo upload with configurable source (upload / shared library / both)
+- Configurable per-user flags: allow password reset, allow name/info changes, allow profile picture changes
 
 ### Personalisation
 - **Themes** — Light, Dark, Blue, Keqing; theme CSS files are auto-detected from `static/custom/theme/` so new themes can be added by dropping in a CSS file
 - **Fonts** — built-in system fonts plus any font files placed in `static/custom/font/` (e.g. OpenDyslexic); selected per user in settings
+- Per-user column visibility for the item list table and project list table
 
 ### Notifications
 - Notification centre showing date-parameter alerts (due today or overdue) and duration-parameter windows
-- Project dateline alerts
+- Project dateline alerts (configurable N-days-before warning)
 
 ### Audit Log
 - Every create / read / update / delete action is logged with user, entity type, entity ID, and timestamp
+- In/Out module has a dedicated lending activity log view
 
-### REST API
+---
+
+## Internal REST API
+
+All endpoints listed below are **internal** — they require an active login session (`@login_required`) and are consumed exclusively by the web UI. They are **not** designed or secured for direct third-party access.
+
+> **Planned:** A separate external API with token-based authentication and RBAC integration is under development for future 3rd-party integrations. When available it will be documented in a dedicated API reference.
+
+### Search
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/search-item` | Search items (supports location/rack filters) |
-| GET | `/api/drawer/<rack_uuid>/<drawer_id>` | Items in a specific drawer |
-| POST | `/api/drawer/toggle-availability` | Mark a drawer available/unavailable |
-| POST | `/api/drawer/move-items` | Bulk-move drawer contents |
-| GET | `/api/available-fonts` | List available fonts |
+| POST | `/api/search-item` | Search items by name or UUID; supports location/rack filters and exact-match mode |
+
+### Visual Storage — Drawers & Racks
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/drawer/<rack_uuid>/<drawer_id>` | Items stored in a specific drawer |
+| POST | `/api/drawer/toggle-availability` | Mark a drawer available or unavailable |
+| POST | `/api/drawer/update-info` | Update the short-info label of a drawer |
+| POST | `/api/drawer/update-icon` | Set or clear a drawer's icon |
+| POST | `/api/drawer/move-items` | Bulk-move drawer contents to another drawer or location |
+| POST | `/api/drawer/swap-items` | Swap contents between two drawers |
+| POST | `/api/rack/update-rack-icon` | Set or clear a rack's icon |
+| POST | `/api/rack/<rack_uuid>/merge-cells` | Merge a set of rack cells into one logical slot |
+| POST | `/api/rack/<rack_uuid>/split-cells` | Split a merged rack cell group back to individual cells |
+
+### Quick-Add (Inline Forms)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/category/add` | Create a category without leaving the item form |
+| POST | `/api/footprint/add` | Create a footprint without leaving the item form |
+| POST | `/api/tag/add` | Create a tag without leaving the item form |
+| POST | `/api/location/add` | Create a location without leaving the item form |
+
+### Contacts
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/contacts/persons` | List all contact persons |
+| GET | `/api/contacts/organizations` | List all contact organizations |
+| GET | `/api/contacts/all` | List all contacts (persons, organizations, and groups) |
+
+### Sticker & QR Previews
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/item/<uuid>/sticker-preview/<template_id>` | Rendered sticker HTML preview for an item |
+| GET | `/api/item/<uuid>/sticker-print/<template_id>` | Sticker PDF for an item |
+| GET | `/api/location/<uuid>/sticker-preview/<template_id>` | Rendered sticker HTML preview for a location |
+| GET | `/api/location/<uuid>/sticker-print/<template_id>` | Sticker PDF for a location |
+| GET | `/api/rack/<uuid>/sticker-preview/<template_id>` | Rendered sticker HTML preview for a rack |
+| GET | `/api/rack/<uuid>/sticker-print/<template_id>` | Sticker PDF for a rack |
+| GET | `/api/in-out/session/<lending_id>/session-qr-svg` | Inline SVG QR code for a lending session |
+| GET | `/api/in-out/session/<lending_id>/sticker-preview/<template_id>` | Rendered sticker HTML preview for a lending session |
+| GET | `/api/in-out/session/<lending_id>/sticker-print/<template_id>` | Sticker PDF for a lending session |
+
+### System / Settings
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/available-fonts` | List custom font files detected in `static/custom/font/` |
+| POST | `/api/settings/system/scan-share-files` | Scan the share folder on disk and register any untracked files |
 
 ---
 
@@ -233,20 +330,24 @@ ElectroManager/
 ├── routes/                       # Flask blueprints (one per feature area)
 │   ├── item.py                   # Item CRUD, search, parameters, attachments
 │   ├── batch.py                  # Batch management and serial numbers
-│   ├── project.py                # Projects, BOM, project attachments
+│   ├── in_out.py                 # Lending & return sessions (In/Out)
+│   ├── project.py                # Projects, BOM, cost items, project attachments
 │   ├── location_rack.py          # Locations and racks management
 │   ├── visual_storage.py         # Visual rack/drawer interface
 │   ├── category.py               # Categories
 │   ├── footprint_tag.py          # Footprints and tags
 │   ├── magic_parameter.py        # Magic Parameters and templates
+│   ├── contacts.py               # Contact persons, organizations, groups
+│   ├── share.py                  # Shared file library
 │   ├── user_role.py              # Users and roles
+│   ├── auth.py                   # Login, logout, authentication
 │   ├── settings.py               # Application settings
 │   ├── notification.py           # Notification centre
 │   ├── report.py                 # Reports
 │   ├── backup.py                 # Backup and restore
-│   ├── print_routes.py           # Print views
+│   ├── print.py                  # Print views
 │   ├── qr_template.py            # QR sticker template designer
-│   ├── api.py                    # REST API endpoints
+│   ├── api.py                    # Core internal REST API endpoints
 │   └── __init__.py               # Blueprint registration
 │
 ├── templates/                    # Jinja2 HTML templates
@@ -254,8 +355,10 @@ ElectroManager/
 │   ├── items.html                # Item list
 │   ├── item_detail.html          # Item detail view
 │   ├── item_form.html            # Item create / edit form
+│   ├── in_out*.html              # Lending / return pages
 │   ├── project*.html             # Project pages
 │   ├── visual_storage.html       # Visual rack map
+│   ├── contacts*.html            # Contact management pages
 │   ├── users.html / roles.html   # User and role management
 │   ├── backup_restore.html       # Backup / restore UI
 │   ├── settings*.html            # Settings pages
@@ -265,16 +368,19 @@ ElectroManager/
 │
 ├── static/
 │   ├── css/
-│   │   ├── style.css             # Application stylesheet
-│   │   └── themes/               # Theme files (light, dark, blue, keqing, …)
+│   │   └── style.css             # Application stylesheet
 │   ├── js/
 │   │   ├── script.js             # Main application JS
 │   │   ├── theme-loader.js       # Theme switching
-│   │   └── table-sorter.js       # Client-side table sorting
-│   ├── fonts/                    # Project fonts for personalisation (e.g. OpenDyslexic)
+│   │   ├── table-sorter.js       # Client-side table sorting
+│   │   ├── md-editor.js          # Markdown editor helper
+│   │   └── marked.min.js         # Markdown renderer
+│   ├── mp3/                      # UI sound effects (scanner beep, success, error)
 │   ├── icons/                    # Bootstrap Icons — core, downloaded at build/startup
 │   ├── lib/                      # Bootstrap CSS/JS + SortableJS — core, downloaded at build/startup
 │   └── custom/                   # ← User-provided: custom fonts + themes (bind-mounted in Docker)
+│       ├── font/                 # Drop font files here (.woff2, .ttf, etc.)
+│       └── theme/                # Drop theme CSS files here
 │
 ├── uploads/                      # User file uploads (runtime, bind-mounted in Docker)
 └── instance/
