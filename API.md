@@ -39,6 +39,7 @@ System-wide toggle (admin)
 |---------|---------|
 | `api_item_search_enabled` | Enables/disables Item Search scope for everyone |
 | `api_lending_return_enabled` | Enables/disables Lending & Return scope for everyone |
+| `api_rack_drawer_enabled` | Enables/disables Location, Rack & Drawer scope for everyone |
 
 If a scope is disabled system-wide, **no user** can use it regardless of their personal settings.
 
@@ -50,6 +51,7 @@ Each user independently enables the scopes they need:
 |------------|-------|
 | `api_item_search` | Item Search & Information |
 | `api_lending_return` | Lending & Return |
+| `api_rack_drawer` | Location, Rack & Drawer |
 
 Both Level 1 and Level 2 must be enabled for a scope to work.
 
@@ -116,6 +118,9 @@ For cart operations that fail per-item, the top-level code is `CART_VALIDATION_F
 | `RETURN_QTY_EXCEEDED` | 400 | Return qty exceeds the user's currently borrowed qty |
 | `CART_VALIDATION_FAILED` | 409 | One or more cart items failed — nothing was committed |
 | `RATE_LIMITED` | 429 | Rate limit exceeded |
+| `RACK_NOT_FOUND` | 404 | No rack with that UUID |
+| `MISSING_QUERY` | 400 | `q` parameter is empty |
+| `INVALID_POSITION` | 400 | Row/col out of bounds (must be 1-based) |
 
 ---
 
@@ -365,7 +370,266 @@ The server only allows returning items that are recorded as lent to the API key 
 
 ---
 
+### Location, Rack & Drawer
+
+#### `GET /api/v1/location/search`
+
+**Scope required:** `rack_drawer`
+
+Search for items by name, UUID, batch UID, or ISN and return their physical storage locations.
+
+**Query parameters:**
+
+| Parameter | Required | Default | Notes |
+|-----------|----------|---------|-------|
+| `q` | yes | — | Item name (partial), item UUID, batch UID (`XXXXXXXX-B01`), or ISN |
+| `limit` | no | `20` | Maximum results for name searches (max 50) |
+
+The server auto-detects the query type:
+
+| Detected type | `query_type` |
+|---|---|
+| ISN exact match | `isn` |
+| Batch UID pattern (`XXXX-B##`) | `batch_uid` |
+| Item UUID (10–20 alphanum chars) | `uuid` |
+| Anything else | `name` (partial match) |
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "query": "Arduino",
+  "query_type": "name",
+  "count": 2,
+  "results": [
+    {
+      "name": "Arduino Mega",
+      "item_uuid": "ABC123DEFG012345",
+      "sku": "ARD-MEGA",
+      "short_info": "2560 variant",
+      "locations": [
+        {
+          "batch_uid": "ABC123DEFG012345-B01",
+          "batch_label": "Batch 1",
+          "quantity": 10,
+          "available": 8,
+          "sn_tracking": false,
+          "location_type": "rack",
+          "rack_uuid": "RACK-UUID-HERE",
+          "rack_name": "Main Cabinet",
+          "rack_color": "#3a86ff",
+          "drawer_cell": "R2-C3",
+          "drawer_row": 2,
+          "drawer_col": 3,
+          "drawer_short_info": "MCU row"
+        }
+      ]
+    }
+  ]
+}
+```
+
+For ISN results an extra `isn` and `lent_out` field appear at the top level of the result entry.
+
+`location_type` can be `rack`, `location`, or `unspecified`.
+
+---
+
+#### `GET /api/v1/rack/<rack_uuid>`
+
+**Scope required:** `rack_drawer`
+
+Returns rack metadata plus a flat lightweight list of all items and batches stored in the rack.
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "rack": {
+    "uuid": "RACK-UUID",
+    "name": "Main Cabinet",
+    "short_info": "Lab A shelf",
+    "description": "",
+    "color": "#3a86ff",
+    "location": { "uuid": "LOC-UUID", "name": "Lab A", "color": "#28a745" },
+    "rows": 5,
+    "cols": 5,
+    "stats": {
+      "total_cells": 25,
+      "unavailable": 2,
+      "used": 8,
+      "empty": 15
+    }
+  },
+  "items": [
+    {
+      "type": "item_main",
+      "name": "Arduino Mega",
+      "item_uuid": "ABC123DEFG012345",
+      "sku": "ARD-MEGA",
+      "short_info": "",
+      "drawer_cell": "R2-C3",
+      "drawer_row": 2,
+      "drawer_col": 3,
+      "quantity": 10,
+      "available": 8
+    },
+    {
+      "type": "batch_override",
+      "name": "Resistor Kit",
+      "item_uuid": "XYZ789ABCDEF0123",
+      "sku": "RES-KIT",
+      "short_info": "Mixed values",
+      "drawer_cell": "R1-C1",
+      "drawer_row": 1,
+      "drawer_col": 1,
+      "quantity": 5,
+      "available": 5
+    }
+  ]
+}
+```
+
+`type` is `item_main` (item's primary location) or `batch_override` (batch has its own location in this rack).
+
+---
+
+#### `GET /api/v1/rack/<rack_uuid>/layout`
+
+**Scope required:** `rack_drawer`
+
+Returns the full cell-by-cell layout of a rack. Use this to recreate the visual grid.
+
+**Cell states:**
+
+| `state` | Meaning |
+|---|---|
+| `empty` | Cell is empty |
+| `has_items` | Cell contains items |
+| `merged_master` | Master of a rectangular merge — use `row_span`/`col_span` |
+| `merged_away` | Hidden slave of a rectangular merge — skip when rendering |
+| `group_master` | Master of a non-rectangular group — still rendered |
+| `group_slave` | Member of a non-rectangular group — still rendered |
+| `unavailable` | Cell marked unavailable |
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "rack_uuid": "RACK-UUID",
+  "rack_name": "Main Cabinet",
+  "rack_color": "#3a86ff",
+  "rows": 3,
+  "cols": 3,
+  "legend": { "empty": "...", "has_items": "...", "...": "..." },
+  "cells": [
+    {
+      "row": 1, "col": 1, "cell_id": "R1-C1",
+      "state": "merged_master",
+      "short_info": "Power shelf",
+      "row_span": 2, "col_span": 1,
+      "item_count": 3
+    },
+    {
+      "row": 2, "col": 1, "cell_id": "R2-C1",
+      "state": "merged_away",
+      "short_info": "",
+      "master_cell": "R1-C1"
+    },
+    {
+      "row": 1, "col": 2, "cell_id": "R1-C2",
+      "state": "has_items",
+      "short_info": "MCU row",
+      "item_count": 2
+    },
+    {
+      "row": 1, "col": 3, "cell_id": "R1-C3",
+      "state": "empty",
+      "short_info": ""
+    }
+  ]
+}
+```
+
+**Row/col indices are 1-based** (R1-C1 through R{rows}-C{cols}).
+
+For `merged_away` cells the `master_cell` field indicates which master cell they belong to.
+
+For `group_master`/`group_slave` cells: `group_master` and `group_size` fields are included.
+
+---
+
+#### `GET /api/v1/rack/<rack_uuid>/drawer/<row>/<col>`
+
+**Scope required:** `rack_drawer`
+
+Get full contents of a single drawer cell. `row` and `col` are **1-based integers**.
+
+Returns drawer state plus a detailed item list matching the visual-storage drawer popup.
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "rack_uuid": "RACK-UUID",
+  "rack_name": "Main Cabinet",
+  "row": 2,
+  "col": 3,
+  "cell_id": "R2-C3",
+  "state": "has_items",
+  "short_info": "MCU row",
+  "items": [
+    {
+      "type": "item_main",
+      "item_uuid": "ABC123DEFG012345",
+      "name": "Arduino Mega",
+      "sku": "ARD-MEGA",
+      "short_info": "",
+      "batches": [
+        {
+          "batch_uid": "ABC123DEFG012345-B01",
+          "batch_label": "Batch 1",
+          "quantity": 10,
+          "available": 8,
+          "sn_tracking": false
+        }
+      ]
+    },
+    {
+      "type": "batch_override",
+      "item_uuid": "XYZ789ABCDEF0123",
+      "name": "Resistor Kit",
+      "sku": "RES-KIT",
+      "short_info": "Mixed values",
+      "batch_uid": "XYZ789ABCDEF0123-B02",
+      "batch_label": "Batch 2",
+      "quantity": 5,
+      "available": 5,
+      "sn_tracking": false
+    }
+  ]
+}
+```
+
+`type` values are the same as rack info. For `item_main` entries the `batches` array lists every batch stored in this drawer. For `batch_override` entries the batch fields are flat (one entry per batch).
+
+**Error codes specific to location/rack:**
+
+| Code | HTTP | Meaning |
+|---|---|---|
+| `RACK_NOT_FOUND` | 404 | No rack with that UUID |
+| `MISSING_QUERY` | 400 | `q` parameter is empty |
+| `INVALID_POSITION` | 400 | Row/col out of bounds (must be 1-based) |
+
+---
+
 ### Typical ESP32 / Client Flow
+
+**Lending flow:**
 
 ```
 Boot / scan
@@ -382,13 +646,28 @@ Boot / scan
         Commit — show session_id and success/failure per item
 ```
 
+**Rack/drawer display flow:**
+
+```
+Find item location
+│
+├── GET /api/v1/location/search?q=<item_name_or_uuid>
+│       Returns which rack + drawer the item lives in
+│
+├── GET /api/v1/rack/<uuid>/layout
+│       Fetch full rack grid to render on a display or web UI
+│
+└── GET /api/v1/rack/<uuid>/drawer/<row>/<col>
+        Load full contents of the target drawer on demand
+```
+
 ---
 
 ### Setup — Enabling the API
 
 1. **Admin: enable system-wide scope**
    - `Settings → System → Server API`
-   - Turn on the scopes you want available (Item Search, Lending & Return)
+   - Turn on the scopes you want available (Item Search, Lending & Return, Location, Rack & Drawer)
    - Optionally adjust the rate limit (default 5 req/s)
 
 2. **Admin: grant role permission**
@@ -399,7 +678,7 @@ Boot / scan
 3. **User: generate API key and enable scopes**
    - `Settings → User API`
    - Toggle **Enable API** to generate a personal API key
-   - Enable the scopes needed (must match what the admin enabled system-wide)
+   - Enable the scopes needed (must match what the admin enabled system-wide): Item Search, Lending & Return, and/or Location, Rack & Drawer
    - Copy the API key — it is shown only once (use the Show button)
    - To rotate: click **Revoke** then re-enable
 
