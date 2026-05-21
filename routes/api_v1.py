@@ -5,7 +5,8 @@ All timestamps : ISO 8601 naive (server timezone)
 """
 from flask import Blueprint, request, jsonify
 from models import (db, User, Item, ItemBatch, BatchSerialNumber,
-                    BatchLendRecord, LendingSession, _generate_lending_id, Setting)
+                    BatchLendRecord, LendingSession, Rack, Location,
+                    _generate_lending_id, Setting)
 from utils import log_audit
 from datetime import datetime, timezone
 import time
@@ -645,3 +646,445 @@ def api_return():
         'return_datetime': return_dt.strftime('%Y-%m-%dT%H:%M:%S'),
         'items':           item_results,
     })
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Location / Rack & Drawer — shared helpers
+# ════════════════════════════════════════════════════════════════════════════
+
+def _parse_cell(cell_id):
+    """'R2-C3' → (2, 3); anything else → (None, None)"""
+    if not cell_id:
+        return None, None
+    m = re.match(r'^R(\d+)-C(\d+)$', cell_id)
+    return (int(m.group(1)), int(m.group(2))) if m else (None, None)
+
+
+def _batch_summary(batch):
+    return {
+        'batch_uid':     batch.get_batch_uid(),
+        'batch_label':   batch.get_display_label(),
+        'total_qty':     batch.quantity,
+        'available_qty': batch.get_available_quantity(),
+        'sn_tracking':   batch.sn_tracking_enabled,
+    }
+
+
+def _batch_location(batch):
+    """Return location dict for one batch (respects follow_main_location)."""
+    if batch.follow_main_location:
+        item = batch.item
+        rack = item.rack if item.rack_id else None
+        loc  = item.general_location if item.location_id else None
+    else:
+        rack = batch.batch_rack if batch.rack_id else None
+        loc  = batch.batch_location if batch.location_id else None
+
+    if rack:
+        cell = (batch.item.drawer if batch.follow_main_location else batch.drawer) or ''
+        row, col = _parse_cell(cell)
+        return {
+            'location_type':       'rack',
+            'rack_uuid':           rack.uuid,
+            'rack_name':           rack.name,
+            'rack_color':          rack.color or '#6c757d',
+            'drawer_cell':         cell,
+            'drawer_row':          row,
+            'drawer_col':          col,
+            'drawer_short_info':   rack.get_drawer_short_info(cell) if cell else '',
+        }
+    if loc:
+        return {
+            'location_type':  'location',
+            'location_uuid':  loc.uuid,
+            'location_name':  loc.name,
+            'location_color': loc.color or '#6c757d',
+        }
+    return {'location_type': 'unspecified'}
+
+
+def _drawer_entries(rack, cell_id):
+    """Return item entries for one drawer cell (main + batch-override)."""
+    items_main = Item.query.filter_by(rack_id=rack.id, drawer=cell_id).all()
+    batches_ov = ItemBatch.query.filter_by(
+        rack_id=rack.id, drawer=cell_id, follow_main_location=False).all()
+
+    result = []
+    for item in items_main:
+        batches = [b for b in item.batches if b.follow_main_location]
+        result.append({
+            'source':     'item_main',
+            'item_name':  item.name,
+            'item_uuid':  item.uuid,
+            'sku':        item.sku or '',
+            'short_info': item.short_info or '',
+            'batches':    [_batch_summary(b) for b in batches],
+        })
+
+    by_item = {}
+    for batch in batches_ov:
+        iobj = batch.item
+        if not iobj:
+            continue
+        if iobj.id not in by_item:
+            by_item[iobj.id] = {
+                'source':     'batch_override',
+                'item_name':  iobj.name,
+                'item_uuid':  iobj.uuid,
+                'sku':        iobj.sku or '',
+                'short_info': iobj.short_info or '',
+                'batches':    [],
+            }
+        by_item[iobj.id]['batches'].append(_batch_summary(batch))
+    result.extend(by_item.values())
+    return result
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# GET /api/v1/location/search?q=<query>[&limit=20]
+# ════════════════════════════════════════════════════════════════════════════
+@api_v1_bp.route('/location/search', methods=['GET'])
+def api_location_search():
+    user, err = _authenticate(scope='rack_drawer')
+    if err:
+        return err
+
+    q = (request.args.get('q', '') or '').strip()
+    if not q:
+        return _err(400, 'MISSING_QUERY', 'q parameter is required')
+
+    try:
+        limit = max(1, min(int(request.args.get('limit', 20)), 50))
+    except (ValueError, TypeError):
+        limit = 20
+
+    results    = []
+    query_type = 'name'
+
+    # 1 — ISN exact match
+    sn = BatchSerialNumber.query.filter_by(internal_serial_number=q).first()
+    if sn and not sn.is_deleted:
+        query_type = 'isn'
+        batch = sn.batch
+        item  = batch.item
+        entry = {
+            'item_name':  item.name,
+            'item_uuid':  item.uuid,
+            'sku':        item.sku or '',
+            'short_info': item.short_info or '',
+            'isn':        sn.internal_serial_number,
+            'lent_out':   bool(sn.lend_to_id),
+            'locations':  [{**_batch_summary(batch), **_batch_location(batch)}],
+        }
+        results.append(entry)
+
+    # 2 — Batch UID  (e.g. "ABCDEF12-B03")
+    elif re.match(r'^[A-Za-z0-9]+-B\d{1,4}$', q):
+        query_type = 'batch_uid'
+        batch, _, err_d = _resolve_lookup(q)
+        if not err_d and batch:
+            item = batch.item
+            results.append({
+                'item_name':  item.name,
+                'item_uuid':  item.uuid,
+                'sku':        item.sku or '',
+                'short_info': item.short_info or '',
+                'locations':  [{**_batch_summary(batch), **_batch_location(batch)}],
+            })
+        else:
+            return _err(404, err_d['code'] if err_d else 'NOT_FOUND', 'Batch not found')
+
+    # 3 — Item UUID exact match
+    elif re.match(r'^[A-Za-z0-9]{10,20}$', q):
+        item = Item.query.filter_by(uuid=q).first()
+        if item:
+            query_type = 'uuid'
+            locs = []
+            for b in item.batches:
+                locs.append({**_batch_summary(b), **_batch_location(b)})
+            results.append({
+                'item_name':  item.name,
+                'item_uuid':  item.uuid,
+                'sku':        item.sku or '',
+                'short_info': item.short_info or '',
+                'locations':  locs,
+            })
+        # fall through to name search if not found
+        if not results:
+            query_type = 'name'
+
+    # 4 — Item name partial match
+    if query_type == 'name':
+        items = (Item.query
+                 .filter(Item.name.ilike(f'%{q}%'))
+                 .order_by(Item.name)
+                 .limit(limit)
+                 .all())
+        for item in items:
+            locs = [{**_batch_summary(b), **_batch_location(b)} for b in item.batches]
+            results.append({
+                'item_name':  item.name,
+                'item_uuid':  item.uuid,
+                'sku':        item.sku or '',
+                'short_info': item.short_info or '',
+                'locations':  locs,
+            })
+
+    return jsonify({
+        'success':    True,
+        'query':      q,
+        'query_type': query_type,
+        'count':      len(results),
+        'results':    results,
+    })
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# GET /api/v1/rack/<rack_uuid>
+# ════════════════════════════════════════════════════════════════════════════
+@api_v1_bp.route('/rack/<rack_uuid>', methods=['GET'])
+def api_rack_info(rack_uuid):
+    user, err = _authenticate(scope='rack_drawer')
+    if err:
+        return err
+
+    rack = Rack.query.filter_by(uuid=rack_uuid).first()
+    if not rack:
+        return _err(404, 'RACK_NOT_FOUND', 'Rack not found')
+
+    # Location
+    loc = rack.physical_location
+    loc_obj = {'uuid': loc.uuid, 'name': loc.name, 'color': loc.color or '#6c757d'} if loc else None
+
+    # Drawer usage stats
+    unavailable_set = set(rack.get_unavailable_drawers())
+    total_cells = rack.rows * rack.cols
+    unavail_cnt = len(unavailable_set)
+
+    # Items in rack (main + batch-override)
+    items_main = Item.query.filter_by(rack_id=rack.id).all()
+    batches_ov = ItemBatch.query.filter_by(rack_id=rack.id, follow_main_location=False).all()
+    occupied_cells = set()
+    for i in items_main:
+        if i.drawer:
+            occupied_cells.add(i.drawer)
+    for b in batches_ov:
+        if b.drawer:
+            occupied_cells.add(b.drawer)
+
+    # Build items list (lightweight)
+    item_list = []
+    for item in items_main:
+        cell = item.drawer or ''
+        row, col = _parse_cell(cell)
+        batches = [b for b in item.batches if b.follow_main_location]
+        total_qty = sum(b.quantity for b in batches)
+        avail_qty = sum(b.get_available_quantity() for b in batches)
+        item_list.append({
+            'source':      'item_main',
+            'item_name':   item.name,
+            'item_uuid':   item.uuid,
+            'sku':         item.sku or '',
+            'short_info':  item.short_info or '',
+            'drawer_cell': cell,
+            'drawer_row':  row,
+            'drawer_col':  col,
+            'total_qty':   total_qty,
+            'available_qty': avail_qty,
+        })
+
+    by_item = {}
+    for batch in batches_ov:
+        iobj = batch.item
+        if not iobj:
+            continue
+        cell = batch.drawer or ''
+        row, col = _parse_cell(cell)
+        key = (iobj.id, cell)
+        if key not in by_item:
+            by_item[key] = {
+                'source':      'batch_override',
+                'item_name':   iobj.name,
+                'item_uuid':   iobj.uuid,
+                'sku':         iobj.sku or '',
+                'short_info':  iobj.short_info or '',
+                'drawer_cell': cell,
+                'drawer_row':  row,
+                'drawer_col':  col,
+                'total_qty':   0,
+                'available_qty': 0,
+            }
+        by_item[key]['total_qty']   += batch.quantity
+        by_item[key]['available_qty'] += batch.get_available_quantity()
+    item_list.extend(by_item.values())
+
+    return jsonify({
+        'success': True,
+        'rack': {
+            'uuid':        rack.uuid,
+            'name':        rack.name,
+            'short_info':  rack.short_info or '',
+            'description': rack.description or '',
+            'color':       rack.color or '#6c757d',
+            'location':    loc_obj,
+            'rows':        rack.rows,
+            'cols':        rack.cols,
+            'stats': {
+                'total_cells':  total_cells,
+                'unavailable':  unavail_cnt,
+                'used':         len(occupied_cells),
+                'empty':        total_cells - unavail_cnt - len(occupied_cells),
+            },
+        },
+        'items': item_list,
+    })
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# GET /api/v1/rack/<rack_uuid>/layout
+# ════════════════════════════════════════════════════════════════════════════
+@api_v1_bp.route('/rack/<rack_uuid>/layout', methods=['GET'])
+def api_rack_layout(rack_uuid):
+    user, err = _authenticate(scope='rack_drawer')
+    if err:
+        return err
+
+    rack = Rack.query.filter_by(uuid=rack_uuid).first()
+    if not rack:
+        return _err(404, 'RACK_NOT_FOUND', 'Rack not found')
+
+    unavailable = set(rack.get_unavailable_drawers())
+    merged_groups = rack.get_merged_cells()
+    drawer_info   = rack.get_drawer_info()
+
+    # Pre-compute merge maps
+    merged_away    = {}  # cell_id → master_cell_id
+    merged_masters = {}  # cell_id → {row_span, col_span}
+    for group in merged_groups:
+        master = group.get('master', '')
+        cells  = group.get('cells', [])
+        if not master or not cells:
+            continue
+        rows_in = [r for r, _ in (_parse_cell(c) for c in cells) if r is not None]
+        cols_in = [c for _, c in (_parse_cell(c) for c in cells) if c is not None]
+        merged_masters[master] = {
+            'row_span': max(rows_in) - min(rows_in) + 1 if rows_in else 1,
+            'col_span': max(cols_in) - min(cols_in) + 1 if cols_in else 1,
+        }
+        for c in cells:
+            if c != master:
+                merged_away[c] = master
+
+    # Pre-load occupied cells (2 queries, not N×M)
+    item_drawers  = db.session.query(Item.drawer).filter_by(rack_id=rack.id).all()
+    batch_drawers = db.session.query(ItemBatch.drawer).filter_by(
+        rack_id=rack.id, follow_main_location=False).all()
+    item_count_map = {}
+    for (d,) in item_drawers:
+        if d:
+            item_count_map[d] = item_count_map.get(d, 0) + 1
+    for (d,) in batch_drawers:
+        if d:
+            item_count_map[d] = item_count_map.get(d, 0) + 1
+
+    cells = []
+    for r in range(rack.rows):
+        for c in range(rack.cols):
+            cid = f'R{r}-C{c}'
+            if cid in unavailable:
+                state = 'unavailable'
+            elif cid in merged_away:
+                state = 'merged_away'
+            elif cid in merged_masters:
+                state = 'merged_master'
+            elif cid in item_count_map:
+                state = 'has_items'
+            else:
+                state = 'empty'
+
+            cell = {
+                'row':        r,
+                'col':        c,
+                'cell_id':    cid,
+                'state':      state,
+                'short_info': drawer_info.get(cid, ''),
+            }
+            if state == 'merged_master':
+                cell['row_span'] = merged_masters[cid]['row_span']
+                cell['col_span'] = merged_masters[cid]['col_span']
+                cell['item_count'] = item_count_map.get(cid, 0)
+            elif state == 'merged_away':
+                cell['master_cell'] = merged_away[cid]
+            elif state == 'has_items':
+                cell['item_count'] = item_count_map.get(cid, 0)
+
+            cells.append(cell)
+
+    return jsonify({
+        'success':   True,
+        'rack_uuid': rack.uuid,
+        'rack_name': rack.name,
+        'rows':      rack.rows,
+        'cols':      rack.cols,
+        'cells':     cells,
+    })
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# GET /api/v1/rack/<rack_uuid>/drawer/<int:row>/<int:col>
+# ════════════════════════════════════════════════════════════════════════════
+@api_v1_bp.route('/rack/<rack_uuid>/drawer/<int:row>/<int:col>', methods=['GET'])
+def api_rack_drawer(rack_uuid, row, col):
+    user, err = _authenticate(scope='rack_drawer')
+    if err:
+        return err
+
+    rack = Rack.query.filter_by(uuid=rack_uuid).first()
+    if not rack:
+        return _err(404, 'RACK_NOT_FOUND', 'Rack not found')
+
+    if row < 0 or row >= rack.rows or col < 0 or col >= rack.cols:
+        return _err(400, 'INVALID_POSITION',
+                    f'Position ({row},{col}) is outside rack bounds ({rack.rows}×{rack.cols})')
+
+    cid = f'R{row}-C{col}'
+
+    # Determine cell state
+    unavailable = set(rack.get_unavailable_drawers())
+    if cid in unavailable:
+        state = 'unavailable'
+    else:
+        merged_groups = rack.get_merged_cells()
+        merged_away = {}
+        merged_masters = set()
+        for group in merged_groups:
+            master = group.get('master', '')
+            cells  = group.get('cells', [])
+            merged_masters.add(master)
+            for c in cells:
+                if c != master:
+                    merged_away[c] = master
+        if cid in merged_away:
+            state = 'merged_away'
+        elif cid in merged_masters:
+            state = 'merged_master'
+        else:
+            state = 'has_items' if _drawer_entries(rack, cid) else 'empty'
+
+    entries = [] if state in ('merged_away', 'unavailable') else _drawer_entries(rack, cid)
+
+    resp = {
+        'success':    True,
+        'rack_uuid':  rack.uuid,
+        'rack_name':  rack.name,
+        'row':        row,
+        'col':        col,
+        'cell_id':    cid,
+        'state':      state,
+        'short_info': rack.get_drawer_short_info(cid),
+        'items':      entries,
+    }
+    if state == 'merged_away':
+        resp['master_cell'] = merged_away[cid]
+
+    return jsonify(resp)
