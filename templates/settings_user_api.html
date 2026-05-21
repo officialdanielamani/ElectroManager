@@ -145,6 +145,38 @@
                             </option>
                         </optgroup>
                         {% endif %}
+                        {% if current_user.api_rack_drawer and sys_rack_drawer_enabled %}
+                        <optgroup label="Location, Rack &amp; Drawer">
+                            <option value="location_search"
+                                    data-method="GET"
+                                    data-type="get_query"
+                                    data-path="/api/v1/location/search"
+                                    data-desc="Search for an item by name, UUID, batch UID, or ISN — returns rack/drawer location">
+                                GET /api/v1/location/search
+                            </option>
+                            <option value="rack_info"
+                                    data-method="GET"
+                                    data-type="get_rack"
+                                    data-path="/api/v1/rack/{rack_uuid}"
+                                    data-desc="Get rack metadata and a flat list of all items/batches stored in the rack">
+                                GET /api/v1/rack/&lt;rack_uuid&gt;
+                            </option>
+                            <option value="rack_layout"
+                                    data-method="GET"
+                                    data-type="get_rack"
+                                    data-path="/api/v1/rack/{rack_uuid}/layout"
+                                    data-desc="Get full cell-by-cell rack layout with merge/group states — use to recreate the visual grid">
+                                GET /api/v1/rack/&lt;rack_uuid&gt;/layout
+                            </option>
+                            <option value="drawer_contents"
+                                    data-method="GET"
+                                    data-type="get_drawer"
+                                    data-path="/api/v1/rack/{rack_uuid}/drawer/{row}/{col}"
+                                    data-desc="Get full contents of a specific drawer (row and col are 1-based integers)">
+                                GET /api/v1/rack/&lt;rack_uuid&gt;/drawer/&lt;row&gt;/&lt;col&gt;
+                            </option>
+                        </optgroup>
+                        {% endif %}
                         {% if current_user.api_lending_return and sys_lending_return_enabled %}
                         <optgroup label="Lending &amp; Return">
                             <option value="session_get"
@@ -300,7 +332,7 @@
                             </label>
                         </div>
                         <small class="text-muted d-block mt-1 ms-4">
-                            Query drawer contents, toggle availability, and move items between drawers.
+                            Search item locations, view rack layouts, and get drawer contents (read-only).
                         </small>
                     </div>
                     {% else %}
@@ -392,6 +424,15 @@
                             <td><code>GET /api/v1/lookup</code></td>
                         </tr>
                         <tr>
+                            <td><span class="badge bg-success">Rack</span></td>
+                            <td>
+                                <code>GET /api/v1/location/search</code><br>
+                                <code>GET /api/v1/rack/&lt;uuid&gt;</code><br>
+                                <code>GET /api/v1/rack/&lt;uuid&gt;/layout</code><br>
+                                <code>GET /api/v1/rack/&lt;uuid&gt;/drawer/&lt;r&gt;/&lt;c&gt;</code>
+                            </td>
+                        </tr>
+                        <tr>
                             <td><span class="badge bg-warning text-dark">Lending</span></td>
                             <td>
                                 <code>GET /api/v1/lookup</code><br>
@@ -449,10 +490,14 @@ function onDryRunChange() {
 
 // ── Sample bodies per endpoint ─────────────────────────────────────────────────
 const SAMPLES = {
-    lookup_item:  '{\n  "q": "ISN-0042"\n}',
-    session_get:  '{\n  "session_id": "20250521-AB1234"\n}',
-    lend_cart:    '{\n  "items": [\n    {"batch_id": "XXXXXXXXXXXXXXXX-B01", "qty": 1}\n  ],\n  "due_date": "2025-12-31T23:59:59"\n}',
-    return_cart:  '{\n  "items": [\n    {"batch_id": "XXXXXXXXXXXXXXXX-B01", "qty": 1}\n  ]\n}',
+    lookup_item:      '{\n  "q": "ISN-0042"\n}',
+    location_search:  '{\n  "q": "Arduino"\n}',
+    rack_info:        '{\n  "rack_uuid": "YOUR-RACK-UUID"\n}',
+    rack_layout:      '{\n  "rack_uuid": "YOUR-RACK-UUID"\n}',
+    drawer_contents:  '{\n  "rack_uuid": "YOUR-RACK-UUID",\n  "row": 1,\n  "col": 1\n}',
+    session_get:      '{\n  "session_id": "20250521-AB1234"\n}',
+    lend_cart:        '{\n  "items": [\n    {"batch_id": "XXXXXXXXXXXXXXXX-B01", "qty": 1}\n  ],\n  "due_date": "2025-12-31T23:59:59"\n}',
+    return_cart:      '{\n  "items": [\n    {"batch_id": "XXXXXXXXXXXXXXXX-B01", "qty": 1}\n  ]\n}',
 };
 
 function onEndpointChange() {
@@ -500,6 +545,13 @@ function updateCurl() {
             if ([...params].length) urlPath += '?' + params.toString();
         } else if (eType === 'get_path') {
             urlPath = urlPath.replace('{id}', encodeURIComponent(parsed.session_id || '<session_id>'));
+        } else if (eType === 'get_rack') {
+            urlPath = urlPath.replace('{rack_uuid}', encodeURIComponent(parsed.rack_uuid || '<rack_uuid>'));
+        } else if (eType === 'get_drawer') {
+            urlPath = urlPath
+                .replace('{rack_uuid}', encodeURIComponent(parsed.rack_uuid || '<rack_uuid>'))
+                .replace('{row}', encodeURIComponent(parsed.row || '1'))
+                .replace('{col}', encodeURIComponent(parsed.col || '1'));
         }
     } else {
         let parsed = {};
@@ -553,6 +605,13 @@ async function testApi() {
             if ([...params].length) url += '?' + params.toString();
         } else if (eType === 'get_path') {
             url = url.replace('{id}', encodeURIComponent(p.session_id || ''));
+        } else if (eType === 'get_rack') {
+            url = url.replace('{rack_uuid}', encodeURIComponent(p.rack_uuid || ''));
+        } else if (eType === 'get_drawer') {
+            url = url
+                .replace('{rack_uuid}', encodeURIComponent(p.rack_uuid || ''))
+                .replace('{row}', encodeURIComponent(p.row || '1'))
+                .replace('{col}', encodeURIComponent(p.col || '1'));
         }
     }
 
