@@ -316,8 +316,8 @@
       </div>
       {% if can_view_log %}
       <div class="card-body p-2">
-        <!-- Log filter row: Start | End | Contact — stacks vertically on xs screens -->
-        <div class="d-flex flex-wrap gap-1 mb-2 align-items-center">
+        <!-- Log filter row: Start | End | Contact -->
+        <div class="d-flex flex-wrap gap-1 mb-1 align-items-center">
           <input type="date" class="form-control form-control-sm" id="logFilterStart"
                  style="min-width:120px;flex:1 1 120px;"
                  onchange="loadLog()" title="Log entries on/after this date">
@@ -325,17 +325,43 @@
                  style="min-width:120px;flex:1 1 120px;"
                  onchange="loadLog()" title="Log entries on/before this date">
           {% if not can_only_self %}
-          <div class="position-relative" style="min-width:130px;flex:2 1 130px;">
-            <input type="hidden" id="logFilterContactId">
-            <input type="hidden" id="logFilterContactType">
-            <input type="text" class="form-control form-control-sm" id="logFilterContactInput"
-                   placeholder="Contact…" oninput="debounceLogContact()" autocomplete="off"
-                   title="Filter by borrower">
-            <div id="logFilterContactDrop" class="border rounded shadow-sm position-absolute"
-                 style="top:100%;left:0;right:0;z-index:200;max-height:160px;overflow-y:auto;
-                        background:var(--bs-body-bg);display:none;font-size:0.82rem;"></div>
+          <div class="d-flex gap-1 align-items-center" style="min-width:130px;flex:2 1 130px;">
+            <div class="position-relative flex-grow-1">
+              <input type="hidden" id="logFilterContactId">
+              <input type="hidden" id="logFilterContactType">
+              <input type="text" class="form-control form-control-sm" id="logFilterContactInput"
+                     placeholder="All contacts…" oninput="debounceLogContact()" autocomplete="off"
+                     title="Filter by user (shows all their actions) or contact (shows their sessions)">
+              <div id="logFilterContactDrop" class="border rounded shadow-sm position-absolute"
+                   style="top:100%;left:0;right:0;z-index:200;max-height:160px;overflow-y:auto;
+                          background:var(--bs-body-bg);display:none;font-size:0.82rem;"></div>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm py-0 px-1 flex-shrink-0" style="font-size:0.75rem;"
+                    title="Filter to my actions" onclick="selectLogContact('user', _currentUserId, _currentUserLabel)">Me</button>
+            <button class="btn btn-outline-secondary btn-sm py-0 px-1 flex-shrink-0" style="font-size:0.75rem;"
+                    title="Show all" onclick="clearLogContact()">All</button>
           </div>
           {% endif %}
+        </div>
+        <!-- Operation type checkboxes -->
+        <div class="d-flex flex-wrap gap-2 mb-2 align-items-center" style="font-size:0.78rem;">
+          <span class="text-muted">Show:</span>
+          <div class="form-check form-check-inline mb-0">
+            <input class="form-check-input" type="checkbox" id="logOpLend" checked onchange="loadLog()">
+            <label class="form-check-label" for="logOpLend"><span class="badge bg-primary" style="font-size:0.65rem;">Lend</span></label>
+          </div>
+          <div class="form-check form-check-inline mb-0">
+            <input class="form-check-input" type="checkbox" id="logOpReturn" checked onchange="loadLog()">
+            <label class="form-check-label" for="logOpReturn"><span class="badge bg-success" style="font-size:0.65rem;">Return</span></label>
+          </div>
+          <div class="form-check form-check-inline mb-0">
+            <input class="form-check-input" type="checkbox" id="logOpEdit" checked onchange="loadLog()">
+            <label class="form-check-label" for="logOpEdit"><span class="badge bg-secondary" style="font-size:0.65rem;">Edit</span></label>
+          </div>
+          <div class="form-check form-check-inline mb-0">
+            <input class="form-check-input" type="checkbox" id="logOpDelete" checked onchange="loadLog()">
+            <label class="form-check-label" for="logOpDelete"><span class="badge bg-danger" style="font-size:0.65rem;">Delete</span></label>
+          </div>
         </div>
         <!-- Log results -->
         <div id="logResults" style="max-height:55vh;overflow-y:auto;font-size:0.83rem;">
@@ -2411,7 +2437,6 @@ function clearAdvContact() {
    LENDING & RETURN LOG PANEL
    ════════════════════════════════════════════════════════ */
 function _logInitDefaults() {
-    /* Default log date range: past 7 days to today */
     var now  = new Date();
     var past = new Date(now.getTime() - 7 * 86400000);
     var fmt  = function(d) {
@@ -2421,14 +2446,6 @@ function _logInitDefaults() {
     };
     _setVal('logFilterStart', fmt(past));
     _setVal('logFilterEnd',   fmt(now));
-    /* Default contact to current user */
-    if (!_canOnlySelf) {
-        _logContactId   = String(_currentUserId);
-        _logContactType = 'user';
-        _setVal('logFilterContactId',    String(_currentUserId));
-        _setVal('logFilterContactType',  'user');
-        _setVal('logFilterContactInput', _currentUserLabel);
-    }
 }
 
 function loadLog() {
@@ -2460,11 +2477,19 @@ function _doLoadLog() {
     var end   = _getVal('logFilterEnd');
     var cid   = _getVal('logFilterContactId') || _logContactId;
     var ctype = _getVal('logFilterContactType') || _logContactType;
-    var url   = '/in-out/logs?page=' + _logPage +
-                '&start_date=' + encodeURIComponent(start) +
-                '&end_date='   + encodeURIComponent(end);
+
+    var ops = [];
+    if (document.getElementById('logOpLend')   && document.getElementById('logOpLend').checked)   ops.push('lend');
+    if (document.getElementById('logOpReturn') && document.getElementById('logOpReturn').checked) ops.push('return');
+    if (document.getElementById('logOpEdit')   && document.getElementById('logOpEdit').checked)   ops.push('edit');
+    if (document.getElementById('logOpDelete') && document.getElementById('logOpDelete').checked) ops.push('delete');
+
+    var url = '/in-out/logs?page=' + _logPage +
+              '&start_date=' + encodeURIComponent(start) +
+              '&end_date='   + encodeURIComponent(end);
     if (cid && ctype) url += '&contact_id=' + encodeURIComponent(cid) +
                               '&contact_type=' + encodeURIComponent(ctype);
+    if (ops.length < 4) url += '&actions=' + encodeURIComponent(ops.join(','));
 
     var el = document.getElementById('logResults');
     if (!el) return;
@@ -2551,6 +2576,17 @@ function selectLogContact(type, id, label) {
     _setVal('logFilterContactId',    id);
     _setVal('logFilterContactType',  type);
     _setVal('logFilterContactInput', label);
+    var drop = document.getElementById('logFilterContactDrop');
+    if (drop) drop.style.display = 'none';
+    loadLog();
+}
+
+function clearLogContact() {
+    _logContactId   = '';
+    _logContactType = '';
+    _setVal('logFilterContactId',   '');
+    _setVal('logFilterContactType', '');
+    _setVal('logFilterContactInput', '');
     var drop = document.getElementById('logFilterContactDrop');
     if (drop) drop.style.display = 'none';
     loadLog();

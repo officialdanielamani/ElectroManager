@@ -393,9 +393,26 @@ def in_out_logs_ajax():
     end_str      = request.args.get('end_date',     '').strip()
     contact_id   = request.args.get('contact_id',   '').strip()
     contact_type = request.args.get('contact_type', '').strip()
+    action_filter = request.args.get('actions',     '').strip()
     page         = request.args.get('page', 1, type=int)
 
-    actions = ['lend', 'return', 'update', 'delete', 'batch_sn_purge', 'lend_update', 'sn_batch_save']
+    _ALL_LOG_ACTIONS = ['lend', 'return', 'update', 'delete', 'batch_sn_purge', 'lend_update', 'sn_batch_save']
+    _ACTION_GROUPS = {
+        'lend':   ['lend', 'lend_update'],
+        'return': ['return'],
+        'edit':   ['update', 'sn_batch_save'],
+        'delete': ['delete', 'batch_sn_purge'],
+    }
+    if action_filter:
+        allowed = set()
+        for g in [x.strip() for x in action_filter.split(',') if x.strip()]:
+            allowed.update(_ACTION_GROUPS.get(g, []))
+        actions = [a for a in _ALL_LOG_ACTIONS if a in allowed]
+        if not actions:
+            return jsonify({'entries': [], 'has_more': False, 'total_pages': 1, 'page': 1})
+    else:
+        actions = _ALL_LOG_ACTIONS
+
     q = (AuditLog.query
          .filter(AuditLog.entity_type.in_(['batch', 'item', 'sn', 'lending_session']))
          .filter(AuditLog.action.in_(actions)))
@@ -420,15 +437,20 @@ def in_out_logs_ajax():
     if contact_id and contact_type:
         try:
             cid = int(contact_id)
-            matching_ids = db.session.query(LendingSession.id).filter_by(
-                lend_to_id=cid, lend_to_type=contact_type
-            ).subquery()
-            q = q.filter(
-                db.and_(
-                    AuditLog.entity_type == 'lending_session',
-                    AuditLog.entity_id.in_(matching_ids)
+            if contact_type == 'user':
+                # Show every log entry performed by this user
+                q = q.filter(AuditLog.user_id == cid)
+            else:
+                # For non-user contacts only session entries are meaningful
+                matching_ids = db.session.query(LendingSession.id).filter_by(
+                    lend_to_id=cid, lend_to_type=contact_type
+                ).subquery()
+                q = q.filter(
+                    db.and_(
+                        AuditLog.entity_type == 'lending_session',
+                        AuditLog.entity_id.in_(matching_ids)
+                    )
                 )
-            )
         except ValueError:
             pass
 
