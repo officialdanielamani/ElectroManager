@@ -954,26 +954,12 @@ def api_rack_layout(rack_uuid):
         return _err(404, 'RACK_NOT_FOUND', 'Rack not found')
 
     unavailable = set(rack.get_unavailable_drawers())
-    merged_groups = rack.get_merged_cells()
-    drawer_info   = rack.get_drawer_info()
+    drawer_info = rack.get_drawer_info()
 
-    # Pre-compute merge maps
-    merged_away    = {}  # cell_id → master_cell_id
-    merged_masters = {}  # cell_id → {row_span, col_span}
-    for group in merged_groups:
-        master = group.get('master', '')
-        cells  = group.get('cells', [])
-        if not master or not cells:
-            continue
-        rows_in = [r for r, _ in (_parse_cell(c) for c in cells) if r is not None]
-        cols_in = [c for _, c in (_parse_cell(c) for c in cells) if c is not None]
-        merged_masters[master] = {
-            'row_span': max(rows_in) - min(rows_in) + 1 if rows_in else 1,
-            'col_span': max(cols_in) - min(cols_in) + 1 if cols_in else 1,
-        }
-        for c in cells:
-            if c != master:
-                merged_away[c] = master
+    # compute_merge_layout() distinguishes two kinds of groups:
+    #   rectangular merge  → skip_cells (slaves hidden) + cell_spans (master has rowspan/colspan)
+    #   non-rectangular group → group_cells (all cells visible, master + slave roles)
+    skip_cells, cell_spans, group_cells = rack.compute_merge_layout()
 
     # Pre-load occupied cells (2 queries, not N×M)
     item_drawers  = db.session.query(Item.drawer).filter_by(rack_id=rack.id).all()
@@ -991,12 +977,19 @@ def api_rack_layout(rack_uuid):
     for r in range(rack.rows):
         for c in range(rack.cols):
             cid = f'R{r}-C{c}'
+
             if cid in unavailable:
                 state = 'unavailable'
-            elif cid in merged_away:
+            elif cid in skip_cells:
+                # Slave of a rectangular merge — physically absent from grid
                 state = 'merged_away'
-            elif cid in merged_masters:
+            elif cid in cell_spans:
+                # Master of a rectangular merge — spans row_span × col_span cells
                 state = 'merged_master'
+            elif cid in group_cells:
+                # Part of a non-rectangular group — all cells stay visible
+                g = group_cells[cid]
+                state = 'group_master' if g['role'] == 'master' else 'group_slave'
             elif cid in item_count_map:
                 state = 'has_items'
             else:
@@ -1009,12 +1002,23 @@ def api_rack_layout(rack_uuid):
                 'state':      state,
                 'short_info': drawer_info.get(cid, ''),
             }
+
             if state == 'merged_master':
-                cell['row_span'] = merged_masters[cid]['row_span']
-                cell['col_span'] = merged_masters[cid]['col_span']
+                spans = cell_spans[cid]
+                cell['row_span']   = spans['rowspan']
+                cell['col_span']   = spans['colspan']
                 cell['item_count'] = item_count_map.get(cid, 0)
             elif state == 'merged_away':
-                cell['master_cell'] = merged_away[cid]
+                # Find the master so the client knows which cell it belongs to
+                for group in rack.get_merged_cells():
+                    if cid in group.get('cells', []):
+                        cell['master_cell'] = group.get('master')
+                        break
+            elif state in ('group_master', 'group_slave'):
+                g = group_cells[cid]
+                cell['group_master']  = g['master']
+                cell['group_size']    = g['count']
+                cell['item_count']    = item_count_map.get(cid, 0)
             elif state == 'has_items':
                 cell['item_count'] = item_count_map.get(cid, 0)
 
@@ -1024,8 +1028,18 @@ def api_rack_layout(rack_uuid):
         'success':   True,
         'rack_uuid': rack.uuid,
         'rack_name': rack.name,
+        'rack_color': rack.color or '#6c757d',
         'rows':      rack.rows,
         'cols':      rack.cols,
+        'legend': {
+            'empty':        'Cell is empty',
+            'has_items':    'Cell contains items',
+            'merged_master':'Master of a rectangular merge (use row_span/col_span)',
+            'merged_away':  'Hidden slave of a rectangular merge',
+            'group_master': 'Master of a non-rectangular group (cell is visible)',
+            'group_slave':  'Member of a non-rectangular group (cell is visible)',
+            'unavailable':  'Cell marked as unavailable',
+        },
         'cells':     cells,
     })
 
@@ -1049,27 +1063,21 @@ def api_rack_drawer(rack_uuid, row, col):
 
     cid = f'R{row}-C{col}'
 
-    # Determine cell state
+    # Determine cell state using the same logic as the layout endpoint
     unavailable = set(rack.get_unavailable_drawers())
+    skip_cells, cell_spans, group_cells = rack.compute_merge_layout()
+
     if cid in unavailable:
         state = 'unavailable'
+    elif cid in skip_cells:
+        state = 'merged_away'
+    elif cid in cell_spans:
+        state = 'merged_master'
+    elif cid in group_cells:
+        g = group_cells[cid]
+        state = 'group_master' if g['role'] == 'master' else 'group_slave'
     else:
-        merged_groups = rack.get_merged_cells()
-        merged_away = {}
-        merged_masters = set()
-        for group in merged_groups:
-            master = group.get('master', '')
-            cells  = group.get('cells', [])
-            merged_masters.add(master)
-            for c in cells:
-                if c != master:
-                    merged_away[c] = master
-        if cid in merged_away:
-            state = 'merged_away'
-        elif cid in merged_masters:
-            state = 'merged_master'
-        else:
-            state = 'has_items' if _drawer_entries(rack, cid) else 'empty'
+        state = 'has_items' if _drawer_entries(rack, cid) else 'empty'
 
     entries = [] if state in ('merged_away', 'unavailable') else _drawer_entries(rack, cid)
 
@@ -1085,6 +1093,13 @@ def api_rack_drawer(rack_uuid, row, col):
         'items':      entries,
     }
     if state == 'merged_away':
-        resp['master_cell'] = merged_away[cid]
+        for group in rack.get_merged_cells():
+            if cid in group.get('cells', []):
+                resp['master_cell'] = group.get('master')
+                break
+    elif state in ('group_master', 'group_slave'):
+        g = group_cells[cid]
+        resp['group_master'] = g['master']
+        resp['group_size']   = g['count']
 
     return jsonify(resp)
