@@ -119,6 +119,7 @@ For cart operations that fail per-item, the top-level code is `CART_VALIDATION_F
 | `CART_VALIDATION_FAILED` | 409 | One or more cart items failed — nothing was committed |
 | `RATE_LIMITED` | 429 | Rate limit exceeded |
 | `RACK_NOT_FOUND` | 404 | No rack with that UUID |
+| `LOCATION_NOT_FOUND` | 404 | No general location with that UUID |
 | `MISSING_QUERY` | 400 | `q` parameter is empty |
 | `INVALID_POSITION` | 400 | Row/col out of bounds (must be 1-based) |
 
@@ -436,6 +437,72 @@ For ISN results an extra `isn` and `lent_out` field appear at the top level of t
 
 ---
 
+#### `GET /api/v1/location/<location_uuid>`
+
+**Scope required:** `rack_drawer`
+
+Returns metadata for a general location (not a rack), the racks physically placed there, and any items/batches stored directly at that location (i.e. not inside a rack).
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "location": {
+    "uuid":        "ABCDE12345L",
+    "name":        "Lab A",
+    "short_info":  "Main electronics lab",
+    "description": "Second floor, room 204",
+    "color":       "#28a745"
+  },
+  "rack_count": 2,
+  "item_count": 3,
+  "racks": [
+    {
+      "uuid":       "RACK-UUID",
+      "name":       "Main Cabinet",
+      "short_info": "Left wall",
+      "color":      "#3a86ff",
+      "rows":       5,
+      "cols":       5,
+      "stats": {
+        "total_cells": 25,
+        "unavailable": 2,
+        "used":        8,
+        "empty":       15
+      }
+    }
+  ],
+  "items": [
+    {
+      "type":       "item_main",
+      "name":       "Oscilloscope",
+      "item_uuid":  "XYZ789ABCDEF0123",
+      "sku":        "OSC-200",
+      "short_info": "200 MHz",
+      "quantity":   1,
+      "available":  1
+    },
+    {
+      "type":        "batch_override",
+      "name":        "Breadboard Kit",
+      "item_uuid":   "ABC123DEFG012345",
+      "sku":         "BB-KIT",
+      "short_info":  "",
+      "batch_uid":   "ABC123DEFG012345-B02",
+      "batch_label": "Batch 2",
+      "quantity":    10,
+      "available":   10,
+      "sn_tracking": false
+    }
+  ]
+}
+```
+
+`items` contains entries stored directly at this location (no rack assigned). `type` is `item_main` (item's primary location is here) or `batch_override` (batch has its own location pointing here). Items inside racks at this location are not included — fetch rack data via `GET /api/v1/rack/<uuid>` instead.
+
+---
+
 #### `GET /api/v1/rack/<rack_uuid>`
 
 **Scope required:** `rack_drawer`
@@ -622,6 +689,7 @@ Returns drawer state plus a detailed item list matching the visual-storage drawe
 | Code | HTTP | Meaning |
 |---|---|---|
 | `RACK_NOT_FOUND` | 404 | No rack with that UUID |
+| `LOCATION_NOT_FOUND` | 404 | No general location with that UUID |
 | `MISSING_QUERY` | 400 | `q` parameter is empty |
 | `INVALID_POSITION` | 400 | Row/col out of bounds (must be 1-based) |
 
@@ -653,6 +721,10 @@ Find item location
 │
 ├── GET /api/v1/location/search?q=<item_name_or_uuid>
 │       Returns which rack + drawer the item lives in
+│       (or which general location if no rack is assigned)
+│
+├── GET /api/v1/location/<uuid>          ← general location (no rack)
+│       Metadata + racks at this location + items stored here directly
 │
 ├── GET /api/v1/rack/<uuid>/layout
 │       Fetch full rack grid to render on a display or web UI

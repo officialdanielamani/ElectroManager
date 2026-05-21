@@ -154,6 +154,13 @@
                                     data-desc="Search for an item by name, UUID, batch UID, or ISN — returns rack/drawer location">
                                 GET /api/v1/location/search
                             </option>
+                            <option value="location_info"
+                                    data-method="GET"
+                                    data-type="get_location"
+                                    data-path="/api/v1/location/{location_uuid}"
+                                    data-desc="Get metadata, racks, and items for a general location by its UUID">
+                                GET /api/v1/location/&lt;location_uuid&gt;
+                            </option>
                             <option value="rack_info"
                                     data-method="GET"
                                     data-type="get_rack"
@@ -492,6 +499,7 @@ function onDryRunChange() {
 const SAMPLES = {
     lookup_item:      '{\n  "q": "ISN-0042"\n}',
     location_search:  '{\n  "q": "Arduino"\n}',
+    location_info:    '{\n  "location_uuid": "YOUR-LOCATION-UUID"\n}',
     rack_info:        '{\n  "rack_uuid": "YOUR-RACK-UUID"\n}',
     rack_layout:      '{\n  "rack_uuid": "YOUR-RACK-UUID"\n}',
     drawer_contents:  '{\n  "rack_uuid": "YOUR-RACK-UUID",\n  "row": 1,\n  "col": 1\n}',
@@ -545,6 +553,8 @@ function updateCurl() {
             if ([...params].length) urlPath += '?' + params.toString();
         } else if (eType === 'get_path') {
             urlPath = urlPath.replace('{id}', encodeURIComponent(parsed.session_id || '<session_id>'));
+        } else if (eType === 'get_location') {
+            urlPath = urlPath.replace('{location_uuid}', encodeURIComponent(parsed.location_uuid || '<location_uuid>'));
         } else if (eType === 'get_rack') {
             urlPath = urlPath.replace('{rack_uuid}', encodeURIComponent(parsed.rack_uuid || '<rack_uuid>'));
         } else if (eType === 'get_drawer') {
@@ -605,6 +615,8 @@ async function testApi() {
             if ([...params].length) url += '?' + params.toString();
         } else if (eType === 'get_path') {
             url = url.replace('{id}', encodeURIComponent(p.session_id || ''));
+        } else if (eType === 'get_location') {
+            url = url.replace('{location_uuid}', encodeURIComponent(p.location_uuid || ''));
         } else if (eType === 'get_rack') {
             url = url.replace('{rack_uuid}', encodeURIComponent(p.rack_uuid || ''));
         } else if (eType === 'get_drawer') {

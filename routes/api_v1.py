@@ -844,6 +844,98 @@ def api_location_search():
 
 
 # ════════════════════════════════════════════════════════════════════════════
+# GET /api/v1/location/<location_uuid>
+# ════════════════════════════════════════════════════════════════════════════
+@api_v1_bp.route('/location/<location_uuid>', methods=['GET'])
+def api_location_info(location_uuid):
+    user, err = _authenticate(scope='rack_drawer')
+    if err:
+        return err
+
+    loc = Location.query.filter_by(uuid=location_uuid).first()
+    if not loc:
+        return _err(404, 'LOCATION_NOT_FOUND', 'Location not found')
+
+    # Racks physically placed in this location
+    racks_list = []
+    for rack in loc.racks:
+        unavail  = len(rack.get_unavailable_drawers())
+        total    = rack.rows * rack.cols
+        occupied = db.session.query(db.func.count()).select_from(
+            Item.__table__
+        ).filter_by(rack_id=rack.id).scalar() or 0
+        occupied += db.session.query(db.func.count()).select_from(
+            ItemBatch.__table__
+        ).filter_by(rack_id=rack.id, follow_main_location=False).scalar() or 0
+        racks_list.append({
+            'uuid':       rack.uuid,
+            'name':       rack.name,
+            'short_info': rack.short_info or '',
+            'color':      rack.color or '#6c757d',
+            'rows':       rack.rows,
+            'cols':       rack.cols,
+            'stats': {
+                'total_cells': total,
+                'unavailable': unavail,
+                'used':        occupied,
+                'empty':       total - unavail - occupied,
+            },
+        })
+
+    # Items whose general (non-rack) location is here
+    items_main = Item.query.filter_by(location_id=loc.id, rack_id=None).all()
+    item_list  = []
+    for item in items_main:
+        follow_batches = [b for b in item.batches if b.follow_main_location]
+        total_qty = sum(b.quantity for b in follow_batches)
+        avail_qty = sum(b.get_available_quantity() for b in follow_batches)
+        item_list.append({
+            'type':       'item_main',
+            'name':       item.name,
+            'item_uuid':  item.uuid,
+            'sku':        item.sku or '',
+            'short_info': item.short_info or '',
+            'quantity':   total_qty,
+            'available':  avail_qty,
+        })
+
+    # Batches whose overridden location (non-rack) is here
+    batches_ov = ItemBatch.query.filter_by(
+        location_id=loc.id, rack_id=None, follow_main_location=False).all()
+    for batch in batches_ov:
+        iobj = batch.item
+        if not iobj:
+            continue
+        item_list.append({
+            'type':        'batch_override',
+            'name':        iobj.name,
+            'item_uuid':   iobj.uuid,
+            'sku':         iobj.sku or '',
+            'short_info':  iobj.short_info or '',
+            'batch_uid':   batch.get_batch_uid(),
+            'batch_label': batch.get_display_label(),
+            'quantity':    batch.quantity,
+            'available':   batch.get_available_quantity(),
+            'sn_tracking': batch.sn_tracking_enabled,
+        })
+
+    return jsonify({
+        'success': True,
+        'location': {
+            'uuid':        loc.uuid,
+            'name':        loc.name,
+            'short_info':  loc.info or '',
+            'description': loc.description or '',
+            'color':       loc.color or '#6c757d',
+        },
+        'rack_count':  len(racks_list),
+        'item_count':  len(item_list),
+        'racks':  racks_list,
+        'items':  item_list,
+    })
+
+
+# ════════════════════════════════════════════════════════════════════════════
 # GET /api/v1/rack/<rack_uuid>
 # ════════════════════════════════════════════════════════════════════════════
 @api_v1_bp.route('/rack/<rack_uuid>', methods=['GET'])
