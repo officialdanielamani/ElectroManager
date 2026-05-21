@@ -76,10 +76,10 @@
                     <div class="mb-2">
                         <label class="form-label form-label-sm mb-1">Thumbnail</label>
                         <div class="d-flex align-items-center gap-2">
-                            <div id="projThumbPreview" style="width:56px;height:56px;border:1px solid #dee2e6;border-radius:6px;background:#f8f9fa;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;">
+                            <div id="projThumbPreview" style="width:56px;height:56px;border:1px solid var(--bs-border-color);border-radius:6px;background:var(--bs-tertiary-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;">
                                 {% if project and project.thumbnail %}
                                     {% if project.thumbnail.startswith('biicon:') %}
-                                    <i class="bi bi-{{ project.thumbnail[7:] }}" style="font-size:28px;color:#333;"></i>
+                                    <i class="bi bi-{{ project.thumbnail[7:] }}" style="font-size:28px;color:var(--bs-body-color);"></i>
                                     {% elif project.thumbnail.startswith('icon:') %}
                                     <img src="{{ url_for('share.share_serve', category='icon', filename=project.thumbnail[5:]) }}" style="width:100%;height:100%;object-fit:contain;padding:4px;">
                                     {% elif project.thumbnail.startswith('share:') %}
@@ -87,7 +87,7 @@
                                     {% else %}
                                     <img src="{{ url_for('project_uploaded_file', filename=project.thumbnail) }}" style="width:100%;height:100%;object-fit:cover;border-radius:6px;">
                                     {% endif %}
-                                    <button type="button" onclick="clearProjThumb()" style="position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:none;background:#dc3545;color:white;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;z-index:1;" title="Remove thumbnail"><i class="bi bi-x"></i></button>
+                                    <button type="button" onclick="clearProjThumb()" style="position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:none;background:var(--bs-danger);color:var(--bs-white);font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;z-index:1;" title="Remove thumbnail"><i class="bi bi-x"></i></button>
                                 {% else %}
                                 <i class="bi bi-image text-muted" style="font-size:1.5rem;"></i>
                                 {% endif %}
@@ -167,7 +167,7 @@
                     <script>
                     /* Search-and-select widget */
                     (function() {
-                        var usersData = [{% for u in users %}{"id":{{ u.id }},"label":"{{ u.username }}"}{% if not loop.last %},{% endif %}{% endfor %}];
+                        var usersData = [{% for u in users %}{"id":{{ u.id }},"label":"{{ u.name|e }}","extra":"{{ (u.short_info or '')|e }}"}{% if not loop.last %},{% endif %}{% endfor %}];
                         var personsData = [{% for p in contact_persons %}{"id":{{ p.id }},"label":"{{ p.name }}{% if p.organization %} ({{ p.organization.name }}){% endif %}{% if p.email %} — {{ p.email }}{% endif %}"}{% if not loop.last %},{% endif %}{% endfor %}];
                         var orgsData = [{% for o in contact_orgs %}{"id":{{ o.id }},"label":"{{ o.name }}{% if o.email %} — {{ o.email }}{% endif %}"}{% if not loop.last %},{% endif %}{% endfor %}];
 
@@ -214,7 +214,10 @@
                             function renderDropdown(q) {
                                 var q2 = q.toLowerCase();
                                 var matches = data.filter(function(d) {
-                                    return d.label.toLowerCase().indexOf(q2) !== -1 && !selected[d.id];
+                                    return !selected[d.id] && (
+                                        d.label.toLowerCase().indexOf(q2) !== -1 ||
+                                        (d.extra && d.extra.toLowerCase().indexOf(q2) !== -1)
+                                    );
                                 });
                                 dropEl.innerHTML = '';
                                 if (matches.length === 0) {
@@ -224,7 +227,16 @@
                                 matches.slice(0, 10).forEach(function(d) {
                                     var item = document.createElement('div');
                                     item.className = 'ss-dropdown-item';
-                                    item.textContent = d.label;
+                                    var nameEl = document.createElement('div');
+                                    nameEl.textContent = d.label;
+                                    item.appendChild(nameEl);
+                                    if (d.extra) {
+                                        var extraEl = document.createElement('div');
+                                        extraEl.className = 'text-muted';
+                                        extraEl.style.fontSize = '0.75rem';
+                                        extraEl.textContent = d.extra;
+                                        item.appendChild(extraEl);
+                                    }
                                     item.addEventListener('mousedown', function(e) {
                                         e.preventDefault();
                                         selected[d.id] = d.label;
@@ -458,6 +470,7 @@
         </div>
         {% endif %}
 
+        {% if can_view_costing %}
         <!-- Costing -->
         <div class="card mt-3">
             <div class="card-header">
@@ -466,42 +479,63 @@
             <div class="card-body p-2">
 
         <!-- Cost Summary -->
-        {% set _cpq = project.get_cost_per_qty_total() %}
-        {% set _ov = project.get_overall_cost_total() %}
-        {% set _qty = project.quantity or 1 %}
-        {% set _est = (project.get_bom_total_cost() + _cpq) * _qty + _ov %}
-        <div class="row g-2 mb-2">
-            <div class="col-6 col-md-2"><div class="card bg-light h-100"><div class="card-body text-center p-2"><small class="text-muted d-block">Quantity</small><strong>{{ _qty }}</strong></div></div></div>
-            <div class="col-6 col-md-2">
-                <div class="card bg-light mb-1"><div class="card-body text-center p-2"><small class="text-muted d-block">Est. BOM</small><span style="font-size:0.85rem;">{{ currency }} {{ '{:,.{}f}'.format(project.get_bom_total_cost(), currency_decimal) }}</span></div></div>
-                <div class="card bg-light"><div class="card-body text-center p-2"><small class="text-muted d-block">Act. BOM</small><span style="font-size:0.85rem;">{{ currency }} {{ '{:,.{}f}'.format(project.get_bom_actual_cost(), currency_decimal) }}</span></div></div>
-            </div>
-            <div class="col-6 col-md-2">
-                <div class="card bg-light mb-1"><div class="card-body text-center p-2"><small class="text-muted d-block">Cost/Qty</small><span style="font-size:0.85rem;">{{ currency }} {{ '{:,.{}f}'.format(_cpq, currency_decimal) }}</span></div></div>
-                <div class="card bg-light"><div class="card-body text-center p-2"><small class="text-muted d-block">Overall</small><span style="font-size:0.85rem;">{{ currency }} {{ '{:,.{}f}'.format(_ov, currency_decimal) }}</span></div></div>
-            </div>
-            <div class="col-6 col-md-6"><div class="card bg-primary text-white h-100"><div class="card-body text-center p-2 d-flex flex-column justify-content-center"><small class="d-block">Project Total</small><h5 class="mb-1">{{ currency }} {{ '{:,.{}f}'.format(_est, currency_decimal) }}</h5><small class="opacity-75">(BOM+CPQ)×Qty+Overall</small></div></div></div>
-        </div>
+        {% set _bom_est = project.get_bom_total_cost() %}
+        {% set _bom_act = project.get_bom_actual_cost() %}
+        {% set _cpq    = project.get_cost_per_qty_total() %}
+        {% set _ov     = project.get_overall_cost_total() %}
+        {% set _qty    = project.quantity or 1 %}
+        {% set _total  = (_bom_act + _cpq) * _qty + _ov %}
+        <table class="table table-bordered mb-2" style="table-layout:fixed;">
+            <tbody>
+                <tr>
+                    <td rowspan="2" class="text-center align-middle table-secondary" style="width:22%;">
+                        <small class="text-muted d-block">Quantity</small>
+                        <strong class="fs-5">{{ _qty }}</strong>
+                    </td>
+                    <td class="text-center p-2 table-secondary" style="width:22%;">
+                        <small class="text-muted d-block">Estimate BOM</small>
+                        <strong>{{ currency }} {{ '{:,.{}f}'.format(_bom_est, currency_decimal) }}</strong>
+                    </td>
+                    <td class="text-center p-2 table-secondary" style="width:22%;">
+                        <small class="text-muted d-block">Cost per Qty</small>
+                        <strong>{{ currency }} {{ '{:,.{}f}'.format(_cpq, currency_decimal) }}</strong>
+                    </td>
+                    <td rowspan="2" class="text-center align-middle bg-primary text-white" style="width:34%;">
+                        <small class="d-block opacity-75">Project Total Cost</small>
+                        <strong class="fs-5">{{ currency }} {{ '{:,.{}f}'.format(_total, currency_decimal) }}</strong>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="text-center p-2 table-secondary">
+                        <small class="text-muted d-block">Actual BOM</small>
+                        <strong>{{ currency }} {{ '{:,.{}f}'.format(_bom_act, currency_decimal) }}</strong>
+                    </td>
+                    <td class="text-center p-2 table-secondary">
+                        <small class="text-muted d-block">Overall Cost</small>
+                        <strong>{{ currency }} {{ '{:,.{}f}'.format(_ov, currency_decimal) }}</strong>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <p class="text-muted small mb-3"><i class="bi bi-info-circle"></i> Formula: <code>((Actual BOM + Cost per Qty) × Quantity) + Overall Cost = Project Total Cost</code></p>
 
         <!-- BOM -->
         <div class="card mt-2 border-0 shadow-sm">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h5 class="mb-0"><i class="bi bi-list-check"></i> Bill of Materials (BOM)</h5>
-                <div class="text-end">
-                    <div><small class="text-muted">Estimated:</small> <strong>{{ currency }} {{ '{:,.{}f}'.format(project.get_bom_total_cost(), currency_decimal) }}</strong></div>
-                    <div><small class="text-muted">Actual:</small> <strong>{{ currency }} {{ '{:,.{}f}'.format(project.get_bom_actual_cost(), currency_decimal) }}</strong></div>
-                </div>
             </div>
             <div class="card-body">
+                {% if can_edit_costing %}
                 <div class="mb-2">
                     <button class="btn btn-sm btn-outline-danger" onclick="deleteBOMSelected()"><i class="bi bi-trash"></i> Delete Selected</button>
                 </div>
+                {% endif %}
                 <div class="table-responsive">
                     <table class="table table-sm table-hover" id="bomTable">
                         <thead>
                             <tr>
-                                <th style="width:30px;"><input type="checkbox" id="bomCheckAll" title="Select all" onclick="toggleCheckAll('bom-sel', this.checked)"></th>
-                                <th style="width:60px;">Arrange</th>
+                                {% if can_edit_costing %}<th style="width:30px;"><input type="checkbox" id="bomCheckAll" title="Select all" onclick="toggleCheckAll('bom-sel', this.checked)"></th>{% endif %}
+                                {% if can_edit_costing %}<th style="width:60px;">Arrange</th>{% endif %}
                                 <th>Item</th>
                                 <th>Batch</th>
                                 <th>Req Qty <small class="text-muted fw-normal">(needed)</small></th>
@@ -509,17 +543,19 @@
                                 <th>Used SNs</th>
                                 <th>Est. Cost</th>
                                 <th>Actual Cost</th>
-                                <th>Actions</th>
+                                {% if can_edit_costing %}<th>Actions</th>{% endif %}
                             </tr>
                         </thead>
                         <tbody>
                             {% for bom in bom_items %}
                             <tr id="bom-row-{{ bom.id }}" {% if not bom.item %}class="table-warning"{% endif %}>
-                                <td><input type="checkbox" class="bom-sel" value="{{ bom.id }}"></td>
+                                {% if can_edit_costing %}<td><input type="checkbox" class="bom-sel" value="{{ bom.id }}"></td>{% endif %}
+                                {% if can_edit_costing %}
                                 <td class="text-nowrap">
                                     <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveBOM({{ bom.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
                                     <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveBOM({{ bom.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
                                 </td>
+                                {% endif %}
                                 <td>
                                     {% if bom.item %}
                                     <a href="{{ url_for('item.item_detail', uuid=bom.item.uuid) }}" target="_blank">{{ bom.item.name }}</a>
@@ -530,22 +566,30 @@
                                 </td>
                                 <td>{{ bom.batch.get_display_label() if bom.batch else '-' }}</td>
                                 <td>
+                                    {% if can_edit_costing %}
                                     <div class="input-group input-group-sm" style="width:110px;">
                                         <input type="number" class="form-control form-control-sm" id="bomReqQty{{ bom.id }}" value="{{ bom.quantity }}" min="1">
                                         <button class="btn btn-outline-primary btn-sm" onclick="updateBOMReqQty({{ bom.id }})" title="Save"><i class="bi bi-check"></i></button>
                                     </div>
+                                    {% else %}
+                                    {{ bom.quantity }}
+                                    {% endif %}
                                 </td>
                                 <td>
-                                    {% if bom.batch and bom.batch.sn_tracking_enabled %}
-                                    <div class="d-flex align-items-center gap-1">
-                                        <span class="badge bg-secondary">{{ bom.used_quantity }}</span>
-                                        <button class="btn btn-sm btn-outline-info py-0 px-1" onclick="openSNModal({{ bom.id }})" title="Select serial numbers"><i class="bi bi-upc-scan"></i> SNs</button>
-                                    </div>
+                                    {% if can_edit_costing %}
+                                        {% if bom.batch and bom.batch.sn_tracking_enabled %}
+                                        <div class="d-flex align-items-center gap-1">
+                                            <span class="badge bg-secondary">{{ bom.used_quantity }}</span>
+                                            <button class="btn btn-sm btn-outline-info py-0 px-1" onclick="openSNModal({{ bom.id }})" title="Select serial numbers"><i class="bi bi-upc-scan"></i> SNs</button>
+                                        </div>
+                                        {% else %}
+                                        <div class="input-group input-group-sm" style="width:110px;">
+                                            <input type="number" class="form-control form-control-sm" id="bomUsedQty{{ bom.id }}" value="{{ [bom.used_quantity, 0]|max }}" min="0" max="{{ ([bom.batch.get_available_quantity() + bom.used_quantity, 0]|max) if bom.batch else 9999 }}">
+                                            <button class="btn btn-outline-success btn-sm" onclick="updateBOMUsedQty({{ bom.id }})" title="Save"><i class="bi bi-check"></i></button>
+                                        </div>
+                                        {% endif %}
                                     {% else %}
-                                    <div class="input-group input-group-sm" style="width:110px;">
-                                        <input type="number" class="form-control form-control-sm" id="bomUsedQty{{ bom.id }}" value="{{ [bom.used_quantity, 0]|max }}" min="0" max="{{ ([bom.batch.get_available_quantity() + bom.used_quantity, 0]|max) if bom.batch else 9999 }}">
-                                        <button class="btn btn-outline-success btn-sm" onclick="updateBOMUsedQty({{ bom.id }})" title="Save"><i class="bi bi-check"></i></button>
-                                    </div>
+                                    {{ bom.used_quantity }}
                                     {% endif %}
                                 </td>
                                 <td>
@@ -557,10 +601,12 @@
                                 </td>
                                 <td>{{ currency }} {{ '{:,.{}f}'.format(bom.get_total_cost(), currency_decimal) }}</td>
                                 <td>{{ currency }} {{ '{:,.{}f}'.format(bom.get_actual_cost(), currency_decimal) }}</td>
+                                {% if can_edit_costing %}
                                 <td class="text-nowrap">
                                     <button class="btn btn-outline-warning py-0 px-1" style="font-size:0.7rem;" onclick="openEditBOMModal({{ bom.id }}, {{ bom.item_id or 'null' }}, {{ bom.batch_id or 'null' }}, {{ bom.quantity }}, this.dataset.itemname)" data-itemname="{{ bom.item_display_name|e }}" title="Edit"><i class="bi bi-pencil"></i></button>
                                     {% if bom.item %}<a href="{{ url_for('item.item_detail', uuid=bom.item.uuid) }}" target="_blank" class="btn btn-outline-info py-0 px-1" style="font-size:0.7rem;" title="Item Info"><i class="bi bi-info-circle"></i></a>{% endif %}
                                 </td>
+                                {% endif %}
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -584,6 +630,7 @@
                     </table>
                 </div>
 
+                {% if can_edit_costing %}
                 <hr>
                 <h6><i class="bi bi-plus-circle"></i> Add Item to BOM</h6>
                 <p class="text-muted small mb-2">Enter any required quantity — no limit. Set <em>Used Qty</em> later once items are physically pulled from stock.</p>
@@ -596,6 +643,7 @@
                     </div>
                 </div>
                 <div id="bomSearchResults" class="border rounded p-2" style="max-height: 350px; overflow-y: auto; display: none;"></div>
+                {% endif %}{# can_edit_costing #}
             </div>
         </div>
 
@@ -603,39 +651,44 @@
         <div class="card mt-2 border-0 shadow-sm">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h5 class="mb-0"><i class="bi bi-calculator"></i> Cost per Quantity</h5>
-                <button type="button" class="btn btn-sm btn-outline-primary" onclick="openCostModal('per_qty')"><i class="bi bi-plus-lg"></i> Add Item</button>
+                {% if can_edit_costing %}<button type="button" class="btn btn-sm btn-outline-primary" onclick="openCostModal('per_qty')"><i class="bi bi-plus-lg"></i> Add Item</button>{% endif %}
             </div>
             <div class="card-body">
+                {% if can_edit_costing %}
                 <div class="mb-2">
                     <button class="btn btn-sm btn-outline-danger" onclick="deleteCostSelected('per_qty')"><i class="bi bi-trash"></i> Delete Selected</button>
                 </div>
+                {% endif %}
                 <div class="table-responsive">
                     <table class="table table-sm table-hover">
                         <thead>
                             <tr>
-                                <th style="width:30px;"><input type="checkbox" id="cpqCheckAll" title="Select all" onclick="toggleCheckAll('cpq-sel', this.checked)"></th>
-                                <th style="width:60px;">Arrange</th>
+                                {% if can_edit_costing %}<th style="width:30px;"><input type="checkbox" id="cpqCheckAll" title="Select all" onclick="toggleCheckAll('cpq-sel', this.checked)"></th>{% endif %}
+                                {% if can_edit_costing %}<th style="width:60px;">Arrange</th>{% endif %}
                                 <th>Item</th>
                                 <th>Description</th>
                                 <th>Price per Qty</th>
                                 <th>Qty</th>
                                 <th>Total</th>
-                                <th>Action</th>
+                                {% if can_edit_costing %}<th>Action</th>{% endif %}
                             </tr>
                         </thead>
                         <tbody>
                         {% for ci in cost_items_per_qty %}
                         <tr>
-                            <td><input type="checkbox" class="cpq-sel" value="{{ ci.id }}"></td>
+                            {% if can_edit_costing %}<td><input type="checkbox" class="cpq-sel" value="{{ ci.id }}"></td>{% endif %}
+                            {% if can_edit_costing %}
                             <td class="text-nowrap">
                                 <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
                                 <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
                             </td>
+                            {% endif %}
                             <td><strong>{{ ci.name }}</strong></td>
                             <td>{{ ci.description or '-' }}</td>
                             <td>{{ currency }} {{ '{:,.{}f}'.format(ci.price, currency_decimal) }}{% if ci.unit_label %} /{{ ci.unit_label }}{% endif %}</td>
                             <td>{{ '{:g}'.format(ci.quantity) }}</td>
                             <td>{{ currency }} {{ '{:,.{}f}'.format(ci.total, currency_decimal) }}</td>
+                            {% if can_edit_costing %}
                             <td>
                                 <button class="btn btn-outline-warning py-0 px-1" style="font-size:0.7rem;"
                                     data-ci-id="{{ ci.id }}" data-ci-type="per_qty"
@@ -644,6 +697,7 @@
                                     data-ci-qty="{{ ci.quantity }}"
                                     onclick="editCostItemFromData(this)" title="Edit"><i class="bi bi-pencil"></i></button>
                             </td>
+                            {% endif %}
                         </tr>
                         {% else %}
                         <tr><td colspan="8" class="text-muted text-center py-2">No items yet. Click Add Item to start.</td></tr>
@@ -666,39 +720,44 @@
         <div class="card mt-2 border-0 shadow-sm">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h5 class="mb-0"><i class="bi bi-receipt"></i> Overall Cost</h5>
-                <button type="button" class="btn btn-sm btn-outline-primary" onclick="openCostModal('overall')"><i class="bi bi-plus-lg"></i> Add Item</button>
+                {% if can_edit_costing %}<button type="button" class="btn btn-sm btn-outline-primary" onclick="openCostModal('overall')"><i class="bi bi-plus-lg"></i> Add Item</button>{% endif %}
             </div>
             <div class="card-body">
+                {% if can_edit_costing %}
                 <div class="mb-2">
                     <button class="btn btn-sm btn-outline-danger" onclick="deleteCostSelected('overall')"><i class="bi bi-trash"></i> Delete Selected</button>
                 </div>
+                {% endif %}
                 <div class="table-responsive">
                     <table class="table table-sm table-hover">
                         <thead>
                             <tr>
-                                <th style="width:30px;"><input type="checkbox" id="overallCheckAll" title="Select all" onclick="toggleCheckAll('overall-sel', this.checked)"></th>
-                                <th style="width:60px;">Arrange</th>
+                                {% if can_edit_costing %}<th style="width:30px;"><input type="checkbox" id="overallCheckAll" title="Select all" onclick="toggleCheckAll('overall-sel', this.checked)"></th>{% endif %}
+                                {% if can_edit_costing %}<th style="width:60px;">Arrange</th>{% endif %}
                                 <th>Item</th>
                                 <th>Description</th>
                                 <th>Price per Qty</th>
                                 <th>Qty</th>
                                 <th>Total</th>
-                                <th>Action</th>
+                                {% if can_edit_costing %}<th>Action</th>{% endif %}
                             </tr>
                         </thead>
                         <tbody>
                         {% for ci in cost_items_overall %}
                         <tr>
-                            <td><input type="checkbox" class="overall-sel" value="{{ ci.id }}"></td>
+                            {% if can_edit_costing %}<td><input type="checkbox" class="overall-sel" value="{{ ci.id }}"></td>{% endif %}
+                            {% if can_edit_costing %}
                             <td class="text-nowrap">
                                 <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'up')" title="Move up"><i class="bi bi-arrow-up"></i></button>
                                 <button class="btn btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="moveCostItem({{ ci.id }}, 'down')" title="Move down"><i class="bi bi-arrow-down"></i></button>
                             </td>
+                            {% endif %}
                             <td><strong>{{ ci.name }}</strong></td>
                             <td>{{ ci.description or '-' }}</td>
                             <td>{{ currency }} {{ '{:,.{}f}'.format(ci.price, currency_decimal) }}{% if ci.unit_label %} /{{ ci.unit_label }}{% endif %}</td>
                             <td>{{ '{:g}'.format(ci.quantity) }}</td>
                             <td>{{ currency }} {{ '{:,.{}f}'.format(ci.total, currency_decimal) }}</td>
+                            {% if can_edit_costing %}
                             <td>
                                 <button class="btn btn-outline-warning py-0 px-1" style="font-size:0.7rem;"
                                     data-ci-id="{{ ci.id }}" data-ci-type="overall"
@@ -707,9 +766,10 @@
                                     data-ci-qty="{{ ci.quantity }}"
                                     onclick="editCostItemFromData(this)" title="Edit"><i class="bi bi-pencil"></i></button>
                             </td>
+                            {% endif %}
                         </tr>
                         {% else %}
-                        <tr><td colspan="8" class="text-muted text-center py-2">No items yet. Click Add Item to start.</td></tr>
+                        <tr><td colspan="8" class="text-muted text-center py-2">No items yet.{% if can_edit_costing %} Click Add Item to start.{% endif %}</td></tr>
                         {% endfor %}
                         </tbody>
                         {% if cost_items_overall %}
@@ -728,6 +788,7 @@
             </div>
         </div>
         <!-- end Costing card -->
+        {% endif %}{# can_view_costing #}
 
         <!-- Duplicate Save/Back at bottom -->
         <div class="card mt-3">
@@ -862,7 +923,7 @@
     /* ---- Project thumbnail helpers ---- */
     let _ptIconsCache = null;
     let _ptShareCache = null;
-    const _ptClearBtnHtml = `<button type="button" onclick="clearProjThumb()" style="position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:none;background:#dc3545;color:white;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;z-index:1;" title="Remove thumbnail"><i class="bi bi-x"></i></button>`;
+    const _ptClearBtnHtml = `<button type="button" onclick="clearProjThumb()" style="position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:none;background:var(--bs-danger);color:var(--bs-white);font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;z-index:1;" title="Remove thumbnail"><i class="bi bi-x"></i></button>`;
 
     window.clearProjThumb = function() {
         document.getElementById('projThumbnailValue').value = '';
@@ -877,7 +938,7 @@
         if (type === 'icon') {
             const i = document.createElement('i');
             i.className = 'bi bi-' + value.replace(/[^a-z0-9-]/gi, '');
-            i.style.cssText = 'font-size:28px;color:#333;';
+            i.style.cssText = 'font-size:28px;color:var(--bs-body-color);';
             p.appendChild(i);
             p.insertAdjacentHTML('beforeend', _ptClearBtnHtml);
         } else if (url) {
@@ -916,8 +977,8 @@
         const grid = document.getElementById('ptIpGrid');
         if (!grid) return;
         grid.innerHTML = filtered.map(ic => {
-            const sel = ic.name === curIcon ? 'background:#0d6efd22;outline:2px solid #0d6efd;border-radius:4px;' : '';
-            return `<button type="button" style="border:1px solid #dee2e6;border-radius:4px;padding:4px 2px;background:white;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:52px;${sel}" title="${ic.name}" onclick="ptSelectIcon('${ic.name}')"><i class="${ic.class}" style="font-size:18px;"></i><span style="font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${ic.name}</span></button>`;
+            const sel = ic.name === curIcon ? 'background:color-mix(in srgb, var(--bs-primary) 15%, transparent);outline:2px solid var(--bs-primary);border-radius:4px;' : '';
+            return `<button type="button" style="border:1px solid var(--bs-border-color);border-radius:4px;padding:4px 2px;background:var(--bs-body-bg);color:var(--bs-body-color);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:52px;${sel}" title="${ic.name}" onclick="ptSelectIcon('${ic.name}')"><i class="${ic.class}" style="font-size:18px;"></i><span style="font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${ic.name}</span></button>`;
         }).join('') || '<p class="text-muted text-center py-4" style="grid-column:1/-1;">No icons found.</p>';
     };
 
@@ -975,11 +1036,11 @@
         const prefix = f => f.category === 'icon' ? 'icon:' : 'share:';
         grid.innerHTML = filtered.map(f => {
             const val = prefix(f) + f.filename;
-            const sel = val === current ? 'border:2px solid #0d6efd;' : 'border:1px solid #dee2e6;';
-            return `<div style="cursor:pointer;border-radius:6px;padding:6px;background:white;${sel}display:flex;flex-direction:column;align-items:center;gap:4px;" onclick="ptSelectShare('${_escSq(val)}','${_escSq(f.url)}','${_escSq(f.category)}')">
+            const sel = val === current ? 'border:2px solid var(--bs-primary);' : 'border:1px solid var(--bs-border-color);';
+            return `<div style="cursor:pointer;border-radius:6px;padding:6px;background:var(--bs-body-bg);color:var(--bs-body-color);${sel}display:flex;flex-direction:column;align-items:center;gap:4px;" onclick="ptSelectShare('${_escSq(val)}','${_escSq(f.url)}','${_escSq(f.category)}')">
                 <img src="${f.url}" style="max-width:60px;max-height:60px;object-fit:contain;">
                 <span style="font-size:10px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px;" title="${f.name}">${f.name}</span>
-                <span style="font-size:9px;background:#6c757d;color:white;padding:1px 5px;border-radius:10px;">${f.category}</span>
+                <span class="badge bg-secondary" style="font-size:9px;">${f.category}</span>
             </div>`;
         }).join('') || '<p class="text-muted text-center py-4" style="grid-column:1/-1;">No files found.</p>';
     };

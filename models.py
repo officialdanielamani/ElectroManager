@@ -71,7 +71,7 @@ class Location(db.Model):
 
 class Role(db.Model):
     __tablename__ = 'roles'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(64), unique=True, nullable=False)
     description = db.Column(db.String(512))
@@ -111,8 +111,9 @@ class Role(db.Model):
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
-    
+
     id = db.Column(db.Integer, primary_key=True)
+    user_uid = db.Column(db.String(6), unique=True, nullable=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
@@ -138,31 +139,20 @@ class User(UserMixin, db.Model):
     auto_unlock_enabled = db.Column(db.Boolean, default=True)
     auto_unlock_minutes = db.Column(db.Integer, default=15)
     
+    def __init__(self, **kwargs):
+        super(User, self).__init__(**kwargs)
+        if not self.user_uid:
+            chars = string.ascii_uppercase + string.digits
+            self.user_uid = 'U' + ''.join(secrets.choice(chars) for _ in range(5))
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
     
-    def is_admin(self):
-        return self.user_role and self.user_role.name == 'Admin'
-    
-    def is_editor(self):
-        if self.is_admin():
-            return True
-        return self.has_permission('items', 'view') and (
-            self.has_permission('items', 'create') or
-            self.has_permission('items', 'edit_info') or
-            self.has_permission('items', 'create_batch') or
-            self.has_permission('lending_return', 'edit_batch') or
-            self.has_permission('lending_return', 'edit_lending') or
-            self.has_permission('items', 'edit_advance')
-        )
-    
     def has_permission(self, resource, action):
-        if self.is_admin():
-            return True
-        return self.user_role and self.user_role.has_permission(resource, action)
+        return bool(self.user_role and self.user_role.has_permission(resource, action))
     
     def get_table_columns(self):
         try:
@@ -1500,9 +1490,8 @@ class Project(db.Model):
         """Actual BOM cost based on used_quantity"""
         return sum(b.get_actual_cost() for b in self.bom_items)
     def get_project_total_cost(self):
-        return self.get_bom_total_cost() * (self.quantity or 1)
-    def get_project_actual_cost(self):
-        return self.get_bom_actual_cost() * (self.quantity or 1)
+        qty = self.quantity or 1
+        return (self.get_bom_actual_cost() + self.get_cost_per_qty_total()) * qty + self.get_overall_cost_total()
     def get_cost_per_qty_total(self):
         return sum(i.total for i in self.cost_items if i.cost_type == 'per_qty')
     def get_overall_cost_total(self):

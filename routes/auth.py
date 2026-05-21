@@ -141,14 +141,16 @@ def register():
     
     form = RegistrationForm()
     if form.validate_on_submit():
-        # Get Viewer role as default for new registrations
-        viewer_role = Role.query.filter_by(name='Viewer').first()
+        # Default new registrations to the least-privileged system role
+        viewer_role = (Role.query.filter_by(name='Viewer').first()
+                       or Role.query.filter_by(is_system_role=True).order_by(Role.id.desc()).first())
         if not viewer_role:
-            flash('System error: Default role not found. Please contact administrator.', 'danger')
+            flash('System error: No default role found. Please contact your administrator.', 'danger')
             return redirect(url_for('auth.login'))
         
         user = User(
             username=form.username.data,
+            name=form.username.data,
             email=form.email.data,
             role_id=viewer_role.id
         )

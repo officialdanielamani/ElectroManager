@@ -35,7 +35,14 @@
                     <p class="card-text text-muted">
                         <small>
                             <strong>Type:</strong> 
-                            <span class="badge bg-primary">{{ template.template_type }}</span>
+                            <span class="badge
+                                {% if template.template_type == 'Items' %}bg-primary
+                                {% elif template.template_type == 'Item Batch' %}bg-success
+                                {% elif template.template_type == 'Location' %}bg-warning text-dark
+                                {% elif template.template_type == 'Racks' %}bg-info text-dark
+                                {% elif template.template_type == 'Drawer' %}bg-secondary
+                                {% elif template.template_type == 'In-Out' %}bg-danger
+                                {% else %}bg-primary{% endif %}">{{ template.template_type }}</span>
                         </small>
                     </p>
                     <p class="card-text">

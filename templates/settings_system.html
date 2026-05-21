@@ -119,6 +119,19 @@
                                {% if download_all_share_files_page %}checked{% endif %}>
                         <label class="form-check-label" for="dl_sf_page">Share Files page (<code>/settings/share-files</code>)</label>
                     </div>
+
+                    {% if can_edit %}
+                    <hr>
+                    <label class="form-label fw-semibold"><i class="bi bi-arrow-repeat"></i> Scan for Changes</label>
+                    <div class="form-text mb-2">Scan all Share File directories and sync the database — adds records for new files found on disk, removes records for deleted files.</div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="scanShareFilesBtn">
+                        <i class="bi bi-search"></i> Scan Now
+                    </button>
+                    <span id="scanShareSpinner" class="ms-2 d-none">
+                        <span class="spinner-border spinner-border-sm text-secondary" role="status"></span>
+                        <span class="text-muted small">Scanning…</span>
+                    </span>
+                    {% endif %}
                 </div>
             </div>
 
@@ -534,4 +547,76 @@
         </div>
     </div>
 </div>
+
+<!-- Scan Results Modal -->
+<div class="modal fade" id="scanResultsModal" tabindex="-1" aria-labelledby="scanResultsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="scanResultsModalLabel"><i class="bi bi-arrow-repeat"></i> Scan Results</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="scanResultsBody">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if can_edit %}
+<script>
+document.getElementById('scanShareFilesBtn').addEventListener('click', function () {
+    const btn = this;
+    const spinner = document.getElementById('scanShareSpinner');
+    btn.disabled = true;
+    spinner.classList.remove('d-none');
+
+    fetch('{{ url_for("settings.scan_share_files") }}', {
+        method: 'POST',
+        headers: {'Accept': 'application/json'},
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        spinner.classList.add('d-none');
+
+        let html = '';
+        if (!data.success) {
+            html = `<div class="alert alert-danger mb-0">${data.message || 'Scan failed.'}</div>`;
+        } else {
+            html += `<p class="mb-2"><strong>Unchanged:</strong> ${data.unchanged} file(s)</p>`;
+
+            if (data.added.length > 0) {
+                html += `<p class="mb-1 text-success fw-semibold"><i class="bi bi-plus-circle"></i> Added (${data.added.length})</p>`;
+                html += '<ul class="small mb-3">';
+                data.added.forEach(f => { html += `<li><code>${f.category}/</code>${f.filename}</li>`; });
+                html += '</ul>';
+            } else {
+                html += `<p class="text-muted small mb-3"><i class="bi bi-check-circle"></i> No new files found.</p>`;
+            }
+
+            if (data.removed.length > 0) {
+                html += `<p class="mb-1 text-danger fw-semibold"><i class="bi bi-dash-circle"></i> Removed (${data.removed.length})</p>`;
+                html += '<ul class="small mb-0">';
+                data.removed.forEach(f => { html += `<li><code>${f.category}/</code>${f.filename}</li>`; });
+                html += '</ul>';
+            } else {
+                html += `<p class="text-muted small mb-0"><i class="bi bi-check-circle"></i> No missing files found.</p>`;
+            }
+        }
+
+        document.getElementById('scanResultsBody').innerHTML = html;
+        new bootstrap.Modal(document.getElementById('scanResultsModal')).show();
+    })
+    .catch(() => {
+        btn.disabled = false;
+        spinner.classList.add('d-none');
+        document.getElementById('scanResultsBody').innerHTML = '<div class="alert alert-danger mb-0">Network error — scan could not complete.</div>';
+        new bootstrap.Modal(document.getElementById('scanResultsModal')).show();
+    });
+});
+</script>
+{% endif %}
 {% endblock %}

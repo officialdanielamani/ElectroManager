@@ -239,6 +239,13 @@
                                    value="{{ current_user.short_info or '' }}" placeholder="e.g. Lab Technician">
                         </div>
                         {% endif %}
+                        {% if current_user.user_uid %}
+                        <div class="mb-3">
+                            <label class="form-label">User ID</label>
+                            <input type="text" class="form-control" value="{{ current_user.user_uid }}" readonly>
+                            <small class="text-muted">Permanent identifier — never changes.</small>
+                        </div>
+                        {% endif %}
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-save"></i> Save Profile
                         </button>
@@ -620,13 +627,13 @@ const allProjectColumns = [
     { id: 'tags', label: 'Tags' },
     { id: 'date_start', label: 'Date Start' },
     { id: 'dateline', label: 'Dateline' },
-    { id: 'total_cost', label: 'Total Cost' },
+    {% if can_view_costing %}{ id: 'total_cost', label: 'Total Cost' },{% endif %}
     { id: 'status', label: 'Status' },
     { id: 'users', label: 'Users' },
     { id: 'group', label: 'Group' },
     { id: 'project_id', label: 'Project ID' }
 ];
-const defaultProjectColumns = ['info', 'categories', 'tags', 'date_start', 'dateline', 'total_cost', 'status', 'users', 'group', 'project_id'];
+const defaultProjectColumns = ['info', 'categories', 'tags', 'date_start', 'dateline', {% if can_view_costing %}'total_cost', {% endif %}'status', 'users', 'group', 'project_id'];
 
 document.addEventListener('DOMContentLoaded', function() {
     const c = document.getElementById('projectColumnsContainer');

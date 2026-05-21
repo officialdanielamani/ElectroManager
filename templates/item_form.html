@@ -64,12 +64,11 @@
                     </div>
 
                     <!-- Thumbnail -->
-                    {% if item %}
                     <div class="mb-2">
                         <label class="form-label form-label-sm mb-1">Thumbnail</label>
                         <div class="d-flex align-items-center gap-2">
                             <div id="thumbPreview" style="width:56px;height:56px;border:1px solid #dee2e6;border-radius:6px;background:#f8f9fa;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;">
-                                {% if item.thumbnail %}
+                                {% if item and item.thumbnail %}
                                     {% if item.thumbnail.startswith('biicon:') %}
                                     <i class="bi bi-{{ item.thumbnail[7:] }}" style="font-size:28px;color:#333;"></i>
                                     {% elif item.thumbnail.startswith('share:') %}
@@ -86,13 +85,14 @@
                             </div>
                             <div class="d-flex flex-column gap-1">
                                 <button type="button" class="btn btn-sm btn-outline-primary" onclick="openThumbIconPicker()"><i class="bi bi-star"></i> Icon</button>
+                                {% if item %}
                                 <button type="button" class="btn btn-sm btn-outline-secondary" onclick="openThumbPicturePicker()"><i class="bi bi-image"></i> Picture</button>
+                                {% endif %}
                                 <button type="button" class="btn btn-sm btn-outline-info" onclick="openThumbSharePicker()"><i class="bi bi-folder"></i> Share Files</button>
                             </div>
                         </div>
-                        <input type="hidden" name="thumbnail" id="thumbnailValue" value="{{ item.thumbnail or '' }}">
+                        <input type="hidden" name="thumbnail" id="thumbnailValue" value="{{ item.thumbnail or '' if item else '' }}">
                     </div>
-                    {% endif %}
 
                     <div class="row mb-2">
                         <div class="col-md-6">
@@ -105,7 +105,7 @@
                                 {{ form.category_id(class="form-select form-select-sm", disabled=(item_perms and not item_perms.can_edit_info)) }}
                                 <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
                                     data-bs-target="#addCategoryModal"
-                                    {% if item_perms and not item_perms.can_edit_info %}disabled{% endif %}>
+                                    {% if not current_user.has_permission('settings_sections.item_management', 'edit') %}disabled{% endif %}>
                                     <i class="bi bi-plus-circle"></i>
                                 </button>
                             </div>
@@ -118,7 +118,7 @@
                             {{ form.footprint_id(class="form-select form-select-sm", disabled=(item_perms and not item_perms.can_edit_info)) }}
                             <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
                                 data-bs-target="#addFootprintModal"
-                                {% if item_perms and not item_perms.can_edit_info %}disabled{% endif %}>
+                                {% if not current_user.has_permission('settings_sections.item_management', 'edit') %}disabled{% endif %}>
                                 <i class="bi bi-plus-circle"></i>
                             </button>
                         </div>
@@ -128,7 +128,7 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <label class="form-label form-label-sm mb-0">Tags</label>
                             <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
-                                data-bs-target="#addTagModal" {% if item_perms and not item_perms.can_edit_info %}disabled{% endif %}>
+                                data-bs-target="#addTagModal" {% if not current_user.has_permission('settings_sections.item_management', 'edit') %}disabled{% endif %}>
                                 <i class="bi bi-plus-circle"></i> Add Tag
                             </button>
                         </div>
@@ -3733,7 +3733,6 @@ document.addEventListener('DOMContentLoaded', function() {
 {% endif %}
 
 <!-- ===== Thumbnail Picker Modals ===== -->
-{% if item %}
 
 <!-- Bootstrap Icon Picker -->
 <div class="modal fade" id="thumbIconPickerModal" tabindex="-1">
@@ -3753,6 +3752,7 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 </div>
 
+{% if item %}
 <!-- Picture Picker (uploaded item images) -->
 <div class="modal fade" id="thumbPicturePickerModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -3787,6 +3787,7 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     </div>
 </div>
+{% endif %}
 
 <!-- Share Files Picker (item + icon categories) -->
 <div class="modal fade" id="thumbSharePickerModal" tabindex="-1">
@@ -3940,7 +3941,6 @@ document.getElementById('thumbSharePickerModal').addEventListener('show.bs.modal
 // legacy clearThumbnail alias kept for any old references
 function clearThumbnail() { clearThumb(); }
 </script>
-{% endif %}
 
 <!-- ===== Share File Picker Modal ===== -->
 {% if share_files_item is defined %}

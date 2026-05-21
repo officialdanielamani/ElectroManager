@@ -65,7 +65,8 @@ def _build_log_entries(page=1, can_view_log=True):
         user = User.query.get(log.user_id)
         entries.append({
             'log': log,
-            'username': user.username if user else 'Unknown',
+            'username': (user.name) if user else 'Unknown',
+            'user_uid': user.user_uid if user else '',
             'timestamp': log.timestamp.strftime('%d/%m/%Y %H:%M') if log.timestamp else '?',
             'display': _format_log_details(log.action, log.details),
         })
@@ -75,15 +76,14 @@ def _build_log_entries(page=1, can_view_log=True):
 @in_out_bp.route('/in-out')
 @login_required
 def in_out():
-    if not current_user.has_permission('lending_return', 'view_page') and not current_user.is_admin():
+    if not current_user.has_permission('lending_return', 'view_page'):
         abort(403)
 
-    can_view_log    = current_user.is_admin() or current_user.has_permission('lending_return', 'view_log')
-    can_lend        = current_user.is_admin() or current_user.has_permission('lending_return', 'edit_lending') or current_user.has_permission('lending_return', 'only_self_lending')
-    can_edit_batch  = current_user.is_admin() or current_user.has_permission('lending_return', 'edit_batch')
-    can_delete_batch= current_user.is_admin() or current_user.has_permission('lending_return', 'delete_batch')
-    can_only_self   = (not current_user.is_admin()
-                       and current_user.has_permission('lending_return', 'only_self_lending')
+    can_view_log    = current_user.has_permission('lending_return', 'view_log')
+    can_lend        = current_user.has_permission('lending_return', 'edit_lending') or current_user.has_permission('lending_return', 'only_self_lending')
+    can_edit_batch  = current_user.has_permission('lending_return', 'edit_batch')
+    can_delete_batch= current_user.has_permission('lending_return', 'delete_batch')
+    can_only_self   = (current_user.has_permission('lending_return', 'only_self_lending')
                        and not current_user.has_permission('lending_return', 'edit_batch'))
     scan_enabled    = Setting.get('lr_scan_enabled', False) is True
 
@@ -107,7 +107,7 @@ def in_out():
                            scan_enabled=scan_enabled,
                            lr_settings=lr_settings,
                            current_user_id=current_user.id,
-                           current_user_label=current_user.username,
+                           current_user_label=current_user.name,
                            currency=Setting.get('currency', '$'))
 
 
@@ -316,14 +316,12 @@ def in_out_session_detail(lending_id):
 @login_required
 def in_out_sessions_list():
     """AJAX: list lending sessions with date / contact filters."""
-    can_lend = (current_user.is_admin()
-                or current_user.has_permission('lending_return', 'edit_lending')
+    can_lend = (current_user.has_permission('lending_return', 'edit_lending')
                 or current_user.has_permission('lending_return', 'only_self_lending'))
     if not can_lend:
         return jsonify({'sessions': []})
 
-    can_only_self = (not current_user.is_admin()
-                     and current_user.has_permission('lending_return', 'only_self_lending')
+    can_only_self = (current_user.has_permission('lending_return', 'only_self_lending')
                      and not current_user.has_permission('lending_return', 'edit_batch'))
 
     start_str  = request.args.get('start_date', '').strip()
@@ -384,12 +382,11 @@ def in_out_sessions_list():
 @login_required
 def in_out_logs_ajax():
     """AJAX: return filtered audit log entries as JSON."""
-    can_view_log = current_user.is_admin() or current_user.has_permission('lending_return', 'view_log')
+    can_view_log = current_user.has_permission('lending_return', 'view_log')
     if not can_view_log:
         return jsonify({'entries': [], 'has_more': False})
 
-    can_only_self = (not current_user.is_admin()
-                     and current_user.has_permission('lending_return', 'only_self_lending')
+    can_only_self = (current_user.has_permission('lending_return', 'only_self_lending')
                      and not current_user.has_permission('lending_return', 'edit_batch'))
 
     start_str    = request.args.get('start_date',   '').strip()
@@ -445,7 +442,8 @@ def in_out_logs_ajax():
         user = User.query.get(log.user_id)
         result.append({
             'action':    log.action,
-            'username':  user.username if user else 'Unknown',
+            'username':  (user.name) if user else 'Unknown',
+            'user_uid':  user.user_uid if user else '',
             'timestamp': log.timestamp.strftime('%d/%m/%Y %H:%M') if log.timestamp else '?',
             'display':   _format_log_details(log.action, log.details),
         })
@@ -458,8 +456,7 @@ def in_out_logs_ajax():
 @login_required
 def in_out_submit_cart():
     """Process a multi-item cart submission (lend or return)."""
-    can_lend = (current_user.is_admin()
-                or current_user.has_permission('lending_return', 'edit_lending')
+    can_lend = (current_user.has_permission('lending_return', 'edit_lending')
                 or current_user.has_permission('lending_return', 'only_self_lending'))
     if not can_lend:
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
@@ -470,8 +467,7 @@ def in_out_submit_cart():
     detail = data.get('detail', {})
     now    = datetime.now(timezone.utc)
 
-    can_only_self = (not current_user.is_admin()
-                     and current_user.has_permission('lending_return', 'only_self_lending')
+    can_only_self = (current_user.has_permission('lending_return', 'only_self_lending')
                      and not current_user.has_permission('lending_return', 'edit_batch'))
 
     global_notes = (detail.get('notes', '') or '').strip()[:256]
@@ -679,8 +675,7 @@ def in_out_submit_cart():
 @in_out_bp.route('/in-out/lend', methods=['POST'])
 @login_required
 def in_out_lend():
-    can_lend = (current_user.is_admin()
-                or current_user.has_permission('lending_return', 'edit_lending')
+    can_lend = (current_user.has_permission('lending_return', 'edit_lending')
                 or current_user.has_permission('lending_return', 'only_self_lending'))
     if not can_lend:
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
@@ -691,8 +686,7 @@ def in_out_lend():
     item       = batch.item
     now        = datetime.now(timezone.utc)
 
-    can_only_self = (not current_user.is_admin()
-                     and current_user.has_permission('lending_return', 'only_self_lending')
+    can_only_self = (current_user.has_permission('lending_return', 'only_self_lending')
                      and not current_user.has_permission('lending_return', 'edit_batch'))
 
     if batch.sn_tracking_enabled:
@@ -762,8 +756,7 @@ def in_out_lend():
 @in_out_bp.route('/in-out/return', methods=['POST'])
 @login_required
 def in_out_return():
-    can_lend = (current_user.is_admin()
-                or current_user.has_permission('lending_return', 'edit_lending')
+    can_lend = (current_user.has_permission('lending_return', 'edit_lending')
                 or current_user.has_permission('lending_return', 'only_self_lending'))
     if not can_lend:
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
@@ -834,7 +827,7 @@ def in_out_return():
 @in_out_bp.route('/in-out/batch/<int:batch_id>/edit', methods=['POST'])
 @login_required
 def in_out_edit_batch(batch_id):
-    if not (current_user.is_admin() or current_user.has_permission('lending_return', 'edit_batch')):
+    if not (current_user.has_permission('lending_return', 'edit_batch')):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
     batch = ItemBatch.query.get_or_404(batch_id)
     item  = batch.item
@@ -874,7 +867,7 @@ def in_out_edit_batch(batch_id):
 @in_out_bp.route('/in-out/batch/<int:batch_id>/purge-deleted-sn', methods=['POST'])
 @login_required
 def in_out_purge_deleted_sn(batch_id):
-    if not (current_user.is_admin() or current_user.has_permission('lending_return', 'delete_batch')):
+    if not (current_user.has_permission('lending_return', 'delete_batch')):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
     batch = ItemBatch.query.get_or_404(batch_id)
     item  = batch.item
@@ -898,7 +891,7 @@ def in_out_purge_deleted_sn(batch_id):
 @in_out_bp.route('/in-out/batch/<int:batch_id>/delete', methods=['POST'])
 @login_required
 def in_out_delete_batch(batch_id):
-    if not (current_user.is_admin() or current_user.has_permission('lending_return', 'delete_batch')):
+    if not (current_user.has_permission('lending_return', 'delete_batch')):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
     batch = ItemBatch.query.get_or_404(batch_id)
     item  = batch.item
@@ -923,7 +916,7 @@ def in_out_delete_batch(batch_id):
 @login_required
 def session_qr_sticker(lending_id):
     """Show QR sticker page for a lending/return session."""
-    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
         abort(403)
     from models import StickerTemplate
     session = LendingSession.query.filter_by(lending_id=lending_id).first_or_404()
@@ -935,7 +928,7 @@ def session_qr_sticker(lending_id):
 @login_required
 def api_session_inline_qr(lending_id):
     """Return a simple QR SVG for the session ID (for inline notification display)."""
-    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
         return jsonify({'error': 'Permission denied'}), 403
     from flask import Response
     from qr_utils import generate_session_qr_svg
@@ -948,7 +941,7 @@ def api_session_inline_qr(lending_id):
 @login_required
 def api_session_sticker_preview(lending_id, template_id):
     """Return JSON with SVG preview for a session sticker."""
-    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
         return jsonify({'error': 'Permission denied'}), 403
     from flask import send_file
     from models import StickerTemplate
@@ -971,7 +964,7 @@ def api_session_sticker_preview(lending_id, template_id):
 @login_required
 def api_session_sticker_print(lending_id, template_id):
     """Generate and return a PDF sticker for a session."""
-    if not current_user.is_admin() and not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
         return jsonify({'error': 'Permission denied'}), 403
     from flask import send_file
     from models import StickerTemplate

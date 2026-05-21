@@ -135,6 +135,15 @@
                                 {{ form.short_info(class="form-control", placeholder="e.g. Lab Technician") }}
                             {% endif %}
                         </div>
+
+                        <!-- USER ID (readonly) -->
+                        {% if user and user.user_uid %}
+                        <div class="mb-3">
+                            <label class="form-label">User ID</label>
+                            <input type="text" class="form-control" value="{{ user.user_uid }}" readonly>
+                            <small class="text-muted">Permanent identifier — never changes.</small>
+                        </div>
+                        {% endif %}
                     </div>
 
                     <!-- SECURITY SECTION -->

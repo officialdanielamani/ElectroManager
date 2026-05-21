@@ -135,12 +135,27 @@ def visual_storage():
     
     # For the dropdown, show all racks for location selection, but filtered by current location for rack selection
     all_racks_for_dropdown = racks_to_display
+    # Build JS-embeddable rack list (mirrors item_form.html racksData pattern)
+    all_racks_data = [
+        {
+            'uuid': r.uuid,
+            'name': r.name,
+            'rows': r.rows,
+            'cols': r.cols,
+            'location_uuid': r.physical_location.uuid if r.physical_location else '',
+            'merged_cells': r.get_merged_cells(),
+            'drawer_info': r.get_drawer_info(),
+            'unavailable_drawers': r.get_unavailable_drawers(),
+        }
+        for r in all_racks_for_dropdown
+    ]
     locations = Location.query.order_by(Location.name).all()
-    return render_template('visual_storage.html', 
-                          racks=rack_data, 
-                          all_racks=all_racks_for_dropdown, 
-                          locations=locations, 
-                          current_location_uuid=location_uuid, 
+    return render_template('visual_storage.html',
+                          racks=rack_data,
+                          all_racks=all_racks_for_dropdown,
+                          all_racks_data=all_racks_data,
+                          locations=locations,
+                          current_location_uuid=location_uuid,
                           current_rack_uuid=rack_uuid,
                           current_page=page,
                           total_pages=total_pages,
@@ -315,62 +330,146 @@ def update_drawer_icon():
 
 @visual_storage_bp.route('/api/drawer/move-items', methods=['POST'])
 @login_required
-@permission_required("settings_sections.location_management", "edit")
+@permission_required("items", "edit_info")
 def move_drawer_items():
-    """Move all items from a drawer to a new location"""
+    """Move all items and batch overrides from a drawer to a new location"""
     try:
         data = request.get_json()
-        rack_uuid = data.get('rack_id')  # Now receives UUID
+        rack_uuid = data.get('rack_id')
         drawer_id = data.get('drawer_id')
         location_type = data.get('location_type')  # 'general' or 'drawer'
-        
-        # Get rack by UUID to get ID for queries
+
         rack = Rack.query.filter_by(uuid=rack_uuid).first_or_404()
-        
-        # Get all items in the drawer
+
+        # Get all main-location items and all batch overrides in this drawer
         items = Item.query.filter_by(rack_id=rack.id, drawer=drawer_id).all()
-        
-        if not items:
+        batches = ItemBatch.query.filter_by(rack_id=rack.id, drawer=drawer_id, follow_main_location=False).all()
+
+        if not items and not batches:
             return jsonify({'success': False, 'error': 'No items in this drawer'})
-        
-        # Move items based on location type
+
         if location_type == 'general':
             new_location_uuid = data.get('location_id')
             if not new_location_uuid or new_location_uuid == 0:
                 return jsonify({'success': False, 'error': 'Please select a general location'})
-            
+
             new_location = Location.query.filter_by(uuid=new_location_uuid).first_or_404()
-            
+
             for item in items:
                 item.location_id = new_location.id
                 item.rack_id = None
                 item.drawer = None
+            for batch in batches:
+                batch.location_id = new_location.id
+                batch.rack_id = None
+                batch.drawer = None
         else:  # drawer
             new_rack_uuid = data.get('new_rack_id')
             new_drawer = data.get('new_drawer')
-            
+
             if not new_rack_uuid or new_rack_uuid == 0 or not new_drawer:
                 return jsonify({'success': False, 'error': 'Please select a rack and drawer'})
-            
+
             new_rack = Rack.query.filter_by(uuid=new_rack_uuid).first_or_404()
-            
+
             for item in items:
                 item.location_id = None
                 item.rack_id = new_rack.id
                 item.drawer = new_drawer
-        
-        db.session.commit()
-        
-        log_audit(current_user.id, 'bulk_update', 'item', None,
-                 f'Moved {len(items)} items from Rack {rack.uuid} Drawer {drawer_id}')
+            for batch in batches:
+                batch.location_id = None
+                batch.rack_id = new_rack.id
+                batch.drawer = new_drawer
 
-        return jsonify({'success': True, 'items_moved': len(items)})
+        db.session.commit()
+
+        total_moved = len(items) + len(batches)
+        log_audit(current_user.id, 'bulk_update', 'item', None,
+                  f'Moved {len(items)} items and {len(batches)} batch overrides from Rack {rack.uuid} Drawer {drawer_id}')
+
+        return jsonify({'success': True, 'items_moved': total_moved})
     except Exception as e:
         db.session.rollback()
         import traceback
         logger.error(f"Error moving drawer items: {str(e)}")
         logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': 'An error occurred while moving drawer items.'})
+
+
+@visual_storage_bp.route('/api/drawer/swap-items', methods=['POST'])
+@login_required
+@permission_required("items", "edit_info")
+def swap_drawer_items():
+    """Swap all items and batch overrides between two drawers"""
+    try:
+        data = request.get_json()
+        src_rack_uuid = data.get('rack_id')
+        src_drawer_id = data.get('drawer_id')
+        dst_rack_uuid = data.get('new_rack_id')
+        dst_drawer_id = data.get('new_drawer')
+        swap_meta     = data.get('swap_meta', True)
+
+        if not src_rack_uuid or not src_drawer_id or not dst_rack_uuid or not dst_drawer_id:
+            return jsonify({'success': False, 'error': 'Please select a rack and drawer to swap with'})
+
+        src_rack = Rack.query.filter_by(uuid=src_rack_uuid).first_or_404()
+        dst_rack = Rack.query.filter_by(uuid=dst_rack_uuid).first_or_404()
+
+        if src_rack.id == dst_rack.id and src_drawer_id == dst_drawer_id:
+            return jsonify({'success': False, 'error': 'Source and destination drawer are the same'})
+
+        src_items = Item.query.filter_by(rack_id=src_rack.id, drawer=src_drawer_id).all()
+        src_batches = ItemBatch.query.filter_by(rack_id=src_rack.id, drawer=src_drawer_id, follow_main_location=False).all()
+        dst_items = Item.query.filter_by(rack_id=dst_rack.id, drawer=dst_drawer_id).all()
+        dst_batches = ItemBatch.query.filter_by(rack_id=dst_rack.id, drawer=dst_drawer_id, follow_main_location=False).all()
+
+        # Move source → destination
+        for item in src_items:
+            item.rack_id = dst_rack.id
+            item.drawer = dst_drawer_id
+        for batch in src_batches:
+            batch.rack_id = dst_rack.id
+            batch.drawer = dst_drawer_id
+
+        # Move destination → source
+        for item in dst_items:
+            item.rack_id = src_rack.id
+            item.drawer = src_drawer_id
+        for batch in dst_batches:
+            batch.rack_id = src_rack.id
+            batch.drawer = src_drawer_id
+
+        # Swap thumbnail (icon) and short info if requested
+        if swap_meta:
+            src_icon  = src_rack.get_drawer_icon(src_drawer_id)
+            dst_icon  = dst_rack.get_drawer_icon(dst_drawer_id)
+            src_rack.set_drawer_icon(src_drawer_id, dst_icon.get('type', 'none'), dst_icon.get('value', ''))
+            dst_rack.set_drawer_icon(dst_drawer_id, src_icon.get('type', 'none'), src_icon.get('value', ''))
+
+            src_info = src_rack.get_drawer_short_info(src_drawer_id)
+            dst_info = dst_rack.get_drawer_short_info(dst_drawer_id)
+            src_rack.set_drawer_short_info(src_drawer_id, dst_info)
+            dst_rack.set_drawer_short_info(dst_drawer_id, src_info)
+
+        db.session.commit()
+
+        total = len(src_items) + len(src_batches) + len(dst_items) + len(dst_batches)
+        log_audit(current_user.id, 'bulk_update', 'item', None,
+                  f'Swapped drawers: Rack {src_rack.uuid} {src_drawer_id} ↔ Rack {dst_rack.uuid} {dst_drawer_id} '
+                  f'({len(src_items)+len(src_batches)} ↔ {len(dst_items)+len(dst_batches)} entries)')
+
+        return jsonify({
+            'success': True,
+            'items_swapped': total,
+            'src_count': len(src_items) + len(src_batches),
+            'dst_count': len(dst_items) + len(dst_batches),
+        })
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        logger.error(f"Error swapping drawer items: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({'success': False, 'error': 'An error occurred while swapping drawer items.'})
 
 def _parse_cell(cell):
     """Parse 'R{row}-C{col}' → (row, col) ints. Raises ValueError on bad input."""

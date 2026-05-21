@@ -313,9 +313,12 @@
                                 </div>
                                 {% if not batch.sn_tracking_enabled %}
                                 <div class="mb-2">
-                                    <button class="btn btn-outline-secondary btn-sm" title="Print QR Batch">
+                                    {% if current_user.has_permission('settings_sections.qr_templates', 'print_qr') %}
+                                    <a href="{{ url_for('qr_template.batch_qr_sticker', uuid=item.uuid, batch_id=batch.id) }}"
+                                       class="btn btn-outline-secondary btn-sm" target="_blank">
                                         <i class="bi bi-qr-code"></i> Print QR Batch
-                                    </button>
+                                    </a>
+                                    {% endif %}
                                 </div>
                                 {% endif %}
                                 {% set proj_names = batch.get_project_names_for_batch() %}
@@ -359,9 +362,12 @@
                                     <strong><i class="bi bi-upc-scan"></i> Serial Numbers</strong>
                                 </div>
                                 <div class="mb-2">
-                                    <button class="btn btn-outline-secondary btn-sm" title="Print QR Batch">
-                                        <i class="bi bi-qr-code"></i> Print QR Batch
+                                    {% if current_user.has_permission('settings_sections.qr_templates', 'print_qr') %}
+                                    <button class="btn btn-outline-secondary btn-sm"
+                                            onclick="printBatchQr({{ batch.id }}, '{{ item.uuid }}')">
+                                        <i class="bi bi-qr-code"></i> Print QR (Selected SNs)
                                     </button>
+                                    {% endif %}
                                 </div>
                                 <div class="table-responsive">
                                     <table class="table table-sm table-bordered sn-table" id="snTable{{ batch.id }}">
@@ -726,6 +732,16 @@ function toggleAllSn(source, batchId) {
     document.querySelectorAll('.sn-check-' + batchId).forEach(function(cb) {
         cb.checked = source.checked;
     });
+}
+
+function printBatchQr(batchId, itemUuid) {
+    const checked = document.querySelectorAll('.sn-check-' + batchId + ':checked');
+    if (checked.length === 0) {
+        alert('Please select at least one serial number to print.');
+        return;
+    }
+    const snIds = Array.from(checked).map(function(el) { return el.value; });
+    window.open('/item/' + itemUuid + '/batch/' + batchId + '/qr-sticker?sn_ids=' + encodeURIComponent(snIds.join(',')), '_blank');
 }
 
 /* ── Bulk Edit Details modal ── */

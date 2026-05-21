@@ -277,6 +277,7 @@ def _apply_column_migrations():
         ("racks",                "rack_icon",            "TEXT DEFAULT NULL"),
         ("projects",             "thumbnail",            "VARCHAR(300)"),
         ("project_bom_items",    "sort_order",           "INTEGER DEFAULT 0"),
+        ("users",                "user_uid",             "VARCHAR(6)"),
     ]
     with db.engine.connect() as conn:
         for table, col, col_type in additions:
@@ -286,6 +287,25 @@ def _apply_column_migrations():
                 logger.info(f"DB migration: added {table}.{col}")
             except Exception:
                 pass  # column already exists
+
+    # Backfill user_uid for existing users that don't have one yet
+    import secrets, string
+    def _gen_uid():
+        chars = string.ascii_uppercase + string.digits
+        return 'U' + ''.join(secrets.choice(chars) for _ in range(5))
+
+    with db.engine.connect() as conn:
+        rows = conn.execute(db.text("SELECT id FROM users WHERE user_uid IS NULL")).fetchall()
+        if rows:
+            existing = {r[0] for r in conn.execute(db.text("SELECT user_uid FROM users WHERE user_uid IS NOT NULL")).fetchall()}
+            for (uid_row,) in rows:
+                uid = _gen_uid()
+                while uid in existing:
+                    uid = _gen_uid()
+                existing.add(uid)
+                conn.execute(db.text("UPDATE users SET user_uid = :uid WHERE id = :id"), {"uid": uid, "id": uid_row})
+            conn.commit()
+            logger.info(f"DB migration: backfilled user_uid for {len(rows)} user(s)")
 
 with app.app_context():
     db.create_all()          # create any brand-new tables (e.g. lending_sessions)

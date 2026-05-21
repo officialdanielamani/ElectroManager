@@ -1267,6 +1267,26 @@ function updatePropertiesPanel(index) {
             { label: '{ReturnStat} - Return Status (Late/On Time)', value: '{ReturnStat}' },
             { label: '{ReturnReal} - Return submitted timestamp', value: '{ReturnReal}' },
             { label: '{ReturnUser} - Who submitted return', value: '{ReturnUser}' }
+        ],
+        batch: [
+            { label: '{BatchName} - Batch Name', value: '{BatchName}' },
+            { label: '{BatchID} - Item UUID-BatchID', value: '{BatchID}' },
+            { label: '{BatchManu} - Batch Manufacturer', value: '{BatchManu}' },
+            { label: '{BatchNote} - Batch Note', value: '{BatchNote}' },
+            { label: '{BatchDate} - Batch Date of Purchase', value: '{BatchDate}' },
+            { label: '{BatchPriceU} - Price Per Unit of Batch', value: '{BatchPriceU}' },
+            { label: '{BatchPriceT} - Total Price for the Batch', value: '{BatchPriceT}' },
+            { label: '{BatchQty} - Quantity for the Batch', value: '{BatchQty}' },
+            { label: '{BatchLocName} - Location of Batch', value: '{BatchLocName}' },
+            { label: '{BatchLocUUID} - Location UUID', value: '{BatchLocUUID}' },
+            { label: '{BatchRackName} - Rack of Batch', value: '{BatchRackName}' },
+            { label: '{BatchRackUUID} - Rack UUID', value: '{BatchRackUUID}' },
+            { label: '{BatchDrawLoc} - Drawer (RXX-CXX format)', value: '{BatchDrawLoc}' },
+            { label: '{BatchInfo} - Info for specific item in batch', value: '{BatchInfo}' },
+            { label: '{BatchSN} - Serial Number for specific item in batch', value: '{BatchSN}' },
+            { label: '{BatchISN} - Internal Serial Number (e.g. UUID-20251005-B02-002)', value: '{BatchISN}' },
+            { label: '{BatchSISN} - Short ISN without UUID (e.g. 20251005-B02-002)', value: '{BatchSISN}' },
+            { label: '{BatchINSD} - Short ISN without UUID+Date (e.g. B02-002)', value: '{BatchINSD}' }
         ]
     };
 
@@ -1285,6 +1305,9 @@ function updatePropertiesPanel(index) {
             placeholderOptions += `<optgroup label="Racks">${placeholders.rack.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else if (templateType.includes('in-out')) {
             placeholderOptions += `<optgroup label="In-Out">${placeholders.inout.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else if (templateType.includes('item batch')) {
+            placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+            placeholderOptions += `<optgroup label="Batch">${placeholders.batch.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else {
             // Default to item template
             placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
@@ -1376,6 +1399,9 @@ function updatePropertiesPanel(index) {
             placeholderOptions += `<optgroup label="Racks">${placeholders.rack.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else if (templateType.includes('in-out')) {
             placeholderOptions += `<optgroup label="In-Out">${placeholders.inout.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else if (templateType.includes('item batch')) {
+            placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+            placeholderOptions += `<optgroup label="Batch">${placeholders.batch.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else {
             // Default to item template
             placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
@@ -1426,6 +1452,9 @@ function updatePropertiesPanel(index) {
             placeholderOptions += `<optgroup label="Racks">${placeholders.rack.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else if (templateType.includes('in-out')) {
             placeholderOptions += `<optgroup label="In-Out">${placeholders.inout.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+        } else if (templateType.includes('item batch')) {
+            placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
+            placeholderOptions += `<optgroup label="Batch">${placeholders.batch.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;
         } else {
             // Default to item template
             placeholderOptions += `<optgroup label="Items">${placeholders.item.map(p => `<option value="${p.value}">${p.label}</option>`).join('')}</optgroup>`;

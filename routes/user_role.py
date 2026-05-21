@@ -126,7 +126,7 @@ def user_new():
         if _pps not in ('upload', 'share', 'both'):
             _pps = 'share'
         user = User(
-            name=(form.name.data or '').strip()[:64] or None,
+            name=(form.name.data or '').strip()[:64] or form.username.data,
             short_info=(form.short_info.data or '').strip()[:128] or None,
             username=form.username.data,
             email=form.email.data,
@@ -175,6 +175,14 @@ def user_new():
         flash(f'User "{user.username}" created successfully!', 'success')
         return redirect(url_for('user_role.users'))
     
+    # Pre-select Viewer role for new users (safest default)
+    if request.method == 'GET':
+        viewer = Role.query.filter_by(name='Viewer').first()
+        if viewer is None:
+            viewer = Role.query.filter_by(is_system_role=True).order_by(Role.id.desc()).first()
+        if viewer:
+            form.role_id.data = viewer.id
+
     return render_template('user_form.html', form=form, title='New User', profile_share_files=SharedFile.query.filter_by(category='profile').order_by(SharedFile.created_at.desc()).all())
 
 
@@ -242,7 +250,7 @@ def user_edit(id):
             return redirect(url_for('user_role.user_edit', id=user.id))
         
         # Regular form submission (full user edit)
-        user.name = (form.name.data or '').strip()[:64] or None
+        user.name = (form.name.data or '').strip()[:64] or user.username
         user.short_info = (form.short_info.data or '').strip()[:128] or None
         user.username = form.username.data
         user.email = form.email.data
@@ -421,58 +429,46 @@ def role_new():
             flash(f'Role "{form.name.data}" already exists!', 'danger')
             return render_template('role_form.html', form=form, title='New Role', role=None)
         
-        # Create new role with default permissions (all false)
+        # Create new role with default permissions (all false — mirrors _ADMIN_PERMS structure)
         default_perms = {
-            # Item Management (simplified schema grouped by concern)
             "items": {
-                # Component
-                "view": False,
-                "create": False,
-                "delete": False,
-                # Item Info
-                "view_info": False,
-                "edit_info": False,
-                # Batch creation
+                "view": False, "create": False, "delete": False,
+                "view_info": False, "edit_info": False,
+                "edit_batch": False, "edit_quantity": False,
                 "create_batch": False,
-                # Advance Info
-                "view_advance": False,
-                "edit_advance": False,
-                "delete_advance": False,
+                "view_advance": False, "edit_advance": False, "delete_advance": False,
             },
-            # Lending & Return permissions
             "lending_return": {
-                "view_page": False,
-                "view_log": False,
-                "edit_batch": False,
-                "delete_batch": False,
-                "edit_lending": False,
-                "delete_lending": False,
+                "view_page": False, "only_self_lending": False, "view_log": False,
+                "edit_batch": False, "delete_batch": False,
+                "edit_lending": False, "delete_lending": False,
             },
-            # Page Permissions
             "pages": {
-                "visual_storage": {"view": False},
-                "notifications": {"view": False}
+                "visual_storage": {"view": False, "edit": False},
+                "notifications":  {"view": False, "edit": False},
+                "settings":       {"view": False, "edit": False},
             },
-            # Settings Page Sections
+            "projects": {
+                "view": False, "create": False, "edit": False, "delete": False,
+                "view_costing": False, "edit_costing": False,
+            },
             "settings_sections": {
-                "system_settings": {"view": False, "edit": False},
-                "reports": {"view": False},
-                "item_management": {"view": False, "edit": False, "delete": False},
-                "magic_parameters": {"view": False, "edit": False, "delete": False},
-                "location_management": {"view": False, "edit": False, "delete": False},
-                "qr_templates": {"print_qr": False, "view": False, "edit": False, "delete": False},
+                "system_settings":    {"view": False, "edit": False},
+                "reports":            {"view": False},
+                "item_management":    {"view": False, "edit": False, "delete": False},
+                "magic_parameters":   {"view": False, "edit": False, "delete": False},
+                "location_management":{"view": False, "edit": False, "delete": False},
+                "qr_templates":       {"view": False, "edit": False, "delete": False, "print_qr": False},
                 "users_roles": {
                     "view": False,
-                    "roles_create": False,
-                    "roles_edit": False,
-                    "roles_delete": False,
-                    "users_create": False,
-                    "users_edit": False,
-                    "users_delete": False
+                    "roles_create": False, "roles_edit": False, "roles_delete": False,
+                    "users_create": False, "users_edit": False, "users_delete": False,
                 },
-                "backup_restore": {"view": False, "upload_export": False, "delete": False},
-                "contacts": {"view": False, "edit": False, "delete": False}
-            }
+                "project_settings":   {"view": False, "edit": False, "delete": False},
+                "backup_restore":     {"view": False, "upload_export": False, "delete": False},
+                "contacts":           {"view_users": False, "view_other": False, "edit": False, "delete": False},
+                "share_files":        {"view": False, "add": False, "edit": False, "delete": False},
+            },
         }
         
         role = Role(
@@ -506,7 +502,8 @@ def role_edit(id):
         if 'update_info' in request.form:
             # Update role name and description
             if form.validate_on_submit():
-                role.name = form.name.data
+                if not role.is_system_role:
+                    role.name = form.name.data
                 role.description = form.description.data
                 db.session.commit()
                 log_audit(current_user.id, 'update', 'role', role.id, f'Updated role info: {role.name}')
@@ -555,7 +552,9 @@ def role_edit(id):
                 'view': 'projects_view' in request.form,
                 'create': 'projects_create' in request.form,
                 'edit': 'projects_edit' in request.form,
-                'delete': 'projects_delete' in request.form
+                'delete': 'projects_delete' in request.form,
+                'view_costing': 'projects_view_costing' in request.form,
+                'edit_costing': 'projects_edit_costing' in request.form,
             }
             
             # Settings sections permissions
@@ -624,7 +623,8 @@ def role_edit(id):
             }
 
             perms['settings_sections']['contacts'] = {
-                'view': 'settings_sections_contacts_view' in request.form,
+                'view_users': 'settings_sections_contacts_view_users' in request.form,
+                'view_other': 'settings_sections_contacts_view_other' in request.form,
                 'edit': 'settings_sections_contacts_edit' in request.form,
                 'delete': 'settings_sections_contacts_delete' in request.form
             }

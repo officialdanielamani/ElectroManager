@@ -200,7 +200,7 @@
                             </div>
                             <div class="card-body">
                                 <div class="row g-3">
-                                    <div class="col-md-3">
+                                    <div class="col-md-2">
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" name="projects_view" id="projects_view2"
                                                    {% if perms.get('projects', {}).get('view') %}checked{% endif %}
@@ -210,7 +210,7 @@
                                             </label>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-md-2">
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" name="projects_create" id="projects_create"
                                                    {% if perms.get('projects', {}).get('create') %}checked{% endif %}
@@ -220,7 +220,7 @@
                                             </label>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-md-2">
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" name="projects_edit" id="projects_edit"
                                                    {% if perms.get('projects', {}).get('edit') %}checked{% endif %}
@@ -230,13 +230,33 @@
                                             </label>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-md-2">
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" name="projects_delete" id="projects_delete"
                                                    {% if perms.get('projects', {}).get('delete') %}checked{% endif %}
                                                    {% if role.is_system_role %}disabled{% endif %}>
                                             <label class="form-check-label" for="projects_delete">
                                                 <strong>Delete</strong><br><small class="text-muted">Delete projects</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="projects_view_costing" id="projects_view_costing"
+                                                   {% if perms.get('projects', {}).get('view_costing') %}checked{% endif %}
+                                                   {% if role.is_system_role %}disabled{% endif %}>
+                                            <label class="form-check-label" for="projects_view_costing">
+                                                <strong>View Costing</strong><br><small class="text-muted">See BOM, cost breakdown, total cost</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="projects_edit_costing" id="projects_edit_costing"
+                                                   {% if perms.get('projects', {}).get('edit_costing') %}checked{% endif %}
+                                                   {% if role.is_system_role %}disabled{% endif %}>
+                                            <label class="form-check-label" for="projects_edit_costing">
+                                                <strong>Edit Costing</strong><br><small class="text-muted">Add/edit BOM, cost items, quantities</small>
                                             </label>
                                         </div>
                                     </div>
@@ -607,15 +627,23 @@
                                 <div class="mb-4 p-3 bg-light rounded">
                                     <h6 class="mb-3"><i class="bi bi-person-lines-fill"></i> Contacts <code class="text-muted">/settings/contacts</code></h6>
                                     <div class="row">
-                                        <div class="col-md-4">
+                                        <div class="col-md-3">
                                             <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" name="settings_sections_contacts_view"
-                                                       {% if perms.get('settings_sections', {}).get('contacts', {}).get('view') %}checked{% endif %}
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_contacts_view_users"
+                                                       {% if perms.get('settings_sections', {}).get('contacts', {}).get('view_users') %}checked{% endif %}
                                                        {% if role.is_system_role %}disabled{% endif %}>
-                                                <label class="form-check-label">View</label>
+                                                <label class="form-check-label">View Users</label>
                                             </div>
                                         </div>
-                                        <div class="col-md-4">
+                                        <div class="col-md-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="settings_sections_contacts_view_other"
+                                                       {% if perms.get('settings_sections', {}).get('contacts', {}).get('view_other') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">View Other</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" name="settings_sections_contacts_edit"
                                                        {% if perms.get('settings_sections', {}).get('contacts', {}).get('edit') %}checked{% endif %}
@@ -623,7 +651,7 @@
                                                 <label class="form-check-label">Edit</label>
                                             </div>
                                         </div>
-                                        <div class="col-md-4">
+                                        <div class="col-md-3">
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" name="settings_sections_contacts_delete"
                                                        {% if perms.get('settings_sections', {}).get('contacts', {}).get('delete') %}checked{% endif %}

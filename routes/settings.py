@@ -160,7 +160,8 @@ def settings_general():
                          current_font=current_font,
                          available_themes=available_themes,
                          available_fonts=available_fonts,
-                         demo_mode=current_app.config.get('DEMO_MODE', False))
+                         demo_mode=current_app.config.get('DEMO_MODE', False),
+                         can_view_costing=current_user.has_permission('projects', 'view_costing'))
 
 
 
@@ -749,9 +750,11 @@ def settings_system():
 
 @settings_bp.route('/settings/system/delete-system-logo', endpoint='delete_system_logo', methods=['POST'])
 @login_required
-@admin_required
 def delete_system_logo():
     """Delete the system logo and favicon from the instance folder."""
+    if not current_user.has_permission('settings_sections.system_settings', 'edit'):
+        flash('You do not have permission to edit system settings.', 'danger')
+        return redirect(url_for('settings.settings_system'))
     fname = Setting.get('system_logo', '')
     if fname:
         for f in (fname, 'favicon.ico'):
@@ -766,9 +769,11 @@ def delete_system_logo():
 
 @settings_bp.route('/settings/system/delete-company-logo', endpoint='delete_company_logo', methods=['POST'])
 @login_required
-@admin_required
 def delete_company_logo():
     """Delete the company logo from the instance folder."""
+    if not current_user.has_permission('settings_sections.system_settings', 'edit'):
+        flash('You do not have permission to edit system settings.', 'danger')
+        return redirect(url_for('settings.settings_system'))
     fname = Setting.get('company_logo', '')
     if fname:
         try:
@@ -778,6 +783,82 @@ def delete_company_logo():
         Setting.set('company_logo', '', 'Company logo filename in instance folder')
         flash('Company logo deleted.', 'success')
     return redirect(url_for('settings.settings_system'))
+
+
+@settings_bp.route('/api/settings/system/scan-share-files', endpoint='scan_share_files', methods=['POST'])
+@login_required
+def scan_share_files():
+    """Scan share file directories and sync DB records to match disk state."""
+    if not current_user.has_permission('settings_sections.system_settings', 'edit'):
+        return jsonify({'success': False, 'message': 'Permission denied.'}), 403
+
+    from routes.share import SHARE_CATEGORIES, _share_folder
+
+    upload_folder = current_app.config['UPLOAD_FOLDER']
+    added = []
+    removed = []
+    unchanged_count = 0
+
+    try:
+        for category in SHARE_CATEGORIES:
+            try:
+                folder = _share_folder(upload_folder, category)
+            except ValueError:
+                continue
+
+            os.makedirs(folder, exist_ok=True)
+
+            # Files on disk
+            try:
+                disk_files = set(f for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f)))
+            except OSError:
+                disk_files = set()
+
+            # DB records for this category
+            db_records = SharedFile.query.filter_by(category=category).all()
+            db_filenames = {r.filename: r for r in db_records}
+
+            # Remove DB records whose files are gone from disk
+            for filename, record in list(db_filenames.items()):
+                if filename not in disk_files:
+                    removed.append({'name': record.name, 'filename': filename, 'category': category})
+                    db.session.delete(record)
+
+            # Add DB records for files on disk not tracked in DB
+            for filename in disk_files:
+                if filename not in db_filenames:
+                    filepath = os.path.join(folder, filename)
+                    try:
+                        file_size = os.path.getsize(filepath)
+                    except OSError:
+                        file_size = 0
+                    new_record = SharedFile(
+                        name=filename,
+                        filename=filename,
+                        category=category,
+                        file_size=file_size,
+                        uploaded_by_id=current_user.id,
+                    )
+                    db.session.add(new_record)
+                    added.append({'name': filename, 'filename': filename, 'category': category})
+                else:
+                    unchanged_count += 1
+
+        db.session.commit()
+        log_audit(current_user.id, 'scan_share_files', 'system', None,
+                  f'Scanned share files: {len(added)} added, {len(removed)} removed')
+
+        return jsonify({
+            'success': True,
+            'added': added,
+            'removed': removed,
+            'unchanged': unchanged_count,
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error scanning share files: {e}")
+        return jsonify({'success': False, 'message': 'An error occurred during scan.'}), 500
 
 
 # ============= FOOTPRINTS =============

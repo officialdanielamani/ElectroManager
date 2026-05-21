@@ -28,7 +28,9 @@ def _valid_url(value):
 @contacts_bp.route('/settings/contacts', endpoint='contacts_settings')
 @login_required
 def contacts_settings():
-    if not current_user.has_permission('settings_sections.contacts', 'view'):
+    can_view_users = current_user.has_permission('settings_sections.contacts', 'view_users')
+    can_view_other = current_user.has_permission('settings_sections.contacts', 'view_other')
+    if not can_view_users and not can_view_other:
         flash('No permission.', 'danger')
         return redirect(url_for('settings.settings'))
 
@@ -43,7 +45,8 @@ def contacts_settings():
     return render_template('contacts_settings.html',
                            persons=persons, organizations=organizations,
                            groups=groups, users=users,
-                           can_edit=can_edit, can_delete=can_delete)
+                           can_edit=can_edit, can_delete=can_delete,
+                           can_view_users=can_view_users, can_view_other=can_view_other)
 
 
 # ==================== PERSON CRUD ====================
@@ -357,8 +360,9 @@ def api_contacts_all():
 
     users = User.query.filter_by(is_active=True).order_by(User.username).all()
     for u in users:
-        if not q or q in u.username.lower() or (u.email and q in u.email.lower()):
-            results.append({'id': u.id, 'type': 'user', 'label': u.username, 'extra': u.email or ''})
+        display = u.name
+        if not q or q in u.username.lower() or q in display.lower() or (u.name and q in u.name.lower()):
+            results.append({'id': u.id, 'type': 'user', 'label': display, 'extra': u.short_info or ''})
 
     persons = ContactPerson.query.order_by(ContactPerson.name).all()
     for p in persons:

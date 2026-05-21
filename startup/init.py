@@ -98,10 +98,8 @@ class Startup:
     def init_database(self):
         self.step("Initializing database")
         db_path = os.path.join(self.project_root, 'instance/inventory.db')
-
-        if os.path.exists(db_path):
-            self.log("Database already exists", 'OK')
-            return True
+        label = "Database already exists — running update" if os.path.exists(db_path) else "Initializing database"
+        self.log(label, 'OK')
 
         try:
             result = subprocess.run(
@@ -112,7 +110,7 @@ class Startup:
             )
 
             if result.returncode == 0:
-                self.log("Database initialized", 'OK')
+                self.log("Database ready", 'OK')
                 return True
             else:
                 self.errors.append(f"Database init failed: {result.stderr.decode()}")

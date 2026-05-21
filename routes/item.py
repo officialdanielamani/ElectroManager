@@ -235,6 +235,7 @@ def item_new():
             category_id=form.category_id.data if form.category_id.data and form.category_id.data > 0 else None,
             footprint_id=form.footprint_id.data if form.footprint_id.data and form.footprint_id.data > 0 else None,
             tags=tags_json,
+            thumbnail=request.form.get('thumbnail', '').strip() or None,
             datasheet_urls=(form.datasheet_urls.data or '')[:2048] or None if perms['can_edit_advance'] else None,
             created_by=current_user.id,
             updated_by=current_user.id
