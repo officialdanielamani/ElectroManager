@@ -650,9 +650,9 @@ def settings_system():
                 flash('Invalid API rate limit value!', 'danger')
                 return redirect(url_for('settings.settings_system'))
             Setting.set('api_rate_limit', api_rate_limit_val, 'API requests per second limit (1–100)')
-            Setting.set('api_item_search_enabled',  'api_item_search_enabled'  in request.form, 'Enable Item Search & Information API system-wide')
-            Setting.set('api_rack_drawer_enabled',  'api_rack_drawer_enabled'  in request.form, 'Enable Rack & Drawer API system-wide')
-            Setting.set('api_lending_return_enabled','api_lending_return_enabled' in request.form, 'Enable Lending & Return API system-wide')
+            Setting.set('api_item_search_enabled',   'true' if 'api_item_search_enabled'   in request.form else 'false', 'Enable Item Search & Information API system-wide')
+            Setting.set('api_rack_drawer_enabled',   'true' if 'api_rack_drawer_enabled'   in request.form else 'false', 'Enable Rack & Drawer API system-wide')
+            Setting.set('api_lending_return_enabled','true' if 'api_lending_return_enabled' in request.form else 'false', 'Enable Lending & Return API system-wide')
 
             # Update app config dynamically
             current_app.config['MAX_CONTENT_LENGTH'] = max_file_size * 1024 * 1024

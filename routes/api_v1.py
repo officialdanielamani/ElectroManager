@@ -87,7 +87,7 @@ def _authenticate(scope: str = None):
     # Scope check
     if scope and scope in _SCOPE_MAP:
         user_field, sys_key = _SCOPE_MAP[scope]
-        if Setting.get(sys_key, 'false') != 'true':
+        if not Setting.get(sys_key, False):
             return None, _err(403, 'SCOPE_DISABLED',
                               'This API scope is disabled system-wide by an administrator')
         if not getattr(user, user_field, False):
