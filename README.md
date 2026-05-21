@@ -135,69 +135,11 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 
 ---
 
-## Internal REST API
+## API
 
-All endpoints listed below are **internal** — they require an active login session (`@login_required`) and are consumed exclusively by the web UI. They are **not** designed or secured for direct third-party access.
-
-> **Planned:** A separate external API with token-based authentication and RBAC integration is under development for future 3rd-party integrations. When available it will be documented in a dedicated API reference.
-
-### Search
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/search-item` | Search items by name or UUID; supports location/rack filters and exact-match mode |
-
-### Visual Storage — Drawers & Racks
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/drawer/<rack_uuid>/<drawer_id>` | Items stored in a specific drawer |
-| POST | `/api/drawer/toggle-availability` | Mark a drawer available or unavailable |
-| POST | `/api/drawer/update-info` | Update the short-info label of a drawer |
-| POST | `/api/drawer/update-icon` | Set or clear a drawer's icon |
-| POST | `/api/drawer/move-items` | Bulk-move drawer contents to another drawer or location |
-| POST | `/api/drawer/swap-items` | Swap contents between two drawers |
-| POST | `/api/rack/update-rack-icon` | Set or clear a rack's icon |
-| POST | `/api/rack/<rack_uuid>/merge-cells` | Merge a set of rack cells into one logical slot |
-| POST | `/api/rack/<rack_uuid>/split-cells` | Split a merged rack cell group back to individual cells |
-
-### Quick-Add (Inline Forms)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/category/add` | Create a category without leaving the item form |
-| POST | `/api/footprint/add` | Create a footprint without leaving the item form |
-| POST | `/api/tag/add` | Create a tag without leaving the item form |
-| POST | `/api/location/add` | Create a location without leaving the item form |
-
-### Contacts
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/contacts/persons` | List all contact persons |
-| GET | `/api/contacts/organizations` | List all contact organizations |
-| GET | `/api/contacts/all` | List all contacts (persons, organizations, and groups) |
-
-### Sticker & QR Previews
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/item/<uuid>/sticker-preview/<template_id>` | Rendered sticker HTML preview for an item |
-| GET | `/api/item/<uuid>/sticker-print/<template_id>` | Sticker PDF for an item |
-| GET | `/api/location/<uuid>/sticker-preview/<template_id>` | Rendered sticker HTML preview for a location |
-| GET | `/api/location/<uuid>/sticker-print/<template_id>` | Sticker PDF for a location |
-| GET | `/api/rack/<uuid>/sticker-preview/<template_id>` | Rendered sticker HTML preview for a rack |
-| GET | `/api/rack/<uuid>/sticker-print/<template_id>` | Sticker PDF for a rack |
-| GET | `/api/in-out/session/<lending_id>/session-qr-svg` | Inline SVG QR code for a lending session |
-| GET | `/api/in-out/session/<lending_id>/sticker-preview/<template_id>` | Rendered sticker HTML preview for a lending session |
-| GET | `/api/in-out/session/<lending_id>/sticker-print/<template_id>` | Sticker PDF for a lending session |
-
-### System / Settings
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/available-fonts` | List custom font files detected in `static/custom/font/` |
-| POST | `/api/settings/system/scan-share-files` | Scan the share folder on disk and register any untracked files |
+See **[API.md](API.md)** for the full API reference, including:
+- External API v1 (`/api/v1/`) — token-based, for ESP32 and third-party integrations
+- Internal API — session-based endpoints used by the browser UI
 
 ---
 
@@ -314,6 +256,7 @@ ElectroManager/
 ├── utils.py                      # Shared utilities (permissions, audit log, etc.)
 ├── importexport.py               # JSON import/export logic
 ├── qr_utils.py                   # QR code and sticker PDF generation
+├── API.md                        # API reference (external v1 + internal)
 ├── requirements.txt              # Python dependencies
 ├── js-requirements.json          # JS/CSS library manifest (Bootstrap, etc.)
 ├── Dockerfile                    # Docker image (deps baked in at build time)
@@ -348,6 +291,7 @@ ElectroManager/
 │   ├── print.py                  # Print views
 │   ├── qr_template.py            # QR sticker template designer
 │   ├── api.py                    # Core internal REST API endpoints
+│   ├── api_v1.py                 # External REST API v1 (/api/v1/)
 │   └── __init__.py               # Blueprint registration
 │
 ├── templates/                    # Jinja2 HTML templates
