@@ -26,14 +26,6 @@ class AnonymousUser(AnonymousUserMixin):
         """Anonymous users have no permissions"""
         return False
     
-    def is_admin(self):
-        """Anonymous users are not admins"""
-        return False
-    
-    def is_editor(self):
-        """Anonymous users are not editors"""
-        return False
-    
     @property
     def theme(self):
         """Default theme for anonymous users"""

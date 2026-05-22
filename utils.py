@@ -130,7 +130,7 @@ def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated or not current_user.has_permission('settings_sections.users_roles', 'view'):
-            flash('You need admin privileges to access this page.', 'danger')
+            flash('Permission denied.', 'danger')
             return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated_function
@@ -234,40 +234,32 @@ def markdown_to_html(text):
 
 
 def get_item_edit_permissions(user):
-    """Get simplified item permissions from the role's permission matrix."""
+    """Get item permissions from the role's permission matrix."""
     p  = lambda res, act: user.has_permission(res, act)
     lr = lambda perm: p('lending_return', perm)
 
     can_edit_batch = lr('edit_batch')
 
-    # "full item access" — used by forms to skip per-field restrictions
-    is_admin = (
-        p('items', 'create') and p('items', 'delete') and
-        p('items', 'edit_info') and p('items', 'edit_advance') and
-        can_edit_batch
-    )
-
     return {
-        'can_view':            p('items', 'view'),
-        'can_create':          p('items', 'create'),
-        'can_delete':          p('items', 'delete'),
-        'can_view_info':       p('items', 'view_info'),
-        'can_edit_info':       p('items', 'edit_info'),
-        'can_view_batch':      p('items', 'view_info'),
-        'can_create_batch':    p('items', 'create_batch') or can_edit_batch,
-        'can_edit_batch':      can_edit_batch,
-        'can_edit_quantity':   can_edit_batch,
-        'can_edit_price':      can_edit_batch,
-        'can_edit_sn':         can_edit_batch,
-        'can_edit_lending':    lr('edit_lending'),
-        'can_only_self_lending': (p('lending_return', 'only_self_lending') and not can_edit_batch),
-        'can_delete_batch':    lr('delete_batch'),
-        'can_delete_lending':  lr('delete_lending'),
-        'can_view_advance':    p('items', 'view_advance'),
-        'can_edit_advance':    p('items', 'edit_advance'),
-        'can_delete_advance':  p('items', 'delete_advance'),
-        'can_view_lr_page':    lr('view_page'),
-        'can_view_lr_log':     lr('view_log'),
-        'is_admin':            is_admin,
+        'can_view':              p('items', 'view'),
+        'can_create':            p('items', 'create'),
+        'can_delete':            p('items', 'delete'),
+        'can_view_info':         p('items', 'view_info'),
+        'can_edit_info':         p('items', 'edit_info'),
+        'can_view_batch':        p('items', 'view_info'),
+        'can_create_batch':      p('items', 'create_batch') or can_edit_batch,
+        'can_edit_batch':        can_edit_batch,
+        'can_edit_quantity':     can_edit_batch,
+        'can_edit_price':        can_edit_batch,
+        'can_edit_sn':           can_edit_batch,
+        'can_edit_lending':      lr('edit_lending'),
+        'can_only_self_lending': p('lending_return', 'only_self_lending') and not can_edit_batch,
+        'can_delete_batch':      lr('delete_batch'),
+        'can_delete_lending':    lr('delete_lending'),
+        'can_view_advance':      p('items', 'view_advance'),
+        'can_edit_advance':      p('items', 'edit_advance'),
+        'can_delete_advance':    p('items', 'delete_advance'),
+        'can_view_lr_page':      lr('view_page'),
+        'can_view_lr_log':       lr('view_log'),
     }
 

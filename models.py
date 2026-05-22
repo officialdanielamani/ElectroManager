@@ -160,12 +160,6 @@ class User(UserMixin, db.Model):
     def has_permission(self, resource, action):
         return bool(self.user_role and self.user_role.has_permission(resource, action))
 
-    def is_admin(self):
-        return self.has_permission('settings_sections.users_roles', 'view')
-
-    def is_editor(self):
-        return False
-
     def get_table_columns(self):
         try:
             return json.loads(self.table_columns_view)
