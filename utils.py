@@ -126,10 +126,10 @@ def log_audit(user_id, action, entity_type, entity_id, details=None):
 
 
 def admin_required(f):
-    """Decorator to require admin role"""
+    """Decorator to require user/role management permission"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated or not current_user.is_admin():
+        if not current_user.is_authenticated or not current_user.has_permission('settings_sections.users_roles', 'view'):
             flash('You need admin privileges to access this page.', 'danger')
             return redirect(url_for('index'))
         return f(*args, **kwargs)
@@ -234,30 +234,40 @@ def markdown_to_html(text):
 
 
 def get_item_edit_permissions(user):
-    """Get simplified item permissions grouped by Component / Info / Batch / Advance / LendingReturn."""
-    is_admin = user.is_admin()
-    lr = lambda perm: is_admin or user.has_permission('lending_return', perm)
+    """Get simplified item permissions from the role's permission matrix."""
+    p  = lambda res, act: user.has_permission(res, act)
+    lr = lambda perm: p('lending_return', perm)
+
+    can_edit_batch = lr('edit_batch')
+
+    # "full item access" — used by forms to skip per-field restrictions
+    is_admin = (
+        p('items', 'create') and p('items', 'delete') and
+        p('items', 'edit_info') and p('items', 'edit_advance') and
+        can_edit_batch
+    )
+
     return {
-        'can_view': is_admin or user.has_permission('items', 'view'),
-        'can_create': is_admin or user.has_permission('items', 'create'),
-        'can_delete': is_admin or user.has_permission('items', 'delete'),
-        'can_view_info': is_admin or user.has_permission('items', 'view_info'),
-        'can_edit_info': is_admin or user.has_permission('items', 'edit_info'),
-        'can_view_batch': is_admin or user.has_permission('items', 'view_info'),  # implied by view_info
-        'can_create_batch': is_admin or user.has_permission('items', 'create_batch') or lr('edit_batch'),
-        'can_edit_batch': lr('edit_batch'),
-        'can_edit_quantity': lr('edit_batch'),   # merged into edit_batch
-        'can_edit_price': lr('edit_batch'),      # merged into edit_batch
-        'can_edit_sn': lr('edit_batch'),         # merged into edit_batch
-        'can_edit_lending': lr('edit_lending'),
-        'can_only_self_lending': not is_admin and user.has_permission('lending_return', 'only_self_lending') and not user.has_permission('lending_return', 'edit_batch'),
-        'can_delete_batch': lr('delete_batch'),
-        'can_delete_lending': lr('delete_lending'),
-        'can_view_advance': is_admin or user.has_permission('items', 'view_advance'),
-        'can_edit_advance': is_admin or user.has_permission('items', 'edit_advance'),
-        'can_delete_advance': is_admin or user.has_permission('items', 'delete_advance'),
-        'can_view_lr_page': is_admin or lr('view_page'),
-        'can_view_lr_log': is_admin or lr('view_log'),
-        'is_admin': is_admin,
+        'can_view':            p('items', 'view'),
+        'can_create':          p('items', 'create'),
+        'can_delete':          p('items', 'delete'),
+        'can_view_info':       p('items', 'view_info'),
+        'can_edit_info':       p('items', 'edit_info'),
+        'can_view_batch':      p('items', 'view_info'),
+        'can_create_batch':    p('items', 'create_batch') or can_edit_batch,
+        'can_edit_batch':      can_edit_batch,
+        'can_edit_quantity':   can_edit_batch,
+        'can_edit_price':      can_edit_batch,
+        'can_edit_sn':         can_edit_batch,
+        'can_edit_lending':    lr('edit_lending'),
+        'can_only_self_lending': (p('lending_return', 'only_self_lending') and not can_edit_batch),
+        'can_delete_batch':    lr('delete_batch'),
+        'can_delete_lending':  lr('delete_lending'),
+        'can_view_advance':    p('items', 'view_advance'),
+        'can_edit_advance':    p('items', 'edit_advance'),
+        'can_delete_advance':  p('items', 'delete_advance'),
+        'can_view_lr_page':    lr('view_page'),
+        'can_view_lr_log':     lr('view_log'),
+        'is_admin':            is_admin,
     }
 

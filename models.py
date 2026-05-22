@@ -161,7 +161,7 @@ class User(UserMixin, db.Model):
         return bool(self.user_role and self.user_role.has_permission(resource, action))
 
     def is_admin(self):
-        return bool(self.user_role and self.user_role.is_system_role)
+        return self.has_permission('settings_sections.users_roles', 'view')
 
     def is_editor(self):
         return False
