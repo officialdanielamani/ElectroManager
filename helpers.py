@@ -38,27 +38,19 @@ def is_safe_url_alt(target):
     return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
 
 
-def is_safe_file_path(file_path, base_dir=None):
-    """Validate that a file path is safe for file operations (prevents path traversal).
-    If base_dir is not provided, validates the path is within the app's working directory."""
-    if not file_path:
+def is_safe_file_path(file_path, base_dir):
+    """Validate that a file path resolves within base_dir (prevents path traversal).
+
+    Both .. sequences and symlinks are handled via os.path.realpath.
+    Always provide a base_dir — callers must not omit it.
+    """
+    if not file_path or not base_dir:
         return False
 
     try:
-        if base_dir is None:
-            # Default: ensure path is absolute and doesn't contain traversal
-            abs_file_path = os.path.abspath(file_path)
-            # Reject paths with traversal attempts
-            if '..' in file_path:
-                return False
-            return True
-
-        # Resolve to absolute paths to handle .. and symlinks
-        base_path = os.path.abspath(base_dir)
-        abs_file_path = os.path.abspath(file_path)
-
-        # Ensure file_path stays within base_dir
-        return abs_file_path.startswith(base_path)
+        base_path = os.path.realpath(base_dir)
+        target = os.path.realpath(file_path)
+        return target.startswith(base_path + os.sep) or target == base_path
     except (ValueError, OSError):
         return False
 

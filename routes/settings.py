@@ -471,6 +471,22 @@ def settings_system():
                 if not allowed_extensions:
                     flash('You must specify at least one allowed file type!', 'danger')
                     return redirect(url_for('settings.settings_system'))
+
+                # Remove web-server config override extensions unconditionally.
+                # Other extensions (including .exe, .py, .sh) are allowed — they are
+                # served as file downloads by Flask, never executed server-side.
+                from utils import DANGEROUS_EXTENSIONS
+                raw_exts = [e.strip().lower() for e in allowed_extensions.split(',') if e.strip()]
+                blocked = [e for e in raw_exts if e in DANGEROUS_EXTENSIONS]
+                safe_exts = [e for e in raw_exts if e not in DANGEROUS_EXTENSIONS]
+                if not safe_exts:
+                    flash('All specified extensions are blocked for security reasons. '
+                          'Please use safe file types.', 'danger')
+                    return redirect(url_for('settings.settings_system'))
+                if blocked:
+                    flash(f'The following extensions cannot be allowed (.htaccess/.htpasswd can '
+                          f'reconfigure the web server): {", ".join(blocked)}', 'warning')
+                allowed_extensions = ','.join(safe_exts)
                 
                 # Max file size validation (production mode only)
                 max_file_size = request.form.get('max_file_size', '10')

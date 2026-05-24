@@ -172,10 +172,11 @@ def location_edit(uuid):
         location.color = form.color.data or '#6c757d'
         
         # Handle picture deletion
+        _loc_upload_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations')
         if request.form.get('delete_picture'):
             if location.picture and not location.picture.startswith('share/'):
-                old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations', location.picture)
-                if is_safe_file_path(old_path) and os.path.exists(old_path):
+                old_path = os.path.join(_loc_upload_dir, location.picture)
+                if is_safe_file_path(old_path, _loc_upload_dir) and os.path.exists(old_path):
                     os.remove(old_path)
             location.picture = None
 
@@ -199,8 +200,8 @@ def location_edit(uuid):
                     flash('Only PNG, JPEG, and WebP images are allowed.', 'danger')
                     return render_template('location_form.html', form=form, location=location)
                 if location.picture and not location.picture.startswith('share/'):
-                    old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations', location.picture)
-                    if is_safe_file_path(old_path) and os.path.exists(old_path):
+                    old_path = os.path.join(_loc_upload_dir, location.picture)
+                    if is_safe_file_path(old_path, _loc_upload_dir) and os.path.exists(old_path):
                         os.remove(old_path)
                 if ext == 'jpg':
                     ext = 'jpeg'
@@ -490,10 +491,11 @@ def rack_edit(uuid):
                 flash(f'Warning: {items_cleared} item(s) were removed from drawers outside new bounds. These items now have no location.', 'warning')
         
         # Handle picture deletion
+        _rack_upload_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks')
         if request.form.get('delete_picture'):
             if rack.picture and not rack.picture.startswith('share/'):
-                old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks', rack.picture)
-                if is_safe_file_path(old_path) and os.path.exists(old_path):
+                old_path = os.path.join(_rack_upload_dir, rack.picture)
+                if is_safe_file_path(old_path, _rack_upload_dir) and os.path.exists(old_path):
                     os.remove(old_path)
             rack.picture = None
 
@@ -517,8 +519,8 @@ def rack_edit(uuid):
                     flash('Only PNG, JPEG, and WebP images are allowed.', 'danger')
                     return redirect(url_for('location_rack.rack_edit', uuid=uuid))
                 if rack.picture and not rack.picture.startswith('share/'):
-                    old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks', rack.picture)
-                    if is_safe_file_path(old_path) and os.path.exists(old_path):
+                    old_path = os.path.join(_rack_upload_dir, rack.picture)
+                    if is_safe_file_path(old_path, _rack_upload_dir) and os.path.exists(old_path):
                         os.remove(old_path)
                 if ext == 'jpg':
                     ext = 'jpeg'
@@ -989,11 +991,13 @@ def api_drawer_sticker_print(uuid, drawer_id, template_id):
         return jsonify({'error': 'Failed to generate PDF'}), 500
     log_audit(current_user.id, 'print', 'rack', rack.id,
               f'Printed drawer sticker: {template.name} drawer {drawer_id}')
+    from werkzeug.utils import secure_filename as _sf
+    safe_dl_name = _sf(f'{template.name}_{rack.uuid}_{drawer_id}.pdf') or 'drawer_sticker.pdf'
     return send_file(
         output,
         mimetype='application/pdf',
         as_attachment=True,
-        download_name=f'{template.name}_{rack.uuid}_{drawer_id}.pdf'
+        download_name=safe_dl_name
     )
 
 

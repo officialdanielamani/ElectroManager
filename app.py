@@ -3,6 +3,7 @@ Inventory Manager Application - Main Entry Point
 """
 from flask import Flask, render_template, request, send_from_directory, jsonify, url_for, abort
 from flask_login import LoginManager, current_user, AnonymousUserMixin, login_required
+from flask_wtf.csrf import CSRFProtect
 from config import Config
 from models import db, User, Category, Item, Setting
 from helpers import filesize_filter, jinja_format_amount, markdown_filter
@@ -16,6 +17,10 @@ app.config.from_object(Config)
 
 # Initialize database
 db.init_app(app)
+
+# Initialize CSRF protection — all POST/PUT/PATCH/DELETE routes require a valid token.
+# API blueprints that use Bearer-token auth are exempted below after blueprint registration.
+csrf = CSRFProtect(app)
 
 
 # Custom Anonymous User with permission methods
@@ -213,18 +218,33 @@ def favicon():
     abort(404)
 
 
+_INSTANCE_FILE_ALLOWED_EXTS = {'png', 'jpg', 'jpeg', 'gif', 'ico', 'svg', 'webp'}
+
 @app.route('/instance-file/<filename>')
 def instance_file(filename):
-    """Serve logo files stored in the instance folder (system/company logos)."""
+    """Serve logo/favicon files stored in the instance folder. Restricted to image types only."""
     from werkzeug.utils import secure_filename
     safe_name = secure_filename(filename)
     if not safe_name:
+        abort(404)
+    ext = safe_name.rsplit('.', 1)[-1].lower() if '.' in safe_name else ''
+    if ext not in _INSTANCE_FILE_ALLOWED_EXTS:
         abort(404)
     instance_dir = app.instance_path
     full_path = os.path.join(instance_dir, safe_name)
     if not os.path.exists(full_path):
         abort(404)
     return send_from_directory(instance_dir, safe_name)
+
+
+@app.after_request
+def set_security_headers(response):
+    """Add security headers to every response."""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    return response
 
 
 # Error handlers
@@ -244,6 +264,12 @@ def internal_error(error):
 # Register all modular blueprints
 from routes import register_blueprints
 register_blueprints(app)
+
+# Exempt REST API blueprints from CSRF — they authenticate via Bearer token, not cookies.
+from routes.api import api_bp
+from routes.api_v1 import api_v1_bp
+csrf.exempt(api_bp)
+csrf.exempt(api_v1_bp)
 
 # Validate Bootstrap Icons at startup
 from qr_utils import validate_bootstrap_icons

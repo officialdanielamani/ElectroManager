@@ -207,8 +207,9 @@ def user_edit(id):
         if action == 'delete_photo':
             if user.profile_photo:
                 if not user.profile_photo.startswith('share/'):
-                    filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
-                    if is_safe_file_path(filepath) and os.path.exists(filepath):
+                    _pic_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture')
+                    filepath = os.path.join(_pic_dir, user.profile_photo)
+                    if is_safe_file_path(filepath, _pic_dir) and os.path.exists(filepath):
                         os.remove(filepath)
                 user.profile_photo = None
                 log_audit(current_user.id, 'update', 'user', user.id, f'Deleted profile photo for user: {user.username}')
@@ -232,8 +233,9 @@ def user_edit(id):
                     
                     # Delete old photo if exists (skip if it's a share-sourced photo)
                     if user.profile_photo and not user.profile_photo.startswith('share/'):
-                        old_file = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
-                        if is_safe_file_path(old_file) and os.path.exists(old_file):
+                        _pic_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture')
+                        old_file = os.path.join(_pic_dir, user.profile_photo)
+                        if is_safe_file_path(old_file, _pic_dir) and os.path.exists(old_file):
                             os.remove(old_file)
 
                     # Save with username as filename - sanitize extension
@@ -274,8 +276,9 @@ def user_edit(id):
         if share_file:
             if user.profile_photo and not user.profile_photo.startswith('share/'):
                 # delete old uploaded file
-                old_fp = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
-                if is_safe_file_path(old_fp) and os.path.exists(old_fp):
+                _pic_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture')
+                old_fp = os.path.join(_pic_dir, user.profile_photo)
+                if is_safe_file_path(old_fp, _pic_dir) and os.path.exists(old_fp):
                     os.remove(old_fp)
             user.profile_photo = f'share/{share_file}'
 
@@ -288,8 +291,9 @@ def user_edit(id):
                 file.seek(0)
                 if file_size <= 1024 * 1024:
                     if user.profile_photo and not user.profile_photo.startswith('share/'):
-                        old_fp = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
-                        if is_safe_file_path(old_fp) and os.path.exists(old_fp):
+                        _pic_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture')
+                        old_fp = os.path.join(_pic_dir, user.profile_photo)
+                        if is_safe_file_path(old_fp, _pic_dir) and os.path.exists(old_fp):
                             os.remove(old_fp)
                     ext = secure_filename(file.filename.rsplit('.', 1)[1].lower())
                     filename = f"{secure_filename(form.username.data)}.{ext}"
@@ -718,13 +722,20 @@ def role_clone(id):
 
 
 @user_role_bp.route('/uploads/userpicture/<path:filename>', endpoint='serve_user_picture')
+@login_required
 def serve_user_picture(filename):
     """Serve user profile pictures; filename may be 'share/<actualname>' for share-sourced photos."""
+    from werkzeug.utils import secure_filename as _sf
     if filename.startswith('share/'):
-        share_filename = filename[len('share/'):]
+        safe_name = _sf(filename[len('share/'):])
+        if not safe_name:
+            abort(404)
         folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', 'profile')
-        return send_from_directory(folder, share_filename)
-    return send_from_directory(os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture'), filename)
+        return send_from_directory(folder, safe_name)
+    safe_name = _sf(filename)
+    if not safe_name:
+        abort(404)
+    return send_from_directory(os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture'), safe_name)
 
 
 # ============= ITEMS PRINT =============

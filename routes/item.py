@@ -650,11 +650,13 @@ def item_delete(uuid):
         flash(f'Cannot delete "{item_name}" — it has outstanding (unreturned) lending records.', 'danger')
         return redirect(url_for('item.item_detail', uuid=item.uuid))
 
+    _upload_dir = current_app.config['UPLOAD_FOLDER']
     for attachment in item.attachments:
         try:
-            if attachment.file_path and is_safe_file_path(attachment.file_path):
-                if os.path.exists(attachment.file_path):
-                    os.remove(attachment.file_path)
+            if attachment.file_path:
+                full_path = os.path.join(_upload_dir, attachment.file_path)
+                if is_safe_file_path(full_path, _upload_dir) and os.path.exists(full_path):
+                    os.remove(full_path)
         except Exception as e:
             logging.error(f"Error deleting attachment file {attachment.id}: {e}")
 
@@ -724,11 +726,13 @@ def bulk_delete_items():
                 continue
 
             # Delete attachments
+            _upload_dir = current_app.config['UPLOAD_FOLDER']
             for attachment in item.attachments:
                 try:
-                    if attachment.file_path and is_safe_file_path(attachment.file_path):
-                        if os.path.exists(attachment.file_path):
-                            os.remove(attachment.file_path)
+                    if attachment.file_path:
+                        full_path = os.path.join(_upload_dir, attachment.file_path)
+                        if is_safe_file_path(full_path, _upload_dir) and os.path.exists(full_path):
+                            os.remove(full_path)
                 except Exception as e:
                     logging.error(f"Error deleting attachment file {attachment.id}: {e}")
             
@@ -812,17 +816,26 @@ def upload_attachment(item_id):
             flash(f'❌ File "{file.filename}" rejected: Incompatible file type. Allowed: {extensions_str}', 'danger')
             rejected_count += 1
             continue
-        
+
+        # MIME type validation — detect spoofed files (e.g. an EXE renamed to .jpg)
+        from utils import validate_mime_type
+        declared_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+        mime_ok, mime_reason = validate_mime_type(file, declared_ext)
+        if not mime_ok:
+            flash(f'❌ File "{file.filename}" rejected: {mime_reason}', 'danger')
+            rejected_count += 1
+            continue
+
         # Check file size
         file.seek(0, 2)  # Seek to end
         file_size = file.tell()
         file.seek(0)  # Reset to beginning
-        
+
         if file_size > max_size_bytes:
             flash(f'❌ File "{file.filename}" rejected: Too large ({format_file_size(file_size)}). Max: {max_size_mb}MB', 'danger')
             rejected_count += 1
             continue
-        
+
         file_info = save_file(file, current_app.config['UPLOAD_FOLDER'], item.uuid)
         
         if file_info:
@@ -862,12 +875,14 @@ def delete_attachment(id):
         return redirect(url_for('item.item_edit', uuid=item.uuid))
 
     try:
-        if attachment.file_path and is_safe_file_path(attachment.file_path):
-            if os.path.exists(attachment.file_path):
-                os.remove(attachment.file_path)
+        if attachment.file_path:
+            _upload_dir = current_app.config['UPLOAD_FOLDER']
+            full_path = os.path.join(_upload_dir, attachment.file_path)
+            if is_safe_file_path(full_path, _upload_dir) and os.path.exists(full_path):
+                os.remove(full_path)
     except Exception as e:
         logging.error(f"Error deleting attachment file {attachment.id}: {e}")
-    
+
     db.session.delete(attachment)
     db.session.commit()
     

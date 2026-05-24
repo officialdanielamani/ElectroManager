@@ -18,13 +18,109 @@ try:
 except ImportError:
     MARKDOWN_AVAILABLE = False
 
+# Extensions that are blocked unconditionally because they can reconfigure the web server
+# or be executed server-side by the HTTP daemon (not by Python). .py/.exe/.sh are fine to
+# store as data — they are served as downloads by Flask, never executed.
+DANGEROUS_EXTENSIONS = {'htaccess', 'htpasswd'}
+
+# Maps file extensions to their expected magic-byte signatures (first N bytes).
+# Used to detect MIME spoofing (e.g. a PHP script renamed to .jpg).
+_MAGIC_SIGNATURES: dict[str, list[bytes]] = {
+    'jpg':  [b'\xff\xd8\xff'],
+    'jpeg': [b'\xff\xd8\xff'],
+    'png':  [b'\x89PNG\r\n\x1a\n'],
+    'gif':  [b'GIF87a', b'GIF89a'],
+    'webp': [b'RIFF'],
+    'pdf':  [b'%PDF'],
+    'bmp':  [b'BM'],
+    'ico':  [b'\x00\x00\x01\x00'],
+}
+
+# Extensions where the actual content is binary-executable; detecting these in an
+# uploaded file that claims to be a document type (e.g. .docx) is suspicious.
+_EXECUTABLE_MAGIC: list[bytes] = [
+    b'MZ',           # PE/EXE/DLL
+    b'\x7fELF',      # ELF (Linux binary)
+    b'\xca\xfe\xba\xbe',  # Mach-O fat binary
+    b'\xfe\xed\xfa\xce', b'\xce\xfa\xed\xfe',  # Mach-O 32/64
+]
+
+
+def validate_mime_type(file_obj, declared_ext: str) -> tuple[bool, str]:
+    """
+    Validate that a file's actual content matches its declared extension.
+    Returns (is_valid, reason_string).
+
+    Rules:
+    - If declared_ext is an image type, verify with PIL (most reliable).
+    - If declared_ext has a known magic signature, verify bytes match.
+    - Reject any file whose first bytes are an executable signature when the
+      declared extension is a document/media type.
+    - Files with no known signature (e.g. .txt, .csv, .py, .exe) are passed
+      through — they are served as downloads, never executed server-side.
+    """
+    ext = declared_ext.lower()
+
+    try:
+        header = file_obj.read(16)
+        file_obj.seek(0)
+    except Exception:
+        return False, 'Could not read file header'
+
+    # Image validation via PIL — catches corrupt and spoofed images.
+    image_exts = {'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'tiff', 'tif'}
+    if ext in image_exts:
+        if not PILLOW_AVAILABLE:
+            return True, 'PIL not available, skipping image validation'
+        try:
+            from PIL import Image
+            import io
+            file_obj.seek(0)
+            raw = file_obj.read()
+            file_obj.seek(0)
+            img = Image.open(io.BytesIO(raw))
+            img.verify()
+            return True, 'ok'
+        except Exception as e:
+            return False, f'File is not a valid image: {e}'
+
+    # Magic-byte check for known binary formats (PDF, etc.)
+    if ext in _MAGIC_SIGNATURES:
+        for sig in _MAGIC_SIGNATURES[ext]:
+            if header[:len(sig)] == sig:
+                return True, 'ok'
+        return False, f'File content does not match declared type .{ext}'
+
+    # Reject executable binaries masquerading as document/media types.
+    # (Allow them when the extension itself is an executable type — stored as data.)
+    binary_declared = ext in {'exe', 'dll', 'so', 'bin', 'elf', 'dmg', 'app'}
+    if not binary_declared:
+        for sig in _EXECUTABLE_MAGIC:
+            if header[:len(sig)] == sig:
+                return False, (
+                    f'File appears to be a binary executable but is declared as .{ext}. '
+                    'Upload the file with its correct extension.'
+                )
+
+    return True, 'ok'
+
+
 def allowed_file(filename, allowed_extensions=None):
     """Check if file extension is allowed - respects DEMO_MODE setting"""
     from flask import current_app
-    
+
+    if '.' not in filename:
+        return False
+
+    ext = filename.rsplit('.', 1)[1].lower()
+
+    # Block web-server config overrides unconditionally.
+    if ext in DANGEROUS_EXTENSIONS:
+        return False
+
     # Check if demo mode is enabled via app config
     demo_mode_enabled = current_app.config.get('DEMO_MODE', False)
-    
+
     if demo_mode_enabled:
         # DEMO MODE: Use hardcoded whitelist only
         allowed_extensions = {'jpg', 'jpeg', 'png', 'txt', 'md'}
@@ -33,13 +129,11 @@ def allowed_file(filename, allowed_extensions=None):
         try:
             from models import Setting
             extensions_str = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
-            allowed_extensions = set(ext.strip().lower() for ext in extensions_str.split(',') if ext.strip())
-        except:
-            # Fallback to default if database not available
+            allowed_extensions = set(e.strip().lower() for e in extensions_str.split(',') if e.strip())
+        except Exception:
             allowed_extensions = {'pdf', 'png', 'jpg', 'jpeg', 'gif', 'txt', 'doc', 'docx'}
-    
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in allowed_extensions
+
+    return ext in allowed_extensions
 
 
 def save_file(file, upload_folder, item_uuid):
@@ -215,12 +309,12 @@ def markdown_to_html(text):
         # Sanitize HTML - allow safe tags
         allowed_tags = [
             'p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-            'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'hr', 'table', 
-            'thead', 'tbody', 'tr', 'th', 'td', 'a', 'img'
+            'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'hr', 'table',
+            'thead', 'tbody', 'tr', 'th', 'td', 'a',
+            # img intentionally excluded — external src allows IP tracking / script injection
         ]
         allowed_attributes = {
             'a': ['href', 'title'],
-            'img': ['src', 'alt', 'title'],
             'code': ['class'],
             'pre': ['class']
         }

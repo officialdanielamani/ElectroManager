@@ -32,7 +32,7 @@ def login():
     signup_enabled = Setting.get('signup_enabled', True)
     demo_mode = current_app.config.get('DEMO_MODE', False)
     demo_username = current_app.config.get('DEMO_ADMIN_USERNAME', 'admin')
-    demo_password = os.getenv('ADMIN_PASSWORD', 'admin123')
+    demo_password = os.getenv('ADMIN_PASSWORD', 'admin123') if demo_mode else None
     
     form = LoginForm()
     if form.validate_on_submit():

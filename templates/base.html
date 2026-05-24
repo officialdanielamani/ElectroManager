@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}Electro Manager{% endblock %}</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('favicon') }}">
 
@@ -300,5 +301,25 @@
     </script>
     
     {% block scripts %}{% endblock %}
+
+    <script>
+        // Auto-inject CSRF token into all HTML forms that POST data.
+        // Forms using FlaskForm already have the token via form.hidden_tag(); this covers the rest.
+        (function() {
+            var token = document.querySelector('meta[name="csrf-token"]');
+            if (!token) return;
+            var csrfValue = token.getAttribute('content');
+            document.querySelectorAll('form').forEach(function(form) {
+                var method = (form.getAttribute('method') || 'get').toLowerCase();
+                if (method !== 'post') return;
+                if (form.querySelector('input[name="csrf_token"]')) return;
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'csrf_token';
+                input.value = csrfValue;
+                form.appendChild(input);
+            });
+        })();
+    </script>
 </body>
 </html>
