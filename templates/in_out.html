@@ -282,14 +282,20 @@
                  style="min-width:120px;flex:1 1 120px;"
                  onchange="searchSessions()" title="Due date (lend_end ≤)">
           {% if not can_only_self %}
-          <div class="position-relative" style="min-width:130px;flex:2 1 130px;">
-            <input type="hidden" id="sessFilterContactId">
-            <input type="hidden" id="sessFilterContactType">
-            <input type="text" class="form-control form-control-sm" id="sessFilterContactInput"
-                   placeholder="Contact…" oninput="debounceSessContact()" autocomplete="off">
-            <div id="sessFilterContactDrop" class="border rounded shadow-sm position-absolute"
-                 style="top:100%;left:0;right:0;z-index:200;max-height:160px;overflow-y:auto;
-                        background:var(--bs-body-bg);display:none;font-size:0.82rem;"></div>
+          <div class="d-flex gap-1 align-items-center" style="min-width:130px;flex:2 1 130px;">
+            <div class="position-relative flex-grow-1">
+              <input type="hidden" id="sessFilterContactId">
+              <input type="hidden" id="sessFilterContactType">
+              <input type="text" class="form-control form-control-sm" id="sessFilterContactInput"
+                     placeholder="All contacts…" oninput="debounceSessContact()" autocomplete="off">
+              <div id="sessFilterContactDrop" class="border rounded shadow-sm position-absolute"
+                   style="top:100%;left:0;right:0;z-index:200;max-height:160px;overflow-y:auto;
+                          background:var(--bs-body-bg);display:none;font-size:0.82rem;"></div>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm py-0 px-1 flex-shrink-0" style="font-size:0.75rem;"
+                    title="Filter to my sessions" onclick="selectSessContact('user', _currentUserId, _currentUserLabel)">Me</button>
+            <button class="btn btn-outline-secondary btn-sm py-0 px-1 flex-shrink-0" style="font-size:0.75rem;"
+                    title="Show all sessions" onclick="clearSessContact()">All</button>
           </div>
           {% endif %}
         </div>
@@ -310,8 +316,8 @@
       </div>
       {% if can_view_log %}
       <div class="card-body p-2">
-        <!-- Log filter row: Start | End | Contact — stacks vertically on xs screens -->
-        <div class="d-flex flex-wrap gap-1 mb-2 align-items-center">
+        <!-- Log filter row: Start | End | Contact -->
+        <div class="d-flex flex-wrap gap-1 mb-1 align-items-center">
           <input type="date" class="form-control form-control-sm" id="logFilterStart"
                  style="min-width:120px;flex:1 1 120px;"
                  onchange="loadLog()" title="Log entries on/after this date">
@@ -319,17 +325,43 @@
                  style="min-width:120px;flex:1 1 120px;"
                  onchange="loadLog()" title="Log entries on/before this date">
           {% if not can_only_self %}
-          <div class="position-relative" style="min-width:130px;flex:2 1 130px;">
-            <input type="hidden" id="logFilterContactId">
-            <input type="hidden" id="logFilterContactType">
-            <input type="text" class="form-control form-control-sm" id="logFilterContactInput"
-                   placeholder="Contact…" oninput="debounceLogContact()" autocomplete="off"
-                   title="Filter by borrower">
-            <div id="logFilterContactDrop" class="border rounded shadow-sm position-absolute"
-                 style="top:100%;left:0;right:0;z-index:200;max-height:160px;overflow-y:auto;
-                        background:var(--bs-body-bg);display:none;font-size:0.82rem;"></div>
+          <div class="d-flex gap-1 align-items-center" style="min-width:130px;flex:2 1 130px;">
+            <div class="position-relative flex-grow-1">
+              <input type="hidden" id="logFilterContactId">
+              <input type="hidden" id="logFilterContactType">
+              <input type="text" class="form-control form-control-sm" id="logFilterContactInput"
+                     placeholder="All contacts…" oninput="debounceLogContact()" autocomplete="off"
+                     title="Filter by user (shows all their actions) or contact (shows their sessions)">
+              <div id="logFilterContactDrop" class="border rounded shadow-sm position-absolute"
+                   style="top:100%;left:0;right:0;z-index:200;max-height:160px;overflow-y:auto;
+                          background:var(--bs-body-bg);display:none;font-size:0.82rem;"></div>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm py-0 px-1 flex-shrink-0" style="font-size:0.75rem;"
+                    title="Filter to my actions" onclick="selectLogContact('user', _currentUserId, _currentUserLabel)">Me</button>
+            <button class="btn btn-outline-secondary btn-sm py-0 px-1 flex-shrink-0" style="font-size:0.75rem;"
+                    title="Show all" onclick="clearLogContact()">All</button>
           </div>
           {% endif %}
+        </div>
+        <!-- Operation type checkboxes -->
+        <div class="d-flex flex-wrap gap-2 mb-2 align-items-center" style="font-size:0.78rem;">
+          <span class="text-muted">Show:</span>
+          <div class="form-check form-check-inline mb-0">
+            <input class="form-check-input" type="checkbox" id="logOpLend" checked onchange="loadLog()">
+            <label class="form-check-label" for="logOpLend"><span class="badge bg-primary" style="font-size:0.65rem;">Lend</span></label>
+          </div>
+          <div class="form-check form-check-inline mb-0">
+            <input class="form-check-input" type="checkbox" id="logOpReturn" checked onchange="loadLog()">
+            <label class="form-check-label" for="logOpReturn"><span class="badge bg-success" style="font-size:0.65rem;">Return</span></label>
+          </div>
+          <div class="form-check form-check-inline mb-0">
+            <input class="form-check-input" type="checkbox" id="logOpEdit" checked onchange="loadLog()">
+            <label class="form-check-label" for="logOpEdit"><span class="badge bg-secondary" style="font-size:0.65rem;">Edit</span></label>
+          </div>
+          <div class="form-check form-check-inline mb-0">
+            <input class="form-check-input" type="checkbox" id="logOpDelete" checked onchange="loadLog()">
+            <label class="form-check-label" for="logOpDelete"><span class="badge bg-danger" style="font-size:0.65rem;">Delete</span></label>
+          </div>
         </div>
         <!-- Log results -->
         <div id="logResults" style="max-height:55vh;overflow-y:auto;font-size:0.83rem;">
@@ -1640,14 +1672,23 @@ function clearActionForm() {
 }
 
 function showActionForm(batch) {
-    document.getElementById('formDivider').classList.remove('d-none');
-    var el = document.getElementById('actionForm');
     if (_mode === 'edit_batch') {
-        el.innerHTML = buildEditBatchForm(batch);
-    } else if (_mode === 'return') {
-        el.innerHTML = buildReturnForm(batch);
+        document.getElementById('formDivider').classList.remove('d-none');
+        document.getElementById('actionForm').innerHTML = buildEditBatchForm(batch);
+        return;
+    }
+    /* Lend / Return: use cart-based flow */
+    if (batch.sn_tracking) {
+        if (batch._preselectedSnId) {
+            _tryAddSnToCart(batch, batch._preselectedSnId);
+            showDetailForm();
+        } else {
+            clearActionForm();
+            _showSnPickerForCart(batch);
+        }
     } else {
-        el.innerHTML = buildLendForm(batch);
+        _tryAddNormalToCart(batch);
+        showDetailForm();
     }
 }
 
@@ -1665,269 +1706,6 @@ function _nowStr() {
            'T' + pad(now.getHours()) + ':' + pad(now.getMinutes());
 }
 
-/* ── Lending Form (single-item, non-cart mode) ── */
-function buildLendForm(b) {
-    if (!_canLend) return '<div class="alert alert-warning">No permission to lend.</div>';
-    var html = '<h6 class="mb-3"><i class="bi bi-hand-index-thumb"></i> Lend — ' + _esc(b.display_label) + ' (' + _esc(b.item_name) + ')</h6>';
-
-    if (b.sn_tracking) {
-        var avail = (b.serial_numbers || []).filter(function(sn) { return !sn.is_deleted && !sn.lend_to_id; });
-        if (avail.length === 0) { return html + '<div class="alert alert-info">No available units to lend.</div>'; }
-        html += '<div class="mb-2"><label class="form-label fw-semibold">Select units to lend</label>' +
-            '<div style="max-height:200px;overflow-y:auto;border:1px solid #dee2e6;border-radius:4px;padding:4px;">';
-        avail.forEach(function(sn) {
-            var chkId = 'sn-lend-' + sn.id;
-            var pre = (b._preselectedSnId && b._preselectedSnId === sn.id) ? 'checked' : '';
-            html += '<div class="form-check"><input class="form-check-input sn-lend-chk" type="checkbox" id="' + chkId + '" value="' + sn.id + '" ' + pre + '>' +
-                '<label class="form-check-label small" for="' + chkId + '"><code>' + _esc(sn.isn) + '</code>' + (sn.sn ? ' ' + _esc(sn.sn) : '') + '</label></div>';
-        });
-        html += '</div></div>';
-    } else {
-        html += '<div class="mb-2"><label class="form-label">Qty to Lend</label>' +
-            '<input type="number" class="form-control form-control-sm" id="lendQty" min="1" max="' + b.available_qty + '" value="1"></div>';
-    }
-
-    if (!_canOnlySelf) {
-        html += _buildContactPickerHtml('lend');
-    } else {
-        html += '<div class="alert alert-info py-1 small mb-2"><i class="bi bi-person-check me-1"></i>Lending to yourself only.</div>';
-    }
-
-    var startReq = _lrSettings.lend_start_date_required;
-    var endReq   = _lrSettings.lend_end_date_required;
-    html += '<div class="row g-2 mb-2">' +
-        '<div class="col-md-6"><label class="form-label form-label-sm">Start Date/Time' + _req(startReq) + '</label>' +
-        '<div class="input-group input-group-sm"><button class="btn btn-outline-secondary" type="button" onclick="_setNow(\'lendStart\')" title="Now"><i class="bi bi-clock"></i></button>' +
-        '<input type="datetime-local" class="form-control" id="lendStart"' + (startReq ? ' required' : '') + '></div></div>' +
-        '<div class="col-md-6"><label class="form-label form-label-sm">End / Due Date/Time' + _req(endReq) + '</label>' +
-        '<input type="datetime-local" class="form-control form-control-sm" id="lendEnd"' + (endReq ? ' required' : '') + ((_adv.sessionEnd) ? ' value="' + _esc(_adv.sessionEnd) + '"' : '') + '></div></div>' +
-        '<div class="mb-2"><label class="form-label form-label-sm">Notes</label>' +
-        '<input type="text" class="form-control form-control-sm" id="lendNote" maxlength="128" placeholder="Optional notes"></div>' +
-        '<div class="d-flex gap-2">' +
-        '<button class="btn btn-primary btn-sm" onclick="submitLend(' + b.id + ',' + (b.sn_tracking ? 'true' : 'false') + ')"><i class="bi bi-check-circle-fill"></i> Confirm Lend</button>' +
-        '<button class="btn btn-sm btn-outline-secondary" onclick="clearActionForm()">Cancel</button>' +
-        '</div>';
-    return html;
-}
-
-function _buildContactPickerHtml(prefix) {
-    return '<div class="mb-2"><label class="form-label fw-semibold">Lend To <span class="text-danger">*</span></label>' +
-        '<input type="hidden" id="' + prefix + 'ContactId" value="">' +
-        '<input type="hidden" id="' + prefix + 'ContactType" value="">' +
-        '<div class="border rounded px-2 py-1 d-flex align-items-center justify-content-between" style="cursor:pointer;background:var(--bs-body-bg);min-height:31px;" onclick="toggleLendContactSearch(\'' + prefix + '\')">' +
-        '<span id="' + prefix + 'ContactLabel" class="small text-muted">Click to search contact...</span>' +
-        '<i class="bi bi-x text-danger" id="' + prefix + 'ContactClear" style="display:none;" onclick="event.stopPropagation();clearLendContact(\'' + prefix + '\')"></i>' +
-        '</div>' +
-        '<div id="' + prefix + 'ContactPanel" style="display:none;" class="mt-1">' +
-        '<input type="text" class="form-control form-control-sm" id="' + prefix + 'ContactInput" placeholder="Search by name..." oninput="doLendContactSearchFor(\'' + prefix + '\')">' +
-        '<div id="' + prefix + 'ContactResults" class="border rounded" style="max-height:180px;overflow-y:auto;background:var(--bs-body-bg);"></div>' +
-        '</div></div>';
-}
-
-var _lcTimer = {};
-function toggleLendContactSearch(prefix) {
-    var panel = document.getElementById(prefix + 'ContactPanel');
-    if (!panel) return;
-    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
-    panel.style.display = '';
-    document.getElementById(prefix + 'ContactInput').value = '';
-    document.getElementById(prefix + 'ContactInput').focus();
-    doLendContactSearchFor(prefix);
-}
-function doLendContactSearchFor(prefix) {
-    clearTimeout(_lcTimer[prefix]);
-    _lcTimer[prefix] = setTimeout(function() {
-        var q   = (document.getElementById(prefix + 'ContactInput') || {}).value || '';
-        var el  = document.getElementById(prefix + 'ContactResults');
-        if (!el) return;
-        el.innerHTML = '<div class="text-muted small p-1">Loading...</div>';
-        fetch('/api/contacts/all?q=' + encodeURIComponent(q))
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (!data.length) { el.innerHTML = '<div class="text-muted small p-1">No contacts found.</div>'; return; }
-            var icons  = {user:'bi-person-circle', person:'bi-person', organization:'bi-building', group:'bi-people'};
-            var badges = {user:'bg-primary', person:'bg-secondary', organization:'bg-success', group:'bg-info'};
-            el.innerHTML = data.map(function(c) {
-                var icon  = icons[c.type] || 'bi-person';
-                var badge = badges[c.type] || 'bg-secondary';
-                var lbl   = _esc(c.label || '');
-                var extra = c.extra ? '<small class="text-muted d-block">' + _esc(c.extra) + '</small>' : '';
-                var rawL  = (c.label || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-                return '<div class="d-flex align-items-center gap-2 p-1 border-bottom" style="cursor:pointer;"' +
-                    ' onclick="selectLendContact(\'' + prefix + '\',\'' + c.type + '\',' + c.id + ',\'' + rawL + '\')">' +
-                    '<i class="bi ' + icon + ' text-muted small"></i>' +
-                    '<div class="flex-grow-1"><div class="small">' + lbl + '</div>' + extra + '</div>' +
-                    '<span class="badge ' + badge + '" style="font-size:0.65rem">' + c.type + '</span></div>';
-            }).join('');
-        })
-        .catch(function() { if (el) el.innerHTML = '<div class="text-danger small p-1">Search failed.</div>'; });
-    }, 300);
-}
-function selectLendContact(prefix, type, id, label) {
-    var hidId  = document.getElementById(prefix + 'ContactId');
-    var hidT   = document.getElementById(prefix + 'ContactType');
-    var lbl    = document.getElementById(prefix + 'ContactLabel');
-    var clr    = document.getElementById(prefix + 'ContactClear');
-    if (hidId)  hidId.value  = id;
-    if (hidT)   hidT.value   = type;
-    if (lbl)  { lbl.textContent = label; lbl.className = 'small'; }
-    if (clr)    clr.style.display = '';
-    var panel = document.getElementById(prefix + 'ContactPanel');
-    if (panel) panel.style.display = 'none';
-}
-function clearLendContact(prefix) {
-    var hidId = document.getElementById(prefix + 'ContactId');
-    var hidT  = document.getElementById(prefix + 'ContactType');
-    var lbl   = document.getElementById(prefix + 'ContactLabel');
-    var clr   = document.getElementById(prefix + 'ContactClear');
-    if (hidId)  hidId.value  = '';
-    if (hidT)   hidT.value   = '';
-    if (lbl)  { lbl.textContent = 'Click to search contact...'; lbl.className = 'small text-muted'; }
-    if (clr)    clr.style.display = 'none';
-}
-
-function submitLend(batchId, snTracking) {
-    var payload    = { batch_id: batchId };
-    var startReq   = _lrSettings.lend_start_date_required;
-    var endReq     = _lrSettings.lend_end_date_required;
-    var startVal   = _getVal('lendStart');
-    var endVal     = _getVal('lendEnd');
-    if (!startVal && _adv.startNow) startVal = _nowStr();
-    if (startReq && !startVal) { showToast('Start Date/Time is required.', 'danger'); _playSound('error'); return; }
-    if (endReq && !endVal)     { showToast('End Date/Time is required.', 'danger'); _playSound('error'); return; }
-
-    if (snTracking) {
-        var ids = Array.from(document.querySelectorAll('.sn-lend-chk:checked')).map(function(c){ return parseInt(c.value); });
-        if (ids.length === 0) { showToast('Select at least one unit.', 'warning'); return; }
-        payload.sn_ids = ids;
-        if (!_canOnlySelf) {
-            var cid   = _getVal('lendContactId');
-            var ctype = _getVal('lendContactType');
-            if (!cid) { showToast('Select a contact.', 'danger'); _playSound('error'); return; }
-            payload.lend_to_id   = parseInt(cid);
-            payload.lend_to_type = ctype || 'person';
-        } else {
-            payload.lend_to_id   = _currentUserId;
-            payload.lend_to_type = 'user';
-        }
-        payload.lend_start = startVal;
-        payload.lend_end   = endVal;
-        payload.lend_note  = _getVal('lendNote');
-    } else {
-        var qty = parseInt(_getVal('lendQty')) || 1;
-        var cid2 = null, ctype2 = 'person';
-        if (!_canOnlySelf) {
-            cid2  = _getVal('lendContactId');
-            ctype2 = _getVal('lendContactType') || 'person';
-            if (!cid2) { showToast('Select a contact.', 'danger'); _playSound('error'); return; }
-            cid2 = parseInt(cid2);
-        } else {
-            cid2  = _currentUserId;
-            ctype2 = 'user';
-        }
-        payload.lend_records = [{
-            contact_id: cid2, type: ctype2, qty: qty,
-            start: startVal, end: endVal,
-            lend_note: _getVal('lendNote'),
-        }];
-    }
-    fetch('/in-out/lend', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-        if (d.success) {
-            showToast('Lend recorded successfully.', 'success');
-            _playSound('success');
-            clearActionForm();
-            refreshLog();
-        } else {
-            showToast(d.message || 'Error', 'danger');
-            _playSound('error');
-        }
-    });
-}
-
-/* ── Return Form (single-item, non-cart mode) ── */
-function buildReturnForm(b) {
-    if (!_canLend) return '<div class="alert alert-warning">No permission to process returns.</div>';
-    var html = '<h6 class="mb-3"><i class="bi bi-box-arrow-in-left"></i> Return — ' + _esc(b.display_label) + ' (' + _esc(b.item_name) + ')</h6>';
-    var retReq = _lrSettings.return_date_required;
-
-    if (b.sn_tracking) {
-        var lent = (b.serial_numbers || []).filter(function(sn) { return !sn.is_deleted && sn.lend_to_id; });
-        if (lent.length === 0) { return html + '<div class="alert alert-info">No lent units to return.</div>'; }
-        html += '<div class="mb-2"><label class="form-label fw-semibold">Select units to return</label>' +
-            '<div style="max-height:200px;overflow-y:auto;border:1px solid #dee2e6;border-radius:4px;padding:4px;">';
-        lent.forEach(function(sn) {
-            var chkId = 'sn-ret-' + sn.id;
-            html += '<div class="form-check"><input class="form-check-input sn-return-chk" type="checkbox" id="' + chkId + '" value="' + sn.id + '">' +
-                '<label class="form-check-label small" for="' + chkId + '"><code>' + _esc(sn.isn) + '</code>' +
-                (sn.lend_display ? ' → <em>' + _esc(sn.lend_display) + '</em>' : '') +
-                (sn.lend_end ? ' <span class="text-muted">(due ' + _esc(sn.lend_end.slice(0,10)) + ')</span>' : '') + '</label></div>';
-        });
-        html += '</div></div>';
-    } else {
-        var recs = b.lend_records || [];
-        if (recs.length === 0) { return html + '<div class="alert alert-info">No lending records to return.</div>'; }
-        html += '<div class="mb-2"><label class="form-label fw-semibold">Select lending record(s) to return</label>' +
-            '<div style="max-height:350px;overflow-y:auto;border:1px solid #dee2e6;border-radius:4px;padding:4px;">';
-        recs.forEach(function(r) {
-            var chkId = 'lend-rec-' + r.id;
-            html += '<div class="form-check ps-4 py-2 border-bottom">' +
-                '<input class="form-check-input lend-rec-chk" type="checkbox" id="' + chkId + '" value="' + r.id + '" data-qty="' + (r.qty||1) + '">' +
-                '<label class="form-check-label small" for="' + chkId + '"><strong>' + _esc(r.label||'—') + '</strong>' +
-                ' <span class="badge bg-secondary ms-1">Qty: ' + (r.qty||1) + '</span>' +
-                (r.end ? ' <span class="text-muted">(due ' + _esc(r.end.slice(0,10)) + ')</span>' : '') +
-                '</label></div>';
-        });
-        html += '</div></div>';
-    }
-
-    html += '<div class="mb-2"><label class="form-label form-label-sm">Return Date/Time' + _req(retReq) + (retReq ? '' : ' <span class="text-muted">(leave blank for now)</span>') + '</label>' +
-        '<div class="input-group input-group-sm"><button class="btn btn-outline-secondary" type="button" onclick="_setNow(\'returnDatetime\')" title="Now"><i class="bi bi-clock"></i> Now</button>' +
-        '<input type="datetime-local" class="form-control" id="returnDatetime"' + (retReq ? ' required' : '') + '></div></div>' +
-        '<div class="mb-2"><label class="form-label form-label-sm">Return Notes</label>' +
-        '<input type="text" class="form-control form-control-sm" id="returnNotes" maxlength="128" placeholder="Optional"></div>' +
-        '<div class="d-flex gap-2">' +
-        '<button class="btn btn-warning btn-sm" onclick="submitReturn(' + b.id + ',' + (b.sn_tracking ? 'true' : 'false') + ')"><i class="bi bi-check-circle"></i> Confirm Return</button>' +
-        '<button class="btn btn-sm btn-outline-secondary" onclick="clearActionForm()">Cancel</button>' +
-        '</div>';
-    return html;
-}
-
-function submitReturn(batchId, snTracking) {
-    var retReq = _lrSettings.return_date_required;
-    var retDt  = _getVal('returnDatetime');
-    if (!retDt && _adv.returnNow) retDt = '';  /* server uses now */
-    if (retReq && !retDt) { showToast('Return Date/Time is required.', 'danger'); _playSound('error'); return; }
-    var payload = {
-        batch_id: batchId,
-        return_datetime: retDt,
-        return_notes: _getVal('returnNotes') || '',
-    };
-    if (snTracking) {
-        var ids = Array.from(document.querySelectorAll('.sn-return-chk:checked')).map(function(c){ return parseInt(c.value); });
-        if (!ids.length) { showToast('Select at least one unit.', 'warning'); return; }
-        payload.sn_ids = ids;
-    } else {
-        var rids = Array.from(document.querySelectorAll('.lend-rec-chk:checked')).map(function(c){ return parseInt(c.value); });
-        if (!rids.length) { showToast('Select at least one lending record.', 'warning'); return; }
-        payload.lend_record_ids = rids;
-        payload.return_qty = 0;
-    }
-    fetch('/in-out/return', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-        if (d.success) {
-            showToast(d.on_time ? 'Returned on time.' : 'Returned (LATE).', d.on_time ? 'success' : 'warning');
-            _playSound(d.on_time ? 'success' : 'error');
-            clearActionForm();
-            refreshLog();
-        } else {
-            showToast(d.message || 'Error', 'danger');
-            _playSound('error');
-        }
-    });
-}
 
 /* ════════════════════════════════════════════════════════
    EDIT BATCH FORM
@@ -2329,12 +2107,6 @@ function _sessInitDefaults() {
     };
     _setVal('sessFilterStart', fmt(past));
     _setVal('sessFilterEnd',   fmt(future));
-    /* Default contact to current user for non-self-only users */
-    if (!_canOnlySelf) {
-        _setVal('sessFilterContactId',    String(_currentUserId));
-        _setVal('sessFilterContactType',  'user');
-        _setVal('sessFilterContactInput', _currentUserLabel);
-    }
 }
 
 function searchSessions() {
@@ -2411,6 +2183,7 @@ function _renderSessions(sessions) {
             (s.lend_to_label ? '<span class="fw-semibold">' + _esc(s.lend_to_label) + '</span>' : '') +
             (dateRange ? ' <span class="text-muted">' + _esc(dateRange) + '</span>' : '') +
             '</div>' +
+            (s.is_api ? '<span class="badge bg-warning text-dark flex-shrink-0" style="font-size:0.62rem;" title="Created via external API">API</span>' : '') +
             '<span class="badge bg-secondary flex-shrink-0" style="font-size:0.65rem;">' + (s.item_count || 0) + ' item(s)</span>' +
             '</div>';
     });
@@ -2587,6 +2360,15 @@ function selectSessContact(type, id, label) {
     searchSessions();
 }
 
+function clearSessContact() {
+    _setVal('sessFilterContactId',   '');
+    _setVal('sessFilterContactType', '');
+    _setVal('sessFilterContactInput', '');
+    var drop = document.getElementById('sessFilterContactDrop');
+    if (drop) drop.style.display = 'none';
+    searchSessions();
+}
+
 /* ── Advanced Options contact ── */
 function toggleAdvContactSearch() {
     var panel = document.getElementById('advContactPanel');
@@ -2655,7 +2437,6 @@ function clearAdvContact() {
    LENDING & RETURN LOG PANEL
    ════════════════════════════════════════════════════════ */
 function _logInitDefaults() {
-    /* Default log date range: past 7 days to today */
     var now  = new Date();
     var past = new Date(now.getTime() - 7 * 86400000);
     var fmt  = function(d) {
@@ -2665,14 +2446,6 @@ function _logInitDefaults() {
     };
     _setVal('logFilterStart', fmt(past));
     _setVal('logFilterEnd',   fmt(now));
-    /* Default contact to current user */
-    if (!_canOnlySelf) {
-        _logContactId   = String(_currentUserId);
-        _logContactType = 'user';
-        _setVal('logFilterContactId',    String(_currentUserId));
-        _setVal('logFilterContactType',  'user');
-        _setVal('logFilterContactInput', _currentUserLabel);
-    }
 }
 
 function loadLog() {
@@ -2704,11 +2477,19 @@ function _doLoadLog() {
     var end   = _getVal('logFilterEnd');
     var cid   = _getVal('logFilterContactId') || _logContactId;
     var ctype = _getVal('logFilterContactType') || _logContactType;
-    var url   = '/in-out/logs?page=' + _logPage +
-                '&start_date=' + encodeURIComponent(start) +
-                '&end_date='   + encodeURIComponent(end);
+
+    var ops = [];
+    if (document.getElementById('logOpLend')   && document.getElementById('logOpLend').checked)   ops.push('lend');
+    if (document.getElementById('logOpReturn') && document.getElementById('logOpReturn').checked) ops.push('return');
+    if (document.getElementById('logOpEdit')   && document.getElementById('logOpEdit').checked)   ops.push('edit');
+    if (document.getElementById('logOpDelete') && document.getElementById('logOpDelete').checked) ops.push('delete');
+
+    var url = '/in-out/logs?page=' + _logPage +
+              '&start_date=' + encodeURIComponent(start) +
+              '&end_date='   + encodeURIComponent(end);
     if (cid && ctype) url += '&contact_id=' + encodeURIComponent(cid) +
                               '&contact_type=' + encodeURIComponent(ctype);
+    if (ops.length < 4) url += '&actions=' + encodeURIComponent(ops.join(','));
 
     var el = document.getElementById('logResults');
     if (!el) return;
@@ -2795,6 +2576,17 @@ function selectLogContact(type, id, label) {
     _setVal('logFilterContactId',    id);
     _setVal('logFilterContactType',  type);
     _setVal('logFilterContactInput', label);
+    var drop = document.getElementById('logFilterContactDrop');
+    if (drop) drop.style.display = 'none';
+    loadLog();
+}
+
+function clearLogContact() {
+    _logContactId   = '';
+    _logContactType = '';
+    _setVal('logFilterContactId',   '');
+    _setVal('logFilterContactType', '');
+    _setVal('logFilterContactInput', '');
     var drop = document.getElementById('logFilterContactDrop');
     if (drop) drop.style.display = 'none';
     loadLog();

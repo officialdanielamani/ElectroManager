@@ -8,15 +8,23 @@
         <small class="text-muted">Shared file library — browse, upload, and manage shared files</small>
     </div>
     <div class="d-flex gap-2 align-items-center">
+        <div id="cardSizeSliderWrap" class="d-none d-flex align-items-center gap-1">
+            <i class="bi bi-image text-muted" style="font-size:0.75rem;"></i>
+            <input type="range" id="cardSizeSlider" min="120" max="280" step="10" value="160"
+                   class="form-range" style="width:90px;" title="Card size">
+            <i class="bi bi-image text-muted" style="font-size:1rem;"></i>
+        </div>
         <div class="btn-group btn-group-sm" role="group">
-            <a href="{{ url_for('share.share_files', category=category_filter, view='card') }}"
-               class="btn btn-outline-secondary {% if view_mode == 'card' %}active{% endif %}" title="Card view">
+            <button type="button" id="btnViewCard"
+               class="btn btn-outline-secondary {% if view_mode == 'card' %}active{% endif %}" title="Card view"
+               onclick="setViewMode('card')">
                 <i class="bi bi-grid-3x3-gap"></i>
-            </a>
-            <a href="{{ url_for('share.share_files', category=category_filter, view='list') }}"
-               class="btn btn-outline-secondary {% if view_mode == 'list' %}active{% endif %}" title="List view">
+            </button>
+            <button type="button" id="btnViewList"
+               class="btn btn-outline-secondary {% if view_mode == 'list' %}active{% endif %}" title="List view"
+               onclick="setViewMode('list')">
                 <i class="bi bi-list-ul"></i>
-            </a>
+            </button>
         </div>
         {% if can_add %}
         <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#uploadModal">
@@ -102,10 +110,10 @@
 
 {% elif view_mode == 'card' %}
 <!-- ===== CARD VIEW ===== -->
-<div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3">
+<div id="cardGrid" style="display:grid; gap:1rem; grid-template-columns: repeat(auto-fill, minmax(var(--sf-card-size,160px),1fr));">
     {% for f in files %}
-    <div class="col share-file-card" data-name="{{ f.name|lower }}">
-        <div class="card h-100 shadow-sm" id="card_{{ f.id }}">
+    <div class="share-file-card" data-name="{{ f.name|lower }}" style="position:relative;">
+        <div class="card h-100 shadow-sm" id="card_{{ f.id }}" style="border:1px solid var(--bs-border-color)!important;">
             <!-- Checkbox -->
             <div class="position-absolute top-0 start-0 p-1" style="z-index:1;">
                 <input type="checkbox" class="file-checkbox form-check-input" value="{{ f.id }}"
@@ -478,6 +486,52 @@ function executeBulkDelete(ids) {
         else alert(data.message || 'Error during deletion.');
     })
     .catch(() => alert('Network error. Please try again.'));
+}
+
+// ── View mode persistence ────────────────────────────────────────────────────
+const SF_VIEW_KEY  = 'shareFilesView';
+const SF_SIZE_KEY  = 'shareFilesCardSize';
+const currentView  = '{{ view_mode }}';
+
+function setViewMode(mode) {
+    localStorage.setItem(SF_VIEW_KEY, mode);
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', mode);
+    window.location.href = url.toString();
+}
+
+// On load: if no explicit ?view= in URL, restore from localStorage
+(function () {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('view')) {
+        const saved = localStorage.getItem(SF_VIEW_KEY);
+        if (saved && saved !== currentView) {
+            setViewMode(saved);
+        }
+    } else {
+        // Save whatever the URL says
+        localStorage.setItem(SF_VIEW_KEY, params.get('view'));
+    }
+})();
+
+// ── Card size slider ─────────────────────────────────────────────────────────
+const slider    = document.getElementById('cardSizeSlider');
+const sliderWrap = document.getElementById('cardSizeSliderWrap');
+const cardGrid  = document.getElementById('cardGrid');
+
+function applyCardSize(px) {
+    if (cardGrid) cardGrid.style.setProperty('--sf-card-size', px + 'px');
+}
+
+if (slider && currentView === 'card') {
+    sliderWrap.classList.remove('d-none');
+    const saved = parseInt(localStorage.getItem(SF_SIZE_KEY)) || 160;
+    slider.value = saved;
+    applyCardSize(saved);
+    slider.addEventListener('input', function () {
+        applyCardSize(this.value);
+        localStorage.setItem(SF_SIZE_KEY, this.value);
+    });
 }
 </script>
 {% endblock %}

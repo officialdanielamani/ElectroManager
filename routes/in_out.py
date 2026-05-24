@@ -84,7 +84,7 @@ def in_out():
     can_edit_batch  = current_user.has_permission('lending_return', 'edit_batch')
     can_delete_batch= current_user.has_permission('lending_return', 'delete_batch')
     can_only_self   = (current_user.has_permission('lending_return', 'only_self_lending')
-                       and not current_user.has_permission('lending_return', 'edit_batch'))
+                       and not current_user.has_permission('lending_return', 'edit_lending'))
     scan_enabled    = Setting.get('lr_scan_enabled', False) is True
 
     log_page = request.args.get('log_page', 1, type=int)
@@ -322,7 +322,7 @@ def in_out_sessions_list():
         return jsonify({'sessions': []})
 
     can_only_self = (current_user.has_permission('lending_return', 'only_self_lending')
-                     and not current_user.has_permission('lending_return', 'edit_batch'))
+                     and not current_user.has_permission('lending_return', 'edit_lending'))
 
     start_str  = request.args.get('start_date', '').strip()
     end_str    = request.args.get('end_date',   '').strip()
@@ -344,8 +344,7 @@ def in_out_sessions_list():
         try:
             from datetime import timedelta
             end_dt = datetime.strptime(end_str, '%Y-%m-%d') + timedelta(days=1)
-            q = q.filter(db.or_(LendingSession.lend_end == None,
-                                 LendingSession.lend_end <= end_dt))
+            q = q.filter(LendingSession.lend_start <= end_dt)
         except ValueError:
             pass
 
@@ -372,6 +371,7 @@ def in_out_sessions_list():
             'lend_end':     s.lend_end.strftime('%d/%m/%y')   if s.lend_end   else '',
             'notes':        s.notes or '',
             'item_count':   item_count,
+            'is_api':       bool(s.is_api),
         }
 
     return jsonify({'sessions': [_list_json(s) for s in sessions],
@@ -387,15 +387,32 @@ def in_out_logs_ajax():
         return jsonify({'entries': [], 'has_more': False})
 
     can_only_self = (current_user.has_permission('lending_return', 'only_self_lending')
-                     and not current_user.has_permission('lending_return', 'edit_batch'))
+                     and not current_user.has_permission('lending_return', 'edit_lending'))
 
     start_str    = request.args.get('start_date',   '').strip()
     end_str      = request.args.get('end_date',     '').strip()
     contact_id   = request.args.get('contact_id',   '').strip()
     contact_type = request.args.get('contact_type', '').strip()
+    action_filter = request.args.get('actions',     '').strip()
     page         = request.args.get('page', 1, type=int)
 
-    actions = ['lend', 'return', 'update', 'delete', 'batch_sn_purge', 'lend_update', 'sn_batch_save']
+    _ALL_LOG_ACTIONS = ['lend', 'return', 'update', 'delete', 'batch_sn_purge', 'lend_update', 'sn_batch_save']
+    _ACTION_GROUPS = {
+        'lend':   ['lend', 'lend_update'],
+        'return': ['return'],
+        'edit':   ['update', 'sn_batch_save'],
+        'delete': ['delete', 'batch_sn_purge'],
+    }
+    if action_filter:
+        allowed = set()
+        for g in [x.strip() for x in action_filter.split(',') if x.strip()]:
+            allowed.update(_ACTION_GROUPS.get(g, []))
+        actions = [a for a in _ALL_LOG_ACTIONS if a in allowed]
+        if not actions:
+            return jsonify({'entries': [], 'has_more': False, 'total_pages': 1, 'page': 1})
+    else:
+        actions = _ALL_LOG_ACTIONS
+
     q = (AuditLog.query
          .filter(AuditLog.entity_type.in_(['batch', 'item', 'sn', 'lending_session']))
          .filter(AuditLog.action.in_(actions)))
@@ -420,15 +437,20 @@ def in_out_logs_ajax():
     if contact_id and contact_type:
         try:
             cid = int(contact_id)
-            matching_ids = db.session.query(LendingSession.id).filter_by(
-                lend_to_id=cid, lend_to_type=contact_type
-            ).subquery()
-            q = q.filter(
-                db.and_(
-                    AuditLog.entity_type == 'lending_session',
-                    AuditLog.entity_id.in_(matching_ids)
+            if contact_type == 'user':
+                # Show every log entry performed by this user
+                q = q.filter(AuditLog.user_id == cid)
+            else:
+                # For non-user contacts only session entries are meaningful
+                matching_ids = db.session.query(LendingSession.id).filter_by(
+                    lend_to_id=cid, lend_to_type=contact_type
+                ).subquery()
+                q = q.filter(
+                    db.and_(
+                        AuditLog.entity_type == 'lending_session',
+                        AuditLog.entity_id.in_(matching_ids)
+                    )
                 )
-            )
         except ValueError:
             pass
 
@@ -468,7 +490,7 @@ def in_out_submit_cart():
     now    = datetime.now(timezone.utc)
 
     can_only_self = (current_user.has_permission('lending_return', 'only_self_lending')
-                     and not current_user.has_permission('lending_return', 'edit_batch'))
+                     and not current_user.has_permission('lending_return', 'edit_lending'))
 
     global_notes = (detail.get('notes', '') or '').strip()[:256]
 
@@ -687,7 +709,7 @@ def in_out_lend():
     now        = datetime.now(timezone.utc)
 
     can_only_self = (current_user.has_permission('lending_return', 'only_self_lending')
-                     and not current_user.has_permission('lending_return', 'edit_batch'))
+                     and not current_user.has_permission('lending_return', 'edit_lending'))
 
     if batch.sn_tracking_enabled:
         sn_ids    = data.get('sn_ids', [])

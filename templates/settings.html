@@ -162,6 +162,20 @@
     </div>
     {% endif %}
 
+    <!-- User API -->
+    {% if current_user.has_permission('users_api', 'view') %}
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-plug-fill" style="font-size: 3rem; color: #7c3aed;"></i>
+                <h5 class="card-title mt-3">User API</h5>
+                <p class="card-text small">Personal API key and access scopes</p>
+                <a href="{{ url_for('settings.user_api') }}" class="btn btn-primary">Configure</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Backup & Restore -->
     {% if current_user.has_permission('settings_sections.backup_restore', 'view') %}
     <div class="col-md-6 col-lg-4 mb-3">

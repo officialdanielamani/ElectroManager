@@ -486,6 +486,36 @@
                                     </div>
                                 </div>
 
+                                <!-- Users API -->
+                                <div class="mb-4 p-3 bg-light rounded">
+                                    <h6 class="mb-1"><i class="bi bi-plug-fill text-purple"></i> Users API <code class="text-muted">/settings/user-api</code></h6>
+                                    <small class="text-muted d-block mb-3">Control whether this role can see and use the personal API settings page</small>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="users_api_view"
+                                                       {% if perms.get('users_api', {}).get('view') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">
+                                                    <strong>View API</strong><br>
+                                                    <small class="text-muted">See the User API settings page and current key status</small>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="users_api_run"
+                                                       {% if perms.get('users_api', {}).get('run') %}checked{% endif %}
+                                                       {% if role.is_system_role %}disabled{% endif %}>
+                                                <label class="form-check-label">
+                                                    <strong>Run API</strong><br>
+                                                    <small class="text-muted">Enable/disable their API, generate keys, set scopes, and test</small>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <!-- QR/Barcode Stickers -->
                                 <div class="mb-4 p-3 bg-light rounded">
                                     <h6 class="mb-3"><i class="bi bi-qr-code"></i> QR/Barcode Stickers <code class="text-muted">/settings/qr</code></h6>

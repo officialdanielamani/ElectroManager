@@ -1,7 +1,7 @@
 """
 Settings Routes Blueprint
 """
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file, abort, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file, abort, current_app, session
 from flask_login import login_required, current_user, login_user, logout_user
 from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate, SharedFile
 from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEditForm, AttachmentForm, 
@@ -639,6 +639,21 @@ def settings_system():
                 val = 'true' if key in request.form else 'false'
                 Setting.set(key, val, key)
 
+            # Server API settings
+            api_rate_limit_str = request.form.get('api_rate_limit', '5')
+            try:
+                api_rate_limit_val = int(api_rate_limit_str)
+                if api_rate_limit_val < 1 or api_rate_limit_val > 100:
+                    flash('API rate limit must be between 1 and 100!', 'danger')
+                    return redirect(url_for('settings.settings_system'))
+            except ValueError:
+                flash('Invalid API rate limit value!', 'danger')
+                return redirect(url_for('settings.settings_system'))
+            Setting.set('api_rate_limit', api_rate_limit_val, 'API requests per second limit (1–100)')
+            Setting.set('api_item_search_enabled',   'true' if 'api_item_search_enabled'   in request.form else 'false', 'Enable Item Search & Information API system-wide')
+            Setting.set('api_rack_drawer_enabled',   'true' if 'api_rack_drawer_enabled'   in request.form else 'false', 'Enable Rack & Drawer API system-wide')
+            Setting.set('api_lending_return_enabled','true' if 'api_lending_return_enabled' in request.form else 'false', 'Enable Lending & Return API system-wide')
+
             # Update app config dynamically
             current_app.config['MAX_CONTENT_LENGTH'] = max_file_size * 1024 * 1024
 
@@ -653,6 +668,10 @@ def settings_system():
         return redirect(url_for('settings.settings_system'))
     
     # GET request - load current settings
+    api_rate_limit          = Setting.get('api_rate_limit', '5')
+    api_item_search_enabled  = Setting.get('api_item_search_enabled', False)
+    api_rack_drawer_enabled  = Setting.get('api_rack_drawer_enabled', False)
+    api_lending_return_enabled = Setting.get('api_lending_return_enabled', False)
     signup_enabled = Setting.get('signup_enabled', True)
     currency = Setting.get('currency', '$')
     currency_decimal_places = Setting.get('currency_decimal_places', '2')
@@ -731,6 +750,10 @@ def settings_system():
                           company_country=company_country,
                           signup_enabled=signup_enabled,
                           verinfo_content=verinfo_content,
+                          api_rate_limit=api_rate_limit,
+                          api_item_search_enabled=api_item_search_enabled,
+                          api_rack_drawer_enabled=api_rack_drawer_enabled,
+                          api_lending_return_enabled=api_lending_return_enabled,
                           demo_mode=current_app.config.get('DEMO_MODE', False),
                           project_upload_settings={
                               'picture': {'extensions': Setting.get('project_upload_picture_extensions', 'webp,png,svg,jpeg,jpg'), 'max_size': Setting.get('project_upload_picture_max_size', '10')},
@@ -863,6 +886,78 @@ def scan_share_files():
 
 # ============= FOOTPRINTS =============
 
+
+
+def _generate_api_key(user):
+    """Generate a new hashed API key for *user*.  Returns the plain-text key (shown once)."""
+    import hashlib
+    plain  = 'em_' + secrets.token_urlsafe(32)
+    hashed = hashlib.sha256(plain.encode()).hexdigest()
+    user.api_key_hash   = hashed
+    user.api_key_prefix = plain[:12]   # "em_" + 9 chars for display hint
+    return plain
+
+
+@settings_bp.route('/settings/user-api', endpoint='user_api', methods=['GET', 'POST'])
+@login_required
+def user_api():
+    """User personal API key & scope management."""
+    if not current_user.has_permission('users_api', 'view'):
+        flash('You do not have permission to access API settings.', 'danger')
+        return redirect(url_for('settings.settings'))
+
+    can_run = current_user.has_permission('users_api', 'run')
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+
+        if action == 'toggle_api':
+            if not can_run:
+                flash('You do not have permission to use the API.', 'danger')
+                return redirect(url_for('settings.user_api'))
+            current_user.api_enabled = not current_user.api_enabled
+            if current_user.api_enabled and not current_user.api_key_hash:
+                plain = _generate_api_key(current_user)
+                session['new_api_key'] = plain
+            db.session.commit()
+            log_audit(current_user.id, 'update', 'user', current_user.id,
+                      f'API {"enabled" if current_user.api_enabled else "disabled"}')
+            flash(f'API {"enabled" if current_user.api_enabled else "disabled"} successfully.', 'success')
+
+        elif action == 'revoke_key':
+            if not can_run:
+                flash('You do not have permission to use the API.', 'danger')
+                return redirect(url_for('settings.user_api'))
+            plain = _generate_api_key(current_user)
+            session['new_api_key'] = plain
+            db.session.commit()
+            log_audit(current_user.id, 'update', 'user', current_user.id, 'API key revoked and regenerated')
+            flash('API key revoked — a new key has been generated. Copy it now.', 'success')
+
+        elif action == 'save_scopes':
+            if not can_run:
+                flash('You do not have permission to use the API.', 'danger')
+                return redirect(url_for('settings.user_api'))
+            if Setting.get('api_item_search_enabled', False):
+                current_user.api_item_search = 'api_item_search' in request.form
+            if Setting.get('api_rack_drawer_enabled', False):
+                current_user.api_rack_drawer = 'api_rack_drawer' in request.form
+            if Setting.get('api_lending_return_enabled', False):
+                current_user.api_lending_return = 'api_lending_return' in request.form
+            db.session.commit()
+            log_audit(current_user.id, 'update', 'user', current_user.id, 'API scopes updated')
+            flash('API scope settings saved.', 'success')
+
+        return redirect(url_for('settings.user_api'))
+
+    new_key = session.pop('new_api_key', None)
+    return render_template('settings_user_api.html',
+                           can_run=can_run,
+                           new_key=new_key,
+                           api_rate_limit=Setting.get('api_rate_limit', '5'),
+                           sys_item_search_enabled=Setting.get('api_item_search_enabled', False),
+                           sys_rack_drawer_enabled=Setting.get('api_rack_drawer_enabled', False),
+                           sys_lending_return_enabled=Setting.get('api_lending_return_enabled', False))
 
 
 @settings_bp.route('/settings/magic-parameters')

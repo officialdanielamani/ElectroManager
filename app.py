@@ -26,14 +26,6 @@ class AnonymousUser(AnonymousUserMixin):
         """Anonymous users have no permissions"""
         return False
     
-    def is_admin(self):
-        """Anonymous users are not admins"""
-        return False
-    
-    def is_editor(self):
-        """Anonymous users are not editors"""
-        return False
-    
     @property
     def theme(self):
         """Default theme for anonymous users"""
@@ -278,6 +270,9 @@ def _apply_column_migrations():
         ("projects",             "thumbnail",            "VARCHAR(300)"),
         ("project_bom_items",    "sort_order",           "INTEGER DEFAULT 0"),
         ("users",                "user_uid",             "VARCHAR(6)"),
+        ("lending_sessions",     "is_api",               "BOOLEAN DEFAULT 0"),
+        ("users",                "api_key_hash",         "VARCHAR(64)"),
+        ("users",                "api_key_prefix",       "VARCHAR(16)"),
     ]
     with db.engine.connect() as conn:
         for table, col, col_type in additions:
@@ -306,6 +301,17 @@ def _apply_column_migrations():
                 conn.execute(db.text("UPDATE users SET user_uid = :uid WHERE id = :id"), {"uid": uid, "id": uid_row})
             conn.commit()
             logger.info(f"DB migration: backfilled user_uid for {len(rows)} user(s)")
+
+    # Wipe legacy plain-text API keys — hash-on-store is now the only supported method.
+    # Any existing api_key values are cleared so users must regenerate via the UI.
+    with db.engine.connect() as conn:
+        rows = conn.execute(
+            db.text("SELECT id FROM users WHERE api_key IS NOT NULL AND api_key != ''")
+        ).fetchall()
+        if rows:
+            conn.execute(db.text("UPDATE users SET api_key = NULL WHERE api_key IS NOT NULL"))
+            conn.commit()
+            logger.info(f"DB migration: cleared legacy plain-text api_key for {len(rows)} user(s) — users must regenerate")
 
 with app.app_context():
     db.create_all()          # create any brand-new tables (e.g. lending_sessions)

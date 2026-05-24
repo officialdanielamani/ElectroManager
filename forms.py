@@ -127,9 +127,9 @@ class ItemAddForm(FlaskForm):
         self.footprint_id.choices = [(0, '-- Select Footprint --')] + [(f.id, f.name) for f in Footprint.query.order_by(Footprint.name).all()]
         
         # Apply permission-based field disabling
-        if perms and not perms.get('is_admin'):
+        if perms:
             self._apply_field_permissions(perms)
-    
+
     def _apply_field_permissions(self, perms):
         """Mark fields user doesn't have permission to edit - don't disable to allow data to be sent.
 
@@ -203,9 +203,9 @@ class ItemEditForm(FlaskForm):
         self.footprint_id.choices = [(0, '-- Select Footprint --')] + [(f.id, f.name) for f in Footprint.query.order_by(Footprint.name).all()]
         
         # Apply permission-based field disabling
-        if perms and not perms.get('is_admin'):
+        if perms:
             self._apply_field_permissions(perms)
-    
+
     def _apply_field_permissions(self, perms):
         """Same mapping as ItemAddForm._apply_field_permissions."""
         field_perms = {

@@ -138,7 +138,13 @@ class User(UserMixin, db.Model):
     account_locked_until = db.Column(db.DateTime)
     auto_unlock_enabled = db.Column(db.Boolean, default=True)
     auto_unlock_minutes = db.Column(db.Integer, default=15)
-    
+    api_enabled    = db.Column(db.Boolean, default=False)
+    api_key_hash   = db.Column(db.String(64), nullable=True)   # SHA-256 hex of full key
+    api_key_prefix = db.Column(db.String(16), nullable=True)   # display hint (first chars)
+    api_item_search    = db.Column(db.Boolean, default=False)
+    api_rack_drawer    = db.Column(db.Boolean, default=False)
+    api_lending_return = db.Column(db.Boolean, default=False)
+
     def __init__(self, **kwargs):
         super(User, self).__init__(**kwargs)
         if not self.user_uid:
@@ -153,7 +159,7 @@ class User(UserMixin, db.Model):
     
     def has_permission(self, resource, action):
         return bool(self.user_role and self.user_role.has_permission(resource, action))
-    
+
     def get_table_columns(self):
         try:
             return json.loads(self.table_columns_view)
@@ -880,6 +886,7 @@ class LendingSession(db.Model):
     lend_start = db.Column(db.DateTime, nullable=True)
     lend_end = db.Column(db.DateTime, nullable=True)
     notes = db.Column(db.String(256), nullable=True)
+    is_api = db.Column(db.Boolean, default=False, nullable=False)
 
     creator = db.relationship('User', foreign_keys=[created_by_id])
 
