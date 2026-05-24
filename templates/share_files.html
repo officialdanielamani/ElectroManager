@@ -8,7 +8,7 @@
         <small class="text-muted">Shared file library — browse, upload, and manage shared files</small>
     </div>
     <div class="d-flex gap-2 align-items-center">
-        <div id="cardSizeSliderWrap" class="d-flex align-items-center gap-1" style="display:none!important;">
+        <div id="cardSizeSliderWrap" class="d-none d-flex align-items-center gap-1">
             <i class="bi bi-image text-muted" style="font-size:0.75rem;"></i>
             <input type="range" id="cardSizeSlider" min="120" max="280" step="10" value="160"
                    class="form-range" style="width:90px;" title="Card size">
@@ -110,10 +110,10 @@
 
 {% elif view_mode == 'card' %}
 <!-- ===== CARD VIEW ===== -->
-<div id="cardGrid" class="g-3" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(var(--sf-card-size,160px),1fr));">
+<div id="cardGrid" style="display:grid; gap:1rem; grid-template-columns: repeat(auto-fill, minmax(var(--sf-card-size,160px),1fr));">
     {% for f in files %}
     <div class="share-file-card" data-name="{{ f.name|lower }}" style="position:relative;">
-        <div class="card h-100 shadow-sm" id="card_{{ f.id }}">
+        <div class="card h-100 shadow-sm" id="card_{{ f.id }}" style="border:1px solid var(--bs-border-color)!important;">
             <!-- Checkbox -->
             <div class="position-absolute top-0 start-0 p-1" style="z-index:1;">
                 <input type="checkbox" class="file-checkbox form-check-input" value="{{ f.id }}"
@@ -524,7 +524,7 @@ function applyCardSize(px) {
 }
 
 if (slider && currentView === 'card') {
-    sliderWrap.style.display = '';
+    sliderWrap.classList.remove('d-none');
     const saved = parseInt(localStorage.getItem(SF_SIZE_KEY)) || 160;
     slider.value = saved;
     applyCardSize(saved);
