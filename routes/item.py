@@ -797,47 +797,47 @@ def upload_attachment(item_id):
         return redirect(url_for('item.item_detail', uuid=item.uuid))
     
     files = request.files.getlist('files')
-    
+
     # Get dynamic settings
     max_size_mb = int(Setting.get('max_file_size_mb', '10'))
     max_size_bytes = max_size_mb * 1024 * 1024
     extensions_str = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
-    allowed_extensions = set(ext.strip().lower() for ext in extensions_str.split(',') if ext.strip())
-    
+
     uploaded_count = 0
-    rejected_count = 0
-    
+    errors = []
+
     for file in files:
         if not file or not file.filename:
             continue
-            
+
+        fname = file.filename
+
         # Check file extension
-        if not allowed_file(file.filename):
-            flash(f'❌ File "{file.filename}" rejected: Incompatible file type. Allowed: {extensions_str}', 'danger')
-            rejected_count += 1
+        if not allowed_file(fname):
+            errors.append(f'"{fname}" — incompatible file type. Allowed: {extensions_str}')
             continue
 
         # MIME type validation — detect spoofed files (e.g. an EXE renamed to .jpg)
         from utils import validate_mime_type
-        declared_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+        declared_ext = fname.rsplit('.', 1)[1].lower() if '.' in fname else ''
         mime_ok, mime_reason = validate_mime_type(file, declared_ext)
         if not mime_ok:
-            flash(f'❌ File "{file.filename}" rejected: {mime_reason}', 'danger')
-            rejected_count += 1
+            errors.append(f'"{fname}" — {mime_reason}')
             continue
 
         # Check file size
-        file.seek(0, 2)  # Seek to end
+        file.seek(0, 2)
         file_size = file.tell()
-        file.seek(0)  # Reset to beginning
+        file.seek(0)
 
         if file_size > max_size_bytes:
-            flash(f'❌ File "{file.filename}" rejected: Too large ({format_file_size(file_size)}). Max: {max_size_mb}MB', 'danger')
-            rejected_count += 1
+            errors.append(
+                f'"{fname}" — too large ({format_file_size(file_size)}). Max allowed: {max_size_mb} MB'
+            )
             continue
 
         file_info = save_file(file, current_app.config['UPLOAD_FOLDER'], item.uuid)
-        
+
         if file_info:
             attachment = Attachment(
                 filename=file_info['filename'],
@@ -850,16 +850,20 @@ def upload_attachment(item_id):
             )
             db.session.add(attachment)
             uploaded_count += 1
-    
+
     if uploaded_count > 0:
         db.session.commit()
-        log_audit(current_user.id, 'upload', 'attachment', item.id, f'Uploaded {uploaded_count} file(s) to item: {item.name}')
-        flash(f'✅ {uploaded_count} file(s) uploaded successfully!', 'success')
-    
-    if rejected_count > 0 and uploaded_count == 0:
-        flash(f'⚠️ All {rejected_count} file(s) were rejected. Check file types and sizes above.', 'warning')
-    
-    return redirect(url_for('item.item_detail', uuid=item.uuid))
+        log_audit(current_user.id, 'upload', 'attachment', item.id,
+                  f'Uploaded {uploaded_count} file(s) to item: {item.name}')
+
+    # Return JSON so the JS fetch handler can display real success/error messages
+    # without the flash-consumed-by-redirect silent-failure problem.
+    from flask import jsonify
+    return jsonify({
+        'success': uploaded_count > 0,
+        'uploaded': uploaded_count,
+        'errors': errors,
+    }), 200 if uploaded_count > 0 or not errors else 400
 
 
 

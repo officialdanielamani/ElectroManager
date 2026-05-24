@@ -67,7 +67,11 @@ def validate_mime_type(file_obj, declared_ext: str) -> tuple[bool, str]:
     except Exception:
         return False, 'Could not read file header'
 
-    # Image validation via PIL — catches corrupt and spoofed images.
+    # Image validation via PIL — use open() only, not verify().
+    # verify() is too strict: it fails on progressive JPEGs, PNGs with non-standard
+    # chunk ordering, and other valid-but-unusual images. open() is lazy and only
+    # reads the file header to identify the format, which is sufficient to confirm
+    # the file is a real image and not a disguised non-image.
     image_exts = {'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'tiff', 'tif'}
     if ext in image_exts:
         if not PILLOW_AVAILABLE:
@@ -79,7 +83,9 @@ def validate_mime_type(file_obj, declared_ext: str) -> tuple[bool, str]:
             raw = file_obj.read()
             file_obj.seek(0)
             img = Image.open(io.BytesIO(raw))
-            img.verify()
+            fmt = img.format  # triggers header parsing; raises if not a valid image
+            if not fmt:
+                return False, 'File is not a recognized image format'
             return True, 'ok'
         except Exception as e:
             return False, f'File is not a valid image: {e}'

@@ -1141,18 +1141,22 @@
             method: 'POST',
             body: formData
         })
-            .then(response => {
-                if (response.ok) {
-                    alert('Files uploaded successfully!');
-                    location.reload();
-                } else {
-                    return response.text().then(text => {
-                        alert('Error uploading files: ' + text);
-                    });
+            .then(response => response.json())
+            .then(data => {
+                if (data.errors && data.errors.length > 0) {
+                    let msg = '';
+                    if (data.uploaded > 0) {
+                        msg += data.uploaded + ' file(s) uploaded successfully.\n\n';
+                    }
+                    msg += 'The following file(s) were rejected:\n• ' + data.errors.join('\n• ');
+                    alert(msg);
+                } else if (data.success) {
+                    alert(data.uploaded + ' file(s) uploaded successfully!');
                 }
+                location.reload();
             })
             .catch(error => {
-                alert('Error: ' + error);
+                alert('Upload error: ' + error);
             });
     }
     {% endif %}
