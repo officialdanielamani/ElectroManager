@@ -3,7 +3,7 @@ Inventory Manager Application - Main Entry Point
 """
 from flask import Flask, render_template, request, send_from_directory, jsonify, url_for, abort
 from flask_login import LoginManager, current_user, AnonymousUserMixin, login_required
-from flask_wtf.csrf import CSRFProtect
+from extensions import csrf, limiter
 from config import Config
 from models import db, User, Category, Item, Setting
 from helpers import filesize_filter, jinja_format_amount, markdown_filter
@@ -18,9 +18,9 @@ app.config.from_object(Config)
 # Initialize database
 db.init_app(app)
 
-# Initialize CSRF protection — all POST/PUT/PATCH/DELETE routes require a valid token.
-# API blueprints that use Bearer-token auth are exempted below after blueprint registration.
-csrf = CSRFProtect(app)
+# Initialize shared extensions
+csrf.init_app(app)
+limiter.init_app(app)
 
 
 # Custom Anonymous User with permission methods

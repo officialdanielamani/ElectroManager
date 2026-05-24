@@ -3,8 +3,9 @@ Api Routes Blueprint
 """
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file, abort
 from flask_login import login_required, current_user, login_user, logout_user
+from extensions import limiter
 from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate
-from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEditForm, AttachmentForm, 
+from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEditForm, AttachmentForm,
                    SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm)
 from helpers import is_safe_url, format_currency, is_safe_file_path
 from utils import save_file, log_audit, admin_required, permission_required, item_permission_required, format_file_size, allowed_file
@@ -25,6 +26,7 @@ api_bp = Blueprint('api', __name__)
 
 @api_bp.route('/api/search-item', methods=['POST'])
 @login_required
+@limiter.limit("30 per minute; 5 per second")
 def search_item():
     """API endpoint to search for items in visual storage"""
     data = request.get_json()
