@@ -303,12 +303,13 @@
     {% block scripts %}{% endblock %}
 
     <script>
-        // Auto-inject CSRF token into all HTML forms that POST data.
-        // Forms using FlaskForm already have the token via form.hidden_tag(); this covers the rest.
         (function() {
-            var token = document.querySelector('meta[name="csrf-token"]');
-            if (!token) return;
-            var csrfValue = token.getAttribute('content');
+            var metaToken = document.querySelector('meta[name="csrf-token"]');
+            if (!metaToken) return;
+            var csrfValue = metaToken.getAttribute('content');
+
+            // 1. Auto-inject CSRF hidden field into every POST <form> that doesn't already have one.
+            //    Covers FlaskForm-less forms rendered server-side.
             document.querySelectorAll('form').forEach(function(form) {
                 var method = (form.getAttribute('method') || 'get').toLowerCase();
                 if (method !== 'post') return;
@@ -319,6 +320,28 @@
                 input.value = csrfValue;
                 form.appendChild(input);
             });
+
+            // 2. Intercept all fetch() calls and inject X-CSRFToken on state-changing requests.
+            //    This covers every JS fetch POST/PUT/PATCH/DELETE across all templates.
+            var _origFetch = window.fetch;
+            window.fetch = function(resource, init) {
+                init = init || {};
+                var method = (init.method || 'GET').toUpperCase();
+                if (method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE') {
+                    init.headers = init.headers || {};
+                    // Support plain object headers and Headers instances
+                    if (init.headers instanceof Headers) {
+                        if (!init.headers.has('X-CSRFToken')) {
+                            init.headers.set('X-CSRFToken', csrfValue);
+                        }
+                    } else {
+                        if (!init.headers['X-CSRFToken'] && !init.headers['x-csrftoken']) {
+                            init.headers['X-CSRFToken'] = csrfValue;
+                        }
+                    }
+                }
+                return _origFetch.call(this, resource, init);
+            };
         })();
     </script>
 </body>
