@@ -568,8 +568,8 @@ document.addEventListener('DOMContentLoaded', function() { renderDatasheets(); }
                     <strong><i class="bi bi-clock-history"></i> Created &amp; Updated:</strong>
                     <div class="mt-2">
                         <small class="text-muted">
-                            Created: {{ item.created_at.strftime('%Y-%m-%d %H:%M') }}{% if item.creator %} - by {{ item.creator.username }}{% endif %}<br>
-                            Updated: {{ item.updated_at.strftime('%Y-%m-%d %H:%M') }}{% if item.updater %} - by {{ item.updater.username }}{% endif %}
+                            Created: {{ item.created_at.strftime('%Y-%m-%d %H:%M') if item.created_at else 'N/A' }}{% if item.creator %} - by <a href="{{ url_for('contacts.contacts_settings') }}#user-{{ item.creator.id }}" class="badge bg-secondary text-decoration-none">{{ item.creator.name or item.creator.username }}</a>{% endif %}<br>
+                            Updated: {{ item.updated_at.strftime('%Y-%m-%d %H:%M') if item.updated_at else 'N/A' }}{% if item.updater %} - by <a href="{{ url_for('contacts.contacts_settings') }}#user-{{ item.updater.id }}" class="badge bg-secondary text-decoration-none">{{ item.updater.name or item.updater.username }}</a>{% endif %}
                         </small>
                     </div>
                 </div>

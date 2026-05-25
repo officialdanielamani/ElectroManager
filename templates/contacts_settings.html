@@ -32,7 +32,7 @@
                 {% else %}
                     {% set _upic = '' %}
                 {% endif %}
-                <div class="d-flex align-items-center gap-2 mb-2 p-1 border rounded" style="cursor:pointer;"
+                <div id="user-{{ u.id }}" class="d-flex align-items-center gap-2 mb-2 p-1 border rounded" style="cursor:pointer;"
                      data-bs-toggle="modal" data-bs-target="#userPicModal"
                      data-fullsrc="{{ _upic }}"
                      data-name="{{ u.name }}"
@@ -549,6 +549,18 @@ document.getElementById('userPicModal').addEventListener('show.bs.modal', functi
         infoHtml += '</table>';
     }
     document.getElementById('userPicModalInfo').innerHTML = infoHtml;
+});
+
+// Auto-open user card when navigated from a deep link (e.g. #user-42)
+document.addEventListener('DOMContentLoaded', function() {
+    const hash = window.location.hash;
+    if (hash && hash.startsWith('#user-')) {
+        const el = document.querySelector(hash);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(function() { el.click(); }, 350);
+        }
+    }
 });
 </script>
 {% endblock %}
