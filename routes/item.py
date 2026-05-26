@@ -144,6 +144,12 @@ def items():
     all_racks      = Rack.query.order_by(Rack.name).all()
     all_tags_list  = [{'id': t.id, 'name': t.name, 'color': t.color}
                       for t in Tag.query.order_by(Tag.name).all()]
+    racks_data_bulk = [{'id': r.id, 'name': r.name, 'rows': r.rows, 'cols': r.cols,
+                        'location_id': r.location_id or '',
+                        'unavailable_drawers': r.get_unavailable_drawers(),
+                        'merged_cells': r.get_merged_cells(),
+                        'drawer_info': r.get_drawer_info()}
+                       for r in all_racks]
 
     return render_template('items.html',
                          items=items,
@@ -164,7 +170,8 @@ def items():
                          all_footprints=all_footprints,
                          all_locations=all_locations,
                          all_racks=all_racks,
-                         all_tags_list=all_tags_list)
+                         all_tags_list=all_tags_list,
+                         racks_data_bulk=racks_data_bulk)
 
 # ============= ITEM ROUTES =============
 
