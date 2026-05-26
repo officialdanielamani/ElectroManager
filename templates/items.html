@@ -669,20 +669,20 @@
                         <small class="d-block text-muted" style="font-size: 0.8rem;">Requires Edit Item Info permission</small>
                     </button>
                     {% endif %}
-                    
+
                     <button class="btn btn-danger btn-lg" onclick="promptBulkDelete()" id="bulkDeleteBtn">
                         <i class="bi bi-trash"></i> Bulk Delete
                         <small class="d-block text-muted" style="font-size: 0.8rem;">Delete selected items</small>
                     </button>
-                    
-                    <button class="btn btn-secondary btn-lg" disabled>
+
+                    <button class="btn btn-secondary btn-lg" onclick="openBulkQrPrint()">
                         <i class="bi bi-qr-code"></i> Bulk Print QR
-                        <small class="d-block text-muted" style="font-size: 0.8rem;">Print QR codes for selected items</small>
+                        <small class="d-block text-muted" style="font-size: 0.8rem;">Print QR stickers for selected items</small>
                     </button>
-                </div>
-                
-                <div class="alert alert-info mt-3 mb-0">
-                    <small><i class="bi bi-exclamation-circle"></i> Bulk Edit and Bulk Print QR features are coming soon!</small>
+
+                    <button class="btn btn-info btn-lg" disabled>
+                        <i class="bi bi-layout-split"></i> Compare Items
+                    </button>
                 </div>
             </div>
             <div class="modal-footer">
@@ -1367,6 +1367,17 @@ function beGenerateDrawerGrid(rows, cols, rackId) {
             grid.appendChild(cell);
         }
     }
+}
+
+function openBulkQrPrint() {
+    const checked = document.querySelectorAll('.item-checkbox:checked');
+    if (checked.length === 0) {
+        alert('Please select at least one item to print QR stickers for.');
+        return;
+    }
+    const itemIds = Array.from(checked).map(cb => cb.value).join(',');
+    bootstrap.Modal.getInstance(document.getElementById('bulkOperationModal'))?.hide();
+    window.open('{{ url_for("item.items_bulk_qr_print") }}?item_ids=' + itemIds, '_blank');
 }
 
 function submitBulkEdit() {

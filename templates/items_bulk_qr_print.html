@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Bulk QR Print — {{ stickers|length }} item(s)</title>
+    <style>
+        @page { margin: 8mm; size: A4; }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 12px;
+            color: #333;
+            margin: 0;
+            padding: 12px;
+        }
+
+        /* ── Toolbar (hidden when printing) ── */
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 14px;
+            padding: 8px 12px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+        .toolbar button, .toolbar select, .toolbar label {
+            font-size: 13px;
+        }
+        .toolbar button {
+            padding: 5px 14px;
+            cursor: pointer;
+            border: 1px solid #aaa;
+            border-radius: 4px;
+            background: #fff;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .toolbar button:hover { background: #e0e0e0; }
+        .toolbar button.primary { background: #0d6efd; color: #fff; border-color: #0d6efd; }
+        .toolbar button.primary:hover { background: #0b5ed7; }
+        .toolbar .sep { width: 1px; background: #bbb; align-self: stretch; margin: 0 2px; }
+        .toolbar select { padding: 4px 8px; border: 1px solid #aaa; border-radius: 4px; background: #fff; }
+
+        /* ── Summary bar ── */
+        .summary-bar {
+            font-size: 0.85em;
+            color: #555;
+            margin-bottom: 12px;
+            padding: 6px 10px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+
+        /* ── Sticker grid ── */
+        .sticker-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .sticker-cell {
+            border: 1px dashed #bbb;
+            border-radius: 3px;
+            padding: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .sticker-cell img {
+            display: block;
+            max-width: 100%;
+        }
+
+        .sticker-label {
+            font-size: 0.7em;
+            color: #555;
+            text-align: center;
+            margin-top: 3px;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* ── Print media ── */
+        @media print {
+            body { padding: 0; }
+            .no-print { display: none !important; }
+            .sticker-cell { border-color: transparent; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Toolbar -->
+<div class="toolbar no-print">
+    <button class="primary" onclick="window.print()">&#128438; Print / Save PDF</button>
+    <div class="sep"></div>
+    <label for="templateSelect">Template:</label>
+    <select id="templateSelect" onchange="switchTemplate(this.value)">
+        {% for t in templates %}
+        <option value="{{ t.id }}" {% if t.id == template.id %}selected{% endif %}>{{ t.name }}
+            ({{ t.width_mm }}×{{ t.height_mm }} mm)</option>
+        {% endfor %}
+    </select>
+    <div class="sep"></div>
+    <label for="colsInput">Columns:</label>
+    <input type="number" id="colsInput" min="1" max="20" value="4"
+           style="width:56px; padding:4px 6px; border:1px solid #aaa; border-radius:4px;"
+           oninput="updateLayout()">
+    <div class="sep"></div>
+    <button onclick="window.close()">&#10005; Close</button>
+</div>
+
+<!-- Summary -->
+<div class="summary-bar no-print">
+    <strong>{{ stickers|length }}</strong> sticker(s) &nbsp;|&nbsp;
+    Template: <strong>{{ template.name }}</strong>
+    ({{ template.width_mm }}&times;{{ template.height_mm }} mm)
+</div>
+
+<!-- Sticker grid -->
+<div class="sticker-grid" id="stickerGrid">
+    {% for s in stickers %}
+    <div class="sticker-cell"
+         data-item-name="{{ s.item.name }}"
+         style="width:{{ (template.width_mm * 3.7795)|round|int }}px;">
+        <img src="data:image/svg+xml;charset=utf-8,{{ s.svg | urlencode }}"
+             width="{{ (template.width_mm * 3.7795)|round|int }}"
+             height="{{ (template.height_mm * 3.7795)|round|int }}"
+             alt="{{ s.item.name }}">
+        <div class="sticker-label" title="{{ s.item.name }}">{{ s.item.name }}</div>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+const _itemIds = '{{ item_ids }}';
+
+function switchTemplate(templateId) {
+    window.location.href = '{{ url_for("item.items_bulk_qr_print") }}' +
+        '?item_ids=' + _itemIds + '&template_id=' + templateId;
+}
+
+function updateLayout() {
+    const cols = Math.max(1, parseInt(document.getElementById('colsInput').value) || 4);
+    document.getElementById('stickerGrid').style.gridTemplateColumns =
+        `repeat(${cols}, 1fr)`;
+    document.getElementById('stickerGrid').style.display = 'grid';
+}
+
+// Apply default column layout on load
+document.addEventListener('DOMContentLoaded', updateLayout);
+</script>
+</body>
+</html>

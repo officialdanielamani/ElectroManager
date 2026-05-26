@@ -1648,6 +1648,56 @@ def api_item_sticker_print(uuid, template_id):
 
 
 
+@item_bp.route('/items/bulk-qr-print', endpoint='items_bulk_qr_print')
+@login_required
+def items_bulk_qr_print():
+    """Print QR stickers for multiple selected items."""
+    item_ids_str  = request.args.get('item_ids', '')
+    template_id   = request.args.get('template_id', type=int)
+
+    if not item_ids_str:
+        flash('No items selected.', 'warning')
+        return redirect(url_for('item.items'))
+
+    try:
+        item_ids = [int(i) for i in item_ids_str.split(',') if i.strip()]
+    except ValueError:
+        flash('Invalid item IDs.', 'danger')
+        return redirect(url_for('item.items'))
+
+    items_to_print = Item.query.filter(Item.id.in_(item_ids)).all()
+    if not items_to_print:
+        flash('No items found.', 'warning')
+        return redirect(url_for('item.items'))
+
+    templates = StickerTemplate.query.filter_by(template_type='Items').order_by(StickerTemplate.name).all()
+    if not templates:
+        flash('No QR/Barcode templates found for Items. Please create one in Settings > QR/Barcode.', 'warning')
+        return redirect(url_for('item.items'))
+
+    # Pick requested template or fall back to first available
+    template = None
+    if template_id:
+        template = next((t for t in templates if t.id == template_id), None)
+    if not template:
+        template = templates[0]
+
+    stickers = []
+    for item in items_to_print:
+        data    = get_item_data(item)
+        svg     = render_template_to_svg(template, data)
+        stickers.append({'item': item, 'svg': svg})
+
+    log_audit(current_user.id, 'print', 'item', None,
+              f'Bulk QR print: {len(items_to_print)} items, template "{template.name}"')
+
+    return render_template('items_bulk_qr_print.html',
+                           stickers=stickers,
+                           template=template,
+                           templates=templates,
+                           item_ids=item_ids_str)
+
+
 @item_bp.route('/item/<string:uuid>/qr-sticker')
 @login_required
 def item_qr_sticker(uuid):
