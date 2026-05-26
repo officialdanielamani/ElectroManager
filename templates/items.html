@@ -658,10 +658,17 @@
                 </p>
                 
                 <div class="d-grid gap-2">
-                    <button class="btn btn-warning btn-lg" disabled>
+                    {% if current_user.has_permission('items', 'edit_info') %}
+                    <button class="btn btn-warning btn-lg" onclick="openBulkEditModal()">
                         <i class="bi bi-pencil-square"></i> Bulk Edit
                         <small class="d-block text-muted" style="font-size: 0.8rem;">Edit multiple items at once</small>
                     </button>
+                    {% else %}
+                    <button class="btn btn-warning btn-lg" disabled title="Requires Edit Item Info permission">
+                        <i class="bi bi-pencil-square"></i> Bulk Edit
+                        <small class="d-block text-muted" style="font-size: 0.8rem;">Requires Edit Item Info permission</small>
+                    </button>
+                    {% endif %}
                     
                     <button class="btn btn-danger btn-lg" onclick="promptBulkDelete()" id="bulkDeleteBtn">
                         <i class="bi bi-trash"></i> Bulk Delete
@@ -680,6 +687,152 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Edit Modal -->
+<div class="modal fade" id="bulkEditModal" tabindex="-1" aria-labelledby="bulkEditModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="bulkEditModalLabel">
+                    <i class="bi bi-pencil-square"></i> Bulk Edit — <span id="bulkEditCount">0</span> item(s) selected
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-3">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Leave any field at its default to leave it unchanged.</strong>
+                    Only fields you actively change will be applied to all selected items.
+                </div>
+
+                <!-- Location -->
+                <div class="mb-4">
+                    <label class="form-label fw-semibold"><i class="bi bi-geo-alt"></i> Main Location</label>
+                    <div class="btn-group btn-group-sm w-100 mb-2" role="group">
+                        <input type="radio" class="btn-check" name="be_location_type" id="be_loc_none"  value="no_change" checked>
+                        <label class="btn btn-outline-secondary" for="be_loc_none">No Change</label>
+                        <input type="radio" class="btn-check" name="be_location_type" id="be_loc_gen"   value="general">
+                        <label class="btn btn-outline-primary"   for="be_loc_gen">General Location</label>
+                        <input type="radio" class="btn-check" name="be_location_type" id="be_loc_draw"  value="drawer">
+                        <label class="btn btn-outline-primary"   for="be_loc_draw">Drawer Storage</label>
+                    </div>
+
+                    <div id="be_general_section" style="display:none;">
+                        <select class="form-select form-select-sm" id="be_location_id">
+                            <option value="">— None (clear location) —</option>
+                            {% for loc in all_locations %}
+                            <option value="{{ loc.id }}">{{ loc.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div id="be_drawer_section" style="display:none;">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label form-label-sm">Rack</label>
+                                <select class="form-select form-select-sm" id="be_rack_id" onchange="beFilterDrawersByRack()">
+                                    <option value="">— Select rack —</option>
+                                    {% for rack in all_racks %}
+                                    <option value="{{ rack.id }}"
+                                            data-rows="{{ rack.rows }}"
+                                            data-cols="{{ rack.cols }}">{{ rack.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label form-label-sm">Drawer</label>
+                                <input type="text" class="form-control form-control-sm" id="be_drawer"
+                                       placeholder="e.g. A1" maxlength="50">
+                                <small class="text-muted">Select rack first, then enter drawer ID.</small>
+                            </div>
+                        </div>
+                        <div id="be_drawer_grid_wrap" class="mt-2" style="display:none;">
+                            <div class="p-2 border rounded">
+                                <small class="text-muted d-block mb-1">Click a drawer to select it:</small>
+                                <div style="overflow-x:auto;">
+                                    <div id="be_drawer_grid" style="display:inline-grid; gap:3px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Category -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold"><i class="bi bi-tag"></i> Category</label>
+                    <select class="form-select form-select-sm" id="be_category_id">
+                        <option value="">— No Change —</option>
+                        <option value="0">— None (clear category) —</option>
+                        {% for cat in all_categories %}
+                        <option value="{{ cat.id }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Footprint -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold"><i class="bi bi-vector-pen"></i> Footprint</label>
+                    <select class="form-select form-select-sm" id="be_footprint_id">
+                        <option value="">— No Change —</option>
+                        <option value="0">— None (clear footprint) —</option>
+                        {% for fp in all_footprints %}
+                        <option value="{{ fp.id }}">{{ fp.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Tags -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold"><i class="bi bi-tags"></i> Tags</label>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" id="be_tags_enabled" onchange="beToggleTags()">
+                            <label class="form-check-label" for="be_tags_enabled">Change tags</label>
+                        </div>
+                        <small class="text-muted">(if off, tags will not be changed)</small>
+                    </div>
+                    <div id="be_tags_section" style="display:none;">
+                        <div class="border rounded p-2" style="max-height:160px; overflow-y:auto;">
+                            {% if all_tags_list %}
+                            <div class="d-flex flex-wrap gap-1" id="be_tags_chips">
+                                {% for tag in all_tags_list %}
+                                <div class="be-tag-chip badge d-flex align-items-center gap-1"
+                                     data-id="{{ tag.id }}"
+                                     style="cursor:pointer; background-color:{{ tag.color }}; color:#fff; opacity:0.45; font-size:0.85rem; padding:5px 10px; user-select:none;"
+                                     onclick="beToggleTag(this)">
+                                    {{ tag.name }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <small class="text-muted">No tags defined.</small>
+                            {% endif %}
+                        </div>
+                        <small class="text-muted mt-1 d-block">
+                            Click tags to select. Selected tags will <strong>replace</strong> all existing tags on the chosen items.
+                            Select none to clear all tags.
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Min Quantity -->
+                <div class="mb-1">
+                    <label class="form-label fw-semibold"><i class="bi bi-box"></i> Min Quantity</label>
+                    <input type="number" class="form-control form-control-sm" id="be_min_quantity"
+                           min="0" placeholder="Leave blank to keep unchanged">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="submitBulkEdit()">
+                    <i class="bi bi-check-circle"></i> Apply to Selected Items
+                </button>
             </div>
         </div>
     </div>
@@ -994,6 +1147,176 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('viewCard')?.click();
     }
 });
+
+// ── Bulk Edit ──────────────────────────────────────────────────────────────
+
+function openBulkEditModal() {
+    const checked = document.querySelectorAll('.item-checkbox:checked');
+    if (checked.length === 0) {
+        alert('Please select at least one item to edit.');
+        return;
+    }
+    document.getElementById('bulkEditCount').textContent = checked.length;
+
+    // Reset form
+    document.querySelectorAll('input[name="be_location_type"]').forEach(r => { r.checked = r.value === 'no_change'; });
+    document.getElementById('be_general_section').style.display = 'none';
+    document.getElementById('be_drawer_section').style.display  = 'none';
+    document.getElementById('be_location_id').value  = '';
+    document.getElementById('be_rack_id').value      = '';
+    document.getElementById('be_drawer').value       = '';
+    document.getElementById('be_drawer_grid_wrap').style.display = 'none';
+    document.getElementById('be_drawer_grid').innerHTML = '';
+    document.getElementById('be_category_id').value  = '';
+    document.getElementById('be_footprint_id').value = '';
+    document.getElementById('be_tags_enabled').checked = false;
+    beToggleTags();
+    document.querySelectorAll('.be-tag-chip').forEach(c => beSetTagChip(c, false));
+    document.getElementById('be_min_quantity').value = '';
+
+    // Close bulk operation modal, open edit modal
+    bootstrap.Modal.getInstance(document.getElementById('bulkOperationModal'))?.hide();
+    new bootstrap.Modal(document.getElementById('bulkEditModal')).show();
+}
+
+// Show/hide location sub-sections
+document.querySelectorAll('input[name="be_location_type"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        document.getElementById('be_general_section').style.display =
+            this.value === 'general' ? '' : 'none';
+        document.getElementById('be_drawer_section').style.display  =
+            this.value === 'drawer'  ? '' : 'none';
+    });
+});
+
+// Tag chip toggle
+function beSetTagChip(el, selected) {
+    el.style.opacity = selected ? '1' : '0.45';
+    el.dataset.selected = selected ? '1' : '';
+}
+function beToggleTag(el) {
+    beSetTagChip(el, !el.dataset.selected);
+}
+function beToggleTags() {
+    const on = document.getElementById('be_tags_enabled').checked;
+    document.getElementById('be_tags_section').style.display = on ? '' : 'none';
+}
+
+// Drawer grid builder for bulk edit
+function beFilterDrawersByRack() {
+    const rackSel = document.getElementById('be_rack_id');
+    const opt     = rackSel.options[rackSel.selectedIndex];
+    const gridWrap = document.getElementById('be_drawer_grid_wrap');
+    const grid     = document.getElementById('be_drawer_grid');
+    document.getElementById('be_drawer').value = '';
+
+    if (!rackSel.value) { gridWrap.style.display = 'none'; grid.innerHTML = ''; return; }
+
+    const rows = parseInt(opt.dataset.rows) || 0;
+    const cols = parseInt(opt.dataset.cols) || 0;
+    if (!rows || !cols) { gridWrap.style.display = 'none'; grid.innerHTML = ''; return; }
+
+    grid.style.gridTemplateColumns = `repeat(${cols}, 36px)`;
+    grid.innerHTML = '';
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const label = String.fromCharCode(65 + r) + (c + 1);
+            const cell  = document.createElement('div');
+            cell.textContent = label;
+            cell.title       = label;
+            cell.style.cssText = 'width:36px;height:36px;display:flex;align-items:center;justify-content:center;' +
+                                 'border:1px solid #ccc;border-radius:3px;cursor:pointer;font-size:0.75rem;' +
+                                 'background:#f8f9fa;user-select:none;';
+            cell.addEventListener('click', function() {
+                grid.querySelectorAll('div').forEach(d => { d.style.background = '#f8f9fa'; d.style.color = ''; });
+                this.style.background = '#0d6efd';
+                this.style.color      = '#fff';
+                document.getElementById('be_drawer').value = label;
+            });
+            grid.appendChild(cell);
+        }
+    }
+    gridWrap.style.display = '';
+}
+
+function submitBulkEdit() {
+    const checked = document.querySelectorAll('.item-checkbox:checked');
+    if (checked.length === 0) { alert('No items selected.'); return; }
+    const itemIds = Array.from(checked).map(cb => cb.value);
+
+    const payload = { item_ids: itemIds };
+
+    // Location
+    const locType = document.querySelector('input[name="be_location_type"]:checked')?.value || 'no_change';
+    payload.location_type = locType;
+    if (locType === 'general') {
+        payload.location_id = document.getElementById('be_location_id').value || null;
+    } else if (locType === 'drawer') {
+        const rackId = document.getElementById('be_rack_id').value;
+        const drawer = document.getElementById('be_drawer').value.trim();
+        if (!rackId || !drawer) {
+            alert('Please select a rack and a drawer for Drawer Storage.');
+            return;
+        }
+        payload.rack_id = rackId;
+        payload.drawer  = drawer;
+    }
+
+    // Category ('' = no change)
+    const cat = document.getElementById('be_category_id').value;
+    if (cat !== '') payload.category_id = cat === '0' ? null : cat;
+
+    // Footprint ('' = no change)
+    const fp = document.getElementById('be_footprint_id').value;
+    if (fp !== '') payload.footprint_id = fp === '0' ? null : fp;
+
+    // Tags (only if enabled)
+    if (document.getElementById('be_tags_enabled').checked) {
+        payload.tags = Array.from(document.querySelectorAll('.be-tag-chip[data-selected="1"]'))
+                            .map(c => parseInt(c.dataset.id));
+    }
+
+    // Min quantity
+    const mq = document.getElementById('be_min_quantity').value.trim();
+    if (mq !== '') payload.min_quantity = parseInt(mq);
+
+    // Check at least one change is present (beyond location_type)
+    const hasChange = locType !== 'no_change' ||
+        'category_id' in payload || 'footprint_id' in payload ||
+        'tags' in payload || 'min_quantity' in payload;
+    if (!hasChange) {
+        alert('No changes specified. Please fill in at least one field.');
+        return;
+    }
+
+    const btn = document.querySelector('#bulkEditModal .btn-warning');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving…';
+
+    fetch('{{ url_for("item.bulk_edit_items") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('bulkEditModal'))?.hide();
+            alert(data.message || `Updated ${data.updated_count} item(s) successfully.`);
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        alert('Network error. Please try again.');
+    });
+}
 </script>
 
 <script src="{{ url_for('static', filename='js/table-sorter.js') }}"></script>

@@ -123,21 +123,29 @@ def items():
         )
     
     items = pagination.items
-    
+
     total_items = Item.query.count()
-    
+
     # Calculate stock status based on model methods
     all_items = Item.query.all()
     low_stock_items = sum(1 for item in all_items if item.is_low_stock())
     no_stock_items = sum(1 for item in all_items if item.is_no_stock())
     total_categories = Category.query.count()
-    
+
     # Get user's table columns preference
     user_columns = current_user.get_table_columns()
     currency_symbol = Setting.get('currency', '$')
     currency_decimal_places = int(Setting.get('currency_decimal_places', '2'))
-    
-    return render_template('items.html', 
+
+    # Data for bulk-edit modal
+    all_categories = Category.query.order_by(Category.name).all()
+    all_footprints = Footprint.query.order_by(Footprint.name).all()
+    all_locations  = Location.query.order_by(Location.name).all()
+    all_racks      = Rack.query.order_by(Rack.name).all()
+    all_tags_list  = [{'id': t.id, 'name': t.name, 'color': t.color}
+                      for t in Tag.query.order_by(Tag.name).all()]
+
+    return render_template('items.html',
                          items=items,
                          pagination=pagination,
                          search_form=search_form,
@@ -151,7 +159,12 @@ def items():
                          user_columns=user_columns,
                          per_page=per_page,
                          currency_symbol=currency_symbol,
-                         currency_decimal_places=currency_decimal_places)
+                         currency_decimal_places=currency_decimal_places,
+                         all_categories=all_categories,
+                         all_footprints=all_footprints,
+                         all_locations=all_locations,
+                         all_racks=all_racks,
+                         all_tags_list=all_tags_list)
 
 # ============= ITEM ROUTES =============
 
@@ -777,6 +790,102 @@ def bulk_delete_items():
         db.session.rollback()
         logging.error(f"Error in bulk delete: {e}")
         return jsonify({'success': False, 'message': 'An error occurred during deletion.'}), 500
+
+
+@item_bp.route('/items/bulk-edit', endpoint='bulk_edit_items', methods=['POST'])
+@login_required
+def bulk_edit_items():
+    """Bulk edit selected items — only fields explicitly provided are updated."""
+    if not current_user.has_permission('items', 'edit_info'):
+        return jsonify({'success': False, 'message': 'You do not have permission to edit items.'}), 403
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'message': 'No data provided.'}), 400
+
+    item_ids = data.get('item_ids', [])
+    if not item_ids or not isinstance(item_ids, list):
+        return jsonify({'success': False, 'message': 'No items selected.'}), 400
+
+    try:
+        item_ids = [int(i) for i in item_ids]
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'message': 'Invalid item IDs.'}), 400
+
+    items_to_edit = Item.query.filter(Item.id.in_(item_ids)).all()
+    if not items_to_edit:
+        return jsonify({'success': False, 'message': 'No items found.'}), 404
+
+    # Build the dict of fields to update (only non-skip fields are included)
+    updates = {}
+
+    # ── Location ─────────────────────────────────────────────────────────────
+    location_type = data.get('location_type', 'no_change')
+    if location_type == 'general':
+        loc_id = data.get('location_id')
+        updates['location_id'] = int(loc_id) if loc_id else None
+        updates['rack_id'] = None
+        updates['drawer'] = None
+    elif location_type == 'drawer':
+        rack_id = data.get('rack_id')
+        drawer  = (data.get('drawer') or '').strip()
+        if rack_id and drawer:
+            updates['rack_id']     = int(rack_id)
+            updates['drawer']      = drawer
+            updates['location_id'] = None
+
+    # ── Category ─────────────────────────────────────────────────────────────
+    if 'category_id' in data:
+        cat = data['category_id']
+        if cat not in ('', None):          # '' = "No Change" sentinel
+            updates['category_id'] = int(cat) if cat else None
+
+    # ── Footprint ─────────────────────────────────────────────────────────────
+    if 'footprint_id' in data:
+        fp = data['footprint_id']
+        if fp not in ('', None):
+            updates['footprint_id'] = int(fp) if fp else None
+
+    # ── Tags (null = no change; list = apply, even if empty) ─────────────────
+    if 'tags' in data:
+        tag_list = data['tags']
+        if isinstance(tag_list, list):
+            updates['tags'] = json.dumps(tag_list) if tag_list else None
+
+    # ── Min Quantity ──────────────────────────────────────────────────────────
+    if 'min_quantity' in data:
+        mq = data['min_quantity']
+        if mq is not None and mq != '':
+            try:
+                updates['min_quantity'] = max(0, int(mq))
+            except (ValueError, TypeError):
+                pass
+
+    if not updates:
+        return jsonify({'success': False, 'message': 'No changes specified. Please fill in at least one field.'}), 400
+
+    now = datetime.now(timezone.utc)
+    try:
+        for item in items_to_edit:
+            for field, value in updates.items():
+                setattr(item, field, value)
+            item.updated_by = current_user.id
+            item.updated_at = now
+
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error in bulk edit: {e}")
+        return jsonify({'success': False, 'message': 'Database error during update.'}), 500
+
+    names = ', '.join(i.name for i in items_to_edit[:10])
+    if len(items_to_edit) > 10:
+        names += f' … and {len(items_to_edit) - 10} more'
+    log_audit(current_user.id, 'bulk_edit', 'item', None,
+              f'Bulk edited {len(items_to_edit)} items: {names}')
+
+    return jsonify({'success': True, 'updated_count': len(items_to_edit),
+                    'message': f'Successfully updated {len(items_to_edit)} item(s).'}), 200
 
 
 # ============= ATTACHMENT ROUTES =============
