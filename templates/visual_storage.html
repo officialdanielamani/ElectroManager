@@ -26,6 +26,18 @@
         <div class="card" id="filterCard">
             <div class="card-body py-3">
                 <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-5">
+                        <label class="form-label mb-1 small fw-semibold">Search Item</label>
+                        <div class="input-group">
+                            <input type="text" id="searchInput" class="form-control" placeholder="Name or uuid:XXXXX" onkeydown="handleSearchKeydown(event)">
+                            <button class="btn btn-primary" type="button" onclick="searchItem()">
+                                <i class="bi bi-search"></i> Find
+                            </button>
+                            <button class="btn btn-outline-secondary" type="button" onclick="clearSearch()" title="Clear search">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                    </div>
                     <div class="col-12 col-sm-6 col-md-2">
                         <label class="form-label mb-1 small fw-semibold">Location</label>
                         <select id="locationFilter" class="form-select" onchange="filterByLocation(this.value)">
@@ -43,18 +55,6 @@
                             <option value="{{ r.uuid }}" {% if current_rack_uuid == r.uuid %}selected{% endif %}>{{ r.name }}{% if r.physical_location %} — {{ r.physical_location.name }}{% endif %}</option>
                             {% endfor %}
                         </select>
-                    </div>
-                    <div class="col-12 col-md-5">
-                        <label class="form-label mb-1 small fw-semibold">Search Item</label>
-                        <div class="input-group">
-                            <input type="text" id="searchInput" class="form-control" placeholder="Name or uuid:XXXXX" onkeydown="handleSearchKeydown(event)">
-                            <button class="btn btn-primary" type="button" onclick="searchItem()">
-                                <i class="bi bi-search"></i> Find
-                            </button>
-                            <button class="btn btn-outline-secondary" type="button" onclick="clearSearch()" title="Clear search">
-                                <i class="bi bi-x-lg"></i>
-                            </button>
-                        </div>
                     </div>
                     <div class="col-12 col-md-3 d-flex flex-column gap-1 justify-content-end">
                         <div class="form-check form-switch mb-0">
