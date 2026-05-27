@@ -834,9 +834,11 @@ function _renderBatchCard(b, selected) {
    ════════════════════════════════════════════════════════ */
 function onBatchClick(batchId, preselectedSnId) {
     if (_mode === 'edit_batch') {
+        if (!_canEditBatch) return;
         selectBatch(batchId, preselectedSnId);
         return;
     }
+    if (!_canLend) return;
     fetch('/in-out/batch/' + batchId + '/detail')
     .then(function(r) { return r.json(); })
     .then(function(d) {

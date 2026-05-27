@@ -1594,6 +1594,9 @@ def api_item_sticker_preview(uuid, template_id):
     Generate sticker preview for an item with a specific template
     Returns: SVG image
     """
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'No permission to use QR stickers'}), 403
+
     from models import StickerTemplate
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
@@ -1624,6 +1627,9 @@ def api_item_sticker_print(uuid, template_id):
     Generate printable sticker for an item
     Returns: PDF file download
     """
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        abort(403)
+
     from models import StickerTemplate
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
@@ -1655,6 +1661,9 @@ def items_bulk_qr_sticker():
     if not current_user.has_permission('items', 'view'):
         flash('You do not have permission to view items.', 'danger')
         return redirect(url_for('index'))
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        flash('You do not have permission to use QR stickers.', 'danger')
+        return redirect(url_for('item.items'))
 
     item_ids_str = request.args.get('item_ids', '')
     if not item_ids_str:
@@ -1684,7 +1693,8 @@ def items_bulk_qr_sticker():
 @login_required
 def api_items_bulk_sticker_print(template_id):
     """Generate a multi-page PDF with one sticker per item (Normal mode)."""
-    if not current_user.has_permission('items', 'view'):
+    if not current_user.has_permission('items', 'view') or \
+       not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
         abort(403)
 
     item_ids_str = request.args.get('item_ids', '')
@@ -1717,7 +1727,8 @@ def api_items_bulk_sticker_print(template_id):
 @login_required
 def api_items_bulk_sticker_table_print(template_id):
     """Generate a table-layout PDF with stickers for multiple items."""
-    if not current_user.has_permission('items', 'view'):
+    if not current_user.has_permission('items', 'view') or \
+       not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
         abort(403)
 
     item_ids_str = request.args.get('item_ids', '')
@@ -1766,6 +1777,10 @@ def item_qr_sticker(uuid):
     """
     Page showing QR sticker preview and print options for an item
     """
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        flash('You do not have permission to use QR stickers.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+
     from models import StickerTemplate
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     

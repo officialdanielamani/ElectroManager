@@ -299,6 +299,11 @@ def _session_json(session):
 @in_out_bp.route('/in-out/batch/<int:batch_id>/detail')
 @login_required
 def in_out_batch_detail(batch_id):
+    can_lend      = (current_user.has_permission('lending_return', 'edit_lending')
+                     or current_user.has_permission('lending_return', 'only_self_lending'))
+    can_edit_batch = current_user.has_permission('lending_return', 'edit_batch')
+    if not can_lend and not can_edit_batch:
+        return jsonify({'error': 'No permission'}), 403
     batch = ItemBatch.query.get_or_404(batch_id)
     item  = batch.item
     return jsonify(_batch_json(batch, item))
