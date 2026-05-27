@@ -1299,7 +1299,7 @@ function openDrawer(rackName, drawerId, rackId) {
                 });
                 html += '</tbody></table>';
                 html += '</div>'; // end table-responsive
-                html += '<small class="text-muted"><i class="bi bi-info-circle"></i> <strong>Main</strong> = item\'s main location is this drawer (no batch-level override). Batches show their own quantity.</small>';
+                html += '<small class="text-muted"><i class="bi bi-info-circle"></i> <strong>Main</strong> = assigned here but no batch stock present. Rows with a batch label show actual stock quantity.</small>';
             } else {
                 html += '<div class="alert alert-info">This drawer is empty.</div>';
             }
