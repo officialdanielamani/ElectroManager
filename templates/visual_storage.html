@@ -22,52 +22,48 @@
 <!-- Rack Filter & Search -->
 {% if locations|length > 0 or all_racks|length > 1 %}
 <div class="row mb-3">
-    <div class="col-md-12">
+    <div class="col-12">
         <div class="card" id="filterCard">
-            <div class="card-body">
-                <div class="row g-2 align-items-end flex-wrap">
-                    <div class="col-auto">
-                        <label class="form-label mb-0">Location:</label>
-                        <select id="locationFilter" class="form-select form-select-sm" onchange="filterByLocation(this.value)" style="min-width: 200px;">
+            <div class="card-body py-3">
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <label class="form-label mb-1 small fw-semibold">Location</label>
+                        <select id="locationFilter" class="form-select form-select-sm" onchange="filterByLocation(this.value)">
                             <option value="">All Locations</option>
                             {% for loc in locations %}
                             <option value="{{ loc.uuid }}" {% if current_location_uuid == loc.uuid %}selected{% endif %}>{{ loc.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-auto">
-                        <label class="form-label mb-0">View Rack:</label>
-                        <select id="rackFilter" class="form-select form-select-sm" onchange="filterRack(this.value)" style="min-width: 200px;">
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <label class="form-label mb-1 small fw-semibold">Rack</label>
+                        <select id="rackFilter" class="form-select form-select-sm" onchange="filterRack(this.value)">
                             <option value="">All Racks</option>
                             {% for r in all_racks %}
-                            <option value="{{ r.uuid }}" {% if current_rack_uuid == r.uuid %}selected{% endif %}>{{ r.name }}{% if r.physical_location %} - {{ r.physical_location.name }}{% endif %}</option>
+                            <option value="{{ r.uuid }}" {% if current_rack_uuid == r.uuid %}selected{% endif %}>{{ r.name }}{% if r.physical_location %} — {{ r.physical_location.name }}{% endif %}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-auto">
-                        <label class="form-label mb-0">Search Item:</label>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label mb-1 small fw-semibold">Search Item</label>
                         <div class="input-group input-group-sm">
-                            <input type="text" id="searchInput" class="form-control" placeholder="Name or uuid:XXXXX" style="min-width: 200px;" onkeydown="handleSearchKeydown(event)">
+                            <input type="text" id="searchInput" class="form-control" placeholder="Name or uuid:XXXXX" onkeydown="handleSearchKeydown(event)">
                             <button class="btn btn-primary" type="button" onclick="searchItem()">
                                 <i class="bi bi-search"></i> Find
                             </button>
-                            <button class="btn btn-secondary" type="button" onclick="clearSearch()">
-                                <i class="bi bi-x"></i>
+                            <button class="btn btn-outline-secondary" type="button" onclick="clearSearch()" title="Clear search">
+                                <i class="bi bi-x-lg"></i>
                             </button>
                         </div>
                     </div>
-                    <div class="col-auto d-flex gap-3 align-items-center">
-                        <div class="form-check form-check-inline mb-0">
-                            <input class="form-check-input" type="checkbox" id="exactMatch" value="option1">
-                            <label class="form-check-label" for="exactMatch">
-                                <small>Exact Match</small>
-                            </label>
+                    <div class="col-12 col-md-2 d-flex flex-column gap-1 justify-content-end">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" role="switch" id="exactMatch">
+                            <label class="form-check-label small" for="exactMatch">Exact Match</label>
                         </div>
-                        <div class="form-check form-check-inline mb-0">
-                            <input class="form-check-input" type="checkbox" id="enablePicture">
-                            <label class="form-check-label" for="enablePicture">
-                                <small>Enable Picture</small>
-                            </label>
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" role="switch" id="enablePicture">
+                            <label class="form-check-label small" for="enablePicture">Enable Picture</label>
                         </div>
                     </div>
                 </div>
