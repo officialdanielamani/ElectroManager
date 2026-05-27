@@ -291,7 +291,7 @@ def _session_json(session):
         'lend_end':        session.lend_end.strftime('%Y-%m-%dT%H:%M') if session.lend_end else '',
         'notes':           session.notes or '',
         'created_at':      session.created_at.strftime('%d/%m/%Y %H:%M') if session.created_at else '',
-        'created_by_label': session.creator.username if session.creator else 'Unknown',
+        'created_by_label': (session.creator.name or session.creator.username) if session.creator else 'Unknown',
         'items':           items,
     }
 
