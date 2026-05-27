@@ -487,20 +487,28 @@ void setup() {
     Serial.printf("LED strip: %d LEDs on pin %d\n", NUM_LEDS, LED_PIN);
 #endif
 
-    // Connect WiFi
-    Serial.printf("Connecting to %s", WIFI_SSID);
+    // WiFi
+    Serial.println("\nConnecting to WiFi...");
+    WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
     WiFi.begin(WIFI_SSID, WIFI_PASS);
-    unsigned long t = millis();
-    while (WiFi.status() != WL_CONNECTED) {
-        if (millis() - t > 20000) {
-            Serial.println("\n[ERROR] WiFi timeout. Check SSID/password.");
-            return;
-        }
-        Serial.print(".");
+
+    int timeout = 30;
+    while (WiFi.status() != WL_CONNECTED && timeout > 0) {
         delay(500);
+        Serial.print(".");
+        timeout--;
     }
-    Serial.printf("\nConnected.  IP: %s\n", WiFi.localIP().toString().c_str());
-    Serial.println("Open in browser:  http://" + WiFi.localIP().toString() + "/");
+    Serial.println();
+
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.printf("✓ Connected! IP: %s\n", WiFi.localIP().toString().c_str());
+        Serial.println("Open in browser:  http://" + WiFi.localIP().toString() + "/");
+    } else {
+        Serial.println("✗ WiFi Failed - Starting AP");
+        WiFi.softAP("MyESP32", "12345678");
+        Serial.printf("AP IP: %s\n", WiFi.softAPIP().toString().c_str());
+    }
 
     server.on("/",     HTTP_GET, handleRoot);
     server.on("/find", HTTP_GET, handleFind);

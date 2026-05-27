@@ -47,19 +47,27 @@ void setup() {
     Serial.println("\nElectroManager – Lending Example");
     Serial.println("==================================");
 
-    // Connect WiFi
-    Serial.printf("Connecting to %s", WIFI_SSID);
+    // WiFi
+    Serial.println("\nConnecting to WiFi...");
+    WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
     WiFi.begin(WIFI_SSID, WIFI_PASS);
-    unsigned long t = millis();
-    while (WiFi.status() != WL_CONNECTED) {
-        if (millis() - t > 15000) {
-            Serial.println("\n[ERROR] WiFi timeout. Check SSID/password.");
-            return;
-        }
-        Serial.print(".");
+
+    int timeout = 30;
+    while (WiFi.status() != WL_CONNECTED && timeout > 0) {
         delay(500);
+        Serial.print(".");
+        timeout--;
     }
-    Serial.printf("\nConnected. IP: %s\n", WiFi.localIP().toString().c_str());
+    Serial.println();
+
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.printf("✓ Connected! IP: %s\n", WiFi.localIP().toString().c_str());
+    } else {
+        Serial.println("✗ WiFi Failed - Starting AP");
+        WiFi.softAP("MyESP32", "12345678");
+        Serial.printf("AP IP: %s\n", WiFi.softAPIP().toString().c_str());
+    }
 
     doLend();
 }
