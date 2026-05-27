@@ -186,7 +186,8 @@ static void sendSearchBar(const String& q) {
         "<div class='search-row'>"
         "<input type='text' name='q' placeholder='Arduino, ABC-B01, ISN-0042 …'"
         " value='"));
-    server.sendContent(htmlEsc(q));
+    String safe = htmlEsc(q);
+    if (safe.length()) server.sendContent(safe);  // skip empty: zero-length chunk ends chunked transfer
     server.sendContent(F("' autocomplete='off' autofocus>"
         "<button type='submit'>Find</button>"
         "</div></form></div>"));
