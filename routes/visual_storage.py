@@ -85,9 +85,9 @@ def visual_storage():
 
     rack_data = []
     for rack in racks_for_page:
-        # Items whose main location is this rack (shown without quantity)
+        # Items whose main location is this rack
         items_main = Item.query.filter_by(rack_id=rack.id).all()
-        # Batches that override to this rack (shown with quantity)
+        # Batches that explicitly override to this rack
         batches_here = ItemBatch.query.filter_by(rack_id=rack.id, follow_main_location=False).all()
 
         drawers = {}
@@ -103,6 +103,10 @@ def visual_storage():
                 entry['items'].append(item)
                 if not entry['preview_image']:
                     entry['preview_image'] = _first_image_url(item)
+                # Batches following main location inherit this item's rack/drawer
+                for batch in item.batches:
+                    if batch.follow_main_location:
+                        entry['batches'].append(batch)
 
         for batch in batches_here:
             if batch.drawer:
@@ -184,6 +188,20 @@ def get_drawer_contents(rack_uuid, drawer_id):
             'name': item.name,
             'sku': item.sku or 'N/A',
         })
+        # Batches following main location inherit this item's rack/drawer
+        for batch in item.batches:
+            if batch.follow_main_location:
+                entries.append({
+                    'type': 'batch',
+                    'item_id': item.id,
+                    'item_uuid': item.uuid,
+                    'name': item.name,
+                    'sku': item.sku or 'N/A',
+                    'batch_id': batch.id,
+                    'batch_label': batch.get_display_label(),
+                    'quantity': batch.quantity,
+                    'available': batch.get_available_quantity(),
+                })
     for batch in batches_here:
         item = batch.item
         entries.append({
