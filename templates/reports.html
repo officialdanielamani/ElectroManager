@@ -410,7 +410,7 @@
                 <tbody>
                     {% for log in recent_activity %}
                     <tr>
-                        <td class="small text-muted text-nowrap">{{ log.created_at.strftime('%d/%m/%y %H:%M') }}</td>
+                        <td class="small text-muted text-nowrap">{{ log.timestamp.strftime('%d/%m/%y %H:%M') }}</td>
                         <td class="small text-truncate" style="max-width:100px;">
                             {% if log.user %}{{ log.user.name or log.user.username }}{% else %}—{% endif %}
                         </td>

@@ -129,7 +129,7 @@ def reports():
 
     # ── Recent Activity ────────────────────────────────────────────────────────
     recent_activity = (AuditLog.query
-                       .order_by(AuditLog.created_at.desc())
+                       .order_by(AuditLog.timestamp.desc())
                        .limit(15).all())
 
     return render_template('reports.html', sections=sections, recent_activity=recent_activity)
