@@ -152,9 +152,6 @@
                         <input type="password" class="form-control font-monospace" id="testApiKeyInput"
                                placeholder="Paste your API key — not saved, used only for requests on this page"
                                autocomplete="off" oninput="updateCurl()">
-                        <button class="btn btn-outline-secondary" type="button" onclick="toggleTestKeyVis()" title="Show/hide">
-                            <i class="bi bi-eye" id="testKeyVisIcon"></i>
-                        </button>
                     </div>
                 </div>
 
@@ -488,13 +485,6 @@
     </div>
 </div>
 
-<style>
-/* Suppress browser-native password-reveal button on the test key input */
-#testApiKeyInput::-ms-reveal,
-#testApiKeyInput::-webkit-contacts-auto-fill-button,
-#testApiKeyInput::-webkit-credentials-auto-fill-button { display: none; }
-</style>
-
 <script>
 // ── One-time key copy (shown immediately after generation) ─────────────────────
 function copyNewKey() {
@@ -504,19 +494,6 @@ function copyNewKey() {
         icon.className = 'bi bi-check-lg';
         setTimeout(() => { icon.className = 'bi bi-clipboard'; }, 2000);
     });
-}
-
-// ── Test-panel key show/hide ───────────────────────────────────────────────────
-function toggleTestKeyVis() {
-    const inp  = document.getElementById('testApiKeyInput');
-    const icon = document.getElementById('testKeyVisIcon');
-    if (inp.type === 'password') {
-        inp.type = 'text';
-        icon.className = 'bi bi-eye-slash';
-    } else {
-        inp.type = 'password';
-        icon.className = 'bi bi-eye';
-    }
 }
 
 // Pre-fill test key input from one-time display (if key was just generated)
@@ -565,8 +542,7 @@ function onEndpointChange() {
 
     // Hide dry-run for GET endpoints (not applicable)
     const isGet = (opt.dataset.method || 'GET') === 'GET';
-    document.getElementById('dryRunToggle').closest('.d-flex').style.opacity = isGet ? '0.4' : '';
-    document.getElementById('dryRunToggle').closest('.d-flex').title = isGet ? 'Dry Run does not apply to GET requests' : '';
+    document.getElementById('dryRunToggle').closest('.d-flex').style.display = isGet ? 'none' : '';
 
     updateCurl();
 }
