@@ -87,8 +87,8 @@ def validate_mime_type(file_obj, declared_ext: str) -> tuple[bool, str]:
             if not fmt:
                 return False, 'File is not a recognized image format'
             return True, 'ok'
-        except Exception as e:
-            return False, f'File is not a valid image: {e}'
+        except Exception:
+            return False, 'File is not a valid image'
 
     # Magic-byte check for known binary formats (PDF, etc.)
     if ext in _MAGIC_SIGNATURES:
