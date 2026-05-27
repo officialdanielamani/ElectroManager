@@ -328,16 +328,6 @@ def _apply_column_migrations():
             conn.commit()
             logger.info(f"DB migration: backfilled user_uid for {len(rows)} user(s)")
 
-    # Wipe legacy plain-text API keys — hash-on-store is now the only supported method.
-    # Any existing api_key values are cleared so users must regenerate via the UI.
-    with db.engine.connect() as conn:
-        rows = conn.execute(
-            db.text("SELECT id FROM users WHERE api_key IS NOT NULL AND api_key != ''")
-        ).fetchall()
-        if rows:
-            conn.execute(db.text("UPDATE users SET api_key = NULL WHERE api_key IS NOT NULL"))
-            conn.commit()
-            logger.info(f"DB migration: cleared legacy plain-text api_key for {len(rows)} user(s) — users must regenerate")
 
 with app.app_context():
     db.create_all()          # create any brand-new tables (e.g. lending_sessions)
