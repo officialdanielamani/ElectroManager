@@ -8,7 +8,7 @@ from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemE
                    SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm)
 from helpers import is_safe_url, format_currency, is_safe_file_path
 from utils import save_file, log_audit, admin_required, permission_required, item_permission_required, format_file_size, allowed_file, get_item_edit_permissions
-from qr_utils import get_item_data, render_template_to_svg, generate_single_sticker_pdf
+from qr_utils import get_item_data, render_template_to_svg, generate_single_sticker_pdf, generate_batch_stickers_pdf, generate_table_sticker_pdf
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime, timezone
@@ -1648,13 +1648,15 @@ def api_item_sticker_print(uuid, template_id):
 
 
 
-@item_bp.route('/items/bulk-qr-print', endpoint='items_bulk_qr_print')
+@item_bp.route('/items/bulk-qr-sticker', endpoint='items_bulk_qr_sticker')
 @login_required
-def items_bulk_qr_print():
-    """Print QR stickers for multiple selected items."""
-    item_ids_str  = request.args.get('item_ids', '')
-    template_id   = request.args.get('template_id', type=int)
+def items_bulk_qr_sticker():
+    """Bulk QR sticker page for multiple selected items."""
+    if not current_user.has_permission('items', 'view'):
+        flash('You do not have permission to view items.', 'danger')
+        return redirect(url_for('index'))
 
+    item_ids_str = request.args.get('item_ids', '')
     if not item_ids_str:
         flash('No items selected.', 'warning')
         return redirect(url_for('item.items'))
@@ -1665,37 +1667,97 @@ def items_bulk_qr_print():
         flash('Invalid item IDs.', 'danger')
         return redirect(url_for('item.items'))
 
-    items_to_print = Item.query.filter(Item.id.in_(item_ids)).all()
-    if not items_to_print:
+    items_list = Item.query.filter(Item.id.in_(item_ids)).order_by(Item.name).all()
+    if not items_list:
         flash('No items found.', 'warning')
         return redirect(url_for('item.items'))
 
     templates = StickerTemplate.query.filter_by(template_type='Items').order_by(StickerTemplate.name).all()
-    if not templates:
-        flash('No QR/Barcode templates found for Items. Please create one in Settings > QR/Barcode.', 'warning')
-        return redirect(url_for('item.items'))
 
-    # Pick requested template or fall back to first available
-    template = None
-    if template_id:
-        template = next((t for t in templates if t.id == template_id), None)
-    if not template:
-        template = templates[0]
-
-    stickers = []
-    for item in items_to_print:
-        data    = get_item_data(item)
-        svg     = render_template_to_svg(template, data)
-        stickers.append({'item': item, 'svg': svg})
-
-    log_audit(current_user.id, 'print', 'item', None,
-              f'Bulk QR print: {len(items_to_print)} items, template "{template.name}"')
-
-    return render_template('items_bulk_qr_print.html',
-                           stickers=stickers,
-                           template=template,
+    return render_template('items_bulk_qr_sticker.html',
+                           items=items_list,
                            templates=templates,
                            item_ids=item_ids_str)
+
+
+@item_bp.route('/api/items/bulk-sticker-print/<int:template_id>')
+@login_required
+def api_items_bulk_sticker_print(template_id):
+    """Generate a multi-page PDF with one sticker per item (Normal mode)."""
+    if not current_user.has_permission('items', 'view'):
+        abort(403)
+
+    item_ids_str = request.args.get('item_ids', '')
+    if not item_ids_str:
+        abort(400)
+
+    try:
+        item_ids = [int(i) for i in item_ids_str.split(',') if i.strip()]
+    except ValueError:
+        abort(400)
+
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'Items':
+        abort(400)
+
+    items_list = Item.query.filter(Item.id.in_(item_ids)).order_by(Item.name).all()
+    if not items_list:
+        abort(404)
+
+    output = generate_batch_stickers_pdf(template, items_list, get_item_data)
+
+    log_audit(current_user.id, 'print', 'item', None,
+              f'Bulk sticker print: {len(items_list)} items, template "{template.name}"')
+
+    return send_file(output, mimetype='application/pdf', as_attachment=True,
+                     download_name=f'bulk_stickers_{template.name}.pdf')
+
+
+@item_bp.route('/api/items/bulk-sticker-table-print/<int:template_id>')
+@login_required
+def api_items_bulk_sticker_table_print(template_id):
+    """Generate a table-layout PDF with stickers for multiple items."""
+    if not current_user.has_permission('items', 'view'):
+        abort(403)
+
+    item_ids_str = request.args.get('item_ids', '')
+    if not item_ids_str:
+        abort(400)
+
+    try:
+        item_ids = [int(i) for i in item_ids_str.split(',') if i.strip()]
+    except ValueError:
+        abort(400)
+
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'Items':
+        abort(400)
+
+    items_list = Item.query.filter(Item.id.in_(item_ids)).order_by(Item.name).all()
+    if not items_list:
+        abort(404)
+
+    options = {
+        'paper_w':    request.args.get('paper_w',    210,      type=float),
+        'paper_h':    request.args.get('paper_h',    297,      type=float),
+        'margin_t':   request.args.get('margin_t',   10,       type=float),
+        'margin_b':   request.args.get('margin_b',   10,       type=float),
+        'margin_l':   request.args.get('margin_l',   10,       type=float),
+        'margin_r':   request.args.get('margin_r',   10,       type=float),
+        'spacing_v':  request.args.get('spacing_v',  3,        type=float),
+        'spacing_h':  request.args.get('spacing_h',  3,        type=float),
+        'border':     request.args.get('border', 'false').lower() == 'true',
+        'border_w':   request.args.get('border_w',   0.3,      type=float),
+        'border_color': request.args.get('border_color', '#000000'),
+    }
+
+    output = generate_table_sticker_pdf(template, items_list, get_item_data, options)
+
+    log_audit(current_user.id, 'print', 'item', None,
+              f'Bulk table sticker print: {len(items_list)} items, template "{template.name}"')
+
+    return send_file(output, mimetype='application/pdf', as_attachment=True,
+                     download_name=f'bulk_table_stickers_{template.name}.pdf')
 
 
 @item_bp.route('/item/<string:uuid>/qr-sticker')

@@ -1377,7 +1377,7 @@ function openBulkQrPrint() {
     }
     const itemIds = Array.from(checked).map(cb => cb.value).join(',');
     bootstrap.Modal.getInstance(document.getElementById('bulkOperationModal'))?.hide();
-    window.open('{{ url_for("item.items_bulk_qr_print") }}?item_ids=' + itemIds, '_blank');
+    window.open('{{ url_for("item.items_bulk_qr_sticker") }}?item_ids=' + itemIds, '_blank');
 }
 
 function submitBulkEdit() {

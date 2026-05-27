@@ -1,0 +1,46 @@
+{% extends "_qr_sticker_base.html" %}
+
+{% block sticker_header %}
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h4 class="mb-0"><i class="bi bi-qr-code"></i> Bulk QR/Barcode Stickers</h4>
+        <a href="{{ url_for('item.items') }}" class="btn btn-light btn-sm">
+            <i class="bi bi-arrow-left"></i> Back to Items
+        </a>
+    </div>
+    <div class="card-body">
+        <h6 class="mb-1"><strong>{{ items|length }}</strong> item(s) selected</h6>
+        <small class="text-muted">
+            {% for item in items %}
+                <a href="{{ url_for('item.item_detail', uuid=item.uuid) }}" class="text-decoration-none">{{ item.name }}</a>{% if not loop.last %}, {% endif %}
+            {% endfor %}
+        </small>
+    </div>
+</div>
+{% endblock %}
+
+{% block no_templates_type %}Items{% endblock %}
+
+{% block sticker_init_js %}
+const _pages     = {{ items | map(attribute='uuid') | list | tojson }};
+const _pageNames = {{ items | map(attribute='name') | list | tojson }};
+const _itemIds   = {{ item_ids | tojson }};
+
+/* Single-page fallback (1-item selection) */
+const _previewUrl  = id => `/api/item/${_pages[0]}/sticker-preview/${id}`;
+const _printUrl    = id => `/api/item/${_pages[0]}/sticker-print/${id}`;
+const _entityLabel = ()  => `Item: ${_pageNames[0]}`;
+
+/* Multi-page (2+ items) */
+const _pagePreviewUrl    = (id, i) => `/api/item/${_pages[i]}/sticker-preview/${id}`;
+const _pagePrintUrl      = id      => `/api/items/bulk-sticker-print/${id}?item_ids=${encodeURIComponent(_itemIds)}`;
+const _pageTablePrintUrl = (id, opts) => {
+    const p = new URLSearchParams(Object.assign({item_ids: _itemIds}, opts));
+    return `/api/items/bulk-sticker-table-print/${id}?${p.toString()}`;
+};
+const _pageFilename = (ext, i) => `${_pageNames[i].replace(/[^a-zA-Z0-9_-]/g, '_')}_${_pages[i]}.${ext}`;
+const _pageLabel    = i => `Item ${i + 1}/${_pages.length}: ${_pageNames[i]}`;
+const _downloadName = ext => _pages.length === 1
+    ? `${_pageNames[0].replace(/[^a-zA-Z0-9_-]/g, '_')}_${_pages[0]}.${ext}`
+    : `bulk_qr_stickers.${ext}`;
+{% endblock %}
