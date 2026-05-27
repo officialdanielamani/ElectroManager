@@ -4,8 +4,9 @@ User Role Routes Blueprint
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file, abort, current_app
 from flask_login import login_required, current_user, login_user, logout_user
 from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate, SharedFile, Role
-from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEditForm, AttachmentForm, 
-                   SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm)
+from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEditForm, AttachmentForm,
+                   SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm,
+                   RoleForm)
 from helpers import is_safe_url, format_currency, is_safe_file_path
 from utils import save_file, log_audit, admin_required, permission_required, item_permission_required, format_file_size, allowed_file
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -31,7 +32,6 @@ def users():
         flash('You do not have permission to view users.', 'danger')
         return redirect(url_for('settings.settings'))
     
-    from models import Role
     users = User.query.order_by(User.username).all()
     roles = Role.query.order_by(Role.name).all()
 
@@ -422,8 +422,6 @@ def roles():
 @login_required
 @permission_required("settings_sections.users_roles", "roles_create")
 def role_new():
-    from models import Role
-    from forms import RoleForm
     form = RoleForm()
     
     if form.validate_on_submit():
@@ -496,8 +494,6 @@ def role_new():
 @login_required
 @permission_required("settings_sections.users_roles", "roles_edit")
 def role_edit(id):
-    from models import Role
-    from forms import RoleForm
     role = Role.query.get_or_404(id)
     
     form = RoleForm(obj=role)
@@ -665,7 +661,6 @@ def role_edit(id):
 @login_required
 @permission_required("settings_sections.users_roles", "roles_delete")
 def role_delete(id):
-    from models import Role
     role = Role.query.get_or_404(id)
     
     # Prevent deleting system roles
@@ -692,7 +687,6 @@ def role_delete(id):
 @login_required
 @permission_required("settings_sections.users_roles", "roles_create")
 def role_clone(id):
-    from models import Role
     source_role = Role.query.get_or_404(id)
     
     # Generate unique name for cloned role
