@@ -797,7 +797,7 @@ class BatchSerialNumber(db.Model):
         try:
             if self.lend_to_type == 'user':
                 obj = User.query.get(self.lend_to_id)
-                return obj.username if obj else f'User #{self.lend_to_id}'
+                return (obj.name or obj.username) if obj else f'User #{self.lend_to_id}'
             elif self.lend_to_type == 'person':
                 obj = ContactPerson.query.get(self.lend_to_id)
                 return obj.name if obj else f'Person #{self.lend_to_id}'
@@ -843,7 +843,7 @@ class BatchLendRecord(db.Model):
         try:
             if self.lend_to_type == 'user':
                 obj = User.query.get(self.lend_to_id)
-                return obj.username if obj else f'User #{self.lend_to_id}'
+                return (obj.name or obj.username) if obj else f'User #{self.lend_to_id}'
             elif self.lend_to_type == 'person':
                 obj = ContactPerson.query.get(self.lend_to_id)
                 return obj.name if obj else f'Person #{self.lend_to_id}'
@@ -896,7 +896,7 @@ class LendingSession(db.Model):
         try:
             if self.lend_to_type == 'user':
                 obj = User.query.get(self.lend_to_id)
-                return obj.username if obj else f'User #{self.lend_to_id}'
+                return (obj.name or obj.username) if obj else f'User #{self.lend_to_id}'
             elif self.lend_to_type == 'person':
                 obj = ContactPerson.query.get(self.lend_to_id)
                 return obj.name if obj else f'Person #{self.lend_to_id}'
