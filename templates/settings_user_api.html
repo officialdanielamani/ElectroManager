@@ -439,6 +439,9 @@
                 <h6><i class="bi bi-toggles text-warning"></i> Scopes</h6>
                 <p>Scopes are additive — enable only what you need. Each scope is also subject to your role's underlying permissions and the admin's server-wide toggle.</p>
 
+                <h6><i class="bi bi-globe text-info"></i> CORS</h6>
+                <p>All <code>/api/v1/</code> endpoints include <code>Access-Control-Allow-Origin: *</code> headers. Browser clients on a different origin — such as a page served by an ESP32 — can call the API directly without a proxy.</p>
+
                 <h6><i class="bi bi-speedometer2 text-danger"></i> Rate Limit</h6>
                 <p>Current limit: <strong>{{ api_rate_limit }} req / sec</strong>. Requests over the limit receive HTTP <code>429 Too Many Requests</code>.</p>
 
@@ -484,6 +487,13 @@
 
     </div>
 </div>
+
+<style>
+/* Suppress browser-native password-reveal button on the test key input */
+#testApiKeyInput::-ms-reveal,
+#testApiKeyInput::-webkit-contacts-auto-fill-button,
+#testApiKeyInput::-webkit-credentials-auto-fill-button { display: none; }
+</style>
 
 <script>
 // ── One-time key copy (shown immediately after generation) ─────────────────────
