@@ -1527,8 +1527,8 @@ def items_print():
     currency_decimal_places = int(Setting.get('currency_decimal_places', '2'))
     
     # Get current datetime for footer
-    from datetime import datetime
-    current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    from datetime import datetime, timezone
+    current_datetime = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
     
     return render_template('items_print.html', 
                          items=items,
@@ -1558,8 +1558,8 @@ def item_detail_print(uuid):
     currency_decimal_places = int(Setting.get('currency_decimal_places', '2'))
     
     # Get current datetime for footer
-    from datetime import datetime
-    current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    from datetime import datetime, timezone
+    current_datetime = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
     
     # Parse datasheets
     datasheets = []

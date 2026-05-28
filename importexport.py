@@ -6,7 +6,7 @@ and Contacts (Persons, Organizations, Groups).
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from models import (
     db, MagicParameter, ParameterTemplate, TemplateParameter,
     ParameterUnit, ParameterStringOption, ItemParameter,
@@ -195,7 +195,7 @@ class DataExporter:
         magic_parameters dict keys: number, string, date, template (booleans).
         """
         export_data = {
-            'export_date': datetime.now().isoformat(),
+            'export_date': datetime.now(timezone.utc).isoformat(),
             'include_item_values': include_item_values,
         }
 

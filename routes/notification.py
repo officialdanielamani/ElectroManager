@@ -37,7 +37,7 @@ def notifications():
     can_edit = current_user.has_permission('pages.notifications', 'edit')
 
     notifications = []
-    today = datetime.now().date()
+    today = datetime.now(timezone.utc).date()
 
     # --- Parameter-based date notifications ---
     params = ItemParameter.query.join(ItemParameter.parameter).filter(

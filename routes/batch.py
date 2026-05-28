@@ -784,7 +784,7 @@ def delete_selected_sn(uuid):
     if not batch or batch.item_id != item.id:
         return jsonify({'success': False, 'message': 'Invalid batch'}), 400
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     deleted = 0
     for sn_id in sn_ids:
         sn = BatchSerialNumber.query.get(sn_id)
@@ -876,7 +876,7 @@ def save_sn_pending(uuid, batch_id):
 
     can_qty  = current_user.has_permission('lending_return', 'edit_batch')
     can_lend = current_user.has_permission('lending_return', 'edit_lending')
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     # ── Adds ──
     added = 0

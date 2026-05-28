@@ -4,7 +4,7 @@ Print Routes Blueprint
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 from models import db, Item, Setting
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import logging
 
@@ -112,7 +112,7 @@ def items_print():
     currency_decimal_places = int(Setting.get('currency_decimal_places', '2'))
     
     # Get current datetime for footer
-    current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    current_datetime = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
     
     return render_template('items_print.html',
                          pagination=pagination,
@@ -138,7 +138,7 @@ def item_detail_print(uuid):
     currency_decimal_places = int(Setting.get('currency_decimal_places', '2'))
     
     # Get current datetime for footer
-    current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    current_datetime = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
     
     # Parse datasheets
     datasheets = []

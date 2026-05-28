@@ -139,7 +139,7 @@ def export_selective():
         export_data = DataExporter.export_selective(selections, include_item_values)
 
         response = current_app.make_response(json.dumps(export_data, indent=2))
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         response.headers['Content-Disposition'] = f'attachment; filename=config_export_{timestamp}.json'
         response.headers['Content-Type'] = 'application/json'
         return response
