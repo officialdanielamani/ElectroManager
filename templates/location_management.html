@@ -203,15 +203,16 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title"><i class="bi bi-trash"></i> Confirm Bulk Delete</h5>
+                <h5 class="modal-title"><i class="bi bi-shield-lock"></i> Confirm Your Password</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p class="mb-3">
+                <p class="mb-2">
                     <i class="bi bi-exclamation-triangle text-warning"></i>
-                    You are about to delete <strong id="bulkDeleteCount">0</strong> <span id="bulkDeleteType">item(s)</span>. Enter your password to confirm.
+                    You are about to delete <strong id="bulkDeleteCount">0</strong> <span id="bulkDeleteType">item(s)</span>. Please enter your password to confirm.
                 </p>
-                <div id="bulkDeleteSkipWarning" class="alert alert-warning small d-none">
+                <p class="mb-2 small text-danger fw-semibold" id="bulkDeleteAttemptsLeft"></p>
+                <div id="bulkDeleteInfoMsg" class="alert alert-warning small d-none mb-2">
                     <i class="bi bi-info-circle"></i> <span id="bulkDeleteSkipMsg"></span>
                 </div>
                 <div class="mb-3">
@@ -220,6 +221,10 @@
                            oninput="this.classList.remove('is-invalid'); document.getElementById('bulkDeleteError').style.display='none';">
                     <div class="invalid-feedback" id="bulkDeleteError" style="display:none;">Incorrect password. Please try again.</div>
                 </div>
+                <div class="mb-2">
+                    <div class="fw-semibold small mb-1">To be deleted:</div>
+                    <ul class="list-group list-group-flush small" id="bulkDeleteItemList" style="max-height:180px;overflow-y:auto;border:1px solid var(--bs-border-color);border-radius:6px;"></ul>
+                </div>
                 <div class="alert alert-danger mb-0 small">
                     <i class="bi bi-info-circle"></i> This action cannot be undone!
                 </div>
@@ -227,7 +232,7 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-danger" id="bulkDeleteConfirmBtn" onclick="confirmBulkDelete()">
-                    <i class="bi bi-trash"></i> Verify &amp; Delete
+                    <i class="bi bi-trash"></i> Verify &amp; Continue
                 </button>
             </div>
         </div>
@@ -235,7 +240,9 @@
 </div>
 
 <script>
-let _bulkDeleteEntityType = ''; // 'location' or 'rack'
+let _bulkDeleteEntityType = '';
+let _bulkDeleteAttempts = 0;
+const _BULK_DELETE_MAX_ATTEMPTS = 3;
 
 function showImageModal(imageSrc, name) {
     document.getElementById('modalImage').src = imageSrc;
@@ -246,6 +253,14 @@ function showImageModal(imageSrc, name) {
 function _getSelectedUUIDs(type) {
     const cls = type === 'location' ? '.loc-checkbox' : '.rack-checkbox';
     return Array.from(document.querySelectorAll(cls + ':checked')).map(cb => cb.value);
+}
+
+function _getSelectedNames(type) {
+    const cls = type === 'location' ? '.loc-checkbox' : '.rack-checkbox';
+    return Array.from(document.querySelectorAll(cls + ':checked')).map(cb => {
+        const card = cb.closest('.card-body');
+        return card ? (card.querySelector('.badge')?.textContent?.trim() || cb.value) : cb.value;
+    });
 }
 
 function printSelectedQR(type) {
@@ -269,16 +284,36 @@ function promptBulkDelete(type) {
         return;
     }
     _bulkDeleteEntityType = type;
+    _bulkDeleteAttempts = 0;
+
     const label = type === 'location' ? 'location(s)' : 'rack(s)';
     document.getElementById('bulkDeleteCount').textContent = uuids.length;
     document.getElementById('bulkDeleteType').textContent = label;
-    const skipMsg = type === 'location'
+    document.getElementById('bulkDeleteAttemptsLeft').textContent = `Attempts left: ${_BULK_DELETE_MAX_ATTEMPTS}`;
+
+    const infoMsg = type === 'location'
         ? 'Any items and batches assigned to the selected location(s) will have their location cleared. Racks linked to the location will also be unlinked.'
         : 'Any items and batches stored in the selected rack(s) will have their rack assignment cleared.';
-    document.getElementById('bulkDeleteSkipMsg').textContent = skipMsg;
-    document.getElementById('bulkDeleteSkipWarning').classList.remove('d-none');
+    document.getElementById('bulkDeleteSkipMsg').textContent = infoMsg;
+    document.getElementById('bulkDeleteInfoMsg').classList.remove('d-none');
+
+    // Build name list
+    const names = _getSelectedNames(type);
+    const icon = type === 'location' ? 'bi-geo-alt' : 'bi-grid-3x3';
+    const listEl = document.getElementById('bulkDeleteItemList');
+    listEl.innerHTML = '';
+    names.forEach(name => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item py-1 px-2';
+        li.innerHTML = `<i class="bi ${icon} text-muted me-1"></i>${name}`;
+        listEl.appendChild(li);
+    });
+
     document.getElementById('bulkDeletePassword').value = '';
     document.getElementById('bulkDeletePassword').classList.remove('is-invalid');
+    document.getElementById('bulkDeletePassword').disabled = false;
+    document.getElementById('bulkDeleteError').style.display = 'none';
+    document.getElementById('bulkDeleteConfirmBtn').disabled = false;
     new bootstrap.Modal(document.getElementById('bulkDeleteModal')).show();
 }
 
@@ -295,37 +330,45 @@ function confirmBulkDelete() {
     fetch('{{ url_for("auth.verify_password") }}', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({password: password})
+        body: JSON.stringify({password})
     })
     .then(r => r.json())
     .then(data => {
-        btn.disabled = false;
         btn.innerHTML = orig;
-        if (!data.success) {
+        if (data.success) {
+            btn.disabled = true;
+            bootstrap.Modal.getInstance(document.getElementById('bulkDeleteModal')).hide();
+            const endpoint = _bulkDeleteEntityType === 'location'
+                ? '{{ url_for("location_rack.bulk_delete_locations") }}'
+                : '{{ url_for("location_rack.bulk_delete_racks") }}';
+            fetch(endpoint, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({uuids})
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) { alert(res.message); location.reload(); }
+                else alert('Error: ' + (res.message || 'Delete failed'));
+            })
+            .catch(err => alert('Error: ' + err));
+        } else {
+            _bulkDeleteAttempts++;
+            const left = _BULK_DELETE_MAX_ATTEMPTS - _bulkDeleteAttempts;
             document.getElementById('bulkDeletePassword').classList.add('is-invalid');
+            document.getElementById('bulkDeleteError').textContent = 'Incorrect password. Please try again.';
             document.getElementById('bulkDeleteError').style.display = 'block';
-            return;
-        }
-        // Password OK — proceed with bulk delete
-        const endpoint = _bulkDeleteEntityType === 'location'
-            ? '{{ url_for("location_rack.bulk_delete_locations") }}'
-            : '{{ url_for("location_rack.bulk_delete_racks") }}';
-        bootstrap.Modal.getInstance(document.getElementById('bulkDeleteModal')).hide();
-        fetch(endpoint, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({uuids: uuids})
-        })
-        .then(r => r.json())
-        .then(res => {
-            if (res.success) {
-                alert(res.message);
-                location.reload();
+            document.getElementById('bulkDeleteAttemptsLeft').textContent = `Attempts left: ${left}`;
+            document.getElementById('bulkDeletePassword').value = '';
+            if (_bulkDeleteAttempts >= _BULK_DELETE_MAX_ATTEMPTS) {
+                btn.disabled = true;
+                document.getElementById('bulkDeletePassword').disabled = true;
+                document.getElementById('bulkDeleteError').textContent = 'Too many failed attempts. You will be logged out.';
+                setTimeout(() => { window.location.href = '{{ url_for("auth.logout") }}'; }, 2000);
             } else {
-                alert('Error: ' + (res.message || 'Delete failed'));
+                btn.disabled = false;
             }
-        })
-        .catch(err => alert('Error: ' + err));
+        }
     })
     .catch(err => {
         btn.disabled = false;

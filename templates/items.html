@@ -458,11 +458,6 @@
                                     {% if current_user.has_permission('items', 'edit_info') or current_user.has_permission('lending_return', 'edit_batch') or current_user.has_permission('lending_return', 'edit_lending') or current_user.has_permission('items', 'edit_advance') %}
                                     <a href="{{ url_for('item.item_edit', uuid=item.uuid) }}" class="btn btn-sm btn-warning" title="Edit"><i class="bi bi-pencil"></i></a>
                                     {% endif %}
-                                    {% if current_user.has_permission('items', 'delete') %}
-                                    <form method="POST" action="{{ url_for('item.item_delete', uuid=item.uuid) }}" style="display:contents">
-                                        <button type="submit" class="btn btn-sm btn-danger" title="Delete" onclick="return confirm('Delete this item?')"><i class="bi bi-trash"></i></button>
-                                    </form>
-                                    {% endif %}
                                     {% if not (current_user.has_permission('items', 'view') or current_user.has_permission('items', 'edit_info') or current_user.has_permission('lending_return', 'edit_batch') or current_user.has_permission('lending_return', 'edit_lending') or current_user.has_permission('items', 'edit_advance') or current_user.has_permission('items', 'delete')) %}
                                     <span class="text-muted">-</span>
                                     {% endif %}
@@ -580,12 +575,6 @@
                                     <a href="{{ url_for('item.item_edit', uuid=item.uuid) }}" class="btn btn-sm btn-warning" title="Edit">
                                         <i class="bi bi-pencil"></i>
                                     </a>
-                                    {% endif %}
-                                    {% if current_user.has_permission('items', 'delete') %}
-                                    <button type="button" class="btn btn-sm btn-danger" title="Delete" onclick="if(confirm('Delete {{ item.name }}?')) { document.getElementById('delete-form-{{ item.id }}').submit(); }">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                    <form id="delete-form-{{ item.id }}" method="POST" action="{{ url_for('item.item_delete', uuid=item.uuid) }}" style="display:none;"></form>
                                     {% endif %}
                                 </div>
                             </div>
@@ -867,28 +856,31 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p class="mb-3">
-                    <i class="bi bi-exclamation-triangle text-warning"></i> 
+                <p class="mb-2">
+                    <i class="bi bi-exclamation-triangle text-warning"></i>
                     You are about to delete <strong id="deleteCount">0</strong> item(s). Please enter your password to confirm.
                 </p>
-                
+                <p class="mb-2 small text-danger fw-semibold" id="attemptsLeft"></p>
                 <div class="mb-3">
                     <label for="confirmPassword" class="form-label">Password</label>
-                    <input type="password" class="form-control" id="confirmPassword" placeholder="Enter your password" required 
+                    <input type="password" class="form-control" id="confirmPassword" placeholder="Enter your password" required
                            oninput="this.classList.remove('is-invalid'); document.getElementById('passwordError').style.display='none';">
                     <div class="invalid-feedback" id="passwordError" style="display: none;">
                         Incorrect password. Please try again.
                     </div>
                 </div>
-                
-                <div class="alert alert-danger mb-0">
-                    <small><i class="bi bi-info-circle"></i> This action cannot be undone!</small>
+                <div class="mb-2">
+                    <div class="fw-semibold small mb-1">Items to be deleted:</div>
+                    <ul class="list-group list-group-flush small" id="deleteItemList" style="max-height:180px;overflow-y:auto;border:1px solid var(--bs-border-color);border-radius:6px;"></ul>
+                </div>
+                <div class="alert alert-danger mb-0 small">
+                    <i class="bi bi-info-circle"></i> This action cannot be undone!
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" onclick="verifyPasswordAndDelete()">
-                    <i class="bi bi-trash"></i> Verify & Continue
+                <button type="button" class="btn btn-danger" id="verifyDeleteBtn" onclick="verifyPasswordAndDelete()">
+                    <i class="bi bi-trash"></i> Verify &amp; Continue
                 </button>
             </div>
         </div>
@@ -971,86 +963,87 @@ function liveApplyStatusFilter() {
 }
 
 // Bulk Delete Functions
+let _bulkDeleteAttempts = 0;
+const _BULK_DELETE_MAX_ATTEMPTS = 3;
+
 function promptBulkDelete() {
-    // Get selected items
     const checkedBoxes = document.querySelectorAll('.item-checkbox:checked');
-    
     if (checkedBoxes.length === 0) {
         alert('Please select at least one item to delete.');
         return;
     }
-    
-    // Update the delete count in the password modal
+
+    _bulkDeleteAttempts = 0;
     document.getElementById('deleteCount').textContent = checkedBoxes.length;
-    
-    // Clear previous password input and errors
     document.getElementById('confirmPassword').value = '';
     document.getElementById('confirmPassword').classList.remove('is-invalid');
-    
-    // Close bulk operation modal and open password confirmation modal
+    document.getElementById('passwordError').style.display = 'none';
+    document.getElementById('attemptsLeft').textContent = `Attempts left: ${_BULK_DELETE_MAX_ATTEMPTS}`;
+    document.getElementById('verifyDeleteBtn').disabled = false;
+
+    // Build item list
+    const listEl = document.getElementById('deleteItemList');
+    listEl.innerHTML = '';
+    checkedBoxes.forEach(cb => {
+        const row = cb.closest('tr') || cb.closest('.card');
+        const name = row ? (row.querySelector('td:nth-child(2) a, .card-header strong')?.textContent?.trim() || cb.value) : cb.value;
+        const li = document.createElement('li');
+        li.className = 'list-group-item py-1 px-2';
+        li.innerHTML = `<i class="bi bi-box text-muted me-1"></i>${name}`;
+        listEl.appendChild(li);
+    });
+
     const bulkModal = bootstrap.Modal.getInstance(document.getElementById('bulkOperationModal'));
-    bulkModal.hide();
-    
-    const passwordModal = new bootstrap.Modal(document.getElementById('passwordConfirmModal'));
-    passwordModal.show();
+    if (bulkModal) bulkModal.hide();
+    new bootstrap.Modal(document.getElementById('passwordConfirmModal')).show();
 }
 
 function verifyPasswordAndDelete() {
     const password = document.getElementById('confirmPassword').value;
+    if (!password) { alert('Please enter your password.'); return; }
+
     const checkedBoxes = document.querySelectorAll('.item-checkbox:checked');
     const itemIds = Array.from(checkedBoxes).map(cb => cb.value);
-    
-    if (!password) {
-        alert('Please enter your password.');
-        return;
-    }
-    
-    // Show loading state
-    const deleteBtn = event.target;
-    const originalText = deleteBtn.innerHTML;
-    deleteBtn.disabled = true;
-    deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Verifying...';
-    
-    // Send request to verify password
+
+    const btn = document.getElementById('verifyDeleteBtn');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Verifying…';
+
     fetch('{{ url_for('auth.verify_password') }}', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            password: password
-        })
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({password})
     })
-    .then(response => response.json())
+    .then(r => r.json())
     .then(data => {
-        deleteBtn.disabled = false;
-        deleteBtn.innerHTML = originalText;
-        
+        btn.innerHTML = orig;
         if (data.success) {
-            // Password is correct - close modal and ask for final confirmation
-            const passwordModal = bootstrap.Modal.getInstance(document.getElementById('passwordConfirmModal'));
-            passwordModal.hide();
-            
-            // Show confirmation dialog
-            const itemCount = checkedBoxes.length;
-            if (confirm(`Are you sure you want to delete ${itemCount} item(s)?`)) {
-                // User confirmed - proceed with deletion
-                proceedWithBulkDelete(itemIds);
-            }
+            btn.disabled = true;
+            bootstrap.Modal.getInstance(document.getElementById('passwordConfirmModal')).hide();
+            proceedWithBulkDelete(itemIds);
         } else {
-            // Show error - incorrect password
-            const passwordInput = document.getElementById('confirmPassword');
-            passwordInput.classList.add('is-invalid');
-            const errorDiv = document.getElementById('passwordError');
-            errorDiv.textContent = data.message || 'Incorrect password. Please try again.';
-            errorDiv.style.display = 'block';
+            _bulkDeleteAttempts++;
+            const left = _BULK_DELETE_MAX_ATTEMPTS - _bulkDeleteAttempts;
+            document.getElementById('confirmPassword').classList.add('is-invalid');
+            document.getElementById('passwordError').textContent = 'Incorrect password. Please try again.';
+            document.getElementById('passwordError').style.display = 'block';
+            document.getElementById('attemptsLeft').textContent = `Attempts left: ${left}`;
+            if (_bulkDeleteAttempts >= _BULK_DELETE_MAX_ATTEMPTS) {
+                btn.disabled = true;
+                document.getElementById('confirmPassword').disabled = true;
+                document.getElementById('passwordError').textContent = 'Too many failed attempts. You will be logged out.';
+                setTimeout(() => { window.location.href = '{{ url_for('auth.logout') }}'; }, 2000);
+            } else {
+                btn.disabled = false;
+            }
+            document.getElementById('confirmPassword').value = '';
         }
     })
-    .catch(error => {
-        deleteBtn.disabled = false;
-        deleteBtn.innerHTML = originalText;
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = orig;
         alert('An error occurred. Please try again.');
-        console.error('Error:', error);
     });
 }
 
