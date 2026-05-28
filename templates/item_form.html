@@ -3415,8 +3415,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 {% endif %}
 
-{% if not item %}
-{# ---- Pending Batch Modal (new item only) ---- #}
+{# ---- Pending Batch Modal (new item + edit item pending batches) ---- #}
 <div class="modal fade" id="pendingBatchModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -3763,7 +3762,6 @@ document.addEventListener('DOMContentLoaded', function() {
     render();
 })();
 </script>
-{% endif %}
 
 <!-- ===== Thumbnail Picker Modals ===== -->
 
