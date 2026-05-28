@@ -462,7 +462,7 @@
     const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--bs-border-color').trim() || (isDark ? '#495057' : '#dee2e6');
 
     // Bar chart — Items by Category
-    const catData = {{ inv.category_stats | tojson }};
+    const catData = {{ sections.inventory.category_stats | tojson }};
     const catCtx = document.getElementById('catBarChart');
     if (catCtx && catData.length) {
         new Chart(catCtx, {
@@ -490,9 +490,9 @@
     }
 
     // Pie chart — Stock Status
-    const totalItems = {{ inv.total_items }};
-    const lowStock  = {{ inv.low_stock }};
-    const noStock   = {{ inv.no_stock }};
+    const totalItems = {{ sections.inventory.total_items }};
+    const lowStock  = {{ sections.inventory.low_stock }};
+    const noStock   = {{ sections.inventory.no_stock }};
     const normalStock = Math.max(0, totalItems - lowStock - noStock);
     const stockCtx = document.getElementById('stockPieChart');
     if (stockCtx && totalItems > 0) {

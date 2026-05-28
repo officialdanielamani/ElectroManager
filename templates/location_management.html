@@ -212,7 +212,7 @@
                     You are about to delete <strong id="bulkDeleteCount">0</strong> <span id="bulkDeleteType">item(s)</span>. Enter your password to confirm.
                 </p>
                 <div id="bulkDeleteSkipWarning" class="alert alert-warning small d-none">
-                    <i class="bi bi-info-circle"></i> Items with associated data will be skipped and cannot be deleted.
+                    <i class="bi bi-info-circle"></i> <span id="bulkDeleteSkipMsg"></span>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Password</label>
@@ -272,7 +272,11 @@ function promptBulkDelete(type) {
     const label = type === 'location' ? 'location(s)' : 'rack(s)';
     document.getElementById('bulkDeleteCount').textContent = uuids.length;
     document.getElementById('bulkDeleteType').textContent = label;
-    document.getElementById('bulkDeleteSkipWarning').classList.toggle('d-none', type !== 'location');
+    const skipMsg = type === 'location'
+        ? 'Locations that still have items or racks assigned will be skipped — unassign them first before deleting.'
+        : 'Racks that still have items stored in them will be skipped — remove all items from the rack first.';
+    document.getElementById('bulkDeleteSkipMsg').textContent = skipMsg;
+    document.getElementById('bulkDeleteSkipWarning').classList.remove('d-none');
     document.getElementById('bulkDeletePassword').value = '';
     document.getElementById('bulkDeletePassword').classList.remove('is-invalid');
     new bootstrap.Modal(document.getElementById('bulkDeleteModal')).show();
