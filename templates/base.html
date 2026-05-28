@@ -248,9 +248,9 @@
                                 <div style="padding:6px 16px 8px; border-top:1px solid #dee2e6; margin-top:2px;">
                                     <div style="font-size:.8rem; color:#6c757d; letter-spacing:.03em;">SERVER TIME</div>
                                     <div style="font-family:monospace; font-size:.92rem; font-weight:600; color:#212529; margin-top:1px;">
-                                        {{ server_now.strftime('%d/%m/%Y') }}
+                                        <span id="nav-clock-date">{{ server_now.strftime('%d/%m/%Y') }}</span>
                                         <span style="color:#6c757d; margin:0 3px;">|</span>
-                                        {{ server_now.strftime('%H:%M') }}
+                                        <span id="nav-clock-time">{{ server_now.strftime('%H:%M') }}</span>
                                     </div>
                                     <div style="font-size:.72rem; color:#adb5bd;">{{ tz_label }}</div>
                                 </div>
@@ -312,6 +312,23 @@
     </script>
     
     {% block scripts %}{% endblock %}
+
+    <script>
+        // Live server clock — updates every second without a server round-trip.
+        (function() {
+            var _tzOffsetMs = {{ (server_now.utcoffset().total_seconds() | int) * 1000 }};
+            function _pad(n) { return String(n).padStart(2, '0'); }
+            function _tick() {
+                var d = new Date(Date.now() + _tzOffsetMs);
+                var dateEl = document.getElementById('nav-clock-date');
+                var timeEl = document.getElementById('nav-clock-time');
+                if (dateEl) dateEl.textContent = _pad(d.getUTCDate()) + '/' + _pad(d.getUTCMonth() + 1) + '/' + d.getUTCFullYear();
+                if (timeEl) timeEl.textContent = _pad(d.getUTCHours()) + ':' + _pad(d.getUTCMinutes());
+            }
+            _tick();
+            setInterval(_tick, 1000);
+        })();
+    </script>
 
     <script>
         (function() {
