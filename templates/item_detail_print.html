@@ -205,7 +205,6 @@
         </div>
         <div class="qr-block" id="qr-block">
             <img src="{{ url_for('item.item_qr_svg', uuid=item.uuid) }}" alt="QR Code">
-            <div class="qr-label">{{ item.uuid }}</div>
         </div>
         {% if item.thumbnail %}
         <div class="thumb-block" id="cover-block">

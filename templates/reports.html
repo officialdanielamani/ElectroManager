@@ -121,13 +121,25 @@
             </div>
         </div>
 
+        <!-- Charts row -->
+        <div class="row g-3 mb-3">
+            <div class="col-12 col-lg-6">
+                <h6 class="fw-semibold"><i class="bi bi-bar-chart"></i> Items by Category (Top 10)</h6>
+                <canvas id="catBarChart" style="max-height:220px;"></canvas>
+            </div>
+            <div class="col-12 col-lg-6">
+                <h6 class="fw-semibold"><i class="bi bi-pie-chart"></i> Stock Status</h6>
+                <canvas id="stockPieChart" style="max-height:220px;"></canvas>
+            </div>
+        </div>
+
         <div class="row g-3">
             {% if inv.category_stats %}
             <div class="col-12 col-lg-6">
                 <h6 class="fw-semibold"><i class="bi bi-tags"></i> Items by Category</h6>
                 <div class="table-responsive">
                     <table class="table table-sm table-hover mb-0">
-                        <thead class="table-light">
+                        <thead>
                             <tr><th>Category</th><th class="text-end">Items</th><th style="min-width:110px;">Share</th></tr>
                         </thead>
                         <tbody>
@@ -155,7 +167,7 @@
                 <h6 class="fw-semibold"><i class="bi bi-cpu"></i> Items by Footprint <small class="text-muted fw-normal">(top 10)</small></h6>
                 <div class="table-responsive">
                     <table class="table table-sm table-hover mb-0">
-                        <thead class="table-light">
+                        <thead class="">
                             <tr><th>Footprint</th><th class="text-end">Items</th><th style="min-width:110px;">Share</th></tr>
                         </thead>
                         <tbody>
@@ -237,7 +249,7 @@
         <h6 class="fw-semibold"><i class="bi bi-clock-history"></i> Recent Lending Sessions</h6>
         <div class="table-responsive">
             <table class="table table-sm table-hover mb-0">
-                <thead class="table-light">
+                <thead class="">
                     <tr>
                         <th>Session ID</th>
                         <th>Lent To</th>
@@ -395,7 +407,7 @@
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-sm table-hover mb-0">
-                <thead class="table-light">
+                <thead class="">
                     <tr>
                         <th>When</th>
                         <th>User</th>
@@ -438,4 +450,72 @@
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+{% if 'inventory' in sections %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+    const isDark = document.documentElement.getAttribute('data-theme') !== null;
+    const textColor = getComputedStyle(document.documentElement).getPropertyValue('--bs-body-color').trim() || (isDark ? '#dee2e6' : '#212529');
+    const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--bs-border-color').trim() || (isDark ? '#495057' : '#dee2e6');
+
+    // Bar chart — Items by Category
+    const catData = {{ inv.category_stats | tojson }};
+    const catCtx = document.getElementById('catBarChart');
+    if (catCtx && catData.length) {
+        new Chart(catCtx, {
+            type: 'bar',
+            data: {
+                labels: catData.map(d => d[0]),
+                datasets: [{
+                    label: 'Items',
+                    data: catData.map(d => d[1]),
+                    backgroundColor: 'rgba(13,110,253,0.72)',
+                    borderColor: 'rgba(13,110,253,1)',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { color: textColor, maxRotation: 35 }, grid: { color: gridColor } },
+                    y: { beginAtZero: true, ticks: { color: textColor, precision: 0 }, grid: { color: gridColor } }
+                }
+            }
+        });
+    }
+
+    // Pie chart — Stock Status
+    const totalItems = {{ inv.total_items }};
+    const lowStock  = {{ inv.low_stock }};
+    const noStock   = {{ inv.no_stock }};
+    const normalStock = Math.max(0, totalItems - lowStock - noStock);
+    const stockCtx = document.getElementById('stockPieChart');
+    if (stockCtx && totalItems > 0) {
+        new Chart(stockCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Normal', 'Low Stock', 'No Stock'],
+                datasets: [{
+                    data: [normalStock, lowStock, noStock],
+                    backgroundColor: ['rgba(25,135,84,0.8)', 'rgba(255,193,7,0.8)', 'rgba(220,53,69,0.8)'],
+                    borderColor: ['#198754','#ffc107','#dc3545'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: true,
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: textColor } }
+                }
+            }
+        });
+    }
+})();
+</script>
+{% endif %}
 {% endblock %}

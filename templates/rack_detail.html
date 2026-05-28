@@ -104,9 +104,12 @@
                 {% set drawer_info_map = rack.get_drawer_info() %}
 
                 <!-- Selection controls (top) -->
-                <div class="d-flex gap-2 mb-2" id="drawerControlsTop">
+                <div class="d-flex gap-2 mb-2 flex-wrap" id="drawerControlsTop">
                     <button class="btn btn-sm btn-outline-secondary d-none" id="clearSelectionBtnTop" onclick="clearDrawerSelection()">
                         <i class="bi bi-x-circle"></i> Clear Selection
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="selectAllDrawers()">
+                        <i class="bi bi-check2-all"></i> Select ALL
                     </button>
                     <button class="btn btn-sm btn-outline-primary" onclick="printQRDrawer()">
                         <i class="bi bi-qr-code"></i> Print QR Drawer
@@ -158,9 +161,12 @@
                 </div>
 
                 <!-- Selection controls (bottom) -->
-                <div class="d-flex gap-2 mt-2" id="drawerControlsBottom">
+                <div class="d-flex gap-2 mt-2 flex-wrap" id="drawerControlsBottom">
                     <button class="btn btn-sm btn-outline-secondary d-none" id="clearSelectionBtnBottom" onclick="clearDrawerSelection()">
                         <i class="bi bi-x-circle"></i> Clear Selection
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="selectAllDrawers()">
+                        <i class="bi bi-check2-all"></i> Select ALL
                     </button>
                     <button class="btn btn-sm btn-outline-primary" onclick="printQRDrawer()">
                         <i class="bi bi-qr-code"></i> Print QR Drawer
@@ -409,6 +415,27 @@ function highlightDrawer(drawerId) {
         const firstMatch = document.querySelector(`.item-row[data-drawer="${drawerId}"]`);
         if (firstMatch) firstMatch.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
+}
+
+function selectAllDrawers() {
+    document.querySelectorAll('.rack-view-cell:not(.unavailable):not(.group-slave)').forEach(cell => {
+        const effectiveId = cell.dataset.effective;
+        if (!effectiveId || selectedDrawers.has(effectiveId)) return;
+        selectedDrawers.add(effectiveId);
+        document.querySelectorAll(`.rack-view-cell[data-effective="${effectiveId}"]`)
+            .forEach(c => c.classList.add('cell-active'));
+    });
+    document.querySelectorAll('.item-row').forEach(row => {
+        row.classList.toggle('row-active', selectedDrawers.has(row.dataset.drawer));
+    });
+    const badge = document.getElementById('selectedDrawerBadge');
+    if (selectedDrawers.size > 0) {
+        badge.textContent = selectedDrawers.size + ' drawers selected';
+        badge.classList.remove('d-none');
+    }
+    const showClear = selectedDrawers.size >= 2;
+    document.getElementById('clearSelectionBtnTop').classList.toggle('d-none', !showClear);
+    document.getElementById('clearSelectionBtnBottom').classList.toggle('d-none', !showClear);
 }
 
 function clearDrawerSelection() {

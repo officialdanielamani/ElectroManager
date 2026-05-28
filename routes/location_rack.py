@@ -263,6 +263,67 @@ def location_delete(uuid):
 
 
 
+@location_rack_bp.route('/api/locations/bulk-delete', endpoint='bulk_delete_locations', methods=['POST'])
+@login_required
+@permission_required("settings_sections.location_management", "delete")
+def bulk_delete_locations():
+    """Bulk delete locations by UUID list (JSON body: {uuids: [...]})"""
+    from models import Location
+    data = request.get_json() or {}
+    uuids = data.get('uuids', [])
+    if not uuids or not isinstance(uuids, list):
+        return jsonify({'success': False, 'message': 'No locations selected.'}), 400
+    deleted, skipped = [], []
+    for uuid in uuids:
+        loc = Location.query.filter_by(uuid=str(uuid)).first()
+        if not loc:
+            continue
+        if loc.items or loc.racks:
+            skipped.append(loc.name)
+            continue
+        if loc.uuid:
+            loc_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations', loc.uuid)
+            if os.path.exists(loc_dir):
+                import shutil as _shutil
+                try: _shutil.rmtree(loc_dir)
+                except Exception: pass
+        deleted.append(loc.name)
+        log_audit(current_user.id, 'delete', 'location', loc.id, f'Bulk deleted location: {loc.name}')
+        db.session.delete(loc)
+    db.session.commit()
+    msg = f'Deleted {len(deleted)} location(s).'
+    if skipped:
+        msg += f' Skipped {len(skipped)} (in use): {", ".join(skipped)}.'
+    return jsonify({'success': True, 'message': msg, 'deleted': len(deleted), 'skipped': skipped})
+
+
+@location_rack_bp.route('/api/racks/bulk-delete', endpoint='bulk_delete_racks', methods=['POST'])
+@login_required
+@permission_required("settings_sections.location_management", "delete")
+def bulk_delete_racks():
+    """Bulk delete racks by UUID list (JSON body: {uuids: [...]})"""
+    data = request.get_json() or {}
+    uuids = data.get('uuids', [])
+    if not uuids or not isinstance(uuids, list):
+        return jsonify({'success': False, 'message': 'No racks selected.'}), 400
+    deleted, skipped = [], []
+    for uuid in uuids:
+        rack = Rack.query.filter_by(uuid=str(uuid)).first()
+        if not rack:
+            continue
+        if rack.items:
+            skipped.append(rack.name)
+            continue
+        deleted.append(rack.name)
+        log_audit(current_user.id, 'delete', 'rack', rack.id, f'Bulk deleted rack: {rack.name}')
+        db.session.delete(rack)
+    db.session.commit()
+    msg = f'Deleted {len(deleted)} rack(s).'
+    if skipped:
+        msg += f' Skipped {len(skipped)} (have items): {", ".join(skipped)}.'
+    return jsonify({'success': True, 'message': msg, 'deleted': len(deleted), 'skipped': skipped})
+
+
 @location_rack_bp.route('/location-picture/<path:filepath>', endpoint='location_picture')
 @login_required
 def location_picture(filepath):

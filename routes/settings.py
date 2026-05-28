@@ -17,6 +17,7 @@ import json
 import secrets
 import string
 import logging
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -738,6 +739,28 @@ def settings_system():
                 verinfo_content = f"Error reading {filename}"
             break
     
+    # Storage usage
+    def _dir_size(path):
+        total = 0
+        if os.path.exists(path):
+            for dp, _, fnames in os.walk(path):
+                for f in fnames:
+                    try: total += os.path.getsize(os.path.join(dp, f))
+                    except OSError: pass
+        return total
+
+    upload_folder = current_app.config['UPLOAD_FOLDER']
+    instance_folder = current_app.instance_path
+    try:
+        _disk = shutil.disk_usage(upload_folder)
+        disk_total = _disk.total
+        disk_used  = _disk.used
+        disk_pct   = round(_disk.used / _disk.total * 100, 1) if _disk.total else 0
+    except Exception:
+        disk_total = disk_used = disk_pct = 0
+    uploads_size   = _dir_size(upload_folder)
+    instance_size  = _dir_size(instance_folder)
+
     return render_template('settings_system.html',
                           Setting=Setting,
                           currency=currency,
@@ -776,6 +799,11 @@ def settings_system():
                           api_rack_drawer_enabled=api_rack_drawer_enabled,
                           api_lending_return_enabled=api_lending_return_enabled,
                           demo_mode=current_app.config.get('DEMO_MODE', False),
+                          disk_total=disk_total,
+                          disk_used=disk_used,
+                          disk_pct=disk_pct,
+                          uploads_size=uploads_size,
+                          instance_size=instance_size,
                           project_upload_settings={
                               'picture': {'extensions': Setting.get('project_upload_picture_extensions', 'webp,png,svg,jpeg,jpg'), 'max_size': Setting.get('project_upload_picture_max_size', '10')},
                               'document': {'extensions': Setting.get('project_upload_document_extensions', 'txt,doc,docx,pdf'), 'max_size': Setting.get('project_upload_document_max_size', '10')},
