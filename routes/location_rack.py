@@ -285,13 +285,17 @@ def location_picture(filepath):
 @login_required
 def rack_picture(filepath):
     """Serve rack pictures.  filepath may be:
-      - {rack_uuid}/{filename}.ext  — uploaded file
+      - {rack_uuid}.ext             — uploaded file (flat, new style)
+      - {rack_uuid}/{filename}.ext  — uploaded file (legacy subfolder)
       - share/icon/{filename}       — icon from Share Files
+      - biicon/{icon_name}          — not served here; handled in template
     """
     if filepath.startswith('share/icon/'):
         from routes.share import share_serve
         filename = filepath[len('share/icon/'):]
         return share_serve('icon', filename)
+    if filepath.startswith('biicon/'):
+        abort(404)
     rack_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks')
     safe_path = safe_join(rack_dir, filepath)
     if safe_path is None or not os.path.exists(safe_path):
@@ -357,10 +361,13 @@ def rack_new():
         db.session.add(rack)
         db.session.commit()
         
-        # Handle picture upload with UUID-based path structure
-        # Handle share icon file selection (takes priority over upload)
+        # Handle picture: BI icon > share icon > uploaded file
+        biicon = request.form.get('biicon_file', '').strip()
         share_icon = request.form.get('share_icon_file', '').strip()
-        if share_icon and not request.files.get('picture'):
+        if biicon and not request.files.get('picture'):
+            rack.picture = f'biicon/{biicon}'
+            db.session.commit()
+        elif share_icon and not request.files.get('picture'):
             rack.picture = f'share/icon/{share_icon}'
             db.session.commit()
         elif request.files.get('picture'):
@@ -381,14 +388,14 @@ def rack_new():
                 if ext == 'jpg':
                     ext = 'jpeg'
                 filename = f"{rack.uuid}.{ext}"
-                rack_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks', rack.uuid)
+                rack_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks')
                 os.makedirs(rack_dir, exist_ok=True)
                 for old_ext in ['png', 'jpeg', 'webp']:
                     old_f = os.path.join(rack_dir, f"{rack.uuid}.{old_ext}")
                     if old_f != os.path.join(rack_dir, filename) and os.path.exists(old_f):
                         os.remove(old_f)
                 file.save(os.path.join(rack_dir, filename))
-                rack.picture = f"{rack.uuid}/{filename}"
+                rack.picture = filename
                 db.session.commit()
 
         log_audit(current_user.id, 'create', 'rack', rack.id, f'Created rack: {name}')
@@ -499,9 +506,12 @@ def rack_edit(uuid):
                     os.remove(old_path)
             rack.picture = None
 
-        # Handle share icon file selection (takes priority over upload)
+        # Handle picture: BI icon > share icon > uploaded file
+        biicon = request.form.get('biicon_file', '').strip()
         share_icon = request.form.get('share_icon_file', '').strip()
-        if share_icon and not request.files.get('picture'):
+        if biicon and not request.files.get('picture'):
+            rack.picture = f'biicon/{biicon}'
+        elif share_icon and not request.files.get('picture'):
             rack.picture = f'share/icon/{share_icon}'
         elif request.files.get('picture'):
             file = request.files['picture']
@@ -525,14 +535,14 @@ def rack_edit(uuid):
                 if ext == 'jpg':
                     ext = 'jpeg'
                 filename = f"{rack.uuid}.{ext}"
-                rack_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks', rack.uuid)
+                rack_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks')
                 os.makedirs(rack_dir, exist_ok=True)
                 for old_ext in ['png', 'jpeg', 'webp']:
                     old_f = os.path.join(rack_dir, f"{rack.uuid}.{old_ext}")
                     if old_f != os.path.join(rack_dir, filename) and os.path.exists(old_f):
                         os.remove(old_f)
                 file.save(os.path.join(rack_dir, filename))
-                rack.picture = f"{rack.uuid}/{filename}"
+                rack.picture = filename
 
         db.session.commit()
 

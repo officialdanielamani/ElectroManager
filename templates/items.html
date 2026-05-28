@@ -411,25 +411,25 @@
                                     <td>
                                         {% if item.thumbnail %}
                                             {% if item.thumbnail.startswith('biicon:') %}
-                                            <div style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">
-                                                <i class="bi bi-{{ item.thumbnail[7:] }}" style="font-size:1.5rem;"></i>
+                                            <div style="width:64px;height:64px;display:flex;align-items:center;justify-content:center;">
+                                                <i class="bi bi-{{ item.thumbnail[7:] }}" style="font-size:2rem;"></i>
                                             </div>
                                             {% elif item.thumbnail.startswith('share:') %}
                                             <img src="{{ url_for('share.share_serve', category='item', filename=item.thumbnail[6:]) }}"
-                                                 alt="{{ item.name }}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;">
+                                                 alt="{{ item.name }}" style="width:64px;height:64px;object-fit:cover;border-radius:4px;">
                                             {% elif item.thumbnail.startswith('icon:') %}
                                             <img src="{{ url_for('share.share_serve', category='icon', filename=item.thumbnail[5:]) }}"
-                                                 alt="{{ item.name }}" style="width:40px;height:40px;object-fit:contain;border-radius:4px;">
+                                                 alt="{{ item.name }}" style="width:64px;height:64px;object-fit:contain;border-radius:4px;">
                                             {% else %}
                                             <img src="{{ url_for('uploaded_file', filename=item.thumbnail) }}"
-                                                 alt="{{ item.name }}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;">
+                                                 alt="{{ item.name }}" style="width:64px;height:64px;object-fit:cover;border-radius:4px;">
                                             {% endif %}
                                         {% else %}
                                             {% set img_found = [] %}
                                             {% for att in item.attachments %}
                                                 {% if not img_found and att.file_type and att.file_type in ['png', 'jpg', 'jpeg', 'gif', 'webp'] %}
                                                 <img src="{{ url_for('uploaded_file', filename=att.filename) }}"
-                                                     alt="{{ item.name }}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;">
+                                                     alt="{{ item.name }}" style="width:64px;height:64px;object-fit:cover;border-radius:4px;">
                                                 {% if img_found.append(1) %}{% endif %}
                                                 {% endif %}
                                             {% endfor %}
@@ -1470,7 +1470,7 @@ function submitBulkEdit() {
 
 /* ── Bulk-edit drawer grid ── (mirrors item_form.html drawer cell styles) */
 .drawer-cell-picker {
-    width: 40px; height: 40px;
+    width: 64px; height: 64px;
     border: 1px solid var(--bs-border-color);
     border-radius: 4px;
     display: flex; align-items: center; justify-content: center;

@@ -245,14 +245,14 @@
                                 <i class="bi bi-palette"></i> General Settings
                             </a></li>
                             <li>
-                                <div style="padding:6px 16px 8px; border-top:1px solid #dee2e6; margin-top:2px;">
-                                    <div style="font-size:.8rem; color:#6c757d; letter-spacing:.03em;">SERVER TIME</div>
-                                    <div style="font-family:monospace; font-size:.92rem; font-weight:600; color:#212529; margin-top:1px;">
+                                <div style="padding:6px 16px 8px; border-top:1px solid var(--bs-border-color,#dee2e6); margin-top:2px;">
+                                    <div style="font-size:.8rem; color:var(--bs-secondary-color,#6c757d); letter-spacing:.03em;">SERVER TIME</div>
+                                    <div style="font-family:monospace; font-size:.92rem; font-weight:600; color:var(--bs-body-color,#212529); margin-top:1px;">
                                         <span id="nav-clock-date">{{ server_now.strftime('%d/%m/%Y') }}</span>
-                                        <span style="color:#6c757d; margin:0 3px;">|</span>
+                                        <span style="color:var(--bs-secondary-color,#6c757d); margin:0 3px;">|</span>
                                         <span id="nav-clock-time">{{ server_now.strftime('%H:%M') }}</span>
                                     </div>
-                                    <div style="font-size:.72rem; color:#adb5bd;">{{ tz_label }}</div>
+                                    <div style="font-size:.72rem; color:var(--bs-secondary-color,#adb5bd);">{{ tz_label }}</div>
                                 </div>
                             </li>
                             <li><hr class="dropdown-divider"></li>

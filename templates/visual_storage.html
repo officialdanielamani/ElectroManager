@@ -921,9 +921,9 @@
     #filterCard .input-group { width: 100% !important; min-width: unset !important; }
 }
 
-/* ── Picture Mode ── */
+/* ── Rack Thumbnail ── */
 .rack-thumb-area {
-    display: none;
+    display: flex;
     width: 56px; min-width: 56px; height: 56px;
     border-radius: 8px;
     background: rgba(255,255,255,0.15);
@@ -933,7 +933,6 @@
     flex-shrink: 0;
     transition: box-shadow 0.2s;
 }
-.show-pictures .rack-thumb-area { display: flex; }
 .rack-thumb-area img { width: 100%; height: 100%; object-fit: cover; }
 .rack-thumb-overlay {
     position: absolute; inset: 0;
