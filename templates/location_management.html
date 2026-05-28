@@ -273,8 +273,8 @@ function promptBulkDelete(type) {
     document.getElementById('bulkDeleteCount').textContent = uuids.length;
     document.getElementById('bulkDeleteType').textContent = label;
     const skipMsg = type === 'location'
-        ? 'Locations that still have items or racks assigned will be skipped — unassign them first before deleting.'
-        : 'Racks that still have items stored in them will be skipped — remove all items from the rack first.';
+        ? 'Any items and batches assigned to the selected location(s) will have their location cleared. Racks linked to the location will also be unlinked.'
+        : 'Any items and batches stored in the selected rack(s) will have their rack assignment cleared.';
     document.getElementById('bulkDeleteSkipMsg').textContent = skipMsg;
     document.getElementById('bulkDeleteSkipWarning').classList.remove('d-none');
     document.getElementById('bulkDeletePassword').value = '';

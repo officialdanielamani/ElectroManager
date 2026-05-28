@@ -233,32 +233,32 @@ def location_edit(uuid):
 @login_required
 @permission_required("settings_sections.location_management", "delete")
 def location_delete(uuid):
-    """Delete location"""
-    from models import Location
-    
+    """Delete location — clears location references on items, batches, and racks."""
+    from models import Location, Item, ItemBatch
     location = Location.query.filter_by(uuid=uuid).first_or_404()
-    
-    # Check if location is in use
-    if location.items or location.racks:
-        flash('Cannot delete location that is in use by items or racks!', 'danger')
-        return redirect(url_for('location_rack.location_management'))
-    
-    # Delete picture directory and all its contents
+
+    # Clear references instead of blocking
+    for item in list(location.items):
+        item.location_id = None
+    for batch in ItemBatch.query.filter_by(location_id=location.id).all():
+        batch.location_id = None
+    for rack in list(location.racks):
+        rack.location_id = None
+
+    # Delete picture directory
     if location.uuid:
         location_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations', location.uuid)
         if os.path.exists(location_dir):
             import shutil
-            try:
-                shutil.rmtree(location_dir)
-            except Exception as e:
-                print(f"Error deleting location directory: {e}")
-    
+            try: shutil.rmtree(location_dir)
+            except Exception as e: print(f"Error deleting location directory: {e}")
+
     location_name = location.name
     db.session.delete(location)
     db.session.commit()
-    
-    log_audit(current_user.id, 'delete', 'location', id, f'Deleted location: {location_name}')
-    flash(f'Location "{location_name}" deleted successfully!', 'success')
+
+    log_audit(current_user.id, 'delete', 'location', location.id, f'Deleted location: {location_name}')
+    flash(f'Location "{location_name}" deleted. Any assigned items/racks have been unlinked.', 'success')
     return redirect(url_for('location_rack.location_management'))
 
 
@@ -267,20 +267,23 @@ def location_delete(uuid):
 @login_required
 @permission_required("settings_sections.location_management", "delete")
 def bulk_delete_locations():
-    """Bulk delete locations by UUID list (JSON body: {uuids: [...]})"""
-    from models import Location
+    """Bulk delete locations — clears location references on items, batches, and racks."""
+    from models import Location, Item, ItemBatch
     data = request.get_json() or {}
     uuids = data.get('uuids', [])
     if not uuids or not isinstance(uuids, list):
         return jsonify({'success': False, 'message': 'No locations selected.'}), 400
-    deleted, skipped = [], []
+    deleted = []
     for uuid in uuids:
         loc = Location.query.filter_by(uuid=str(uuid)).first()
         if not loc:
             continue
-        if loc.items or loc.racks:
-            skipped.append(loc.name)
-            continue
+        for item in list(loc.items):
+            item.location_id = None
+        for batch in ItemBatch.query.filter_by(location_id=loc.id).all():
+            batch.location_id = None
+        for rack in list(loc.racks):
+            rack.location_id = None
         if loc.uuid:
             loc_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations', loc.uuid)
             if os.path.exists(loc_dir):
@@ -291,10 +294,8 @@ def bulk_delete_locations():
         log_audit(current_user.id, 'delete', 'location', loc.id, f'Bulk deleted location: {loc.name}')
         db.session.delete(loc)
     db.session.commit()
-    msg = f'Deleted {len(deleted)} location(s).'
-    if skipped:
-        msg += f' Skipped {len(skipped)} (in use): {", ".join(skipped)}.'
-    return jsonify({'success': True, 'message': msg, 'deleted': len(deleted), 'skipped': skipped})
+    msg = f'Deleted {len(deleted)} location(s). Any assigned items/racks have been unlinked.'
+    return jsonify({'success': True, 'message': msg, 'deleted': len(deleted)})
 
 
 @location_rack_bp.route('/api/racks/bulk-delete', endpoint='bulk_delete_racks', methods=['POST'])
@@ -306,22 +307,23 @@ def bulk_delete_racks():
     uuids = data.get('uuids', [])
     if not uuids or not isinstance(uuids, list):
         return jsonify({'success': False, 'message': 'No racks selected.'}), 400
-    deleted, skipped = [], []
+    deleted = []
     for uuid in uuids:
         rack = Rack.query.filter_by(uuid=str(uuid)).first()
         if not rack:
             continue
-        if rack.items:
-            skipped.append(rack.name)
-            continue
+        for item in list(rack.items):
+            item.rack_id = None
+            item.drawer = None
+        for batch in ItemBatch.query.filter_by(rack_id=rack.id).all():
+            batch.rack_id = None
+            batch.drawer = None
         deleted.append(rack.name)
         log_audit(current_user.id, 'delete', 'rack', rack.id, f'Bulk deleted rack: {rack.name}')
         db.session.delete(rack)
     db.session.commit()
-    msg = f'Deleted {len(deleted)} rack(s).'
-    if skipped:
-        msg += f' Skipped {len(skipped)} (have items): {", ".join(skipped)}.'
-    return jsonify({'success': True, 'message': msg, 'deleted': len(deleted), 'skipped': skipped})
+    msg = f'Deleted {len(deleted)} rack(s). Any assigned items/batches have been unlinked.'
+    return jsonify({'success': True, 'message': msg, 'deleted': len(deleted)})
 
 
 @location_rack_bp.route('/location-picture/<path:filepath>', endpoint='location_picture')
@@ -631,18 +633,21 @@ def rack_delete(uuid):
     """Delete rack"""
     rack = Rack.query.filter_by(uuid=uuid).first_or_404()
     rack_name = rack.name
-    
-    # Clear locations for items
+
     items = Item.query.filter_by(rack_id=rack.id).all()
     for item in items:
         item.rack_id = None
         item.drawer = None
-    
+    batches = ItemBatch.query.filter_by(rack_id=rack.id).all()
+    for batch in batches:
+        batch.rack_id = None
+        batch.drawer = None
+
     db.session.delete(rack)
     db.session.commit()
-    
-    log_audit(current_user.id, 'delete', 'rack', id, f'Deleted rack: {rack_name}, cleared {len(items)} item locations')
-    flash(f'Rack "{rack_name}" deleted. {len(items)} item location(s) cleared.', 'success')
+
+    log_audit(current_user.id, 'delete', 'rack', rack.id, f'Deleted rack: {rack_name}')
+    flash(f'Rack "{rack_name}" deleted. Any assigned items/batches have been unlinked.', 'success')
     return redirect(url_for('location_rack.location_management'))
 
 
