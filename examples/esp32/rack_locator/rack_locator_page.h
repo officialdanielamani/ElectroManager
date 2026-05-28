@@ -1,6 +1,6 @@
 #pragma once
 /*
- * PROGMEM page content for rack_finder.ino
+ * PROGMEM page content for rack_locator.ino
  *
  * Kept in a separate header so the Arduino sketch preprocessor
  * (which injects #line directives for function-prototype generation)
@@ -14,13 +14,14 @@ static const char PAGE_HEAD[] PROGMEM = R"HTML(<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rack Finder</title>
+<title>Rack Locator</title>
 <style>
 *{box-sizing:border-box}
 body{font-family:system-ui,sans-serif;margin:0;padding:14px;background:#f8f9fa}
 h2{margin:0 0 4px;font-size:1.2rem}
 .card{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1);padding:14px;margin-bottom:14px}
-.card-header{border-radius:6px 6px 0 0;padding:10px 14px;margin:-14px -14px 12px;color:#fff;font-weight:600}
+.card-header{border-radius:6px 6px 0 0;padding:10px 14px;margin:-14px -14px 12px;color:#fff;font-weight:600;display:flex;align-items:center;justify-content:space-between}
+.rack-status{font-size:.75rem;font-weight:400;opacity:.85}
 .row{display:flex;gap:8px;flex-wrap:wrap}
 input[type=text]{flex:1;min-width:180px;padding:7px 11px;border:1px solid #ced4da;border-radius:6px;font-size:.95rem}
 button{padding:7px 18px;background:#0d6efd;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:.95rem}
@@ -57,7 +58,10 @@ button:hover{background:#0b5ed7}
 .alert{padding:11px 14px;border-radius:6px;margin-top:8px;font-size:.88rem}
 .aw{background:#fff3cd;border:1px solid #ffc107;color:#664d03}
 .ae{background:#f8d7da;border:1px solid #f5c2c7;color:#842029}
+.ai{background:#cff4fc;border:1px solid #9eeaf9;color:#055160}
 .muted{color:#6c757d;font-size:.82rem}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid #dee2e6;border-top-color:#0d6efd;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
 .popup-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);display:none;z-index:200;align-items:flex-start;justify-content:center;padding-top:48px}
 .popup{background:#fff;border-radius:10px;padding:16px 18px;max-width:460px;width:93%;max-height:78vh;overflow-y:auto;position:relative;box-shadow:0 8px 32px rgba(0,0,0,.18)}
 .popup-close{position:absolute;top:10px;right:14px;font-size:1.4rem;cursor:pointer;color:#6c757d;line-height:1;font-weight:300}
@@ -73,7 +77,7 @@ button:hover{background:#0b5ed7}
 </head>
 <body>
 <div class="card">
-<h2>Rack Finder</h2>
+<h2>Rack Locator</h2>
 <p class="muted" style="margin:3px 0 10px">Enter item name, UUID, batch UID (e.g. ABC-B01), or ISN</p>
 <form onsubmit="find(event)">
 <div class="row">
@@ -82,8 +86,8 @@ button:hover{background:#0b5ed7}
 </div>
 </form>
 </div>
-<div id="info"></div>
-<div id="rack"></div>
+<div id="result"></div>
+<div id="racks"></div>
 <div id="drawer-popup" class="popup-overlay" onclick="closePopup(event)">
   <div class="popup">
     <span class="popup-close" onclick="document.getElementById('drawer-popup').style.display='none'">&times;</span>
@@ -95,40 +99,101 @@ button:hover{background:#0b5ed7}
 
 static const char PAGE_JS[] PROGMEM = R"JS(
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+// layouts[uuid] = layout response; highlights[uuid] = {row,col} or null
+var layouts={}, highlights={};
+
+// ── Init: load all configured racks ──────────────────────────────────────
+window.onload=function(){
+  if(!RACKS||!RACKS.length){
+    document.getElementById('racks').innerHTML='<div class="alert aw">No rack UUIDs configured in firmware.</div>';
+    return;
+  }
+  RACKS.forEach(function(uuid){loadRack(uuid);});
+};
+
+function loadRack(uuid){
+  setRackLoading(uuid);
+  fetch(EM+'/api/v1/rack/'+uuid+'/layout',{headers:{Authorization:'Bearer '+K}})
+  .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+  .then(function(d){
+    if(!d.success)throw new Error('Bad response');
+    layouts[uuid]=d;
+    highlights[uuid]=null;
+    renderRack(uuid);
+  })
+  .catch(function(ex){setRackError(uuid,ex.message);});
+}
+
+// ── Rack container helpers ────────────────────────────────────────────────
+function rackDivId(uuid){return 'rack-'+uuid.replace(/[^a-zA-Z0-9]/g,'-');}
+
+function setRackLoading(uuid){
+  var id=rackDivId(uuid);
+  var el=document.getElementById(id);
+  if(!el){
+    el=document.createElement('div');
+    el.id=id;
+    document.getElementById('racks').appendChild(el);
+  }
+  el.innerHTML="<div class='card'><div class='card-header' style='background:#6c757d'>Loading rack…</div>"
+    +"<div style='padding:14px 0 4px'><span class='spin'></span> <span class='muted'>Fetching layout…</span></div></div>";
+}
+
+function setRackError(uuid,msg){
+  var el=document.getElementById(rackDivId(uuid));
+  if(el)el.innerHTML="<div class='alert ae'><strong>"+esc(uuid)+"</strong> — "+esc(msg)+"</div>";
+}
+
+// ── Search ────────────────────────────────────────────────────────────────
 function find(e){
   e.preventDefault();
   var q=document.getElementById('q').value.trim();
   if(!q)return;
-  document.getElementById('info').innerHTML='<p class="muted" style="padding:8px 0">Searching...</p>';
-  document.getElementById('rack').innerHTML='';
+  document.getElementById('result').innerHTML='<p class="muted" style="padding:8px 0">Searching...</p>';
+  // Clear all highlights
+  Object.keys(highlights).forEach(function(u){highlights[u]=null;});
+  redrawAllRacks();
   doSearch(q);
 }
+
 function doSearch(q){
   fetch(EM+'/api/v1/location/search?q='+encodeURIComponent(q),{headers:{Authorization:'Bearer '+K}})
   .then(function(r){if(!r.ok)throw new Error('Search HTTP '+r.status);return r.json();})
   .then(function(d){
     if(!d.success||!d.results||!d.results.length){
-      document.getElementById('info').innerHTML='<div class="alert aw">No items found.</div>';
+      document.getElementById('result').innerHTML='<div class="alert aw">No items found.</div>';
       return;
     }
     var item=d.results[0];
     var locs=item.locations||[];
-    var rackLoc=locs.find(function(l){return l.location_type==='rack';});
+
+    // Find all rack locations that are in our configured racks
+    var matchedRackLocs=locs.filter(function(l){
+      return l.location_type==='rack'&&RACKS.indexOf(l.rack_uuid)>=0;
+    });
+    var anyRackLoc=locs.find(function(l){return l.location_type==='rack';});
     var genLoc=locs.find(function(l){return l.location_type==='location';});
-    renderInfo(item,rackLoc,genLoc);
-    if(!rackLoc)return;
-    fetch(EM+'/api/v1/rack/'+rackLoc.rack_uuid+'/layout',{headers:{Authorization:'Bearer '+K}})
-    .then(function(r2){if(!r2.ok)throw new Error('Layout HTTP '+r2.status);return r2.json();})
-    .then(function(layout){
-      if(!layout.success)throw new Error('Bad layout');
-      renderRack(layout,rackLoc.drawer_row,rackLoc.drawer_col,rackLoc.rack_color||'#3a86ff');
-      fetch('/led?row='+rackLoc.drawer_row+'&col='+rackLoc.drawer_col+'&cols='+layout.cols).catch(function(){});
-    })
-    .catch(function(ex){document.getElementById('rack').innerHTML='<div class="alert ae">'+esc(ex.message)+'</div>';});
+
+    if(matchedRackLocs.length>0){
+      // Apply highlights to all matching racks
+      matchedRackLocs.forEach(function(loc){
+        highlights[loc.rack_uuid]={row:loc.drawer_row,col:loc.drawer_col};
+      });
+      redrawAllRacks();
+      // LED on first match
+      var first=matchedRackLocs[0];
+      fetch('/led?row='+first.drawer_row+'&col='+first.drawer_col+'&cols='+(layouts[first.rack_uuid]?layouts[first.rack_uuid].cols:1)).catch(function(){});
+      renderResult(item,matchedRackLocs[0],null,false);
+    } else {
+      // Item not in any configured rack
+      renderResult(item,anyRackLoc,genLoc,true);
+    }
   })
-  .catch(function(ex){document.getElementById('info').innerHTML='<div class="alert ae">'+esc(ex.message)+'</div>';});
+  .catch(function(ex){document.getElementById('result').innerHTML='<div class="alert ae">'+esc(ex.message)+'</div>';});
 }
-function renderInfo(item,rackLoc,genLoc){
+
+function renderResult(item,rackLoc,genLoc,notInRacks){
   var col=rackLoc?rackLoc.rack_color||'#3a86ff':genLoc?genLoc.location_color||'#6c757d':'#6c757d';
   var h="<div class='card'><div class='card-header' style='background:"+col+"'>"+esc(item.name)+"</div><div class='info-grid'>";
   if(item.sku)        h+="<div class='info-item'><div class='lbl'>SKU</div><div class='val'>"+esc(item.sku)+"</div></div>";
@@ -148,16 +213,34 @@ function renderInfo(item,rackLoc,genLoc){
   }
   if(item.isn&&item.lent_out) h+="<div class='info-item'><div class='lbl'>Status</div><div class='val' style='color:#dc3545'>Lent out</div></div>";
   h+="</div>";
-  if(!rackLoc&&!genLoc) h+="<div class='alert aw' style='margin-top:8px'>Item found but has no location assigned.</div>";
-  else if(!rackLoc)     h+="<div class='alert aw' style='margin-top:8px'>Item is in a general location — no rack/drawer assigned.</div>";
+  if(notInRacks){
+    var where=rackLoc?'in rack <strong>'+esc(rackLoc.rack_name)+'</strong>':genLoc?'in location <strong>'+esc(genLoc.location_name)+'</strong>':'with no location assigned';
+    h+="<div class='alert ai' style='margin-top:8px'>Not in any configured rack — item is "+where+".</div>";
+  }
   h+="</div>";
-  document.getElementById('info').innerHTML=h;
+  document.getElementById('result').innerHTML=h;
 }
-function renderRack(layout,tRow,tCol,color){
-  var uuid=layout.rack_uuid;
+
+// ── Render all racks (re-applies current highlights) ─────────────────────
+function redrawAllRacks(){
+  RACKS.forEach(function(uuid){if(layouts[uuid])renderRack(uuid);});
+}
+
+function renderRack(uuid){
+  var layout=layouts[uuid];
+  if(!layout)return;
+  var hl=highlights[uuid]||null;
+  var tRow=hl?hl.row:null, tCol=hl?hl.col:null;
+  var color=layout.rack_color||'#3a86ff';
   var cols=layout.cols||1;
-  var h="<div class='card'><div class='card-header' style='background:"+esc(color)+"'>"+esc(layout.rack_name)+"</div>"
-       +"<div class='rack-scroll'><div class='rack-grid' style='grid-template-columns:repeat("+cols+",minmax(68px,1fr))'>";
+  var statusTxt=hl?'Drawer '+esc(hl.row+',')+esc(hl.col):'';
+
+  var h="<div class='card'>"
+    +"<div class='card-header' style='background:"+esc(color)+"'>"+esc(layout.rack_name)
+    +(hl?"<span class='rack-status'>&#9654; R"+tRow+"-C"+tCol+"</span>":"")
+    +"</div>"
+    +"<div class='rack-scroll'><div class='rack-grid' style='grid-template-columns:repeat("+cols+",minmax(68px,1fr))'>";
+
   (layout.cells||[]).forEach(function(cell){
     if(cell.state==='merged_away')return;
     var hit=cell.row===tRow&&cell.col===tCol;
@@ -181,6 +264,7 @@ function renderRack(layout,tRow,tCol,color){
     else                                                   h+="<span class='dim'>Empty</span>";
     h+="</span></div>";
   });
+
   h+="</div></div>";
   h+="<div class='legend'>"
     +"<span class='leg'><span class='lb' style='background:#ffc107;border-color:#fd7e14'></span>Target</span>"
@@ -190,8 +274,12 @@ function renderRack(layout,tRow,tCol,color){
     +"<span class='leg'><span class='lb' style='background:#cfe2ff;border-style:dashed;border-color:#0d6efd'></span>Merged</span>"
     +"<span class='leg'><span class='lb' style='background:#6c757d'></span>Unavail</span>"
     +"</div></div>";
-  document.getElementById('rack').innerHTML=h;
+
+  var el=document.getElementById(rackDivId(uuid));
+  if(el)el.innerHTML=h;
 }
+
+// ── Drawer popup ──────────────────────────────────────────────────────────
 function showDrawer(uuid,row,col){
   var overlay=document.getElementById('drawer-popup');
   document.getElementById('popup-content').innerHTML='<p class="muted">Loading...</p>';
