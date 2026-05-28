@@ -285,7 +285,7 @@
                                 <small class="text-muted ms-2">Total Qty: {{ item.get_overall_quantity() }} | Price: {{ currency }}{{ "%.2f"|format(item.get_overall_total_price()) }} | Value: {{ currency }}{{ "%.2f"|format(item.get_overall_total_value()) }}</small>
                             </label>
                             {% if item_perms and item_perms.can_edit_batch %}
-                            <button type="button" class="btn btn-sm btn-success" onclick="openAddBatchModal()" {% if item.batches|length >= 32 %}disabled title="Maximum 32 batches reached"{% endif %}>
+                            <button type="button" class="btn btn-sm btn-success" id="addBatchBtn" onclick="pendingBatchAdd()" {% if item.batches|length >= 32 %}disabled title="Maximum 32 batches reached"{% endif %}>
                                 <i class="bi bi-plus-circle"></i> Add Batch
                             </button>
                             {% endif %}
@@ -468,6 +468,11 @@
                             </div>
                         </div>
                         {% endfor %}
+                        <div id="pending-batches-preview" style="display:none;" class="mt-2">
+                            <hr class="my-1">
+                            <small class="text-warning fw-semibold"><i class="bi bi-clock-history"></i> Pending New Batches <span class="text-muted fw-normal">(will be created when you Save Item)</span></small>
+                            <div id="pending-batches-list" class="mt-1"></div>
+                        </div>
                     </div>
                     {% else %}
                     {# ---- Pending batches UI (new item only) ---- #}
@@ -487,8 +492,8 @@
                             </small>
                         </div>
                     </div>
-                    <input type="hidden" name="pending_batches" id="pending_batches" value="[]">
                     {% endif %}
+                    <input type="hidden" name="pending_batches" id="pending_batches" value="[]">
                     <input type="hidden" name="quantity" id="quantity" value="{{ item.quantity if item else 0 }}">
                     <input type="hidden" name="price" value="{{ item.price if item else 0 }}">
                     {% if item %}
@@ -2724,18 +2729,24 @@ function batchUpdateDrawerGrid(prefix) {
                     <label class="form-label form-label-sm">Manufacturer <small class="text-muted">(optional, max 128)</small></label>
                     <input type="text" class="form-control form-control-sm" id="ab_manufacturer" maxlength="128">
                 </div>
-                <div class="row mb-2">
+                <div class="row mb-1">
                     <div class="col-4">
                         <label class="form-label form-label-sm">Quantity * <small class="text-muted" id="ab_qtyHint">(no limit)</small></label>
                         <input type="number" class="form-control form-control-sm" id="ab_qty" min="0" max="99999" value="1" oninput="abCalcFromQtyPrice()">
                     </div>
                     <div class="col-4">
                         <label class="form-label form-label-sm">Price / Unit</label>
-                        <input type="number" class="form-control form-control-sm" id="ab_price" min="0" step="0.0001" value="0" oninput="abCalcFromQtyPrice()">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">{{ currency }}</span>
+                            <input type="number" class="form-control form-control-sm" id="ab_price" min="0" step="0.0001" value="0" oninput="abCalcFromQtyPrice()">
+                        </div>
                     </div>
                     <div class="col-4">
-                        <label class="form-label form-label-sm">Total Price <small class="text-muted">(auto)</small></label>
-                        <input type="number" class="form-control form-control-sm" id="ab_total" min="0" step="0.01" value="0" oninput="abCalcFromTotal()">
+                        <label class="form-label form-label-sm">Total <small class="text-muted">(auto)</small></label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">{{ currency }}</span>
+                            <input type="number" class="form-control form-control-sm" id="ab_total" min="0" step="0.01" value="0" oninput="abCalcFromTotal()">
+                        </div>
                     </div>
                 </div>
                 <div class="mb-2">
@@ -3432,19 +3443,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     <label class="form-label form-label-sm">Manufacturer <small class="text-muted">(optional, max 128)</small></label>
                     <input type="text" class="form-control form-control-sm" id="pbManufacturer" maxlength="128">
                 </div>
-                <div class="mb-2">
-                    <label class="form-label form-label-sm">Quantity</label>
-                    <input type="number" class="form-control form-control-sm" id="pbQty" min="0" max="99999" value="0" oninput="pbCalcFromQtyPrice()">
-                    <small class="text-muted" id="pbQtyNote"></small>
-                </div>
-                <div class="row mb-2">
-                    <div class="col-6">
-                        <label class="form-label form-label-sm">Price per Unit</label>
-                        <input type="number" class="form-control form-control-sm" id="pbPrice" min="0" step="0.0001" value="0" placeholder="0.00" oninput="pbCalcFromQtyPrice()">
+                <div class="row mb-1">
+                    <div class="col-4">
+                        <label class="form-label form-label-sm">Quantity <small class="text-muted" id="pbQtyNote"></small></label>
+                        <input type="number" class="form-control form-control-sm" id="pbQty" min="0" max="99999" value="0" oninput="pbCalcFromQtyPrice()">
                     </div>
-                    <div class="col-6">
-                        <label class="form-label form-label-sm">Total Price <small class="text-muted">(auto)</small></label>
-                        <input type="number" class="form-control form-control-sm" id="pbTotal" min="0" step="0.01" value="0" oninput="pbCalcFromTotal()">
+                    <div class="col-4">
+                        <label class="form-label form-label-sm">Price / Unit</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">{{ currency }}</span>
+                            <input type="number" class="form-control form-control-sm" id="pbPrice" min="0" step="0.0001" value="0" oninput="pbCalcFromQtyPrice()">
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label form-label-sm">Total <small class="text-muted">(auto)</small></label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">{{ currency }}</span>
+                            <input type="number" class="form-control form-control-sm" id="pbTotal" min="0" step="0.01" value="0" oninput="pbCalcFromTotal()">
+                        </div>
                     </div>
                 </div>
                 <div class="mb-2">
@@ -3533,28 +3549,40 @@ document.addEventListener('DOMContentLoaded', function() {
 (function() {
     var pendingBatches = [];
 
+    var _currSym = '{{ currency }}';
+    var _existingBatchCount = {{ item.batches|length if item else 0 }};
+
     function render() {
         var list = document.getElementById('pending-batches-list');
-        var empty = document.getElementById('pending-batches-empty');
         var hidden = document.getElementById('pending_batches');
         if (!list) return;
-        hidden.value = JSON.stringify(pendingBatches);
+        if (hidden) hidden.value = JSON.stringify(pendingBatches);
+
+        // In edit mode: show/hide the pending preview wrapper and update button state
+        var preview = document.getElementById('pending-batches-preview');
+        if (preview) preview.style.display = pendingBatches.length > 0 ? 'block' : 'none';
+        var addBtn = document.getElementById('addBatchBtn');
+        if (addBtn) {
+            var total = _existingBatchCount + pendingBatches.length;
+            addBtn.disabled = (total >= 32);
+            addBtn.title = total >= 32 ? 'Maximum 32 batches reached' : '';
+        }
 
         if (pendingBatches.length === 0) {
-            list.innerHTML = '<small class="text-muted" id="pending-batches-empty"><i class="bi bi-info-circle"></i> No batches added yet. Click "Add Batch" to pre-create batches.</small>';
+            list.innerHTML = '<small class="text-muted"><i class="bi bi-info-circle"></i> No batches added yet. Click "Add Batch" to pre-create batches.</small>';
             return;
         }
 
         var html = '<table class="table table-sm table-bordered mb-0" style="font-size:0.83rem;">';
-        html += '<thead class="table-light"><tr><th>#</th><th>Label</th><th>Type</th><th>Qty</th><th>Price/Unit</th><th>Total Price</th><th>Date</th><th>Note</th><th></th></tr></thead><tbody>';
+        html += '<thead class="table-light"><tr><th>#</th><th>Label</th><th>Type</th><th>Qty</th><th>Price/Unit</th><th>Total</th><th>Date</th><th>Note</th><th></th></tr></thead><tbody>';
         pendingBatches.forEach(function(b, i) {
             html += '<tr>';
             html += '<td>' + (i + 1) + '</td>';
             html += '<td>' + (b.label ? escHtml(b.label) : '<span class="text-muted">—</span>') + '</td>';
             html += '<td>' + (b.sn_tracking ? '<span class="badge bg-dark">Tracking</span>' : '<span class="badge bg-secondary">Non-Tracking</span>') + '</td>';
             html += '<td>' + b.quantity + '</td>';
-            html += '<td>' + (b.price > 0 ? b.price.toFixed(4) : '<span class="text-muted">—</span>') + '</td>';
-            html += '<td>' + (b.total > 0 ? b.total.toFixed(2) : '<span class="text-muted">—</span>') + '</td>';
+            html += '<td>' + (b.price > 0 ? _currSym + b.price.toFixed(4) : '<span class="text-muted">—</span>') + '</td>';
+            html += '<td>' + (b.total > 0 ? _currSym + b.total.toFixed(2) : '<span class="text-muted">—</span>') + '</td>';
             html += '<td>' + (b.date ? escHtml(b.date) : '<span class="text-muted">—</span>') + '</td>';
             html += '<td>' + (b.note ? escHtml(b.note) : '<span class="text-muted">—</span>') + '</td>';
             html += '<td class="text-nowrap">';
@@ -3634,8 +3662,8 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('pbQty').value = b.quantity;
         document.getElementById('pbQty').max = b.sn_tracking ? '100' : '99999';
         document.getElementById('pbQtyNote').textContent = b.sn_tracking ? 'Max 100 for tracking batches.' : '';
-        document.getElementById('pbPrice').value = b.price || '0';
-        document.getElementById('pbTotal').value = b.total || '0';
+        document.getElementById('pbPrice').value = parseFloat(b.price || 0).toFixed(4);
+        document.getElementById('pbTotal').value = parseFloat(b.total || 0).toFixed(2);
         document.getElementById('pbDate').value = b.date || '';
         document.getElementById('pbFollowMain').checked = b.follow_main_location !== false;
         document.getElementById('pbLocationId').value = b.location_id || '';
@@ -3679,9 +3707,9 @@ document.addEventListener('DOMContentLoaded', function() {
         var maxQty = tracking ? 100 : 99999;
         if (qty < 0) qty = 0;
         if (qty > maxQty) qty = maxQty;
-        var price = parseFloat(document.getElementById('pbPrice').value) || 0;
+        var price = parseFloat(parseFloat(document.getElementById('pbPrice').value || 0).toFixed(4)) || 0;
         if (price < 0) price = 0;
-        var total = parseFloat(document.getElementById('pbTotal').value) || 0;
+        var total = parseFloat(parseFloat(document.getElementById('pbTotal').value || 0).toFixed(2)) || 0;
         if (total < 0) total = 0;
         var date = document.getElementById('pbDate').value;
         var followMain = document.getElementById('pbFollowMain').checked;

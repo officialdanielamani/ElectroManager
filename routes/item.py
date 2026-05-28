@@ -628,6 +628,79 @@ def item_edit(uuid):
 
         db.session.commit()
 
+        # Process any pending new batches submitted from the edit form
+        pending_batches_raw = request.form.get('pending_batches', '[]')
+        try:
+            pending_batches_list = json.loads(pending_batches_raw)
+        except (json.JSONDecodeError, TypeError):
+            pending_batches_list = []
+
+        if isinstance(pending_batches_list, list) and perms.get('can_edit_batch') and pending_batches_list:
+            from models import ItemBatch
+            for pb in pending_batches_list:
+                if not isinstance(pb, dict):
+                    continue
+                qty = int(pb.get('quantity', 0)) if perms.get('can_edit_quantity') else 0
+                if qty < 0:
+                    qty = 0
+                sn_tracking = bool(pb.get('sn_tracking', False))
+                max_qty = 100 if sn_tracking else 99999
+                if qty > max_qty:
+                    qty = max_qty
+                label = str(pb.get('label', '')).strip()[:32] or None
+                manufacturer = str(pb.get('manufacturer', '')).strip()[:128] or None
+                price = float(pb.get('price', 0) or 0) if perms.get('can_edit_price') else 0.0
+                if price < 0:
+                    price = 0.0
+                date_str = pb.get('date', '')
+                purchase_date = None
+                if date_str:
+                    try:
+                        purchase_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                    except ValueError:
+                        pass
+                follow_main = pb.get('follow_main_location', True)
+                if follow_main is None:
+                    follow_main = True
+                batch_loc_id = pb.get('location_id') or None
+                batch_rack_id = pb.get('rack_id') or None
+                batch_drawer = pb.get('drawer') or None
+                try:
+                    batch_loc_id = int(batch_loc_id) if batch_loc_id else None
+                except (ValueError, TypeError):
+                    batch_loc_id = None
+                try:
+                    batch_rack_id = int(batch_rack_id) if batch_rack_id else None
+                except (ValueError, TypeError):
+                    batch_rack_id = None
+                if follow_main:
+                    batch_loc_id = None
+                    batch_rack_id = None
+                    batch_drawer = None
+                note = str(pb.get('note', '')).strip()[:128] or None
+                batch = ItemBatch(
+                    item_id=item.id,
+                    batch_number=item.get_next_batch_number(),
+                    batch_label=label,
+                    manufacturer=manufacturer,
+                    note=note,
+                    quantity=qty,
+                    price_per_unit=price,
+                    purchase_date=purchase_date,
+                    sn_tracking_enabled=sn_tracking,
+                    follow_main_location=bool(follow_main),
+                    location_id=batch_loc_id,
+                    rack_id=batch_rack_id,
+                    drawer=batch_drawer,
+                )
+                db.session.add(batch)
+                db.session.flush()
+                if sn_tracking:
+                    batch.generate_serial_numbers()
+            item.recalculate_from_batches()
+            item.updated_by = current_user.id
+            db.session.commit()
+
         log_audit(current_user.id, 'update', 'item', item.id, f'Updated item: {item.name}')
         flash(f'Item "{item.name}" updated successfully!', 'success')
         return redirect(url_for('item.item_detail', uuid=item.uuid))
