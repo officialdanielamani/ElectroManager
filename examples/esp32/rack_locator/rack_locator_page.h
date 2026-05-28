@@ -26,6 +26,9 @@ h2{margin:0 0 4px;font-size:1.2rem}
 input[type=text]{flex:1;min-width:180px;padding:7px 11px;border:1px solid #ced4da;border-radius:6px;font-size:.95rem}
 button{padding:7px 18px;background:#0d6efd;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:.95rem}
 button:hover{background:#0b5ed7}
+.btn-sm{padding:4px 12px;font-size:.8rem}
+.btn-sec{background:#6c757d}
+.btn-sec:hover{background:#5c636a}
 .info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-top:10px}
 .info-item{background:#f1f3f5;border-radius:6px;padding:7px 10px}
 .lbl{font-size:.68rem;color:#6c757d;text-transform:uppercase;letter-spacing:.04em}
@@ -62,6 +65,15 @@ button:hover{background:#0b5ed7}
 .muted{color:#6c757d;font-size:.82rem}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid #dee2e6;border-top-color:#0d6efd;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
+.res-item{padding:9px 14px;border-bottom:1px solid #f0f0f0;cursor:pointer;display:flex;align-items:center;gap:10px}
+.res-item:last-child{border-bottom:none}
+.res-item:hover{background:#f8f9fa}
+.res-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.res-body{flex:1;min-width:0}
+.res-name{font-weight:600;font-size:.92rem}
+.res-sku{font-size:.74rem;color:#6c757d}
+.res-loc{font-size:.78rem;color:#495057;margin-top:2px}
+.back-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #f0f0f0}
 .popup-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);display:none;z-index:200;align-items:flex-start;justify-content:center;padding-top:48px}
 .popup{background:#fff;border-radius:10px;padding:16px 18px;max-width:460px;width:93%;max-height:78vh;overflow-y:auto;position:relative;box-shadow:0 8px 32px rgba(0,0,0,.18)}
 .popup-close{position:absolute;top:10px;right:14px;font-size:1.4rem;cursor:pointer;color:#6c757d;line-height:1;font-weight:300}
@@ -81,7 +93,7 @@ button:hover{background:#0b5ed7}
 <p class="muted" style="margin:3px 0 10px">Enter item name, UUID, batch UID (e.g. ABC-B01), or ISN</p>
 <form onsubmit="find(event)">
 <div class="row">
-<input id="q" type="text" placeholder="Arduino, ABC-B01, ISN-0042..." autocomplete="off" autofocus>
+<input id="q" type="text" placeholder="OLED, ABC-B01, ISN-0042..." autocomplete="off" autofocus>
 <button type="submit">Find</button>
 </div>
 </form>
@@ -102,6 +114,9 @@ const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'
 
 // layouts[uuid] = layout response; highlights[uuid] = {row,col} or null
 var layouts={}, highlights={};
+
+// Stored search results so list items can reference by index
+var _results=[];
 
 // ── Init: load all configured racks ──────────────────────────────────────
 window.onload=function(){
@@ -145,57 +160,104 @@ function setRackError(uuid,msg){
   if(el)el.innerHTML="<div class='alert ae'><strong>"+esc(uuid)+"</strong> — "+esc(msg)+"</div>";
 }
 
-// ── Search ────────────────────────────────────────────────────────────────
+// ── Search entry point ────────────────────────────────────────────────────
 function find(e){
   e.preventDefault();
   var q=document.getElementById('q').value.trim();
   if(!q)return;
-  document.getElementById('result').innerHTML='<p class="muted" style="padding:8px 0">Searching...</p>';
-  // Clear all highlights
+  document.getElementById('result').innerHTML='<p class="muted" style="padding:8px 0"><span class="spin"></span> Searching…</p>';
+  _results=[];
   Object.keys(highlights).forEach(function(u){highlights[u]=null;});
   redrawAllRacks();
-  doSearch(q);
-}
-
-function doSearch(q){
   fetch(EM+'/api/v1/location/search?q='+encodeURIComponent(q),{headers:{Authorization:'Bearer '+K}})
   .then(function(r){if(!r.ok)throw new Error('Search HTTP '+r.status);return r.json();})
   .then(function(d){
     if(!d.success||!d.results||!d.results.length){
-      document.getElementById('result').innerHTML='<div class="alert aw">No items found.</div>';
+      document.getElementById('result').innerHTML='<div class="alert aw">No items found for “'+esc(q)+'”.</div>';
       return;
     }
-    var item=d.results[0];
-    var locs=item.locations||[];
-
-    // Find all rack locations that are in our configured racks
-    var matchedRackLocs=locs.filter(function(l){
-      return l.location_type==='rack'&&RACKS.indexOf(l.rack_uuid)>=0;
-    });
-    var anyRackLoc=locs.find(function(l){return l.location_type==='rack';});
-    var genLoc=locs.find(function(l){return l.location_type==='location';});
-
-    if(matchedRackLocs.length>0){
-      // Apply highlights to all matching racks
-      matchedRackLocs.forEach(function(loc){
-        highlights[loc.rack_uuid]={row:loc.drawer_row,col:loc.drawer_col};
-      });
-      redrawAllRacks();
-      // LED on first match
-      var first=matchedRackLocs[0];
-      fetch('/led?row='+first.drawer_row+'&col='+first.drawer_col+'&cols='+(layouts[first.rack_uuid]?layouts[first.rack_uuid].cols:1)).catch(function(){});
-      renderResult(item,matchedRackLocs[0],null,false);
+    _results=d.results;
+    if(_results.length===1){
+      // Only one match — go straight to detail
+      selectItem(0);
     } else {
-      // Item not in any configured rack
-      renderResult(item,anyRackLoc,genLoc,true);
+      renderResultList();
     }
   })
   .catch(function(ex){document.getElementById('result').innerHTML='<div class="alert ae">'+esc(ex.message)+'</div>';});
 }
 
-function renderResult(item,rackLoc,genLoc,notInRacks){
+// ── Results list (multiple matches) ──────────────────────────────────────
+function renderResultList(){
+  var h="<div class='card'><div class='card-header' style='background:#495057'>"
+    +_results.length+" results — tap to locate</div><div style='padding:2px 0'>";
+  _results.forEach(function(item,i){
+    var locs=item.locations||[];
+    var inRacks=locs.filter(function(l){return l.location_type==='rack'&&RACKS.indexOf(l.rack_uuid)>=0;});
+    var locText,dotColor;
+    if(inRacks.length>0){
+      dotColor='#198754';
+      locText=inRacks.map(function(l){return esc(l.rack_name)+' → '+esc(l.drawer_cell);}).join(' &amp; ');
+    } else {
+      var g=locs.find(function(l){return l.location_type==='location';});
+      var r=locs.find(function(l){return l.location_type==='rack';});
+      if(g){locText=esc(g.location_name);dotColor='#6c757d';}
+      else if(r){locText=esc(r.rack_name)+' (not configured)';dotColor='#fd7e14';}
+      else{locText='No location assigned';dotColor='#adb5bd';}
+    }
+    h+="<div class='res-item' onclick='selectItem("+i+")'>"
+      +"<span class='res-dot' style='background:"+dotColor+"'></span>"
+      +"<div class='res-body'>"
+      +"<div class='res-name'>"+esc(item.name)+"</div>";
+    if(item.sku)h+="<div class='res-sku'>"+esc(item.sku)+"</div>";
+    h+="<div class='res-loc'>"+locText+"</div>";
+    h+="</div></div>";
+  });
+  h+="</div></div>";
+  document.getElementById('result').innerHTML=h;
+}
+
+// ── Select an item from results ───────────────────────────────────────────
+function selectItem(idx){
+  var item=_results[idx];
+  if(!item)return;
+
+  Object.keys(highlights).forEach(function(u){highlights[u]=null;});
+
+  var locs=item.locations||[];
+  var matchedRackLocs=locs.filter(function(l){
+    return l.location_type==='rack'&&RACKS.indexOf(l.rack_uuid)>=0;
+  });
+  var anyRackLoc=locs.find(function(l){return l.location_type==='rack';});
+  var genLoc=locs.find(function(l){return l.location_type==='location';});
+
+  if(matchedRackLocs.length>0){
+    matchedRackLocs.forEach(function(loc){
+      highlights[loc.rack_uuid]={row:loc.drawer_row,col:loc.drawer_col};
+    });
+    redrawAllRacks();
+    var first=matchedRackLocs[0];
+    fetch('/led?row='+first.drawer_row+'&col='+first.drawer_col
+      +'&cols='+(layouts[first.rack_uuid]?layouts[first.rack_uuid].cols:1)).catch(function(){});
+    renderItemDetail(item,matchedRackLocs[0],null,false);
+  } else {
+    renderItemDetail(item,anyRackLoc,genLoc,true);
+  }
+}
+
+// ── Item detail card ──────────────────────────────────────────────────────
+function renderItemDetail(item,rackLoc,genLoc,notInRacks){
   var col=rackLoc?rackLoc.rack_color||'#3a86ff':genLoc?genLoc.location_color||'#6c757d':'#6c757d';
-  var h="<div class='card'><div class='card-header' style='background:"+col+"'>"+esc(item.name)+"</div><div class='info-grid'>";
+  var h="<div class='card'>";
+  // Back button when there were multiple results
+  if(_results.length>1){
+    h+="<div class='back-bar' style='padding:10px 14px 0'>"
+      +"<button class='btn-sm btn-sec' onclick='renderResultList()' style='padding:4px 12px;font-size:.8rem;background:#6c757d;color:#fff;border:none;border-radius:5px;cursor:pointer'>"
+      +"← Back</button>"
+      +"<span class='muted' style='font-size:.8rem'>"+_results.length+" results</span>"
+      +"</div>";
+  }
+  h+="<div class='card-header' style='background:"+col+"'>"+esc(item.name)+"</div><div class='info-grid'>";
   if(item.sku)        h+="<div class='info-item'><div class='lbl'>SKU</div><div class='val'>"+esc(item.sku)+"</div></div>";
   if(item.short_info) h+="<div class='info-item'><div class='lbl'>Info</div><div class='val'>"+esc(item.short_info)+"</div></div>";
   if(item.isn)        h+="<div class='info-item'><div class='lbl'>ISN</div><div class='val'>"+esc(item.isn)+"</div></div>";
@@ -214,7 +276,9 @@ function renderResult(item,rackLoc,genLoc,notInRacks){
   if(item.isn&&item.lent_out) h+="<div class='info-item'><div class='lbl'>Status</div><div class='val' style='color:#dc3545'>Lent out</div></div>";
   h+="</div>";
   if(notInRacks){
-    var where=rackLoc?'in rack <strong>'+esc(rackLoc.rack_name)+'</strong>':genLoc?'in location <strong>'+esc(genLoc.location_name)+'</strong>':'with no location assigned';
+    var where=rackLoc?'in rack <strong>'+esc(rackLoc.rack_name)+'</strong>'
+             :genLoc?'in location <strong>'+esc(genLoc.location_name)+'</strong>'
+             :'with no location assigned';
     h+="<div class='alert ai' style='margin-top:8px'>Not in any configured rack — item is "+where+".</div>";
   }
   h+="</div>";
@@ -233,7 +297,6 @@ function renderRack(uuid){
   var tRow=hl?hl.row:null, tCol=hl?hl.col:null;
   var color=layout.rack_color||'#3a86ff';
   var cols=layout.cols||1;
-  var statusTxt=hl?'Drawer '+esc(hl.row+',')+esc(hl.col):'';
 
   var h="<div class='card'>"
     +"<div class='card-header' style='background:"+esc(color)+"'>"+esc(layout.rack_name)
@@ -282,7 +345,7 @@ function renderRack(uuid){
 // ── Drawer popup ──────────────────────────────────────────────────────────
 function showDrawer(uuid,row,col){
   var overlay=document.getElementById('drawer-popup');
-  document.getElementById('popup-content').innerHTML='<p class="muted">Loading...</p>';
+  document.getElementById('popup-content').innerHTML='<p class="muted">Loading…</p>';
   overlay.style.display='flex';
   fetch(EM+'/api/v1/rack/'+uuid+'/drawer/'+row+'/'+col,{headers:{Authorization:'Bearer '+K}})
   .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
