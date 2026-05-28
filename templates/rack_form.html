@@ -726,17 +726,19 @@ function openRackBiIconPicker() {
     modal.show();
 }
 
-document.getElementById('rackBiIconModal')?.addEventListener('show.bs.modal', async function() {
-    if (_rackBiCache) { _rackBiRenderIcons(_rackBiCache); return; }
-    const grid = document.getElementById('rackBiIconGrid');
-    if (grid) grid.innerHTML = '<p class="text-muted text-center py-4">Loading…</p>';
-    try {
-        const resp = await fetch('/api/icons');
-        _rackBiCache = await resp.json();
-        _rackBiRenderIcons(_rackBiCache);
-    } catch(e) {
-        if (grid) grid.innerHTML = '<p class="text-danger text-center py-4">Error loading icons.</p>';
-    }
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('rackBiIconModal')?.addEventListener('show.bs.modal', async function() {
+        if (_rackBiCache) { _rackBiRenderIcons(_rackBiCache); return; }
+        const grid = document.getElementById('rackBiIconGrid');
+        if (grid) grid.innerHTML = '<p class="text-muted text-center py-4">Loading…</p>';
+        try {
+            const resp = await fetch('/api/icons');
+            _rackBiCache = await resp.json();
+            _rackBiRenderIcons(_rackBiCache);
+        } catch(e) {
+            if (grid) grid.innerHTML = '<p class="text-danger text-center py-4">Error loading icons.</p>';
+        }
+    });
 });
 
 function _rackBiRenderIcons(icons) {
@@ -785,7 +787,7 @@ function selectRackBiIcon(iconName) {
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-star me-2"></i>Select Bootstrap Icon</h5>
+                <h5 class="modal-title"><i class="bi bi-star me-2"></i>Select Icon for Rack</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">

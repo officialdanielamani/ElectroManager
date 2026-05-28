@@ -135,7 +135,11 @@ def visual_storage():
             'merged_cells': rack.get_merged_cells(),
             'drawer_info': rack.get_drawer_info(),
             'drawer_icons': rack.get_drawer_icons(),
-            'rack_icon': rack.get_rack_icon(),
+            'rack_icon': (lambda pic, ri: (
+                {'type': 'icon', 'value': pic[7:]} if ri['type'] == 'none' and pic and pic.startswith('biicon/')
+                else {'type': 'file', 'value': url_for('location_rack.rack_picture', filepath=pic)} if ri['type'] == 'none' and pic
+                else ri
+            ))(rack.picture, rack.get_rack_icon()),
             'skip_cells': list(skip_cells),
             'cell_spans': cell_spans,
             'group_cells': group_cells,
