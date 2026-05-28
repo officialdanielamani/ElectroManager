@@ -47,13 +47,21 @@
 
                     <hr>
 
-                    <!-- Timezone (placeholder — not yet functional) -->
+                    <!-- Display Timezone -->
                     <div class="mb-3">
-                        <label for="system_timezone" class="form-label fw-semibold">System Timezone</label>
-                        <select class="form-select" id="system_timezone" name="system_timezone" disabled>
-                            <option value="">— Coming soon —</option>
+                        <label for="display_timezone" class="form-label fw-semibold">Display Timezone</label>
+                        <select class="form-select" id="display_timezone" name="display_timezone">
+                            <option value="" {% if not display_timezone %}selected{% endif %}>UTC+00:00 (default / server UTC)</option>
+                            {% for val, label in tz_offsets %}
+                            <option value="{{ val }}" {% if display_timezone == val %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
                         </select>
-                        <div class="form-text"><i class="bi bi-info-circle"></i> Timezone selection is not yet functional. Dates and times currently use the server's local timezone.</div>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i>
+                            All timestamps in the UI are stored as UTC and converted for display only.
+                            You can also set the <code>TZ</code> environment variable (IANA name, e.g. <code>Asia/Kuala_Lumpur</code>) as a fallback — this setting takes priority.
+                            {% if tz_label %}<br><span class="text-success"><i class="bi bi-check-circle"></i> Currently displaying as <strong>{{ tz_label }}</strong></span>{% endif %}
+                        </div>
                     </div>
 
                     <!-- Banner Timeout -->

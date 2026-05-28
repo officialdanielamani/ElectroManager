@@ -244,6 +244,17 @@
                             <li><a class="dropdown-item" href="{{ url_for('settings.settings_general') }}">
                                 <i class="bi bi-palette"></i> General Settings
                             </a></li>
+                            <li>
+                                <div style="padding:6px 16px 8px; border-top:1px solid #dee2e6; margin-top:2px;">
+                                    <div style="font-size:.8rem; color:#6c757d; letter-spacing:.03em;">SERVER TIME</div>
+                                    <div style="font-family:monospace; font-size:.92rem; font-weight:600; color:#212529; margin-top:1px;">
+                                        {{ server_now.strftime('%d/%m/%Y') }}
+                                        <span style="color:#6c757d; margin:0 3px;">|</span>
+                                        {{ server_now.strftime('%H:%M') }}
+                                    </div>
+                                    <div style="font-size:.72rem; color:#adb5bd;">{{ tz_label }}</div>
+                                </div>
+                            </li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">
                                 <i class="bi bi-box-arrow-right"></i> Logout

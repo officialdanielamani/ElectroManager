@@ -81,6 +81,76 @@ def from_json_filter(value):
 app.jinja_env.filters['from_json'] = from_json_filter
 
 
+# ── Display timezone ──────────────────────────────────────────────────────
+import re as _re, os as _os
+from datetime import timezone as _tz_cls, timedelta as _td
+
+# UTC offset list: -12:00 → +14:00 in 15-minute steps (~105 entries)
+TZ_OFFSETS = []
+for _tm in range(-12 * 60, 14 * 60 + 1, 15):
+    _s = '+' if _tm >= 0 else '-'
+    _a = abs(_tm)
+    _h, _m = divmod(_a, 60)
+    _v = f"{_s}{_h:02d}:{_m:02d}"
+    TZ_OFFSETS.append((_v, f"UTC{_v}"))
+
+def _resolve_display_tz():
+    raw = ''
+    try:
+        s = Setting.query.filter_by(key='display_timezone').first()
+        if s and s.value:
+            raw = s.value.strip()
+    except Exception:
+        pass
+    if not raw:
+        raw = _os.environ.get('TZ', '').strip()
+    if not raw:
+        return _tz_cls.utc, 'UTC+00:00'
+    # Fixed offset: +08:00 / -05:30
+    m = _re.fullmatch(r'([+-])(\d{1,2}):(\d{2})', raw)
+    if m:
+        sign = 1 if m.group(1) == '+' else -1
+        h, mins = int(m.group(2)), int(m.group(3))
+        tz = _tz_cls(sign * _td(hours=h, minutes=mins))
+        return tz, f"UTC{m.group(1)}{h:02d}:{mins:02d}"
+    # IANA name (TZ env, Docker users)
+    try:
+        from zoneinfo import ZoneInfo
+        from datetime import datetime as _dtnow
+        tz = ZoneInfo(raw)
+        offset = _dtnow.now(tz).utcoffset()
+        total = int(offset.total_seconds())
+        sign = '+' if total >= 0 else '-'
+        h, mins = divmod(abs(total) // 60, 60)
+        return tz, f"UTC{sign}{h:02d}:{mins:02d} ({raw})"
+    except Exception:
+        return _tz_cls.utc, 'UTC+00:00'
+
+def _get_display_tz():
+    from flask import g, has_request_context
+    if has_request_context():
+        if not hasattr(g, '_tz_cache'):
+            g._tz_cache = _resolve_display_tz()
+        return g._tz_cache
+    return _resolve_display_tz()
+
+def _localtime_filter(dt, fmt='%Y-%m-%d %H:%M'):
+    if not dt:
+        return ''
+    tz, _ = _get_display_tz()
+    if not getattr(dt, 'tzinfo', None):
+        dt = dt.replace(tzinfo=_tz_cls.utc)
+    return dt.astimezone(tz).strftime(fmt)
+
+app.jinja_env.filters['localtime'] = _localtime_filter
+
+@app.context_processor
+def _inject_server_time():
+    from datetime import datetime as _dt
+    tz, label = _get_display_tz()
+    now_local = _dt.now(_tz_cls.utc).astimezone(tz)
+    return {'server_now': now_local, 'tz_label': label}
+
 def load_dependencies():
     """Return core static assets bundled in the repository."""
     return [

@@ -394,7 +394,7 @@
                                     </td>
                                     {% endif %}
                                     {% if col == 'updated_at' %}
-                                    <td>{{ item.updated_at.strftime('%Y-%m-%d %H:%M') if item.updated_at else '-' }}</td>
+                                    <td>{{ item.updated_at | localtime if item.updated_at else '-' }}</td>
                                     {% endif %}
                                     {% if col == 'status' %}
                                     <td>

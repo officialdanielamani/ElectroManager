@@ -252,13 +252,9 @@
                     <tr>
                         <td><code class="small">{{ s.lending_id }}</code></td>
                         <td class="text-truncate" style="max-width:130px;">{{ s.get_lend_to_display() or '—' }}</td>
-                        <td class="d-none d-sm-table-cell small text-muted">{{ s.lend_start.strftime('%d/%m/%y') if s.lend_start else '—' }}</td>
-                        <td class="d-none d-sm-table-cell small">
-                            {% if s.lend_end %}
-                                {{ s.lend_end.strftime('%d/%m/%y') }}
-                            {% else %}—{% endif %}
-                        </td>
-                        <td class="small text-muted">{{ s.created_at.strftime('%d/%m/%y %H:%M') }}</td>
+                        <td class="d-none d-sm-table-cell small text-muted">{{ s.lend_start | localtime('%d/%m/%y') if s.lend_start else '—' }}</td>
+                        <td class="d-none d-sm-table-cell small">{{ s.lend_end | localtime('%d/%m/%y') if s.lend_end else '—' }}</td>
+                        <td class="small text-muted">{{ s.created_at | localtime('%d/%m/%y %H:%M') }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -410,7 +406,7 @@
                 <tbody>
                     {% for log in recent_activity %}
                     <tr>
-                        <td class="small text-muted text-nowrap">{{ log.timestamp.strftime('%d/%m/%y %H:%M') }}</td>
+                        <td class="small text-muted text-nowrap">{{ log.timestamp | localtime('%d/%m/%y %H:%M') }}</td>
                         <td class="small text-truncate" style="max-width:100px;">
                             {% if log.user %}{{ log.user.name or log.user.username }}{% else %}—{% endif %}
                         </td>

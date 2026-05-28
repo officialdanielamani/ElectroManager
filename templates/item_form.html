@@ -409,8 +409,8 @@
                                                 <tr>
                                                     <td>{{ r.get_lend_to_display() or '(not set)' }}</td>
                                                     <td>{{ r.quantity }}</td>
-                                                    <td>{% if r.lend_start %}{{ r.lend_start.strftime('%d/%m/%Y') }}{% if r.lend_start.hour or r.lend_start.minute %} {{ r.lend_start.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
-                                                    <td>{% if r.lend_end %}{{ r.lend_end.strftime('%d/%m/%Y') }}{% if r.lend_end.hour or r.lend_end.minute %} {{ r.lend_end.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
+                                                    <td>{{ r.lend_start | localtime('%d/%m/%Y %H:%M') if r.lend_start else '—' }}</td>
+                                                    <td>{{ r.lend_end | localtime('%d/%m/%Y %H:%M') if r.lend_end else '—' }}</td>
                                                     <td><small class="text-muted">{{ r.lend_note or '—' }}</small></td>
                                                     <td class="text-center">{% if r.lend_notify_enabled %}<i class="bi bi-bell-fill text-warning"></i>{% else %}—{% endif %}</td>
                                                 </tr>

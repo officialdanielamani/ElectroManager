@@ -624,6 +624,8 @@ def settings_system():
             Setting.set('max_drawer_rows', max_drawer_rows, 'Maximum drawer rows (1-32)')
             Setting.set('max_drawer_cols', max_drawer_cols, 'Maximum drawer columns (1-32)')
             Setting.set('banner_timeout', banner_timeout, 'Banner auto-dismiss timeout in seconds (0=permanent)')
+            display_timezone = request.form.get('display_timezone', '').strip()
+            Setting.set('display_timezone', display_timezone, 'Display timezone offset for all timestamps (e.g. +08:00)')
             signup_enabled = 'signup_enabled' in request.form
             Setting.set('signup_enabled', signup_enabled, 'Enable/disable user signup form')
             Setting.set('download_all_item_attachments',   'download_all_item_attachments'   in request.form, 'Enable Download All ZIP for item attachments')
@@ -696,6 +698,7 @@ def settings_system():
     max_drawer_rows = Setting.get('max_drawer_rows', '10')
     max_drawer_cols = Setting.get('max_drawer_cols', '10')
     banner_timeout = Setting.get('banner_timeout', '5')
+    display_timezone = Setting.get('display_timezone', '')
     download_all_item_attachments  = Setting.get('download_all_item_attachments',  True)
     download_all_item_share_files  = Setting.get('download_all_item_share_files',  True)
     download_all_project_attachments = Setting.get('download_all_project_attachments', True)
@@ -744,6 +747,8 @@ def settings_system():
                           max_drawer_rows=max_drawer_rows,
                           max_drawer_cols=max_drawer_cols,
                           banner_timeout=banner_timeout,
+                          display_timezone=display_timezone,
+                          tz_offsets=__import__('app').TZ_OFFSETS,
                           download_all_item_attachments=download_all_item_attachments,
                           download_all_item_share_files=download_all_item_share_files,
                           download_all_project_attachments=download_all_project_attachments,

@@ -385,8 +385,8 @@
     <div class="avoid-break" style="margin-top: 14px;">
         <div class="section-title"><i class="bi bi-clock-history"></i> Created &amp; Updated</div>
         <div style="font-size: 0.9em; color: #555;">
-            <div>Created: {{ item.created_at.strftime('%Y-%m-%d %H:%M') if item.created_at else 'N/A' }}{% if item.creator %} - by {{ item.creator.name or item.creator.username }}{% endif %}</div>
-            <div>Updated: {{ item.updated_at.strftime('%Y-%m-%d %H:%M') if item.updated_at else 'N/A' }}{% if item.updater %} - by {{ item.updater.name or item.updater.username }}{% endif %}</div>
+            <div>Created: {{ item.created_at | localtime if item.created_at else 'N/A' }}{% if item.creator %} - by {{ item.creator.name or item.creator.username }}{% endif %}</div>
+            <div>Updated: {{ item.updated_at | localtime if item.updated_at else 'N/A' }}{% if item.updater %} - by {{ item.updater.name or item.updater.username }}{% endif %}</div>
         </div>
     </div>
 
