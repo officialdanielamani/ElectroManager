@@ -67,8 +67,8 @@ def reports():
             'no_stock':       sum(1 for i in all_items if i.is_no_stock()),
             'total_batches':  ItemBatch.query.count(),
             'total_value':    total_value,
-            'category_stats': category_stats,
-            'footprint_stats': footprint_stats,
+            'category_stats': [[r[0], r[1]] for r in category_stats],
+            'footprint_stats': [[r[0], r[1]] for r in footprint_stats],
         }
 
     # ── Lending & Return ────────────────────────────────────────────────────────

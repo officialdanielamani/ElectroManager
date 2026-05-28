@@ -131,32 +131,32 @@
                     <hr>
                     <!-- Storage Usage -->
                     <label class="form-label fw-semibold"><i class="bi bi-hdd"></i> Storage Usage</label>
-                    <div class="form-text mb-2">Disk and folder usage for application data directories.</div>
-                    {% set bar_class = 'bg-danger' if disk_pct > 80 else ('bg-warning' if disk_pct > 70 else 'bg-success') %}
-                    <div class="mb-2">
+                    <div class="form-text mb-2">Folder sizes and underlying filesystem usage. Each bar shows how full the filesystem that folder lives on is — useful when <code>uploads/</code> and <code>instance/</code> are on separate volumes.</div>
+                    <div class="mb-3">
                         <div class="d-flex justify-content-between small mb-1">
-                            <span><i class="bi bi-hdd-fill"></i> Total Disk</span>
-                            <span class="text-muted">{{ (disk_used / 1073741824) | round(2) }} GB / {{ (disk_total / 1073741824) | round(2) }} GB</span>
+                            <span><i class="bi bi-folder2-open text-primary"></i> <strong>uploads/</strong></span>
+                            <span class="text-muted">{{ (uploads_size / 1048576) | round(2) }} MB used &nbsp;·&nbsp; {{ uploads_disk_pct }}% of {{ (uploads_disk_total / 1073741824) | round(1) }} GB filesystem</span>
                         </div>
-                        <div class="progress" style="height:16px;">
-                            <div class="progress-bar {{ bar_class }}" role="progressbar"
-                                 style="width:{{ [disk_pct, 100]|min }}%;"
-                                 aria-valuenow="{{ disk_pct }}" aria-valuemin="0" aria-valuemax="100">
-                                {{ disk_pct }}%
+                        <div class="progress" style="height:14px;">
+                            <div class="progress-bar {% if uploads_disk_pct > 80 %}bg-danger{% elif uploads_disk_pct > 70 %}bg-warning{% else %}bg-success{% endif %}"
+                                 role="progressbar"
+                                 style="width:{{ [uploads_disk_pct, 100]|min }}%;"
+                                 aria-valuenow="{{ uploads_disk_pct }}" aria-valuemin="0" aria-valuemax="100">
+                                {{ uploads_disk_pct }}%
                             </div>
                         </div>
                     </div>
-                    <div class="row g-2 mt-1">
-                        <div class="col-md-6">
-                            <div class="border rounded p-2 small">
-                                <div class="fw-semibold text-truncate"><i class="bi bi-folder2-open text-primary"></i> uploads/</div>
-                                <div class="text-muted">{{ (uploads_size / 1048576) | round(2) }} MB</div>
-                            </div>
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span><i class="bi bi-database text-secondary"></i> <strong>instance/</strong></span>
+                            <span class="text-muted">{{ (instance_size / 1048576) | round(2) }} MB used &nbsp;·&nbsp; {{ instance_disk_pct }}% of {{ (instance_disk_total / 1073741824) | round(1) }} GB filesystem</span>
                         </div>
-                        <div class="col-md-6">
-                            <div class="border rounded p-2 small">
-                                <div class="fw-semibold text-truncate"><i class="bi bi-database text-secondary"></i> instance/</div>
-                                <div class="text-muted">{{ (instance_size / 1048576) | round(2) }} MB</div>
+                        <div class="progress" style="height:14px;">
+                            <div class="progress-bar {% if instance_disk_pct > 80 %}bg-danger{% elif instance_disk_pct > 70 %}bg-warning{% else %}bg-success{% endif %}"
+                                 role="progressbar"
+                                 style="width:{{ [instance_disk_pct, 100]|min }}%;"
+                                 aria-valuenow="{{ instance_disk_pct }}" aria-valuemin="0" aria-valuemax="100">
+                                {{ instance_disk_pct }}%
                             </div>
                         </div>
                     </div>
@@ -628,7 +628,7 @@
                     <li><strong>User Signup</strong> — Allow self-registration at <code>/register</code>. Disable to require admin-created accounts only.</li>
                     <li><strong>Default Theme</strong> — Fallback theme for anonymous users and new accounts.</li>
                     <li><strong>Download All (ZIP)</strong> — Control which sections expose a bulk download button.</li>
-                    <li><strong>Storage Usage</strong> — Live view of disk space and directory sizes for <code>uploads/</code> and <code>instance/</code>. Bar turns yellow above 70% and red above 80%.</li>
+                    <li><strong>Storage Usage</strong> — Two bars showing folder sizes and the fill level of each folder's underlying filesystem. Supports separate volumes (e.g. uploads on HDD, instance on SSD). Bar turns yellow above 70% and red above 80%.</li>
                 </ul>
 
                 <h6 class="mt-3"><i class="bi bi-building"></i> Company Details</h6>

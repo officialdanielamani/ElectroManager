@@ -751,15 +751,20 @@ def settings_system():
 
     upload_folder = current_app.config['UPLOAD_FOLDER']
     instance_folder = current_app.instance_path
+    uploads_size = _dir_size(upload_folder)
+    instance_size = _dir_size(instance_folder)
     try:
-        _disk = shutil.disk_usage(upload_folder)
-        disk_total = _disk.total
-        disk_used  = _disk.used
-        disk_pct   = round(_disk.used / _disk.total * 100, 1) if _disk.total else 0
+        _ud = shutil.disk_usage(upload_folder)
+        uploads_disk_total = _ud.total
+        uploads_disk_pct = round(_ud.used / _ud.total * 100, 1) if _ud.total else 0
     except Exception:
-        disk_total = disk_used = disk_pct = 0
-    uploads_size   = _dir_size(upload_folder)
-    instance_size  = _dir_size(instance_folder)
+        uploads_disk_total = uploads_disk_pct = 0
+    try:
+        _id = shutil.disk_usage(instance_folder)
+        instance_disk_total = _id.total
+        instance_disk_pct = round(_id.used / _id.total * 100, 1) if _id.total else 0
+    except Exception:
+        instance_disk_total = instance_disk_pct = 0
 
     return render_template('settings_system.html',
                           Setting=Setting,
@@ -799,11 +804,12 @@ def settings_system():
                           api_rack_drawer_enabled=api_rack_drawer_enabled,
                           api_lending_return_enabled=api_lending_return_enabled,
                           demo_mode=current_app.config.get('DEMO_MODE', False),
-                          disk_total=disk_total,
-                          disk_used=disk_used,
-                          disk_pct=disk_pct,
                           uploads_size=uploads_size,
                           instance_size=instance_size,
+                          uploads_disk_total=uploads_disk_total,
+                          uploads_disk_pct=uploads_disk_pct,
+                          instance_disk_total=instance_disk_total,
+                          instance_disk_pct=instance_disk_pct,
                           project_upload_settings={
                               'picture': {'extensions': Setting.get('project_upload_picture_extensions', 'webp,png,svg,jpeg,jpg'), 'max_size': Setting.get('project_upload_picture_max_size', '10')},
                               'document': {'extensions': Setting.get('project_upload_document_extensions', 'txt,doc,docx,pdf'), 'max_size': Setting.get('project_upload_document_max_size', '10')},
