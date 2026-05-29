@@ -122,6 +122,9 @@
 
                 <!-- Category, Footprint, Location, Tags -->
                 <div class="row mb-3">
+                    <div class="col-md-12"><strong>Short Info:</strong> {{ item.short_info if item.short_info else '' }}</div>
+                </div>
+                <div class="row mb-3">
                     <div class="col-md-6"><strong>Category:</strong> {{ item.category.name if item.category else 'None' }}</div>
                     <div class="col-md-6"><strong>Footprint:</strong> {{ item.footprint.name if item.footprint else 'None' }}</div>
                 </div>
