@@ -105,11 +105,14 @@
                     {% endif %}
                     <div style="flex:1;">
                         <div class="mb-2"><strong>UUID:</strong> <code>{{ item.uuid }}</code></div>
+                        {% if can_view_info %}
                         <div class="mb-2"><strong>SKU:</strong> {{ item.sku or 'N/A' }}</div>
                         <div><strong>Type / Model:</strong> {{ item.info or 'N/A' }}</div>
+                        {% endif %}
                     </div>
                 </div>
 
+                {% if can_view_info %}
                 <hr>
 
                 <!-- Category, Footprint, Location, Tags -->
@@ -128,6 +131,7 @@
                         {% endif %}
                     </div>
                 </div>
+                {% endif %}
 
                 <hr>
 
@@ -222,12 +226,14 @@
                 {% if item.is_no_stock() %}
                 <div class="alert alert-danger"><i class="bi bi-exclamation-circle-fill"></i> No Stock!</div>
                 {% elif item.is_low_stock() %}
-                <div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> Low Stock! (Min: {{ item.min_quantity }})</div>
+                <div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> Low Stock!{% if can_view_info %} (Min: {{ item.min_quantity }}){% endif %}</div>
                 {% endif %}
 
+                {% if can_view_info %}
                 <div class="mb-3">
                     <small class="text-muted">Min Quantity: {{ item.min_quantity }}</small>
                 </div>
+                {% endif %}
 
                 <hr>
 

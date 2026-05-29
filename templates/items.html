@@ -151,7 +151,7 @@
                                     </a>
                                 </th>
                                 {% for col in user_columns %}
-                                    {% if col == 'type_model' %}
+                                    {% if col == 'type_model' and can_view_info %}
                                         <th>
                                             <a href="#" class="text-decoration-none" title="Sort by Type/Model">
                                                 Type/Model
@@ -159,7 +159,7 @@
                                             </a>
                                         </th>
                                     {% endif %}
-                                    {% if col == 'sku' %}
+                                    {% if col == 'sku' and can_view_info %}
                                         <th>
                                             <a href="#" class="text-decoration-none" title="Sort by SKU">
                                                 SKU
@@ -167,7 +167,7 @@
                                             </a>
                                         </th>
                                     {% endif %}
-                                    {% if col == 'category' %}
+                                    {% if col == 'category' and can_view_info %}
                                         <th>
                                             <a href="#" class="text-decoration-none" title="Sort by Category">
                                                 Category
@@ -175,8 +175,8 @@
                                             </a>
                                         </th>
                                     {% endif %}
-                                    {% if col == 'tags' %}<th>Tags</th>{% endif %}
-                                    {% if col == 'footprint' %}
+                                    {% if col == 'tags' and can_view_info %}<th>Tags</th>{% endif %}
+                                    {% if col == 'footprint' and can_view_info %}
                                         <th>
                                             <a href="#" class="text-decoration-none" title="Sort by Footprint">
                                                 Footprint
@@ -224,7 +224,7 @@
                                             </a>
                                         </th>
                                     {% endif %}
-                                    {% if col == 'min_quantity' %}
+                                    {% if col == 'min_quantity' and can_view_info %}
                                         <th>
                                             <a href="#" class="text-decoration-none" title="Sort by Min Quantity">
                                                 Min Quantity
@@ -232,7 +232,7 @@
                                             </a>
                                         </th>
                                     {% endif %}
-                                    {% if col == 'location' %}
+                                    {% if col == 'location' and can_view_info %}
                                         <th>
                                             <a href="#" class="text-decoration-none" title="Sort by Location">
                                                 Location
@@ -312,13 +312,13 @@
                                     <a href="{{ url_for('item.item_detail', uuid=item.uuid) }}">{{ item.name }}</a>
                                 </td>
                                 {% for col in user_columns %}
-                                    {% if col == 'type_model' %}
+                                    {% if col == 'type_model' and can_view_info %}
                                     <td>{{ item.info or '-' }}</td>
                                     {% endif %}
-                                    {% if col == 'sku' %}
+                                    {% if col == 'sku' and can_view_info %}
                                     <td>{{ item.sku or '-' }}</td>
                                     {% endif %}
-                                    {% if col == 'category' %}
+                                    {% if col == 'category' and can_view_info %}
                                     <td>
                                         {% if item.category %}
                                         <span class="badge" style="background-color: {{ item.category.color }}; color: white;">
@@ -329,7 +329,7 @@
                                         {% endif %}
                                     </td>
                                     {% endif %}
-                                    {% if col == 'tags' %}
+                                    {% if col == 'tags' and can_view_info %}
                                     <td>
                                         {% for tag in item.get_tags_list() %}
                                         <span class="badge" style="background-color: {{ tag.color }}; color: white;">{{ tag.name }}</span>
@@ -337,7 +337,7 @@
                                         {% if not item.get_tags_list() %}-{% endif %}
                                     </td>
                                     {% endif %}
-                                    {% if col == 'footprint' %}
+                                    {% if col == 'footprint' and can_view_info %}
                                     <td>
                                         {% if item.footprint %}
                                         {{ item.footprint.name }}
@@ -379,10 +379,10 @@
                                         {% endif %}
                                     </td>
                                     {% endif %}
-                                    {% if col == 'min_quantity' %}
+                                    {% if col == 'min_quantity' and can_view_info %}
                                     <td>{{ item.min_quantity if item.min_quantity is not none else '-' }}</td>
                                     {% endif %}
-                                    {% if col == 'location' %}
+                                    {% if col == 'location' and can_view_info %}
                                     <td>
                                         {% if item.rack and item.drawer %}
                                         {{ item.rack.name }} - {{ item.drawer }}
@@ -485,14 +485,16 @@
                                 </h6>
                             </div>
                             <div class="card-body p-2">
+                                {% if can_view_info %}
                                 <p class="mb-1 small"><strong>Model:</strong> {{ item.info or '-' }}</p>
                                 <p class="mb-1 small"><strong>SKU:</strong> {{ item.sku or '-' }}</p>
                                 <p class="mb-1 small">
-                                    <strong>Category:</strong> 
+                                    <strong>Category:</strong>
                                     {% if item.category %}
                                     <span class="badge" style="background-color: {{ item.category.color }}; color: white; font-size: 0.7rem;">{{ item.category.name }}</span>
                                     {% else %}-{% endif %}
                                 </p>
+                                {% endif %}
                                 <p class="mb-2 small"><code style="font-size: 0.9rem; font-family: 'Courier New', Courier, monospace; color: var(--bs-code-color); background-color: var(--bs-code-bg); padding: 2px 6px; border-radius: 3px;">{{ item.uuid }}</code></p>
                                 
                                 <hr class="my-2">
@@ -534,8 +536,9 @@
                                 
                                 <hr class="my-2">
                                 
+                                {% if can_view_info %}
                                 <p class="mb-1 small">
-                                    <strong>Tags:</strong> 
+                                    <strong>Tags:</strong>
                                     {% for tag in item.get_tags_list() %}
                                     <span class="badge" style="background-color: {{ tag.color }}; color: white; font-size: 0.65rem;">{{ tag.name }}</span>
                                     {% endfor %}
@@ -545,13 +548,14 @@
                                     <strong>Footprint:</strong> {{ item.footprint.name if item.footprint else '-' }}
                                 </p>
                                 <p class="mb-1 small">
-                                    <strong>Location:</strong> 
+                                    <strong>Location:</strong>
                                     {% if item.rack and item.drawer %}
                                     {{ item.rack.name }} - {{ item.drawer }}
                                     {% elif item.general_location %}
                                     {{ item.general_location.name }}
                                     {% else %}-{% endif %}
                                 </p>
+                                {% endif %}
                                 <p class="mb-1 small">
                                     <strong>Quantity:</strong> {{ item.get_overall_quantity() }}
                                     {% if item.is_no_stock() %}

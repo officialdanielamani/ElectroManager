@@ -171,7 +171,8 @@ def items():
                          all_locations=all_locations,
                          all_racks=all_racks,
                          all_tags_list=all_tags_list,
-                         racks_data_bulk=racks_data_bulk)
+                         racks_data_bulk=racks_data_bulk,
+                         can_view_info=current_user.has_permission('items', 'view_info'))
 
 # ============= ITEM ROUTES =============
 
@@ -380,7 +381,8 @@ def item_detail(uuid):
     return render_template('item_detail.html', item=item, attachment_form=attachment_form,
                          currency_symbol=currency_symbol, currency_decimal_places=currency_decimal_places, qr_templates=qr_templates,
                          download_all_item_attachments=Setting.get('download_all_item_attachments', True),
-                         download_all_item_share_files=Setting.get('download_all_item_share_files', True))
+                         download_all_item_share_files=Setting.get('download_all_item_share_files', True),
+                         can_view_info=current_user.has_permission('items', 'view_info'))
 
 
 @item_bp.route('/item/<string:uuid>/qr', endpoint='item_qr_svg')

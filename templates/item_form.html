@@ -50,18 +50,22 @@
                             {{ form.name(class="form-control form-control-sm" + (" is-invalid" if form.name.errors else
                             ""), disabled=(item_perms and not item_perms.can_edit_info)) }}
                         </div>
+                        {% if not item_perms or item_perms.can_view_info %}
                         <div class="col-md-4">
                             <label class="form-label form-label-sm">SKU</label>
                             {{ form.sku(class="form-control form-control-sm", disabled=(item_perms and not item_perms.can_edit_info)) }}
                         </div>
+                        {% endif %}
                     </div>
 
+                    {% if not item_perms or item_perms.can_view_info %}
                     <div class="row mb-2">
                         <div class="col-12">
                             <label class="form-label form-label-sm">Short Info</label>
                             {{ form.short_info(class="form-control form-control-sm", maxlength="128", placeholder="Brief summary shown on cards (max 128 chars)", disabled=(item_perms and not item_perms.can_edit_info)) }}
                         </div>
                     </div>
+                    {% endif %}
 
                     <!-- Thumbnail -->
                     <div class="mb-2">
@@ -94,6 +98,7 @@
                         <input type="hidden" name="thumbnail" id="thumbnailValue" value="{{ item.thumbnail or '' if item else '' }}">
                     </div>
 
+                    {% if not item_perms or item_perms.can_view_info %}
                     <div class="row mb-2">
                         <div class="col-md-6">
                             <label class="form-label form-label-sm">Type / Model</label>
@@ -232,6 +237,7 @@
                             </div>
                         </div>
                     </div>
+                    {% endif %}
 
                     <div class="row mb-2">
                         <div class="col-md-6">
@@ -239,12 +245,15 @@
                             <input type="text" class="form-control form-control-sm"
                                 value="{{ item.uuid if item else 'Auto-generated' }}" readonly>
                         </div>
+                        {% if not item_perms or item_perms.can_view_info %}
                         <div class="col-md-6">
                             <label class="form-label form-label-sm">Min Quantity</label>
                             {{ form.min_quantity(class="form-control form-control-sm", placeholder="0", disabled=(item_perms and not item_perms.can_edit_info)) }}
                         </div>
+                        {% endif %}
                     </div>
 
+                    {% if not item_perms or item_perms.can_view_info %}
                     <div class="row mb-0">
                         <div class="col-12">
                             <div class="form-check">
@@ -261,6 +270,7 @@
                             </div>
                         </div>
                     </div>
+                    {% endif %}
                 </div>
             </div>
 
