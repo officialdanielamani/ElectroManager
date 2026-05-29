@@ -507,21 +507,21 @@ function initializeFontListener() {
 <script>
 // Table Columns Customization
 const allColumns = [
-    { id: 'type_model', label: 'Type/Model', required: false },
-    { id: 'sku', label: 'SKU', required: false },
-    { id: 'category', label: 'Category', required: false },
-    { id: 'tags', label: 'Tags', required: false },
-    { id: 'footprint', label: 'Footprint', required: false },
+    {% if can_view_info %}{ id: 'type_model', label: 'Type/Model', required: false },{% endif %}
+    {% if can_view_info %}{ id: 'sku', label: 'SKU', required: false },{% endif %}
+    {% if can_view_info %}{ id: 'category', label: 'Category', required: false },{% endif %}
+    {% if can_view_info %}{ id: 'tags', label: 'Tags', required: false },{% endif %}
+    {% if can_view_info %}{ id: 'footprint', label: 'Footprint', required: false },{% endif %}
     { id: 'quantity', label: 'Overall Quantity', required: false },
     { id: 'available_quantity', label: 'Available Quantity', required: false },
-    { id: 'total_price', label: 'Total Price', required: false },
-    { id: 'total_value', label: 'Total Value', required: false },
-    { id: 'price_per_unit', label: 'Price Per Unit', required: false },
-    { id: 'location', label: 'Location', required: false },
+    {% if can_view_price %}{ id: 'total_price', label: 'Total Price', required: false },{% endif %}
+    {% if can_view_price %}{ id: 'total_value', label: 'Total Value', required: false },{% endif %}
+    {% if can_view_price %}{ id: 'price_per_unit', label: 'Price Per Unit', required: false },{% endif %}
+    {% if can_view_info %}{ id: 'location', label: 'Location', required: false },{% endif %}
     { id: 'uuid', label: 'UUID', required: false },
     { id: 'status', label: 'Status', required: false },
     { id: 'thumbnail', label: 'Thumbnail', required: false },
-    { id: 'short_info', label: 'Short Info', required: false }
+    {% if can_view_info %}{ id: 'short_info', label: 'Short Info', required: false },{% endif %}
 ];
 
 const defaultColumns = ['category', 'tags', 'quantity', 'total_price', 'location', 'status'];

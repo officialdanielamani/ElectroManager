@@ -162,7 +162,9 @@ def settings_general():
                          available_themes=available_themes,
                          available_fonts=available_fonts,
                          demo_mode=current_app.config.get('DEMO_MODE', False),
-                         can_view_costing=current_user.has_permission('projects', 'view_costing'))
+                         can_view_costing=current_user.has_permission('projects', 'view_costing'),
+                         can_view_info=current_user.has_permission('items', 'view_info'),
+                         can_view_price=current_user.has_permission('items', 'view_price'))
 
 
 

@@ -212,6 +212,7 @@
                         <strong>Available:</strong>
                         <h3 class="text-success">{{ item.get_available_quantity() }}</h3>
                     </div>
+                    {% if can_view_price %}
                     <div class="col-md-2">
                         <strong>Total Price:</strong>
                         <h4 class="text-success">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(item.get_overall_total_price()) }}</h4>
@@ -221,6 +222,7 @@
                         <strong>Total Value <small class="text-muted">(in stock)</small>:</strong>
                         <h4 class="text-secondary">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(item.get_overall_total_value()) }}</h4>
                     </div>
+                    {% endif %}
                 </div>
 
                 {% if item.is_no_stock() %}
@@ -259,8 +261,10 @@
                                 {% if batch.sn_tracking_enabled %}
                                 <span class="badge bg-dark"><i class="bi bi-upc-scan"></i> Tracking</span>
                                 {% endif %}
+                                {% if can_view_price %}
                                 <span class="badge bg-success">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.price_per_unit) }}/unit</span>
                                 <span class="badge bg-info">Price: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_price()) }}</span>
+                                {% endif %}
                                 {% if not batch.follow_main_location %}
                                 <span class="badge" style="background-color: {{ batch.get_effective_location_color() }};"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>
                                 {% endif %}
@@ -289,11 +293,13 @@
                                 <div class="row mb-2">
                                     <div class="col-md-3"><strong>Batch #:</strong> {{ batch.batch_number }}</div>
                                     <div class="col-md-3"><strong>Quantity:</strong> {{ batch.quantity }}</div>
+                                    {% if can_view_price %}
                                     <div class="col-md-3"><strong>Price/Unit:</strong> {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.price_per_unit) }}</div>
                                     <div class="col-md-3">
                                         <strong>Total Price:</strong> {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_price()) }}
                                         {% if batch.quantity == 0 %}<small class="text-muted d-block">(qty=0, shows 1×)</small>{% endif %}
                                     </div>
+                                    {% endif %}
                                 </div>
                                 <div class="row mb-2">
                                     <div class="col-md-3"><strong>Available Qty:</strong> {{ batch.get_available_quantity() }}</div>

@@ -123,6 +123,7 @@ _ADMIN_PERMS = {
     "items": {
         "view": True, "create": True, "delete": True,
         "view_info": True, "edit_info": True,
+        "view_price": True,
         "edit_batch": True, "edit_quantity": True,
         "create_batch": True,
         "view_advance": True, "edit_advance": True, "delete_advance": True,
@@ -165,6 +166,7 @@ _MANAGER_PERMS = {
     "items": {
         "view": True, "create": True, "delete": True,
         "view_info": True, "edit_info": True,
+        "view_price": True,
         "edit_batch": True, "edit_quantity": True,
         "create_batch": True,
         "view_advance": True, "edit_advance": True, "delete_advance": True,
@@ -207,6 +209,7 @@ _VIEWER_PERMS = {
     "items": {
         "view": True, "create": False, "delete": False,
         "view_info": True, "edit_info": False,
+        "view_price": True,
         "edit_batch": False, "edit_quantity": False,
         "create_batch": False,
         "view_advance": True, "edit_advance": False, "delete_advance": False,

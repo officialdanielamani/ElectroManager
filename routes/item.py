@@ -172,7 +172,8 @@ def items():
                          all_racks=all_racks,
                          all_tags_list=all_tags_list,
                          racks_data_bulk=racks_data_bulk,
-                         can_view_info=current_user.has_permission('items', 'view_info'))
+                         can_view_info=current_user.has_permission('items', 'view_info'),
+                         can_view_price=current_user.has_permission('items', 'view_price'))
 
 # ============= ITEM ROUTES =============
 
@@ -382,7 +383,8 @@ def item_detail(uuid):
                          currency_symbol=currency_symbol, currency_decimal_places=currency_decimal_places, qr_templates=qr_templates,
                          download_all_item_attachments=Setting.get('download_all_item_attachments', True),
                          download_all_item_share_files=Setting.get('download_all_item_share_files', True),
-                         can_view_info=current_user.has_permission('items', 'view_info'))
+                         can_view_info=current_user.has_permission('items', 'view_info'),
+                         can_view_price=current_user.has_permission('items', 'view_price'))
 
 
 @item_bp.route('/item/<string:uuid>/qr', endpoint='item_qr_svg')
@@ -1605,7 +1607,7 @@ def items_print():
     from datetime import datetime, timezone
     current_datetime = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
     
-    return render_template('items_print.html', 
+    return render_template('items_print.html',
                          items=items,
                          page=page,
                          per_page=per_page,
@@ -1614,7 +1616,9 @@ def items_print():
                          currency_symbol=currency_symbol,
                          currency_decimal_places=currency_decimal_places,
                          current_user=current_user,
-                         current_datetime=current_datetime)
+                         current_datetime=current_datetime,
+                         can_view_info=current_user.has_permission('items', 'view_info'),
+                         can_view_price=current_user.has_permission('items', 'view_price'))
 
 
 
@@ -1655,7 +1659,9 @@ def item_detail_print(uuid):
                          currency_decimal_places=currency_decimal_places,
                          current_user=current_user,
                          current_datetime=current_datetime,
-                         datasheets=datasheets)
+                         datasheets=datasheets,
+                         can_view_info=current_user.has_permission('items', 'view_info'),
+                         can_view_price=current_user.has_permission('items', 'view_price'))
 
 
 # ============= QR/BARCODE STICKER TEMPLATE ROUTES =============

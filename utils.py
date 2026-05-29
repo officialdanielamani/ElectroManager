@@ -346,6 +346,7 @@ def get_item_edit_permissions(user):
         'can_delete':            p('items', 'delete'),
         'can_view_info':         p('items', 'view_info'),
         'can_edit_info':         p('items', 'edit_info'),
+        'can_view_price':        p('items', 'view_price'),
         'can_view_batch':        p('items', 'view_info'),
         'can_create_batch':      p('items', 'create_batch') or can_edit_batch,
         'can_edit_batch':        can_edit_batch,
