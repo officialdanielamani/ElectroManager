@@ -62,7 +62,7 @@
                     </a>
                     {% endif %}
                     {% if current_user.has_permission('items', 'view_lending_history') %}
-                    <a href="{{ url_for('item.item_lending_history', uuid=item.uuid) }}" class="btn btn-info btn-sm">
+                    <a href="{{ url_for('item.item_lending_history', uuid=item.uuid) }}" class="btn btn-lend-history btn-sm">
                         <i class="bi bi-clock-history"></i> Lend &amp; Return History
                     </a>
                     {% endif %}
@@ -312,7 +312,10 @@
                                 <div class="row mb-2">
                                     <div class="col-md-3"><strong>Available Qty:</strong> {{ batch.get_available_quantity() }}</div>
                                     <div class="col-md-3"><strong>Date:</strong> {{ batch.purchase_date.strftime('%d/%m/%Y') if batch.purchase_date else 'N/A' }}</div>
-                                    <div class="col-md-6"><strong>Note:</strong> {{ batch.note or 'N/A' }}</div>
+                                    <div class="col-md-3"><strong>Note:</strong> {{ batch.note or 'N/A' }}</div>
+                                    {% if not batch.sn_tracking_enabled %}
+                                    <div class="col-md-3"><strong>Lending Qty:</strong> {{ batch.get_lend_quantity() }}</div>
+                                    {% endif %}
                                 </div>
                                 <div class="row mb-2">
                                     <div class="col-12 small">
@@ -380,9 +383,6 @@
                                                 <th>Internal Serial Number (ISN)</th>
                                                 <th>Info</th>
                                                 <th>Project</th>
-                                                <th>Lend To</th>
-                                                <th>Lend Start</th>
-                                                <th>Lend End</th>
                                                 <th>Status</th>
                                             </tr>
                                         </thead>
@@ -404,19 +404,13 @@
                                                     {% else %}-{% endif %}
                                                 </td>
                                                 <td>
-                                                    {% if not sn.is_deleted and sn.lend_to_id and sn.returned_at is none %}
-                                                        {% if sn_project_used %}<span class="text-muted" style="opacity:0.5">{{ sn.get_lend_to_display() or '-' }}</span>
-                                                        {% else %}{{ sn.get_lend_to_display() or '-' }}{% endif %}
-                                                    {% else %}-{% endif %}
-                                                </td>
-                                                <td class="small">{{ sn.lend_start | localtime('%d/%m/%Y %H:%M') if (not sn.is_deleted and sn.lend_to_id and sn.returned_at is none and sn.lend_start) else '—' }}</td>
-                                                <td class="small">{{ sn.lend_end | localtime('%d/%m/%Y %H:%M') if (not sn.is_deleted and sn.lend_to_id and sn.returned_at is none and sn.lend_end) else '—' }}</td>
-                                                <td>
                                                     {% if sn.is_deleted %}
                                                     <span class="badge bg-danger" title="Removed by {{ sn.deleted_by.username if sn.deleted_by else 'unknown' }} on {{ sn.deleted_at | localtime if sn.deleted_at else '?' }}{% if sn.deleted_reason %} — {{ sn.deleted_reason }}{% endif %}">Removed</span>
                                                     {% if sn.deleted_reason %}<div class="text-muted" style="font-size:0.72rem">{{ sn.deleted_reason[:40] }}{% if sn.deleted_reason|length > 40 %}…{% endif %}</div>{% endif %}
                                                     {% elif sn.lend_to_id and sn.returned_at is none %}
                                                     <span class="badge bg-warning text-dark">Lending</span>
+                                                    {% elif sn_project_used %}
+                                                    <span class="badge bg-info">Project</span>
                                                     {% else %}
                                                     <span class="badge bg-success">Active</span>
                                                     {% endif %}

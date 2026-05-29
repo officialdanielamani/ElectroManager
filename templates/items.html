@@ -56,6 +56,9 @@
                             <button type="button" class="btn btn-outline-secondary" onclick="clearItemSearch()" title="Clear search">
                                 <i class="bi bi-x-lg"></i>
                             </button>
+                            <a href="{{ url_for('item.item_advanced_search') }}" class="btn btn-outline-secondary" title="Advanced Search">
+                                <i class="bi bi-gear"></i>
+                            </a>
                         </div>
                     </div>
                     <div class="col-md-3">
@@ -65,11 +68,6 @@
                             <option value="{{ cat[0] }}" {% if cat[0] == category_id %}selected{% endif %}>{{ cat[1] }}</option>
                             {% endfor %}
                         </select>
-                    </div>
-                    <div class="col-md-3">
-                        <button type="button" class="btn btn-outline-secondary w-100" title="Advanced Search (coming soon)" disabled>
-                            <i class="bi bi-gear"></i> Advanced
-                        </button>
                     </div>
                 </form>
             </div>

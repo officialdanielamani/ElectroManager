@@ -51,29 +51,29 @@
             {% endif %}
         </div>
     </div>
-    <div class="card-body p-0">
+    <div class="card-body p-2 p-md-3">
         <div class="table-responsive">
-            <table class="table table-sm table-hover mb-0 align-middle" style="font-size:0.85rem;">
+            <table class="table table-sm table-hover table-bordered mb-0 align-middle" id="historyTable{{ bh.batch.id }}" style="font-size:0.85rem; min-width:900px;">
                 <thead class="table-light">
                     <tr>
-                        <th width="30"><input type="checkbox" class="form-check-input batch-select-all" data-batch="{{ bh.batch.id }}"></th>
-                        <th>Start</th>
-                        <th>End</th>
+                        <th style="width:30px"><input type="checkbox" class="form-check-input batch-select-all" data-batch="{{ bh.batch.id }}"></th>
+                        <th><a href="#" class="text-decoration-none text-body">Start <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>
+                        <th><a href="#" class="text-decoration-none text-body">End <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>
                         {% if bh.type == 'sn' %}
-                        <th>ISN</th>
+                        <th><a href="#" class="text-decoration-none text-body">ISN <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>
                         {% else %}
-                        <th>Qty</th>
+                        <th><a href="#" class="text-decoration-none text-body">Qty <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>
                         {% endif %}
-                        <th>Lending Session ID</th>
-                        <th>Lend To</th>
-                        <th>Approved By</th>
-                        <th>Lend Notes</th>
-                        <th>Notification</th>
-                        <th>Return On</th>
-                        <th>Accept By</th>
-                        <th>Status</th>
-                        <th>Return Session ID</th>
-                        <th>Return Notes</th>
+                        <th><a href="#" class="text-decoration-none text-body">Lending Session ID <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>
+                        <th><a href="#" class="text-decoration-none text-body">Lend To <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>
+                        <th><a href="#" class="text-decoration-none text-body">Approved By <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>
+                        <th><a href="#" class="text-decoration-none text-body">Lend Notes <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>
+                        <th><a href="#" class="text-decoration-none text-body">Notification <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>
+                        <th><a href="#" class="text-decoration-none text-body">Return On <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>
+                        <th><a href="#" class="text-decoration-none text-body">Accept By <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>
+                        <th><a href="#" class="text-decoration-none text-body">Status <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>
+                        <th><a href="#" class="text-decoration-none text-body">Return Session ID <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>
+                        <th><a href="#" class="text-decoration-none text-body">Return Notes <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -197,15 +197,23 @@
 {% endif %}
 {% endfor %}
 
+<script src="{{ url_for('static', filename='js/table-sorter.js') }}"></script>
 <script>
-// Select-all per batch
-document.querySelectorAll('.batch-select-all').forEach(function(masterCb) {
-    masterCb.addEventListener('change', function() {
-        var batchId = this.dataset.batch;
-        document.querySelectorAll('.row-checkbox[data-batch="' + batchId + '"]').forEach(function(cb) {
-            cb.checked = masterCb.checked;
+document.addEventListener('DOMContentLoaded', function () {
+    // Select-all per batch
+    document.querySelectorAll('.batch-select-all').forEach(function(masterCb) {
+        masterCb.addEventListener('change', function() {
+            var batchId = this.dataset.batch;
+            document.querySelectorAll('.row-checkbox[data-batch="' + batchId + '"]').forEach(function(cb) {
+                cb.checked = masterCb.checked;
+            });
         });
     });
+
+    // Sortable table per batch — sort all non-checkbox columns
+    {% for bh in batch_histories %}{% if bh.records %}
+    new TableSorter('historyTable{{ bh.batch.id }}', { skipLast: false });
+    {% endif %}{% endfor %}
 });
 </script>
 {% endblock %}

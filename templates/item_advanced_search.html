@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Advanced Search Settings{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h5 class="mb-0">
+        <i class="bi bi-gear"></i> Advanced Search Settings
+    </h5>
+    <a href="{{ url_for('item.items') }}" class="btn btn-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Back to Items
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body text-muted">
+        <i class="bi bi-tools"></i> Advanced search options will be available here.
+    </div>
+</div>
+{% endblock %}

@@ -2,12 +2,13 @@
 // Handles sorting without server calls
 
 class TableSorter {
-  constructor(tableId = 'itemTable') {
+  constructor(tableId = 'itemTable', opts = {}) {
     this.table = document.getElementById(tableId);
     this.tbody = this.table?.querySelector('tbody');
     this.headers = this.table?.querySelectorAll('thead th');
     this.currentSort = { column: null, direction: 'asc' };
-    
+    this.skipLast = opts.skipLast !== false; // default true; pass false to sort all non-checkbox cols
+
     if (this.table && this.headers) {
       this.init();
     }
@@ -16,8 +17,9 @@ class TableSorter {
   init() {
     // Attach click handlers to sortable headers
     this.headers.forEach((header, index) => {
-      // Skip checkbox column and action column
-      if (index === 0 || index === this.headers.length - 1) return;
+      // Always skip checkbox column (index 0); skip last only if skipLast is true
+      if (index === 0) return;
+      if (this.skipLast && index === this.headers.length - 1) return;
       
       const link = header.querySelector('a');
       if (link) {
