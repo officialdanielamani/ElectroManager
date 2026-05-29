@@ -51,13 +51,14 @@
                 <form method="GET" action="{{ url_for('item.items') }}" class="row g-3" id="itemSearchForm">
                     <div class="col-md-6">
                         <div class="input-group">
-                            <input type="text" name="search" class="form-control" placeholder="Search by name, short info, or uuid:&lt;UUID&gt;" value="{{ search_query }}" id="itemSearchInput">
+                            <input type="text" name="search" class="form-control" placeholder="Name or uuid:&lt;UUID&gt;" value="{{ search_query }}" id="itemSearchInput">
+                            <button type="submit" class="btn btn-primary" title="Search"><i class="bi bi-search"></i> Search</button>
                             <button type="button" class="btn btn-outline-secondary" onclick="clearItemSearch()" title="Clear search">
                                 <i class="bi bi-x-lg"></i>
                             </button>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <select name="category" class="form-select">
                             <option value="0">All Categories</option>
                             {% for cat in search_form.category.choices[1:] %}
@@ -65,10 +66,9 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-3">
-                        <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Search</button>
-                        <button type="button" class="btn btn-outline-secondary" title="Advanced Search (coming soon)" disabled>
-                            <i class="bi bi-gear"></i>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-outline-secondary w-100" title="Advanced Search (coming soon)" disabled>
+                            <i class="bi bi-gear"></i> Advanced
                         </button>
                     </div>
                 </form>

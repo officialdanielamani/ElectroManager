@@ -25,11 +25,10 @@
     <div class="col-12">
         <div class="card" id="filterCard">
             <div class="card-body py-3">
-                <div class="row g-2 align-items-end">
+                <div class="row g-2 align-items-center">
                     <div class="col-12 col-md-5">
-                        <label class="form-label mb-1 small fw-semibold">Search Item</label>
                         <div class="input-group">
-                            <input type="text" id="searchInput" class="form-control" placeholder="Name or uuid:XXXXX" onkeydown="handleSearchKeydown(event)">
+                            <input type="text" id="searchInput" class="form-control" placeholder="Name or uuid:&lt;UUID&gt;" onkeydown="handleSearchKeydown(event)">
                             <button class="btn btn-primary" type="button" onclick="searchItem()">
                                 <i class="bi bi-search"></i> Find
                             </button>
@@ -39,7 +38,6 @@
                         </div>
                     </div>
                     <div class="col-12 col-sm-6 col-md-2">
-                        <label class="form-label mb-1 small fw-semibold">Location</label>
                         <select id="locationFilter" class="form-select" onchange="filterByLocation(this.value)">
                             <option value="">All Locations</option>
                             {% for loc in locations %}
@@ -48,7 +46,6 @@
                         </select>
                     </div>
                     <div class="col-12 col-sm-6 col-md-2">
-                        <label class="form-label mb-1 small fw-semibold">Rack</label>
                         <select id="rackFilter" class="form-select" onchange="filterRack(this.value)">
                             <option value="">All Racks</option>
                             {% for r in all_racks %}
