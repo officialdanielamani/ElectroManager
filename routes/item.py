@@ -48,13 +48,16 @@ def items():
     query = Item.query
     
     if search_query:
-        query = query.filter(
-            db.or_(
-                Item.name.ilike(f'%{search_query}%'),
-                Item.description.ilike(f'%{search_query}%'),
-                Item.sku.ilike(f'%{search_query}%')
+        if search_query.lower().startswith('uuid:'):
+            uuid_val = search_query[5:].strip()
+            query = query.filter(Item.uuid == uuid_val)
+        else:
+            query = query.filter(
+                db.or_(
+                    Item.name.ilike(f'%{search_query}%'),
+                    Item.description.ilike(f'%{search_query}%')
+                )
             )
-        )
     
     if category_id > 0:
         query = query.filter_by(category_id=category_id)
