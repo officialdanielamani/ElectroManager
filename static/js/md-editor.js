@@ -1,6 +1,7 @@
 /**
  * Markdown Editor — toolbar + live preview toggle
  * Requires marked.js to be loaded before this script for preview rendering.
+ * Optionally uses highlight.js (hljs) for syntax-highlighted code blocks in preview.
  *
  * Usage:
  *   initMdEditor(textareaElement)
@@ -88,6 +89,13 @@
         return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>');
     }
 
+    function highlightPreview(pane) {
+        if (typeof hljs === 'undefined') return;
+        pane.querySelectorAll('pre code').forEach(function (el) {
+            hljs.highlightElement(el);
+        });
+    }
+
     function makeBtn(cfg, disabled) {
         var btn = document.createElement('button');
         btn.type = 'button';
@@ -153,6 +161,12 @@
         prevBtn.title = 'Toggle markdown preview';
         bar.appendChild(prevBtn);
 
+        // ── Char count ────────────────────────────────────────────────
+        var charCount = document.createElement('small');
+        charCount.className = 'text-muted ms-2 align-self-center text-nowrap';
+        charCount.textContent = ta.value.length + ' chars';
+        bar.appendChild(charCount);
+
         // ── Preview pane ───────────────────────────────────────────────
         var previewPane = document.createElement('div');
         previewPane.className = 'md-editor-preview markdown-content px-3 py-2';
@@ -172,12 +186,18 @@
 
         wrapper.appendChild(previewPane);
 
+        // ── Live char count ────────────────────────────────────────────
+        ta.addEventListener('input', function () {
+            charCount.textContent = ta.value.length + ' chars';
+        });
+
         // ── Toggle logic ───────────────────────────────────────────────
         var inPreview = false;
         prevBtn.addEventListener('click', function () {
             inPreview = !inPreview;
             if (inPreview) {
                 previewPane.innerHTML = renderMarkdown(ta.value);
+                highlightPreview(previewPane);
                 previewPane.style.minHeight = Math.max(100, ta.offsetHeight) + 'px';
                 ta.style.display = 'none';
                 previewPane.style.display = '';

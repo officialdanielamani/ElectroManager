@@ -156,6 +156,8 @@ def load_dependencies():
     return [
         'lib/bootstrap.min.css',
         'icons/bootstrap-icons.css',
+        'css/pygments.css',
+        'lib/highlight-theme.css',
     ], [
         'lib/bootstrap.bundle.min.js',
         'lib/sortable.min.js',
@@ -163,6 +165,8 @@ def load_dependencies():
         {'name': 'Bootstrap', 'version': '5.3.0'},
         {'name': 'Bootstrap Icons', 'version': '1.11.1'},
         {'name': 'SortableJS', 'version': '1.15.0'},
+        {'name': 'Pygments', 'version': '2.x'},
+        {'name': 'highlight.js', 'version': '11.9.0'},
     ]
 
 
