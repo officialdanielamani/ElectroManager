@@ -68,6 +68,7 @@
                         <th>Lend To</th>
                         <th>Approved By</th>
                         <th>Lend Notes</th>
+                        <th>Notification</th>
                         <th>Return On</th>
                         <th>Accept By</th>
                         <th>Status</th>
@@ -131,6 +132,16 @@
                         <span title="{{ row.obj.lend_note }}">
                             {{ row.obj.lend_note | truncate(40) }}
                         </span>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+
+                    {# Notification #}
+                    <td class="text-nowrap">
+                        {% if row.obj.lend_notify_enabled %}
+                        <i class="bi bi-bell-fill text-warning"></i>
+                        <small>{{ row.obj.lend_notify_before_days }} day{{ 's' if row.obj.lend_notify_before_days != 1 }}</small>
                         {% else %}
                         <span class="text-muted">—</span>
                         {% endif %}

@@ -67,11 +67,6 @@
                     <a href="{{ url_for('item.item_qr_sticker', uuid=item.uuid) }}" class="btn btn-success btn-sm">
                         <i class="bi bi-qr-code"></i> Print QR
                     </a>
-                    {% if current_user.has_permission('items', 'view_lending_history') %}
-                    <a href="{{ url_for('item.item_lending_history', uuid=item.uuid) }}" class="btn btn-secondary btn-sm">
-                        <i class="bi bi-clock-history"></i> Lend &amp; Return History
-                    </a>
-                    {% endif %}
                     {% if current_user.has_permission('items', 'delete') %}
                     <form method="POST" action="{{ url_for('item.item_delete', uuid=item.uuid) }}" style="display:inline">
                         <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Delete this item?')">
@@ -336,7 +331,22 @@
                                         <i class="bi bi-qr-code"></i> Print QR Batch
                                     </a>
                                     {% endif %}
+                                    {% if current_user.has_permission('items', 'view_lending_history') %}
+                                    <a href="{{ url_for('item.item_lending_history', uuid=item.uuid) }}"
+                                       class="btn btn-outline-info btn-sm">
+                                        <i class="bi bi-clock-history"></i> Lend &amp; Return History
+                                    </a>
+                                    {% endif %}
                                 </div>
+                                {% else %}
+                                {% if current_user.has_permission('items', 'view_lending_history') %}
+                                <div class="mb-2">
+                                    <a href="{{ url_for('item.item_lending_history', uuid=item.uuid) }}"
+                                       class="btn btn-outline-info btn-sm">
+                                        <i class="bi bi-clock-history"></i> Lend &amp; Return History
+                                    </a>
+                                </div>
+                                {% endif %}
                                 {% endif %}
                                 {% set proj_names = batch.get_project_names_for_batch() %}
                                 {% if proj_names %}
@@ -352,26 +362,6 @@
                                     </table>
                                 </div>
                                 {% endif %}
-                                {% if not batch.sn_tracking_enabled and batch.get_lend_quantity() > 0 %}
-                                <div class="mb-2">
-                                    <strong>Lending <small class="text-muted">({{ batch.get_lend_quantity() }} total)</small></strong>
-                                    <table class="table table-sm table-bordered mt-1 mb-0 small">
-                                        <thead><tr><th>Lend To</th><th class="text-center">Qty</th><th>Start</th><th>Due Date</th><th class="text-center">Notify</th></tr></thead>
-                                        <tbody>
-                                        {% for rec in batch.lend_records if rec.returned_at is none %}
-                                        <tr>
-                                            <td>{{ rec.get_lend_to_display() or '—' }}</td>
-                                            <td class="text-center">{{ rec.quantity }}</td>
-                                            <td>{{ rec.lend_start | localtime('%d/%m/%Y %H:%M') if rec.lend_start else '—' }}</td>
-                                            <td>{{ rec.lend_end | localtime('%d/%m/%Y %H:%M') if rec.lend_end else '—' }}</td>
-                                            <td class="text-center">{% if rec.lend_notify_enabled %}<i class="bi bi-bell-fill text-warning" title="Remind {{ rec.lend_notify_before_days }} days before"></i>{% else %}—{% endif %}</td>
-                                        </tr>
-                                        {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                {% endif %}
-
                                 <!-- Serial Numbers Table (if enabled) -->
                                 {% if batch.sn_tracking_enabled and batch.serial_numbers|length > 0 %}
                                 <hr>
