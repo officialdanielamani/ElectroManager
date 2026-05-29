@@ -55,7 +55,7 @@ def items():
             query = query.filter(
                 db.or_(
                     Item.name.ilike(f'%{search_query}%'),
-                    Item.description.ilike(f'%{search_query}%')
+                    Item.short_info.ilike(f'%{search_query}%')
                 )
             )
     

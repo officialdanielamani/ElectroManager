@@ -51,7 +51,7 @@
                 <form method="GET" action="{{ url_for('item.items') }}" class="row g-3" id="itemSearchForm">
                     <div class="col-md-6">
                         <div class="input-group">
-                            <input type="text" name="search" class="form-control" placeholder="Search by name, description, or uuid:&lt;UUID&gt;" value="{{ search_query }}" id="itemSearchInput">
+                            <input type="text" name="search" class="form-control" placeholder="Search by name, short info, or uuid:&lt;UUID&gt;" value="{{ search_query }}" id="itemSearchInput">
                             <button type="button" class="btn btn-outline-secondary" onclick="clearItemSearch()" title="Clear search">
                                 <i class="bi bi-x-lg"></i>
                             </button>
