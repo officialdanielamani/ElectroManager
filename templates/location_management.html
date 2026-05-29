@@ -299,13 +299,16 @@ function promptBulkDelete(type) {
 
     // Build name list
     const names = _getSelectedNames(type);
-    const icon = type === 'location' ? 'bi-geo-alt' : 'bi-grid-3x3';
+    const iconCls = type === 'location' ? 'bi-geo-alt' : 'bi-grid-3x3';
     const listEl = document.getElementById('bulkDeleteItemList');
     listEl.innerHTML = '';
     names.forEach(name => {
         const li = document.createElement('li');
         li.className = 'list-group-item py-1 px-2';
-        li.innerHTML = `<i class="bi ${icon} text-muted me-1"></i>${name}`;
+        const ico = document.createElement('i');
+        ico.className = `bi ${iconCls} text-muted me-1`;
+        li.appendChild(ico);
+        li.appendChild(document.createTextNode(name));
         listEl.appendChild(li);
     });
 

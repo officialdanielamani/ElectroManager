@@ -989,7 +989,10 @@ function promptBulkDelete() {
         const name = row ? (row.querySelector('td:nth-child(2) a, .card-header strong')?.textContent?.trim() || cb.value) : cb.value;
         const li = document.createElement('li');
         li.className = 'list-group-item py-1 px-2';
-        li.innerHTML = `<i class="bi bi-box text-muted me-1"></i>${name}`;
+        const ico = document.createElement('i');
+        ico.className = 'bi bi-box text-muted me-1';
+        li.appendChild(ico);
+        li.appendChild(document.createTextNode(name));
         listEl.appendChild(li);
     });
 
