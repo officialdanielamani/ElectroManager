@@ -67,6 +67,11 @@
                     <a href="{{ url_for('item.item_qr_sticker', uuid=item.uuid) }}" class="btn btn-success btn-sm">
                         <i class="bi bi-qr-code"></i> Print QR
                     </a>
+                    {% if current_user.has_permission('items', 'view_lending_history') %}
+                    <a href="{{ url_for('item.item_lending_history', uuid=item.uuid) }}" class="btn btn-secondary btn-sm">
+                        <i class="bi bi-clock-history"></i> Lend &amp; Return History
+                    </a>
+                    {% endif %}
                     {% if current_user.has_permission('items', 'delete') %}
                     <form method="POST" action="{{ url_for('item.item_delete', uuid=item.uuid) }}" style="display:inline">
                         <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Delete this item?')">
