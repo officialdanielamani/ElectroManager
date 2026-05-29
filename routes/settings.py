@@ -17,6 +17,7 @@ import json
 import secrets
 import string
 import logging
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -409,7 +410,7 @@ def save_table_columns_view():
         columns = json.loads(columns_json)
         
         # Validate columns
-        valid_columns = ['type_model', 'sku', 'category', 'tags', 'footprint', 'quantity', 'available_quantity', 'total_value', 'total_price', 'price_per_unit', 'location', 'uuid', 'status']
+        valid_columns = ['type_model', 'sku', 'category', 'tags', 'footprint', 'quantity', 'available_quantity', 'total_value', 'total_price', 'price_per_unit', 'location', 'uuid', 'status', 'thumbnail', 'short_info']
         columns = [col for col in columns if col in valid_columns]
         
         # Save to current user
@@ -471,6 +472,22 @@ def settings_system():
                 if not allowed_extensions:
                     flash('You must specify at least one allowed file type!', 'danger')
                     return redirect(url_for('settings.settings_system'))
+
+                # Remove web-server config override extensions unconditionally.
+                # Other extensions (including .exe, .py, .sh) are allowed — they are
+                # served as file downloads by Flask, never executed server-side.
+                from utils import DANGEROUS_EXTENSIONS
+                raw_exts = [e.strip().lower() for e in allowed_extensions.split(',') if e.strip()]
+                blocked = [e for e in raw_exts if e in DANGEROUS_EXTENSIONS]
+                safe_exts = [e for e in raw_exts if e not in DANGEROUS_EXTENSIONS]
+                if not safe_exts:
+                    flash('All specified extensions are blocked for security reasons. '
+                          'Please use safe file types.', 'danger')
+                    return redirect(url_for('settings.settings_system'))
+                if blocked:
+                    flash(f'The following extensions cannot be allowed (.htaccess/.htpasswd can '
+                          f'reconfigure the web server): {", ".join(blocked)}', 'warning')
+                allowed_extensions = ','.join(safe_exts)
                 
                 # Max file size validation (production mode only)
                 max_file_size = request.form.get('max_file_size', '10')
@@ -608,6 +625,8 @@ def settings_system():
             Setting.set('max_drawer_rows', max_drawer_rows, 'Maximum drawer rows (1-32)')
             Setting.set('max_drawer_cols', max_drawer_cols, 'Maximum drawer columns (1-32)')
             Setting.set('banner_timeout', banner_timeout, 'Banner auto-dismiss timeout in seconds (0=permanent)')
+            display_timezone = request.form.get('display_timezone', '').strip()
+            Setting.set('display_timezone', display_timezone, 'Display timezone offset for all timestamps (e.g. +08:00)')
             signup_enabled = 'signup_enabled' in request.form
             Setting.set('signup_enabled', signup_enabled, 'Enable/disable user signup form')
             Setting.set('download_all_item_attachments',   'download_all_item_attachments'   in request.form, 'Enable Download All ZIP for item attachments')
@@ -680,6 +699,7 @@ def settings_system():
     max_drawer_rows = Setting.get('max_drawer_rows', '10')
     max_drawer_cols = Setting.get('max_drawer_cols', '10')
     banner_timeout = Setting.get('banner_timeout', '5')
+    display_timezone = Setting.get('display_timezone', '')
     download_all_item_attachments  = Setting.get('download_all_item_attachments',  True)
     download_all_item_share_files  = Setting.get('download_all_item_share_files',  True)
     download_all_project_attachments = Setting.get('download_all_project_attachments', True)
@@ -719,6 +739,33 @@ def settings_system():
                 verinfo_content = f"Error reading {filename}"
             break
     
+    # Storage usage
+    def _dir_size(path):
+        total = 0
+        if os.path.exists(path):
+            for dp, _, fnames in os.walk(path):
+                for f in fnames:
+                    try: total += os.path.getsize(os.path.join(dp, f))
+                    except OSError: pass
+        return total
+
+    upload_folder = current_app.config['UPLOAD_FOLDER']
+    instance_folder = current_app.instance_path
+    uploads_size = _dir_size(upload_folder)
+    instance_size = _dir_size(instance_folder)
+    try:
+        _ud = shutil.disk_usage(upload_folder)
+        uploads_disk_total = _ud.total
+        uploads_disk_pct = round(_ud.used / _ud.total * 100, 1) if _ud.total else 0
+    except Exception:
+        uploads_disk_total = uploads_disk_pct = 0
+    try:
+        _id = shutil.disk_usage(instance_folder)
+        instance_disk_total = _id.total
+        instance_disk_pct = round(_id.used / _id.total * 100, 1) if _id.total else 0
+    except Exception:
+        instance_disk_total = instance_disk_pct = 0
+
     return render_template('settings_system.html',
                           Setting=Setting,
                           currency=currency,
@@ -728,6 +775,8 @@ def settings_system():
                           max_drawer_rows=max_drawer_rows,
                           max_drawer_cols=max_drawer_cols,
                           banner_timeout=banner_timeout,
+                          display_timezone=display_timezone,
+                          tz_offsets=__import__('app').TZ_OFFSETS,
                           download_all_item_attachments=download_all_item_attachments,
                           download_all_item_share_files=download_all_item_share_files,
                           download_all_project_attachments=download_all_project_attachments,
@@ -755,6 +804,12 @@ def settings_system():
                           api_rack_drawer_enabled=api_rack_drawer_enabled,
                           api_lending_return_enabled=api_lending_return_enabled,
                           demo_mode=current_app.config.get('DEMO_MODE', False),
+                          uploads_size=uploads_size,
+                          instance_size=instance_size,
+                          uploads_disk_total=uploads_disk_total,
+                          uploads_disk_pct=uploads_disk_pct,
+                          instance_disk_total=instance_disk_total,
+                          instance_disk_pct=instance_disk_pct,
                           project_upload_settings={
                               'picture': {'extensions': Setting.get('project_upload_picture_extensions', 'webp,png,svg,jpeg,jpg'), 'max_size': Setting.get('project_upload_picture_max_size', '10')},
                               'document': {'extensions': Setting.get('project_upload_document_extensions', 'txt,doc,docx,pdf'), 'max_size': Setting.get('project_upload_document_max_size', '10')},

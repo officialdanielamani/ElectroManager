@@ -52,12 +52,12 @@
                     </p>
                     <p class="card-text">
                         <small class="text-muted">
-                            <strong>Created:</strong> {{ template.created_at.strftime('%Y-%m-%d %H:%M') }}{% if template.creator %} - by {{ template.creator.username }}{% endif %}
+                            <strong>Created:</strong> {{ template.created_at | localtime }}{% if template.creator %} - by {{ template.creator.username }}{% endif %}
                         </small>
                     </p>
                     <p class="card-text">
                         <small class="text-muted">
-                            <strong>Updated:</strong> {{ template.updated_at.strftime('%Y-%m-%d %H:%M') }}{% if template.updater %} - by {{ template.updater.username }}{% endif %}
+                            <strong>Updated:</strong> {{ template.updated_at | localtime }}{% if template.updater %} - by {{ template.updater.username }}{% endif %}
                         </small>
                     </p>
                 </div>

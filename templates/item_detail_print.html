@@ -3,9 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>{{ item.name }} - Print</title>
-    {% if item.thumbnail and item.thumbnail.startswith('biicon:') %}
     <link rel="stylesheet" href="{{ url_for('static', filename='icons/bootstrap-icons.css') }}">
-    {% endif %}
     <style>
         /* ── Print margins fix ── */
         @page { margin: 0; size: A4; }
@@ -207,7 +205,6 @@
         </div>
         <div class="qr-block" id="qr-block">
             <img src="{{ url_for('item.item_qr_svg', uuid=item.uuid) }}" alt="QR Code">
-            <div class="qr-label">{{ item.uuid }}</div>
         </div>
         {% if item.thumbnail %}
         <div class="thumb-block" id="cover-block">
@@ -382,6 +379,15 @@
         </div>
     </div>
     {% endif %}
+
+    <!-- Created & Updated -->
+    <div class="avoid-break" style="margin-top: 14px;">
+        <div class="section-title"><i class="bi bi-clock-history"></i> Created &amp; Updated</div>
+        <div style="font-size: 0.9em; color: #555;">
+            <div>Created: {{ item.created_at | localtime if item.created_at else 'N/A' }}{% if item.creator %} - by {{ item.creator.name or item.creator.username }}{% endif %}</div>
+            <div>Updated: {{ item.updated_at | localtime if item.updated_at else 'N/A' }}{% if item.updater %} - by {{ item.updater.name or item.updater.username }}{% endif %}</div>
+        </div>
+    </div>
 
     <!-- Footer -->
     <div class="print-footer">

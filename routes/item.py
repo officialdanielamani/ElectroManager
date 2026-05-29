@@ -8,7 +8,7 @@ from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemE
                    SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm)
 from helpers import is_safe_url, format_currency, is_safe_file_path
 from utils import save_file, log_audit, admin_required, permission_required, item_permission_required, format_file_size, allowed_file, get_item_edit_permissions
-from qr_utils import get_item_data, render_template_to_svg, generate_single_sticker_pdf
+from qr_utils import get_item_data, render_template_to_svg, generate_single_sticker_pdf, generate_batch_stickers_pdf, generate_table_sticker_pdf
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime, timezone
@@ -123,21 +123,35 @@ def items():
         )
     
     items = pagination.items
-    
+
     total_items = Item.query.count()
-    
+
     # Calculate stock status based on model methods
     all_items = Item.query.all()
     low_stock_items = sum(1 for item in all_items if item.is_low_stock())
     no_stock_items = sum(1 for item in all_items if item.is_no_stock())
     total_categories = Category.query.count()
-    
+
     # Get user's table columns preference
     user_columns = current_user.get_table_columns()
     currency_symbol = Setting.get('currency', '$')
     currency_decimal_places = int(Setting.get('currency_decimal_places', '2'))
-    
-    return render_template('items.html', 
+
+    # Data for bulk-edit modal
+    all_categories = Category.query.order_by(Category.name).all()
+    all_footprints = Footprint.query.order_by(Footprint.name).all()
+    all_locations  = Location.query.order_by(Location.name).all()
+    all_racks      = Rack.query.order_by(Rack.name).all()
+    all_tags_list  = [{'id': t.id, 'name': t.name, 'color': t.color}
+                      for t in Tag.query.order_by(Tag.name).all()]
+    racks_data_bulk = [{'id': r.id, 'name': r.name, 'rows': r.rows, 'cols': r.cols,
+                        'location_id': r.location_id or '',
+                        'unavailable_drawers': r.get_unavailable_drawers(),
+                        'merged_cells': r.get_merged_cells(),
+                        'drawer_info': r.get_drawer_info()}
+                       for r in all_racks]
+
+    return render_template('items.html',
                          items=items,
                          pagination=pagination,
                          search_form=search_form,
@@ -151,7 +165,13 @@ def items():
                          user_columns=user_columns,
                          per_page=per_page,
                          currency_symbol=currency_symbol,
-                         currency_decimal_places=currency_decimal_places)
+                         currency_decimal_places=currency_decimal_places,
+                         all_categories=all_categories,
+                         all_footprints=all_footprints,
+                         all_locations=all_locations,
+                         all_racks=all_racks,
+                         all_tags_list=all_tags_list,
+                         racks_data_bulk=racks_data_bulk)
 
 # ============= ITEM ROUTES =============
 
@@ -608,6 +628,79 @@ def item_edit(uuid):
 
         db.session.commit()
 
+        # Process any pending new batches submitted from the edit form
+        pending_batches_raw = request.form.get('pending_batches', '[]')
+        try:
+            pending_batches_list = json.loads(pending_batches_raw)
+        except (json.JSONDecodeError, TypeError):
+            pending_batches_list = []
+
+        if isinstance(pending_batches_list, list) and perms.get('can_edit_batch') and pending_batches_list:
+            from models import ItemBatch
+            for pb in pending_batches_list:
+                if not isinstance(pb, dict):
+                    continue
+                qty = int(pb.get('quantity', 0)) if perms.get('can_edit_quantity') else 0
+                if qty < 0:
+                    qty = 0
+                sn_tracking = bool(pb.get('sn_tracking', False))
+                max_qty = 100 if sn_tracking else 99999
+                if qty > max_qty:
+                    qty = max_qty
+                label = str(pb.get('label', '')).strip()[:32] or None
+                manufacturer = str(pb.get('manufacturer', '')).strip()[:128] or None
+                price = float(pb.get('price', 0) or 0) if perms.get('can_edit_price') else 0.0
+                if price < 0:
+                    price = 0.0
+                date_str = pb.get('date', '')
+                purchase_date = None
+                if date_str:
+                    try:
+                        purchase_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                    except ValueError:
+                        pass
+                follow_main = pb.get('follow_main_location', True)
+                if follow_main is None:
+                    follow_main = True
+                batch_loc_id = pb.get('location_id') or None
+                batch_rack_id = pb.get('rack_id') or None
+                batch_drawer = pb.get('drawer') or None
+                try:
+                    batch_loc_id = int(batch_loc_id) if batch_loc_id else None
+                except (ValueError, TypeError):
+                    batch_loc_id = None
+                try:
+                    batch_rack_id = int(batch_rack_id) if batch_rack_id else None
+                except (ValueError, TypeError):
+                    batch_rack_id = None
+                if follow_main:
+                    batch_loc_id = None
+                    batch_rack_id = None
+                    batch_drawer = None
+                note = str(pb.get('note', '')).strip()[:128] or None
+                batch = ItemBatch(
+                    item_id=item.id,
+                    batch_number=item.get_next_batch_number(),
+                    batch_label=label,
+                    manufacturer=manufacturer,
+                    note=note,
+                    quantity=qty,
+                    price_per_unit=price,
+                    purchase_date=purchase_date,
+                    sn_tracking_enabled=sn_tracking,
+                    follow_main_location=bool(follow_main),
+                    location_id=batch_loc_id,
+                    rack_id=batch_rack_id,
+                    drawer=batch_drawer,
+                )
+                db.session.add(batch)
+                db.session.flush()
+                if sn_tracking:
+                    batch.generate_serial_numbers()
+            item.recalculate_from_batches()
+            item.updated_by = current_user.id
+            db.session.commit()
+
         log_audit(current_user.id, 'update', 'item', item.id, f'Updated item: {item.name}')
         flash(f'Item "{item.name}" updated successfully!', 'success')
         return redirect(url_for('item.item_detail', uuid=item.uuid))
@@ -650,11 +743,13 @@ def item_delete(uuid):
         flash(f'Cannot delete "{item_name}" — it has outstanding (unreturned) lending records.', 'danger')
         return redirect(url_for('item.item_detail', uuid=item.uuid))
 
+    _upload_dir = current_app.config['UPLOAD_FOLDER']
     for attachment in item.attachments:
         try:
-            if attachment.file_path and is_safe_file_path(attachment.file_path):
-                if os.path.exists(attachment.file_path):
-                    os.remove(attachment.file_path)
+            if attachment.file_path:
+                full_path = os.path.join(_upload_dir, attachment.file_path)
+                if is_safe_file_path(full_path, _upload_dir) and os.path.exists(full_path):
+                    os.remove(full_path)
         except Exception as e:
             logging.error(f"Error deleting attachment file {attachment.id}: {e}")
 
@@ -724,11 +819,13 @@ def bulk_delete_items():
                 continue
 
             # Delete attachments
+            _upload_dir = current_app.config['UPLOAD_FOLDER']
             for attachment in item.attachments:
                 try:
-                    if attachment.file_path and is_safe_file_path(attachment.file_path):
-                        if os.path.exists(attachment.file_path):
-                            os.remove(attachment.file_path)
+                    if attachment.file_path:
+                        full_path = os.path.join(_upload_dir, attachment.file_path)
+                        if is_safe_file_path(full_path, _upload_dir) and os.path.exists(full_path):
+                            os.remove(full_path)
                 except Exception as e:
                     logging.error(f"Error deleting attachment file {attachment.id}: {e}")
             
@@ -775,6 +872,102 @@ def bulk_delete_items():
         return jsonify({'success': False, 'message': 'An error occurred during deletion.'}), 500
 
 
+@item_bp.route('/items/bulk-edit', endpoint='bulk_edit_items', methods=['POST'])
+@login_required
+def bulk_edit_items():
+    """Bulk edit selected items — only fields explicitly provided are updated."""
+    if not current_user.has_permission('items', 'edit_info'):
+        return jsonify({'success': False, 'message': 'You do not have permission to edit items.'}), 403
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'message': 'No data provided.'}), 400
+
+    item_ids = data.get('item_ids', [])
+    if not item_ids or not isinstance(item_ids, list):
+        return jsonify({'success': False, 'message': 'No items selected.'}), 400
+
+    try:
+        item_ids = [int(i) for i in item_ids]
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'message': 'Invalid item IDs.'}), 400
+
+    items_to_edit = Item.query.filter(Item.id.in_(item_ids)).all()
+    if not items_to_edit:
+        return jsonify({'success': False, 'message': 'No items found.'}), 404
+
+    # Build the dict of fields to update (only non-skip fields are included)
+    updates = {}
+
+    # ── Location ─────────────────────────────────────────────────────────────
+    location_type = data.get('location_type', 'no_change')
+    if location_type == 'general':
+        loc_id = data.get('location_id')
+        updates['location_id'] = int(loc_id) if loc_id else None
+        updates['rack_id'] = None
+        updates['drawer'] = None
+    elif location_type == 'drawer':
+        rack_id = data.get('rack_id')
+        drawer  = (data.get('drawer') or '').strip()
+        if rack_id and drawer:
+            updates['rack_id']     = int(rack_id)
+            updates['drawer']      = drawer
+            updates['location_id'] = None
+
+    # ── Category ─────────────────────────────────────────────────────────────
+    if 'category_id' in data:
+        cat = data['category_id']
+        if cat not in ('', None):          # '' = "No Change" sentinel
+            updates['category_id'] = int(cat) if cat else None
+
+    # ── Footprint ─────────────────────────────────────────────────────────────
+    if 'footprint_id' in data:
+        fp = data['footprint_id']
+        if fp not in ('', None):
+            updates['footprint_id'] = int(fp) if fp else None
+
+    # ── Tags (null = no change; list = apply, even if empty) ─────────────────
+    if 'tags' in data:
+        tag_list = data['tags']
+        if isinstance(tag_list, list):
+            updates['tags'] = json.dumps(tag_list) if tag_list else None
+
+    # ── Min Quantity ──────────────────────────────────────────────────────────
+    if 'min_quantity' in data:
+        mq = data['min_quantity']
+        if mq is not None and mq != '':
+            try:
+                updates['min_quantity'] = max(0, int(mq))
+            except (ValueError, TypeError):
+                pass
+
+    if not updates:
+        return jsonify({'success': False, 'message': 'No changes specified. Please fill in at least one field.'}), 400
+
+    now = datetime.now(timezone.utc)
+    try:
+        for item in items_to_edit:
+            for field, value in updates.items():
+                setattr(item, field, value)
+            item.updated_by = current_user.id
+            item.updated_at = now
+
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error in bulk edit: {e}")
+        return jsonify({'success': False, 'message': 'Database error during update.'}), 500
+
+    names = ', '.join(i.name for i in items_to_edit[:10])
+    if len(items_to_edit) > 10:
+        names += f' … and {len(items_to_edit) - 10} more'
+    log_audit(current_user.id, 'bulk_edit', 'item', None,
+              f'Bulk edited {len(items_to_edit)} items: {names}')
+
+    return jsonify({'success': True, 'updated_count': len(items_to_edit),
+                    'message': f'Successfully updated {len(items_to_edit)} item(s).'}), 200
+
+
 # ============= ATTACHMENT ROUTES =============
 
 
@@ -793,38 +986,47 @@ def upload_attachment(item_id):
         return redirect(url_for('item.item_detail', uuid=item.uuid))
     
     files = request.files.getlist('files')
-    
+
     # Get dynamic settings
     max_size_mb = int(Setting.get('max_file_size_mb', '10'))
     max_size_bytes = max_size_mb * 1024 * 1024
     extensions_str = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
-    allowed_extensions = set(ext.strip().lower() for ext in extensions_str.split(',') if ext.strip())
-    
+
     uploaded_count = 0
-    rejected_count = 0
-    
+    errors = []
+
     for file in files:
         if not file or not file.filename:
             continue
-            
+
+        fname = file.filename
+
         # Check file extension
-        if not allowed_file(file.filename):
-            flash(f'❌ File "{file.filename}" rejected: Incompatible file type. Allowed: {extensions_str}', 'danger')
-            rejected_count += 1
+        if not allowed_file(fname):
+            errors.append(f'"{fname}" — incompatible file type. Allowed: {extensions_str}')
             continue
-        
+
+        # MIME type validation — detect spoofed files (e.g. an EXE renamed to .jpg)
+        from utils import validate_mime_type
+        declared_ext = fname.rsplit('.', 1)[1].lower() if '.' in fname else ''
+        mime_ok, mime_reason = validate_mime_type(file, declared_ext)
+        if not mime_ok:
+            errors.append(f'"{fname}" — {mime_reason}')
+            continue
+
         # Check file size
-        file.seek(0, 2)  # Seek to end
+        file.seek(0, 2)
         file_size = file.tell()
-        file.seek(0)  # Reset to beginning
-        
+        file.seek(0)
+
         if file_size > max_size_bytes:
-            flash(f'❌ File "{file.filename}" rejected: Too large ({format_file_size(file_size)}). Max: {max_size_mb}MB', 'danger')
-            rejected_count += 1
+            errors.append(
+                f'"{fname}" — too large ({format_file_size(file_size)}). Max allowed: {max_size_mb} MB'
+            )
             continue
-        
+
         file_info = save_file(file, current_app.config['UPLOAD_FOLDER'], item.uuid)
-        
+
         if file_info:
             attachment = Attachment(
                 filename=file_info['filename'],
@@ -837,16 +1039,20 @@ def upload_attachment(item_id):
             )
             db.session.add(attachment)
             uploaded_count += 1
-    
+
     if uploaded_count > 0:
         db.session.commit()
-        log_audit(current_user.id, 'upload', 'attachment', item.id, f'Uploaded {uploaded_count} file(s) to item: {item.name}')
-        flash(f'✅ {uploaded_count} file(s) uploaded successfully!', 'success')
-    
-    if rejected_count > 0 and uploaded_count == 0:
-        flash(f'⚠️ All {rejected_count} file(s) were rejected. Check file types and sizes above.', 'warning')
-    
-    return redirect(url_for('item.item_detail', uuid=item.uuid))
+        log_audit(current_user.id, 'upload', 'attachment', item.id,
+                  f'Uploaded {uploaded_count} file(s) to item: {item.name}')
+
+    # Return JSON so the JS fetch handler can display real success/error messages
+    # without the flash-consumed-by-redirect silent-failure problem.
+    from flask import jsonify
+    return jsonify({
+        'success': uploaded_count > 0,
+        'uploaded': uploaded_count,
+        'errors': errors,
+    }), 200 if uploaded_count > 0 or not errors else 400
 
 
 
@@ -862,12 +1068,14 @@ def delete_attachment(id):
         return redirect(url_for('item.item_edit', uuid=item.uuid))
 
     try:
-        if attachment.file_path and is_safe_file_path(attachment.file_path):
-            if os.path.exists(attachment.file_path):
-                os.remove(attachment.file_path)
+        if attachment.file_path:
+            _upload_dir = current_app.config['UPLOAD_FOLDER']
+            full_path = os.path.join(_upload_dir, attachment.file_path)
+            if is_safe_file_path(full_path, _upload_dir) and os.path.exists(full_path):
+                os.remove(full_path)
     except Exception as e:
         logging.error(f"Error deleting attachment file {attachment.id}: {e}")
-    
+
     db.session.delete(attachment)
     db.session.commit()
     
@@ -1392,8 +1600,8 @@ def items_print():
     currency_decimal_places = int(Setting.get('currency_decimal_places', '2'))
     
     # Get current datetime for footer
-    from datetime import datetime
-    current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    from datetime import datetime, timezone
+    current_datetime = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
     
     return render_template('items_print.html', 
                          items=items,
@@ -1423,8 +1631,8 @@ def item_detail_print(uuid):
     currency_decimal_places = int(Setting.get('currency_decimal_places', '2'))
     
     # Get current datetime for footer
-    from datetime import datetime
-    current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    from datetime import datetime, timezone
+    current_datetime = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
     
     # Parse datasheets
     datasheets = []
@@ -1459,6 +1667,9 @@ def api_item_sticker_preview(uuid, template_id):
     Generate sticker preview for an item with a specific template
     Returns: SVG image
     """
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        return jsonify({'error': 'No permission to use QR stickers'}), 403
+
     from models import StickerTemplate
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
@@ -1489,6 +1700,9 @@ def api_item_sticker_print(uuid, template_id):
     Generate printable sticker for an item
     Returns: PDF file download
     """
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        abort(403)
+
     from models import StickerTemplate
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
@@ -1513,12 +1727,133 @@ def api_item_sticker_print(uuid, template_id):
 
 
 
+@item_bp.route('/items/bulk-qr-sticker', endpoint='items_bulk_qr_sticker')
+@login_required
+def items_bulk_qr_sticker():
+    """Bulk QR sticker page for multiple selected items."""
+    if not current_user.has_permission('items', 'view'):
+        flash('You do not have permission to view items.', 'danger')
+        return redirect(url_for('index'))
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        flash('You do not have permission to use QR stickers.', 'danger')
+        return redirect(url_for('item.items'))
+
+    item_ids_str = request.args.get('item_ids', '')
+    if not item_ids_str:
+        flash('No items selected.', 'warning')
+        return redirect(url_for('item.items'))
+
+    try:
+        item_ids = [int(i) for i in item_ids_str.split(',') if i.strip()]
+    except ValueError:
+        flash('Invalid item IDs.', 'danger')
+        return redirect(url_for('item.items'))
+
+    items_list = Item.query.filter(Item.id.in_(item_ids)).order_by(Item.name).all()
+    if not items_list:
+        flash('No items found.', 'warning')
+        return redirect(url_for('item.items'))
+
+    templates = StickerTemplate.query.filter_by(template_type='Items').order_by(StickerTemplate.name).all()
+
+    return render_template('items_bulk_qr_sticker.html',
+                           items=items_list,
+                           templates=templates,
+                           item_ids=item_ids_str)
+
+
+@item_bp.route('/api/items/bulk-sticker-print/<int:template_id>')
+@login_required
+def api_items_bulk_sticker_print(template_id):
+    """Generate a multi-page PDF with one sticker per item (Normal mode)."""
+    if not current_user.has_permission('items', 'view') or \
+       not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        abort(403)
+
+    item_ids_str = request.args.get('item_ids', '')
+    if not item_ids_str:
+        abort(400)
+
+    try:
+        item_ids = [int(i) for i in item_ids_str.split(',') if i.strip()]
+    except ValueError:
+        abort(400)
+
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'Items':
+        abort(400)
+
+    items_list = Item.query.filter(Item.id.in_(item_ids)).order_by(Item.name).all()
+    if not items_list:
+        abort(404)
+
+    output = generate_batch_stickers_pdf(template, items_list, get_item_data)
+
+    log_audit(current_user.id, 'print', 'item', None,
+              f'Bulk sticker print: {len(items_list)} items, template "{template.name}"')
+
+    return send_file(output, mimetype='application/pdf', as_attachment=True,
+                     download_name=f'bulk_stickers_{template.name}.pdf')
+
+
+@item_bp.route('/api/items/bulk-sticker-table-print/<int:template_id>')
+@login_required
+def api_items_bulk_sticker_table_print(template_id):
+    """Generate a table-layout PDF with stickers for multiple items."""
+    if not current_user.has_permission('items', 'view') or \
+       not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        abort(403)
+
+    item_ids_str = request.args.get('item_ids', '')
+    if not item_ids_str:
+        abort(400)
+
+    try:
+        item_ids = [int(i) for i in item_ids_str.split(',') if i.strip()]
+    except ValueError:
+        abort(400)
+
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.template_type != 'Items':
+        abort(400)
+
+    items_list = Item.query.filter(Item.id.in_(item_ids)).order_by(Item.name).all()
+    if not items_list:
+        abort(404)
+
+    options = {
+        'paper_w':    request.args.get('paper_w',    210,      type=float),
+        'paper_h':    request.args.get('paper_h',    297,      type=float),
+        'margin_t':   request.args.get('margin_t',   10,       type=float),
+        'margin_b':   request.args.get('margin_b',   10,       type=float),
+        'margin_l':   request.args.get('margin_l',   10,       type=float),
+        'margin_r':   request.args.get('margin_r',   10,       type=float),
+        'spacing_v':  request.args.get('spacing_v',  3,        type=float),
+        'spacing_h':  request.args.get('spacing_h',  3,        type=float),
+        'border':     request.args.get('border', 'false').lower() == 'true',
+        'border_w':   request.args.get('border_w',   0.3,      type=float),
+        'border_color': request.args.get('border_color', '#000000'),
+    }
+
+    output = generate_table_sticker_pdf(template, items_list, get_item_data, options)
+
+    log_audit(current_user.id, 'print', 'item', None,
+              f'Bulk table sticker print: {len(items_list)} items, template "{template.name}"')
+
+    return send_file(output, mimetype='application/pdf', as_attachment=True,
+                     download_name=f'bulk_table_stickers_{template.name}.pdf')
+
+
 @item_bp.route('/item/<string:uuid>/qr-sticker')
 @login_required
 def item_qr_sticker(uuid):
     """
     Page showing QR sticker preview and print options for an item
     """
+    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+        flash('You do not have permission to use QR stickers.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+
     from models import StickerTemplate
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     

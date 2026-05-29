@@ -47,13 +47,21 @@
 
                     <hr>
 
-                    <!-- Timezone (placeholder — not yet functional) -->
+                    <!-- Display Timezone -->
                     <div class="mb-3">
-                        <label for="system_timezone" class="form-label fw-semibold">System Timezone</label>
-                        <select class="form-select" id="system_timezone" name="system_timezone" disabled>
-                            <option value="">— Coming soon —</option>
+                        <label for="display_timezone" class="form-label fw-semibold">Display Timezone</label>
+                        <select class="form-select" id="display_timezone" name="display_timezone">
+                            <option value="" {% if not display_timezone %}selected{% endif %}>UTC+00:00 (default / server UTC)</option>
+                            {% for val, label in tz_offsets %}
+                            <option value="{{ val }}" {% if display_timezone == val %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
                         </select>
-                        <div class="form-text"><i class="bi bi-info-circle"></i> Timezone selection is not yet functional. Dates and times currently use the server's local timezone.</div>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i>
+                            All timestamps in the UI are stored as UTC and converted for display only.
+                            You can also set the <code>TZ</code> environment variable (IANA name, e.g. <code>Asia/Kuala_Lumpur</code>) as a fallback — this setting takes priority.
+                            {% if tz_label %}<br><span class="text-success"><i class="bi bi-check-circle"></i> Currently displaying as <strong>{{ tz_label }}</strong></span>{% endif %}
+                        </div>
                     </div>
 
                     <!-- Banner Timeout -->
@@ -118,6 +126,39 @@
                         <input class="form-check-input" type="checkbox" name="download_all_share_files_page" id="dl_sf_page"
                                {% if download_all_share_files_page %}checked{% endif %}>
                         <label class="form-check-label" for="dl_sf_page">Share Files page (<code>/settings/share-files</code>)</label>
+                    </div>
+
+                    <hr>
+                    <!-- Storage Usage -->
+                    <label class="form-label fw-semibold"><i class="bi bi-hdd"></i> Storage Usage</label>
+                    <div class="form-text mb-2">Folder sizes and underlying filesystem usage. Each bar shows how full the filesystem that folder lives on is — useful when <code>uploads/</code> and <code>instance/</code> are on separate volumes.</div>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span><i class="bi bi-folder2-open text-primary"></i> <strong>uploads/</strong></span>
+                            <span class="text-muted">{{ (uploads_size / 1048576) | round(2) }} MB used &nbsp;·&nbsp; {{ uploads_disk_pct }}% of {{ (uploads_disk_total / 1073741824) | round(1) }} GB filesystem</span>
+                        </div>
+                        <div class="progress" style="height:14px;">
+                            <div class="progress-bar {% if uploads_disk_pct > 80 %}bg-danger{% elif uploads_disk_pct > 70 %}bg-warning{% else %}bg-success{% endif %}"
+                                 role="progressbar"
+                                 style="width:{{ [uploads_disk_pct, 100]|min }}%;"
+                                 aria-valuenow="{{ uploads_disk_pct }}" aria-valuemin="0" aria-valuemax="100">
+                                {{ uploads_disk_pct }}%
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span><i class="bi bi-database text-secondary"></i> <strong>instance/</strong></span>
+                            <span class="text-muted">{{ (instance_size / 1048576) | round(2) }} MB used &nbsp;·&nbsp; {{ instance_disk_pct }}% of {{ (instance_disk_total / 1073741824) | round(1) }} GB filesystem</span>
+                        </div>
+                        <div class="progress" style="height:14px;">
+                            <div class="progress-bar {% if instance_disk_pct > 80 %}bg-danger{% elif instance_disk_pct > 70 %}bg-warning{% else %}bg-success{% endif %}"
+                                 role="progressbar"
+                                 style="width:{{ [instance_disk_pct, 100]|min }}%;"
+                                 aria-valuenow="{{ instance_disk_pct }}" aria-valuemin="0" aria-valuemax="100">
+                                {{ instance_disk_pct }}%
+                            </div>
+                        </div>
                     </div>
 
                     {% if can_edit %}
@@ -587,6 +628,7 @@
                     <li><strong>User Signup</strong> — Allow self-registration at <code>/register</code>. Disable to require admin-created accounts only.</li>
                     <li><strong>Default Theme</strong> — Fallback theme for anonymous users and new accounts.</li>
                     <li><strong>Download All (ZIP)</strong> — Control which sections expose a bulk download button.</li>
+                    <li><strong>Storage Usage</strong> — Two bars showing folder sizes and the fill level of each folder's underlying filesystem. Supports separate volumes (e.g. uploads on HDD, instance on SSD). Bar turns yellow above 70% and red above 80%.</li>
                 </ul>
 
                 <h6 class="mt-3"><i class="bi bi-building"></i> Company Details</h6>

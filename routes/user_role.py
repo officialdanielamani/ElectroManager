@@ -3,9 +3,10 @@ User Role Routes Blueprint
 """
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file, abort, current_app
 from flask_login import login_required, current_user, login_user, logout_user
-from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate, SharedFile
-from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEditForm, AttachmentForm, 
-                   SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm)
+from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate, SharedFile, Role
+from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEditForm, AttachmentForm,
+                   SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm,
+                   RoleForm)
 from helpers import is_safe_url, format_currency, is_safe_file_path
 from utils import save_file, log_audit, admin_required, permission_required, item_permission_required, format_file_size, allowed_file
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -31,7 +32,6 @@ def users():
         flash('You do not have permission to view users.', 'danger')
         return redirect(url_for('settings.settings'))
     
-    from models import Role
     users = User.query.order_by(User.username).all()
     roles = Role.query.order_by(Role.name).all()
 
@@ -207,8 +207,9 @@ def user_edit(id):
         if action == 'delete_photo':
             if user.profile_photo:
                 if not user.profile_photo.startswith('share/'):
-                    filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
-                    if is_safe_file_path(filepath) and os.path.exists(filepath):
+                    _pic_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture')
+                    filepath = os.path.join(_pic_dir, user.profile_photo)
+                    if is_safe_file_path(filepath, _pic_dir) and os.path.exists(filepath):
                         os.remove(filepath)
                 user.profile_photo = None
                 log_audit(current_user.id, 'update', 'user', user.id, f'Deleted profile photo for user: {user.username}')
@@ -232,8 +233,9 @@ def user_edit(id):
                     
                     # Delete old photo if exists (skip if it's a share-sourced photo)
                     if user.profile_photo and not user.profile_photo.startswith('share/'):
-                        old_file = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
-                        if is_safe_file_path(old_file) and os.path.exists(old_file):
+                        _pic_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture')
+                        old_file = os.path.join(_pic_dir, user.profile_photo)
+                        if is_safe_file_path(old_file, _pic_dir) and os.path.exists(old_file):
                             os.remove(old_file)
 
                     # Save with username as filename - sanitize extension
@@ -274,8 +276,9 @@ def user_edit(id):
         if share_file:
             if user.profile_photo and not user.profile_photo.startswith('share/'):
                 # delete old uploaded file
-                old_fp = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
-                if is_safe_file_path(old_fp) and os.path.exists(old_fp):
+                _pic_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture')
+                old_fp = os.path.join(_pic_dir, user.profile_photo)
+                if is_safe_file_path(old_fp, _pic_dir) and os.path.exists(old_fp):
                     os.remove(old_fp)
             user.profile_photo = f'share/{share_file}'
 
@@ -288,8 +291,9 @@ def user_edit(id):
                 file.seek(0)
                 if file_size <= 1024 * 1024:
                     if user.profile_photo and not user.profile_photo.startswith('share/'):
-                        old_fp = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture', user.profile_photo)
-                        if is_safe_file_path(old_fp) and os.path.exists(old_fp):
+                        _pic_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture')
+                        old_fp = os.path.join(_pic_dir, user.profile_photo)
+                        if is_safe_file_path(old_fp, _pic_dir) and os.path.exists(old_fp):
                             os.remove(old_fp)
                     ext = secure_filename(file.filename.rsplit('.', 1)[1].lower())
                     filename = f"{secure_filename(form.username.data)}.{ext}"
@@ -418,8 +422,6 @@ def roles():
 @login_required
 @permission_required("settings_sections.users_roles", "roles_create")
 def role_new():
-    from models import Role
-    from forms import RoleForm
     form = RoleForm()
     
     if form.validate_on_submit():
@@ -492,8 +494,6 @@ def role_new():
 @login_required
 @permission_required("settings_sections.users_roles", "roles_edit")
 def role_edit(id):
-    from models import Role
-    from forms import RoleForm
     role = Role.query.get_or_404(id)
     
     form = RoleForm(obj=role)
@@ -661,7 +661,6 @@ def role_edit(id):
 @login_required
 @permission_required("settings_sections.users_roles", "roles_delete")
 def role_delete(id):
-    from models import Role
     role = Role.query.get_or_404(id)
     
     # Prevent deleting system roles
@@ -688,7 +687,6 @@ def role_delete(id):
 @login_required
 @permission_required("settings_sections.users_roles", "roles_create")
 def role_clone(id):
-    from models import Role
     source_role = Role.query.get_or_404(id)
     
     # Generate unique name for cloned role
@@ -718,13 +716,20 @@ def role_clone(id):
 
 
 @user_role_bp.route('/uploads/userpicture/<path:filename>', endpoint='serve_user_picture')
+@login_required
 def serve_user_picture(filename):
     """Serve user profile pictures; filename may be 'share/<actualname>' for share-sourced photos."""
+    from werkzeug.utils import secure_filename as _sf
     if filename.startswith('share/'):
-        share_filename = filename[len('share/'):]
+        safe_name = _sf(filename[len('share/'):])
+        if not safe_name:
+            abort(404)
         folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'share', 'profile')
-        return send_from_directory(folder, share_filename)
-    return send_from_directory(os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture'), filename)
+        return send_from_directory(folder, safe_name)
+    safe_name = _sf(filename)
+    if not safe_name:
+        abort(404)
+    return send_from_directory(os.path.join(current_app.config['UPLOAD_FOLDER'], 'userpicture'), safe_name)
 
 
 # ============= ITEMS PRINT =============

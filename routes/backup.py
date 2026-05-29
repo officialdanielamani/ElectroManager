@@ -76,6 +76,12 @@ def backup_restore_upload():
     
     file = request.files['backup']
     if file.filename.endswith('.db'):
+        # Validate SQLite magic bytes before overwriting the live database
+        header = file.read(16)
+        file.seek(0)
+        if header[:16] != b'SQLite format 3\x00':
+            flash('Invalid database file: not a valid SQLite database.', 'danger')
+            return redirect(url_for('backup.backup_restore'))
         db_path = current_app.config.get('SQLALCHEMY_DATABASE_URI', 'sqlite:///inventory.db').replace('sqlite:///', '')
         backup_old_path = 'inventory_backup_old.db'
         shutil.copy(db_path, backup_old_path)
@@ -133,7 +139,7 @@ def export_selective():
         export_data = DataExporter.export_selective(selections, include_item_values)
 
         response = current_app.make_response(json.dumps(export_data, indent=2))
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         response.headers['Content-Disposition'] = f'attachment; filename=config_export_{timestamp}.json'
         response.headers['Content-Type'] = 'application/json'
         return response

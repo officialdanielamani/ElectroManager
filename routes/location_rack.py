@@ -172,10 +172,11 @@ def location_edit(uuid):
         location.color = form.color.data or '#6c757d'
         
         # Handle picture deletion
+        _loc_upload_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations')
         if request.form.get('delete_picture'):
             if location.picture and not location.picture.startswith('share/'):
-                old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations', location.picture)
-                if is_safe_file_path(old_path) and os.path.exists(old_path):
+                old_path = os.path.join(_loc_upload_dir, location.picture)
+                if is_safe_file_path(old_path, _loc_upload_dir) and os.path.exists(old_path):
                     os.remove(old_path)
             location.picture = None
 
@@ -199,8 +200,8 @@ def location_edit(uuid):
                     flash('Only PNG, JPEG, and WebP images are allowed.', 'danger')
                     return render_template('location_form.html', form=form, location=location)
                 if location.picture and not location.picture.startswith('share/'):
-                    old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations', location.picture)
-                    if is_safe_file_path(old_path) and os.path.exists(old_path):
+                    old_path = os.path.join(_loc_upload_dir, location.picture)
+                    if is_safe_file_path(old_path, _loc_upload_dir) and os.path.exists(old_path):
                         os.remove(old_path)
                 if ext == 'jpg':
                     ext = 'jpeg'
@@ -232,34 +233,97 @@ def location_edit(uuid):
 @login_required
 @permission_required("settings_sections.location_management", "delete")
 def location_delete(uuid):
-    """Delete location"""
-    from models import Location
-    
+    """Delete location — clears location references on items, batches, and racks."""
+    from models import Location, Item, ItemBatch
     location = Location.query.filter_by(uuid=uuid).first_or_404()
-    
-    # Check if location is in use
-    if location.items or location.racks:
-        flash('Cannot delete location that is in use by items or racks!', 'danger')
-        return redirect(url_for('location_rack.location_management'))
-    
-    # Delete picture directory and all its contents
+
+    # Clear references instead of blocking
+    for item in list(location.items):
+        item.location_id = None
+    for batch in ItemBatch.query.filter_by(location_id=location.id).all():
+        batch.location_id = None
+    for rack in list(location.racks):
+        rack.location_id = None
+
+    # Delete picture directory
     if location.uuid:
         location_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations', location.uuid)
         if os.path.exists(location_dir):
             import shutil
-            try:
-                shutil.rmtree(location_dir)
-            except Exception as e:
-                print(f"Error deleting location directory: {e}")
-    
+            try: shutil.rmtree(location_dir)
+            except Exception as e: print(f"Error deleting location directory: {e}")
+
     location_name = location.name
     db.session.delete(location)
     db.session.commit()
-    
-    log_audit(current_user.id, 'delete', 'location', id, f'Deleted location: {location_name}')
-    flash(f'Location "{location_name}" deleted successfully!', 'success')
+
+    log_audit(current_user.id, 'delete', 'location', location.id, f'Deleted location: {location_name}')
+    flash(f'Location "{location_name}" deleted. Any assigned items/racks have been unlinked.', 'success')
     return redirect(url_for('location_rack.location_management'))
 
+
+
+@location_rack_bp.route('/api/locations/bulk-delete', endpoint='bulk_delete_locations', methods=['POST'])
+@login_required
+@permission_required("settings_sections.location_management", "delete")
+def bulk_delete_locations():
+    """Bulk delete locations — clears location references on items, batches, and racks."""
+    from models import Location, Item, ItemBatch
+    data = request.get_json() or {}
+    uuids = data.get('uuids', [])
+    if not uuids or not isinstance(uuids, list):
+        return jsonify({'success': False, 'message': 'No locations selected.'}), 400
+    deleted = []
+    for uuid in uuids:
+        loc = Location.query.filter_by(uuid=str(uuid)).first()
+        if not loc:
+            continue
+        for item in list(loc.items):
+            item.location_id = None
+        for batch in ItemBatch.query.filter_by(location_id=loc.id).all():
+            batch.location_id = None
+        for rack in list(loc.racks):
+            rack.location_id = None
+        if loc.uuid:
+            loc_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'locations', loc.uuid)
+            if os.path.exists(loc_dir):
+                import shutil as _shutil
+                try: _shutil.rmtree(loc_dir)
+                except Exception: pass
+        deleted.append(loc.name)
+        log_audit(current_user.id, 'delete', 'location', loc.id, f'Bulk deleted location: {loc.name}')
+        db.session.delete(loc)
+    db.session.commit()
+    msg = f'Deleted {len(deleted)} location(s). Any assigned items/racks have been unlinked.'
+    return jsonify({'success': True, 'message': msg, 'deleted': len(deleted)})
+
+
+@location_rack_bp.route('/api/racks/bulk-delete', endpoint='bulk_delete_racks', methods=['POST'])
+@login_required
+@permission_required("settings_sections.location_management", "delete")
+def bulk_delete_racks():
+    """Bulk delete racks by UUID list (JSON body: {uuids: [...]})"""
+    data = request.get_json() or {}
+    uuids = data.get('uuids', [])
+    if not uuids or not isinstance(uuids, list):
+        return jsonify({'success': False, 'message': 'No racks selected.'}), 400
+    deleted = []
+    for uuid in uuids:
+        rack = Rack.query.filter_by(uuid=str(uuid)).first()
+        if not rack:
+            continue
+        for item in list(rack.items):
+            item.rack_id = None
+            item.drawer = None
+        for batch in ItemBatch.query.filter_by(rack_id=rack.id).all():
+            batch.rack_id = None
+            batch.drawer = None
+        deleted.append(rack.name)
+        log_audit(current_user.id, 'delete', 'rack', rack.id, f'Bulk deleted rack: {rack.name}')
+        db.session.delete(rack)
+    db.session.commit()
+    msg = f'Deleted {len(deleted)} rack(s). Any assigned items/batches have been unlinked.'
+    return jsonify({'success': True, 'message': msg, 'deleted': len(deleted)})
 
 
 @location_rack_bp.route('/location-picture/<path:filepath>', endpoint='location_picture')
@@ -284,13 +348,17 @@ def location_picture(filepath):
 @login_required
 def rack_picture(filepath):
     """Serve rack pictures.  filepath may be:
-      - {rack_uuid}/{filename}.ext  — uploaded file
+      - {rack_uuid}.ext             — uploaded file (flat, new style)
+      - {rack_uuid}/{filename}.ext  — uploaded file (legacy subfolder)
       - share/icon/{filename}       — icon from Share Files
+      - biicon/{icon_name}          — not served here; handled in template
     """
     if filepath.startswith('share/icon/'):
         from routes.share import share_serve
         filename = filepath[len('share/icon/'):]
         return share_serve('icon', filename)
+    if filepath.startswith('biicon/'):
+        abort(404)
     rack_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks')
     safe_path = safe_join(rack_dir, filepath)
     if safe_path is None or not os.path.exists(safe_path):
@@ -356,10 +424,13 @@ def rack_new():
         db.session.add(rack)
         db.session.commit()
         
-        # Handle picture upload with UUID-based path structure
-        # Handle share icon file selection (takes priority over upload)
+        # Handle picture: BI icon > share icon > uploaded file
+        biicon = request.form.get('biicon_file', '').strip()
         share_icon = request.form.get('share_icon_file', '').strip()
-        if share_icon and not request.files.get('picture'):
+        if biicon and not request.files.get('picture'):
+            rack.picture = f'biicon/{biicon}'
+            db.session.commit()
+        elif share_icon and not request.files.get('picture'):
             rack.picture = f'share/icon/{share_icon}'
             db.session.commit()
         elif request.files.get('picture'):
@@ -380,14 +451,14 @@ def rack_new():
                 if ext == 'jpg':
                     ext = 'jpeg'
                 filename = f"{rack.uuid}.{ext}"
-                rack_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks', rack.uuid)
+                rack_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks')
                 os.makedirs(rack_dir, exist_ok=True)
                 for old_ext in ['png', 'jpeg', 'webp']:
                     old_f = os.path.join(rack_dir, f"{rack.uuid}.{old_ext}")
                     if old_f != os.path.join(rack_dir, filename) and os.path.exists(old_f):
                         os.remove(old_f)
                 file.save(os.path.join(rack_dir, filename))
-                rack.picture = f"{rack.uuid}/{filename}"
+                rack.picture = filename
                 db.session.commit()
 
         log_audit(current_user.id, 'create', 'rack', rack.id, f'Created rack: {name}')
@@ -490,16 +561,20 @@ def rack_edit(uuid):
                 flash(f'Warning: {items_cleared} item(s) were removed from drawers outside new bounds. These items now have no location.', 'warning')
         
         # Handle picture deletion
+        _rack_upload_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks')
         if request.form.get('delete_picture'):
             if rack.picture and not rack.picture.startswith('share/'):
-                old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks', rack.picture)
-                if is_safe_file_path(old_path) and os.path.exists(old_path):
+                old_path = os.path.join(_rack_upload_dir, rack.picture)
+                if is_safe_file_path(old_path, _rack_upload_dir) and os.path.exists(old_path):
                     os.remove(old_path)
             rack.picture = None
 
-        # Handle share icon file selection (takes priority over upload)
+        # Handle picture: BI icon > share icon > uploaded file
+        biicon = request.form.get('biicon_file', '').strip()
         share_icon = request.form.get('share_icon_file', '').strip()
-        if share_icon and not request.files.get('picture'):
+        if biicon and not request.files.get('picture'):
+            rack.picture = f'biicon/{biicon}'
+        elif share_icon and not request.files.get('picture'):
             rack.picture = f'share/icon/{share_icon}'
         elif request.files.get('picture'):
             file = request.files['picture']
@@ -517,20 +592,20 @@ def rack_edit(uuid):
                     flash('Only PNG, JPEG, and WebP images are allowed.', 'danger')
                     return redirect(url_for('location_rack.rack_edit', uuid=uuid))
                 if rack.picture and not rack.picture.startswith('share/'):
-                    old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks', rack.picture)
-                    if is_safe_file_path(old_path) and os.path.exists(old_path):
+                    old_path = os.path.join(_rack_upload_dir, rack.picture)
+                    if is_safe_file_path(old_path, _rack_upload_dir) and os.path.exists(old_path):
                         os.remove(old_path)
                 if ext == 'jpg':
                     ext = 'jpeg'
                 filename = f"{rack.uuid}.{ext}"
-                rack_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks', rack.uuid)
+                rack_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'racks')
                 os.makedirs(rack_dir, exist_ok=True)
                 for old_ext in ['png', 'jpeg', 'webp']:
                     old_f = os.path.join(rack_dir, f"{rack.uuid}.{old_ext}")
                     if old_f != os.path.join(rack_dir, filename) and os.path.exists(old_f):
                         os.remove(old_f)
                 file.save(os.path.join(rack_dir, filename))
-                rack.picture = f"{rack.uuid}/{filename}"
+                rack.picture = filename
 
         db.session.commit()
 
@@ -558,18 +633,21 @@ def rack_delete(uuid):
     """Delete rack"""
     rack = Rack.query.filter_by(uuid=uuid).first_or_404()
     rack_name = rack.name
-    
-    # Clear locations for items
+
     items = Item.query.filter_by(rack_id=rack.id).all()
     for item in items:
         item.rack_id = None
         item.drawer = None
-    
+    batches = ItemBatch.query.filter_by(rack_id=rack.id).all()
+    for batch in batches:
+        batch.rack_id = None
+        batch.drawer = None
+
     db.session.delete(rack)
     db.session.commit()
-    
-    log_audit(current_user.id, 'delete', 'rack', id, f'Deleted rack: {rack_name}, cleared {len(items)} item locations')
-    flash(f'Rack "{rack_name}" deleted. {len(items)} item location(s) cleared.', 'success')
+
+    log_audit(current_user.id, 'delete', 'rack', rack.id, f'Deleted rack: {rack_name}')
+    flash(f'Rack "{rack_name}" deleted. Any assigned items/batches have been unlinked.', 'success')
     return redirect(url_for('location_rack.location_management'))
 
 
@@ -989,11 +1067,13 @@ def api_drawer_sticker_print(uuid, drawer_id, template_id):
         return jsonify({'error': 'Failed to generate PDF'}), 500
     log_audit(current_user.id, 'print', 'rack', rack.id,
               f'Printed drawer sticker: {template.name} drawer {drawer_id}')
+    from werkzeug.utils import secure_filename as _sf
+    safe_dl_name = _sf(f'{template.name}_{rack.uuid}_{drawer_id}.pdf') or 'drawer_sticker.pdf'
     return send_file(
         output,
         mimetype='application/pdf',
         as_attachment=True,
-        download_name=f'{template.name}_{rack.uuid}_{drawer_id}.pdf'
+        download_name=safe_dl_name
     )
 
 

@@ -85,9 +85,9 @@ def visual_storage():
 
     rack_data = []
     for rack in racks_for_page:
-        # Items whose main location is this rack (shown without quantity)
+        # Items whose main location is this rack
         items_main = Item.query.filter_by(rack_id=rack.id).all()
-        # Batches that override to this rack (shown with quantity)
+        # Batches that explicitly override to this rack
         batches_here = ItemBatch.query.filter_by(rack_id=rack.id, follow_main_location=False).all()
 
         drawers = {}
@@ -100,9 +100,17 @@ def visual_storage():
         for item in items_main:
             if item.drawer:
                 entry = _ensure(item.drawer)
-                entry['items'].append(item)
                 if not entry['preview_image']:
                     entry['preview_image'] = _first_image_url(item)
+                follow_batches = [b for b in item.batches if b.follow_main_location]
+                if follow_batches:
+                    # Item has stock here via follow-main batches; show batches (with qty)
+                    # rather than a no-qty reference row to avoid duplicate display
+                    for batch in follow_batches:
+                        entry['batches'].append(batch)
+                else:
+                    # No follow-main batches: show the item as a reference-only row
+                    entry['items'].append(item)
 
         for batch in batches_here:
             if batch.drawer:
@@ -122,12 +130,16 @@ def visual_storage():
             'rows': rack.rows,
             'cols': rack.cols,
             'drawers': drawers,
-            'item_count': len(items_main) + len(batches_here),
+            'item_count': len(set(i.id for i in items_main) | set(b.item_id for b in batches_here)),
             'unavailable_drawers': rack.get_unavailable_drawers(),
             'merged_cells': rack.get_merged_cells(),
             'drawer_info': rack.get_drawer_info(),
             'drawer_icons': rack.get_drawer_icons(),
-            'rack_icon': rack.get_rack_icon(),
+            'rack_icon': (lambda pic, ri: (
+                {'type': 'icon', 'value': pic[7:]} if ri['type'] == 'none' and pic and pic.startswith('biicon/')
+                else {'type': 'file', 'value': url_for('location_rack.rack_picture', filepath=pic)} if ri['type'] == 'none' and pic
+                else ri
+            ))(rack.picture, rack.get_rack_icon()),
             'skip_cells': list(skip_cells),
             'cell_spans': cell_spans,
             'group_cells': group_cells,
@@ -177,13 +189,30 @@ def get_drawer_contents(rack_uuid, drawer_id):
 
     entries = []
     for item in items_main:
-        entries.append({
-            'type': 'item_main',
-            'item_id': item.id,
-            'item_uuid': item.uuid,
-            'name': item.name,
-            'sku': item.sku or 'N/A',
-        })
+        follow_batches = [b for b in item.batches if b.follow_main_location]
+        if follow_batches:
+            # Show batches with qty rather than a no-qty reference row
+            for batch in follow_batches:
+                entries.append({
+                    'type': 'batch',
+                    'item_id': item.id,
+                    'item_uuid': item.uuid,
+                    'name': item.name,
+                    'sku': item.sku or 'N/A',
+                    'batch_id': batch.id,
+                    'batch_label': batch.get_display_label(),
+                    'quantity': batch.quantity,
+                    'available': batch.get_available_quantity(),
+                })
+        else:
+            # No follow-main batches: reference-only row (no stock here yet)
+            entries.append({
+                'type': 'item_main',
+                'item_id': item.id,
+                'item_uuid': item.uuid,
+                'name': item.name,
+                'sku': item.sku or 'N/A',
+            })
     for batch in batches_here:
         item = batch.item
         entries.append({

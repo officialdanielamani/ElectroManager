@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}Electro Manager{% endblock %}</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('favicon') }}">
 
@@ -243,6 +244,17 @@
                             <li><a class="dropdown-item" href="{{ url_for('settings.settings_general') }}">
                                 <i class="bi bi-palette"></i> General Settings
                             </a></li>
+                            <li>
+                                <div style="padding:6px 16px 8px; border-top:1px solid var(--bs-border-color,#dee2e6); margin-top:2px;">
+                                    <div style="font-size:.8rem; color:var(--bs-secondary-color,#6c757d); letter-spacing:.03em;">SERVER TIME</div>
+                                    <div style="font-family:monospace; font-size:.92rem; font-weight:600; color:var(--bs-body-color,#212529); margin-top:1px;">
+                                        <span id="nav-clock-date">{{ server_now.strftime('%d/%m/%Y') }}</span>
+                                        <span style="color:var(--bs-secondary-color,#6c757d); margin:0 3px;">|</span>
+                                        <span id="nav-clock-time">{{ server_now.strftime('%H:%M') }}</span>
+                                    </div>
+                                    <div style="font-size:.72rem; color:var(--bs-secondary-color,#adb5bd);">{{ tz_label }}</div>
+                                </div>
+                            </li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">
                                 <i class="bi bi-box-arrow-right"></i> Logout
@@ -300,5 +312,65 @@
     </script>
     
     {% block scripts %}{% endblock %}
+
+    <script>
+        // Live server clock — updates every second without a server round-trip.
+        (function() {
+            var _tzOffsetMs = {{ (server_now.utcoffset().total_seconds() | int) * 1000 }};
+            function _pad(n) { return String(n).padStart(2, '0'); }
+            function _tick() {
+                var d = new Date(Date.now() + _tzOffsetMs);
+                var dateEl = document.getElementById('nav-clock-date');
+                var timeEl = document.getElementById('nav-clock-time');
+                if (dateEl) dateEl.textContent = _pad(d.getUTCDate()) + '/' + _pad(d.getUTCMonth() + 1) + '/' + d.getUTCFullYear();
+                if (timeEl) timeEl.textContent = _pad(d.getUTCHours()) + ':' + _pad(d.getUTCMinutes());
+            }
+            _tick();
+            setInterval(_tick, 1000);
+        })();
+    </script>
+
+    <script>
+        (function() {
+            var metaToken = document.querySelector('meta[name="csrf-token"]');
+            if (!metaToken) return;
+            var csrfValue = metaToken.getAttribute('content');
+
+            // 1. Auto-inject CSRF hidden field into every POST <form> that doesn't already have one.
+            //    Covers FlaskForm-less forms rendered server-side.
+            document.querySelectorAll('form').forEach(function(form) {
+                var method = (form.getAttribute('method') || 'get').toLowerCase();
+                if (method !== 'post') return;
+                if (form.querySelector('input[name="csrf_token"]')) return;
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'csrf_token';
+                input.value = csrfValue;
+                form.appendChild(input);
+            });
+
+            // 2. Intercept all fetch() calls and inject X-CSRFToken on state-changing requests.
+            //    This covers every JS fetch POST/PUT/PATCH/DELETE across all templates.
+            var _origFetch = window.fetch;
+            window.fetch = function(resource, init) {
+                init = init || {};
+                var method = (init.method || 'GET').toUpperCase();
+                if (method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE') {
+                    init.headers = init.headers || {};
+                    // Support plain object headers and Headers instances
+                    if (init.headers instanceof Headers) {
+                        if (!init.headers.has('X-CSRFToken')) {
+                            init.headers.set('X-CSRFToken', csrfValue);
+                        }
+                    } else {
+                        if (!init.headers['X-CSRFToken'] && !init.headers['x-csrftoken']) {
+                            init.headers['X-CSRFToken'] = csrfValue;
+                        }
+                    }
+                }
+                return _origFetch.call(this, resource, init);
+            };
+        })();
+    </script>
 </body>
 </html>

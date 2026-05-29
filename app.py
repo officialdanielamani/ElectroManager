@@ -3,6 +3,7 @@ Inventory Manager Application - Main Entry Point
 """
 from flask import Flask, render_template, request, send_from_directory, jsonify, url_for, abort
 from flask_login import LoginManager, current_user, AnonymousUserMixin, login_required
+from extensions import csrf, limiter
 from config import Config
 from models import db, User, Category, Item, Setting
 from helpers import filesize_filter, jinja_format_amount, markdown_filter
@@ -16,6 +17,10 @@ app.config.from_object(Config)
 
 # Initialize database
 db.init_app(app)
+
+# Initialize shared extensions
+csrf.init_app(app)
+limiter.init_app(app)
 
 
 # Custom Anonymous User with permission methods
@@ -75,6 +80,76 @@ def from_json_filter(value):
 
 app.jinja_env.filters['from_json'] = from_json_filter
 
+
+# ── Display timezone ──────────────────────────────────────────────────────
+import re as _re, os as _os
+from datetime import timezone as _tz_cls, timedelta as _td
+
+# UTC offset list: -12:00 → +14:00 in 15-minute steps (~105 entries)
+TZ_OFFSETS = []
+for _tm in range(-12 * 60, 14 * 60 + 1, 15):
+    _s = '+' if _tm >= 0 else '-'
+    _a = abs(_tm)
+    _h, _m = divmod(_a, 60)
+    _v = f"{_s}{_h:02d}:{_m:02d}"
+    TZ_OFFSETS.append((_v, f"UTC{_v}"))
+
+def _resolve_display_tz():
+    raw = ''
+    try:
+        s = Setting.query.filter_by(key='display_timezone').first()
+        if s and s.value:
+            raw = s.value.strip()
+    except Exception:
+        pass
+    if not raw:
+        raw = _os.environ.get('TZ', '').strip()
+    if not raw:
+        return _tz_cls.utc, 'UTC+00:00'
+    # Fixed offset: +08:00 / -05:30
+    m = _re.fullmatch(r'([+-])(\d{1,2}):(\d{2})', raw)
+    if m:
+        sign = 1 if m.group(1) == '+' else -1
+        h, mins = int(m.group(2)), int(m.group(3))
+        tz = _tz_cls(sign * _td(hours=h, minutes=mins))
+        return tz, f"UTC{m.group(1)}{h:02d}:{mins:02d}"
+    # IANA name (TZ env, Docker users)
+    try:
+        from zoneinfo import ZoneInfo
+        from datetime import datetime as _dtnow
+        tz = ZoneInfo(raw)
+        offset = _dtnow.now(tz).utcoffset()
+        total = int(offset.total_seconds())
+        sign = '+' if total >= 0 else '-'
+        h, mins = divmod(abs(total) // 60, 60)
+        return tz, f"UTC{sign}{h:02d}:{mins:02d} ({raw})"
+    except Exception:
+        return _tz_cls.utc, 'UTC+00:00'
+
+def _get_display_tz():
+    from flask import g, has_request_context
+    if has_request_context():
+        if not hasattr(g, '_tz_cache'):
+            g._tz_cache = _resolve_display_tz()
+        return g._tz_cache
+    return _resolve_display_tz()
+
+def _localtime_filter(dt, fmt='%Y-%m-%d %H:%M'):
+    if not dt:
+        return ''
+    tz, _ = _get_display_tz()
+    if not getattr(dt, 'tzinfo', None):
+        dt = dt.replace(tzinfo=_tz_cls.utc)
+    return dt.astimezone(tz).strftime(fmt)
+
+app.jinja_env.filters['localtime'] = _localtime_filter
+
+@app.context_processor
+def _inject_server_time():
+    from datetime import datetime as _dt
+    tz, label = _get_display_tz()
+    now_local = _dt.now(_tz_cls.utc).astimezone(tz)
+    return {'server_now': now_local, 'tz_label': label}
 
 def load_dependencies():
     """Return core static assets bundled in the repository."""
@@ -213,18 +288,33 @@ def favicon():
     abort(404)
 
 
+_INSTANCE_FILE_ALLOWED_EXTS = {'png', 'jpg', 'jpeg', 'gif', 'ico', 'svg', 'webp'}
+
 @app.route('/instance-file/<filename>')
 def instance_file(filename):
-    """Serve logo files stored in the instance folder (system/company logos)."""
+    """Serve logo/favicon files stored in the instance folder. Restricted to image types only."""
     from werkzeug.utils import secure_filename
     safe_name = secure_filename(filename)
     if not safe_name:
+        abort(404)
+    ext = safe_name.rsplit('.', 1)[-1].lower() if '.' in safe_name else ''
+    if ext not in _INSTANCE_FILE_ALLOWED_EXTS:
         abort(404)
     instance_dir = app.instance_path
     full_path = os.path.join(instance_dir, safe_name)
     if not os.path.exists(full_path):
         abort(404)
     return send_from_directory(instance_dir, safe_name)
+
+
+@app.after_request
+def set_security_headers(response):
+    """Add security headers to every response."""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    return response
 
 
 # Error handlers
@@ -244,6 +334,12 @@ def internal_error(error):
 # Register all modular blueprints
 from routes import register_blueprints
 register_blueprints(app)
+
+# Exempt REST API blueprints from CSRF — they authenticate via Bearer token, not cookies.
+from routes.api import api_bp
+from routes.api_v1 import api_v1_bp
+csrf.exempt(api_bp)
+csrf.exempt(api_v1_bp)
 
 # Validate Bootstrap Icons at startup
 from qr_utils import validate_bootstrap_icons
@@ -302,16 +398,6 @@ def _apply_column_migrations():
             conn.commit()
             logger.info(f"DB migration: backfilled user_uid for {len(rows)} user(s)")
 
-    # Wipe legacy plain-text API keys — hash-on-store is now the only supported method.
-    # Any existing api_key values are cleared so users must regenerate via the UI.
-    with db.engine.connect() as conn:
-        rows = conn.execute(
-            db.text("SELECT id FROM users WHERE api_key IS NOT NULL AND api_key != ''")
-        ).fetchall()
-        if rows:
-            conn.execute(db.text("UPDATE users SET api_key = NULL WHERE api_key IS NOT NULL"))
-            conn.commit()
-            logger.info(f"DB migration: cleared legacy plain-text api_key for {len(rows)} user(s) — users must regenerate")
 
 with app.app_context():
     db.create_all()          # create any brand-new tables (e.g. lending_sessions)

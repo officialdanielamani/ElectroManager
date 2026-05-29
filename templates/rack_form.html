@@ -90,18 +90,23 @@
                             <span class="badge bg-info text-dark"><i class="bi bi-folder-fill"></i> Icon: <span id="rackShareName"></span></span>
                         </div>
 
-                        <!-- Hidden field for icon share file -->
+                        <!-- Hidden field for icon share file / BI icon -->
                         <input type="hidden" name="share_icon_file" id="shareIconFile" value="">
+                        <input type="hidden" name="biicon_file" id="biiconFile" value="">
 
-                        <!-- Upload + Share Files buttons -->
+                        <!-- Upload + icon picker buttons -->
                         <div class="d-flex gap-2 flex-wrap align-items-center mb-1">
                             <input type="file" class="form-control form-control-sm" id="rackPicInput" name="picture" accept="image/png,image/jpeg,image/webp">
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    onclick="openRackBiIconPicker()">
+                                <i class="bi bi-star"></i> Icon
+                            </button>
                             <button type="button" class="btn btn-sm btn-outline-secondary"
                                     data-bs-toggle="modal" data-bs-target="#iconShareModal">
                                 <i class="bi bi-folder2-open"></i> Share Files
                             </button>
                         </div>
-                        <small class="text-muted">PNG, JPEG or WebP (max {{ max_file_size_mb }}MB). Or pick from Share Files icons.</small>
+                        <small class="text-muted">PNG, JPEG or WebP (max {{ max_file_size_mb }}MB). Or pick a Bootstrap icon or Share Files icon.</small>
                     </div>
 
                     <div class="mb-3">
@@ -702,6 +707,7 @@ function clearRackPic() {
 
 function selectRackIcon(filename, name, url) {
     document.getElementById('shareIconFile').value = filename;
+    document.getElementById('biiconFile').value = '';
     document.getElementById('rackShareName').textContent = name;
     document.getElementById('rackShareIndicator').style.display = '';
     showRackPicPreview(url);
@@ -711,7 +717,88 @@ function selectRackIcon(filename, name, url) {
     const modal = bootstrap.Modal.getInstance(document.getElementById('iconShareModal'));
     if (modal) modal.hide();
 }
+
+// ── Bootstrap Icon Picker ─────────────────────────────────────────────────
+var _rackBiCache = null;
+
+function openRackBiIconPicker() {
+    const modal = new bootstrap.Modal(document.getElementById('rackBiIconModal'));
+    modal.show();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('rackBiIconModal')?.addEventListener('show.bs.modal', async function() {
+        if (_rackBiCache) { _rackBiRenderIcons(_rackBiCache); return; }
+        const grid = document.getElementById('rackBiIconGrid');
+        if (grid) grid.innerHTML = '<p class="text-muted text-center py-4">Loading…</p>';
+        try {
+            const resp = await fetch('/api/icons');
+            _rackBiCache = await resp.json();
+            _rackBiRenderIcons(_rackBiCache);
+        } catch(e) {
+            if (grid) grid.innerHTML = '<p class="text-danger text-center py-4">Error loading icons.</p>';
+        }
+    });
+});
+
+function _rackBiRenderIcons(icons) {
+    const query = (document.getElementById('rackBiIconSearch')?.value || '').toLowerCase();
+    const filtered = query ? icons.filter(ic => ic.name.includes(query)) : icons;
+    const grid = document.getElementById('rackBiIconGrid');
+    if (!grid) return;
+    if (!filtered.length) {
+        grid.innerHTML = '<p class="text-muted mb-0" style="grid-column:1/-1;text-align:center;padding:12px 0;">No icons found</p>';
+        return;
+    }
+    grid.innerHTML = filtered.map(ic =>
+        `<button type="button" style="border:1px solid #dee2e6;border-radius:4px;padding:4px 2px;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:52px;" title="${ic.name}" onclick="selectRackBiIcon('${ic.name}')"><i class="${ic.class}" style="font-size:18px;"></i><span style="font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${ic.name}</span></button>`
+    ).join('');
+}
+
+function selectRackBiIcon(iconName) {
+    document.getElementById('biiconFile').value = iconName;
+    document.getElementById('shareIconFile').value = '';
+    document.getElementById('deletePicFlag').value = '';
+    const input = document.getElementById('rackPicInput');
+    if (input) input.value = '';
+    // Show icon as preview
+    const wrap = document.getElementById('rackPicPreviewWrap');
+    const img  = document.getElementById('rackPicPreview');
+    // Replace img with icon display
+    if (wrap) {
+        wrap.style.display = 'inline-block';
+        if (img) { img.src = ''; img.style.display = 'none'; }
+        let iEl = wrap.querySelector('.rack-bi-icon-preview');
+        if (!iEl) {
+            iEl = document.createElement('div');
+            iEl.className = 'rack-bi-icon-preview';
+            iEl.style.cssText = 'width:150px;height:150px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:2px solid #dee2e6;';
+            wrap.insertBefore(iEl, wrap.firstChild);
+        }
+        iEl.innerHTML = `<i class="bi bi-${iconName}" style="font-size:4rem;"></i>`;
+    }
+    document.getElementById('rackShareIndicator').style.display = 'none';
+    bootstrap.Modal.getInstance(document.getElementById('rackBiIconModal'))?.hide();
+}
 </script>
+
+<!-- Bootstrap Icon Picker Modal -->
+<div class="modal fade" id="rackBiIconModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-star me-2"></i>Select Icon for Rack</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" class="form-control form-control-sm mb-3" id="rackBiIconSearch" placeholder="Search icons…" oninput="_rackBiRenderIcons(_rackBiCache||[])">
+                <div id="rackBiIconGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:4px;max-height:400px;overflow-y:auto;">
+                    <p class="text-muted text-center py-4">Loading…</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Icon Share Files Modal -->
 <div class="modal fade" id="iconShareModal" tabindex="-1">

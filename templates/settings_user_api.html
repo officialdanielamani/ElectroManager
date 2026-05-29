@@ -152,9 +152,6 @@
                         <input type="password" class="form-control font-monospace" id="testApiKeyInput"
                                placeholder="Paste your API key — not saved, used only for requests on this page"
                                autocomplete="off" oninput="updateCurl()">
-                        <button class="btn btn-outline-secondary" type="button" onclick="toggleTestKeyVis()" title="Show/hide">
-                            <i class="bi bi-eye" id="testKeyVisIcon"></i>
-                        </button>
                     </div>
                 </div>
 
@@ -439,6 +436,9 @@
                 <h6><i class="bi bi-toggles text-warning"></i> Scopes</h6>
                 <p>Scopes are additive — enable only what you need. Each scope is also subject to your role's underlying permissions and the admin's server-wide toggle.</p>
 
+                <h6><i class="bi bi-globe text-info"></i> CORS</h6>
+                <p>All <code>/api/v1/</code> endpoints include <code>Access-Control-Allow-Origin: *</code> headers. Browser clients on a different origin — such as a page served by an ESP32 — can call the API directly without a proxy.</p>
+
                 <h6><i class="bi bi-speedometer2 text-danger"></i> Rate Limit</h6>
                 <p>Current limit: <strong>{{ api_rate_limit }} req / sec</strong>. Requests over the limit receive HTTP <code>429 Too Many Requests</code>.</p>
 
@@ -496,19 +496,6 @@ function copyNewKey() {
     });
 }
 
-// ── Test-panel key show/hide ───────────────────────────────────────────────────
-function toggleTestKeyVis() {
-    const inp  = document.getElementById('testApiKeyInput');
-    const icon = document.getElementById('testKeyVisIcon');
-    if (inp.type === 'password') {
-        inp.type = 'text';
-        icon.className = 'bi bi-eye-slash';
-    } else {
-        inp.type = 'password';
-        icon.className = 'bi bi-eye';
-    }
-}
-
 // Pre-fill test key input from one-time display (if key was just generated)
 {% if new_key %}
 document.addEventListener('DOMContentLoaded', function () {
@@ -555,8 +542,7 @@ function onEndpointChange() {
 
     // Hide dry-run for GET endpoints (not applicable)
     const isGet = (opt.dataset.method || 'GET') === 'GET';
-    document.getElementById('dryRunToggle').closest('.d-flex').style.opacity = isGet ? '0.4' : '';
-    document.getElementById('dryRunToggle').closest('.d-flex').title = isGet ? 'Dry Run does not apply to GET requests' : '';
+    document.getElementById('dryRunToggle').closest('.d-flex').style.display = isGet ? 'none' : '';
 
     updateCurl();
 }

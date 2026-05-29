@@ -797,7 +797,7 @@ class BatchSerialNumber(db.Model):
         try:
             if self.lend_to_type == 'user':
                 obj = User.query.get(self.lend_to_id)
-                return obj.username if obj else f'User #{self.lend_to_id}'
+                return (obj.name or obj.username) if obj else f'User #{self.lend_to_id}'
             elif self.lend_to_type == 'person':
                 obj = ContactPerson.query.get(self.lend_to_id)
                 return obj.name if obj else f'Person #{self.lend_to_id}'
@@ -843,7 +843,7 @@ class BatchLendRecord(db.Model):
         try:
             if self.lend_to_type == 'user':
                 obj = User.query.get(self.lend_to_id)
-                return obj.username if obj else f'User #{self.lend_to_id}'
+                return (obj.name or obj.username) if obj else f'User #{self.lend_to_id}'
             elif self.lend_to_type == 'person':
                 obj = ContactPerson.query.get(self.lend_to_id)
                 return obj.name if obj else f'Person #{self.lend_to_id}'
@@ -865,7 +865,7 @@ def _generate_lending_id():
     """Generate a unique lending session ID: YYYYMMDD-XXXXXX (6 uppercase alphanumeric chars)."""
     chars = string.ascii_uppercase + string.digits
     while True:
-        date_str = datetime.now().strftime('%Y%m%d')
+        date_str = datetime.now(timezone.utc).strftime('%Y%m%d')
         rand_part = ''.join(secrets.choice(chars) for _ in range(6))
         candidate = f"{date_str}-{rand_part}"
         if not LendingSession.query.filter_by(lending_id=candidate).first():
@@ -896,7 +896,7 @@ class LendingSession(db.Model):
         try:
             if self.lend_to_type == 'user':
                 obj = User.query.get(self.lend_to_id)
-                return obj.username if obj else f'User #{self.lend_to_id}'
+                return (obj.name or obj.username) if obj else f'User #{self.lend_to_id}'
             elif self.lend_to_type == 'person':
                 obj = ContactPerson.query.get(self.lend_to_id)
                 return obj.name if obj else f'Person #{self.lend_to_id}'
@@ -1140,13 +1140,13 @@ class ItemParameter(db.Model):
             try:
                 if self.operation in ['value', 'start', 'end']:
                     param_date = datetime.strptime(self.value, '%Y-%m-%d')
-                    today = datetime.now().date()
+                    today = datetime.now(timezone.utc).date()
                     if param_date.date() == today:
                         return True
                 elif self.operation == 'duration':
                     start_date = datetime.strptime(self.value, '%Y-%m-%d')
                     end_date = datetime.strptime(self.value2, '%Y-%m-%d')
-                    today = datetime.now().date()
+                    today = datetime.now(timezone.utc).date()
                     if start_date.date() <= today <= end_date.date():
                         return True
             except (ValueError, TypeError):

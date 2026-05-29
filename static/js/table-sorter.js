@@ -50,26 +50,15 @@ class TableSorter {
 
   sortTable(columnIndex, direction) {
     const rows = Array.from(this.tbody.querySelectorAll('tr'));
-    
+
     rows.sort((a, b) => {
-      let aVal = a.cells[columnIndex].textContent.trim();
-      let bVal = b.cells[columnIndex].textContent.trim();
+      const aVal = a.cells[columnIndex].textContent.trim();
+      const bVal = b.cells[columnIndex].textContent.trim();
 
-      // Try to detect data type
-      const aNum = parseFloat(aVal.replace(/[^\d.-]/g, ''));
-      const bNum = parseFloat(bVal.replace(/[^\d.-]/g, ''));
-
-      let comparison = 0;
-
-      // Numeric comparison if both are numbers
-      if (!isNaN(aNum) && !isNaN(bNum)) {
-        comparison = aNum - bNum;
-      } else {
-        // String comparison (case-insensitive)
-        aVal = aVal.toLowerCase();
-        bVal = bVal.toLowerCase();
-        comparison = aVal.localeCompare(bVal);
-      }
+      // Natural sort: handles "R3 < R4" and alphabetical correctly.
+      // localeCompare with numeric:true avoids the "strip-digits" trick that
+      // misclassifies product names like "LX-PB225M" as negative numbers.
+      const comparison = aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: 'base' });
 
       return direction === 'asc' ? comparison : -comparison;
     });

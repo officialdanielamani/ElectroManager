@@ -21,7 +21,7 @@
                 <h6 class="mb-0">Session <strong><code>{{ session.lending_id }}</code></strong></h6>
                 <small class="text-muted">
                     Submitted by {{ session.creator.username if session.creator else 'Unknown' }}
-                    on {{ session.created_at.strftime('%Y-%m-%d %H:%M') if session.created_at else '' }}
+                    on {{ session.created_at | localtime if session.created_at else '' }}
                 </small>
             </div>
         </div>

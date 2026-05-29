@@ -215,7 +215,7 @@
                 </td>
                 <td><span class="badge bg-secondary">{{ f.category }}</span></td>
                 <td>{{ f.size_display() }}</td>
-                <td><small>{{ f.created_at.strftime('%Y-%m-%d %H:%M') if f.created_at }}</small></td>
+                <td><small>{{ f.created_at | localtime if f.created_at }}</small></td>
                 <td><small>{{ f.uploader.username if f.uploader else '—' }}</small></td>
                 <td class="text-end">
                     <div class="d-flex gap-1 justify-content-end">

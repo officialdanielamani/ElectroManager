@@ -25,6 +25,23 @@ Keys are stored as SHA-256 hashes on the server — the plain-text key is shown 
 
 ---
 
+### CORS
+
+All `/api/v1/` endpoints include CORS headers on every response:
+
+```
+Access-Control-Allow-Origin:  *
+Access-Control-Allow-Headers: Authorization, Content-Type
+Access-Control-Allow-Methods: GET, POST, OPTIONS
+Access-Control-Max-Age:       86400
+```
+
+`OPTIONS` preflight requests are handled automatically. This means browser-based clients running on a different origin — such as a web UI served directly from an ESP32 — can call the API without a proxy.
+
+> **Note:** The `Authorization` header is a non-simple header and always triggers an `OPTIONS` preflight. The preflight is handled by the server; no special client-side configuration is required.
+
+---
+
 ### User, Roles & Permissions
 
 The external API fully respects the same RBAC system as the web UI. Access is controlled at three levels:
@@ -581,7 +598,7 @@ Returns the full cell-by-cell layout of a rack. Use this to recreate the visual 
 | `merged_away` | Hidden slave of a rectangular merge — skip when rendering |
 | `group_master` | Master of a non-rectangular group — still rendered |
 | `group_slave` | Member of a non-rectangular group — still rendered |
-| `unavailable` | Cell marked unavailable |
+| `unavailable` | Cell marked unavailable. If this cell is also a merge master it will include `row_span` and `col_span` (same as `merged_master`). |
 
 **Response:**
 
@@ -734,6 +751,8 @@ Find item location
 └── GET /api/v1/rack/<uuid>/drawer/<row>/<col>
         Load full contents of the target drawer on demand
 ```
+
+**Browser-rendered (recommended for ESP32):** Rather than parsing JSON on the ESP32 and building HTML server-side, the recommended pattern is to serve a static HTML/JS page from ESP32 flash (PROGMEM) and let the user's browser call the EM API directly. Because CORS is enabled on all `/api/v1/` endpoints, the browser can make authenticated requests from a page hosted on a different origin (the ESP32's IP). The ESP32 only needs to handle LED/indicator control; all heavy JSON processing stays in the browser.
 
 ---
 

@@ -3,7 +3,7 @@ External REST API v1  —  /api/v1/
 Authentication : Authorization: Bearer <api_key>
 All timestamps : ISO 8601 naive (server timezone)
 """
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, make_response
 from models import (db, User, Item, ItemBatch, BatchSerialNumber,
                     BatchLendRecord, LendingSession, Rack, Location,
                     _generate_lending_id, Setting)
@@ -16,19 +16,36 @@ import re
 
 api_v1_bp = Blueprint('api_v1', __name__, url_prefix='/api/v1')
 
+
+@api_v1_bp.after_request
+def _cors(response):
+    """Allow browser clients (e.g. ESP32-served pages) to call the API directly."""
+    response.headers['Access-Control-Allow-Origin']  = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Max-Age']       = '86400'
+    return response
+
+
+@api_v1_bp.route('/<path:_>', methods=['OPTIONS'])
+def _preflight(_):
+    """Handle CORS preflight for all API v1 routes."""
+    return make_response('', 204)
+
 # ── In-memory sliding-window rate limiter ─────────────────────────────────────
 _rl_lock    = threading.Lock()
-_rl_buckets = {}   # api_key -> [monotonic timestamps within last second]
+_rl_buckets = {}   # user_id (int) -> [monotonic timestamps within last second]
 
-def _check_rate_limit(api_key: str, limit: int) -> bool:
+def _check_rate_limit(user_id: int, limit: int) -> bool:
+    # Keyed on user_id so rotating API keys does not reset the rate limit counter.
     now = time.monotonic()
     with _rl_lock:
-        ts = [t for t in _rl_buckets.get(api_key, []) if now - t < 1.0]
+        ts = [t for t in _rl_buckets.get(user_id, []) if now - t < 1.0]
         if len(ts) >= limit:
-            _rl_buckets[api_key] = ts
+            _rl_buckets[user_id] = ts
             return False
         ts.append(now)
-        _rl_buckets[api_key] = ts
+        _rl_buckets[user_id] = ts
         return True
 
 
@@ -81,7 +98,7 @@ def _authenticate(scope: str = None):
     except (ValueError, TypeError):
         limit = 5
 
-    if not _check_rate_limit(key, limit):
+    if not _check_rate_limit(user.id, limit):
         resp = jsonify({'success': False, 'code': 'RATE_LIMITED',
                         'message': f'Rate limit exceeded ({limit} req/s)'})
         resp.headers['Retry-After'] = '1'
@@ -1107,6 +1124,12 @@ def api_rack_layout(rack_uuid):
                 cell['row_span']   = spans['rowspan']
                 cell['col_span']   = spans['colspan']
                 cell['item_count'] = item_count_map.get(cid, 0)
+            elif state == 'unavailable' and cid in cell_spans:
+                # Unavailable cell that is also a merge master — include span so
+                # clients can render it at the correct size.
+                spans = cell_spans[cid]
+                cell['row_span'] = spans['rowspan']
+                cell['col_span'] = spans['colspan']
             elif state == 'merged_away':
                 # Find the master so the client knows which cell it belongs to
                 for group in rack.get_merged_cells():

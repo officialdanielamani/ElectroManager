@@ -345,8 +345,8 @@
                                         <tr>
                                             <td>{{ rec.get_lend_to_display() or '—' }}</td>
                                             <td class="text-center">{{ rec.quantity }}</td>
-                                            <td>{% if rec.lend_start %}{{ rec.lend_start.strftime('%d/%m/%Y') }}{% if rec.lend_start.hour or rec.lend_start.minute %} {{ rec.lend_start.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
-                                            <td>{% if rec.lend_end %}{{ rec.lend_end.strftime('%d/%m/%Y') }}{% if rec.lend_end.hour or rec.lend_end.minute %} {{ rec.lend_end.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
+                                            <td>{{ rec.lend_start | localtime('%d/%m/%Y %H:%M') if rec.lend_start else '—' }}</td>
+                                            <td>{{ rec.lend_end | localtime('%d/%m/%Y %H:%M') if rec.lend_end else '—' }}</td>
                                             <td class="text-center">{% if rec.lend_notify_enabled %}<i class="bi bi-bell-fill text-warning" title="Remind {{ rec.lend_notify_before_days }} days before"></i>{% else %}—{% endif %}</td>
                                         </tr>
                                         {% endfor %}
@@ -408,11 +408,11 @@
                                                         {% else %}{{ sn.get_lend_to_display() or '-' }}{% endif %}
                                                     {% else %}-{% endif %}
                                                 </td>
-                                                <td class="small">{% if not sn.is_deleted and sn.lend_to_id and sn.returned_at is none and sn.lend_start %}{{ sn.lend_start.strftime('%d/%m/%Y') }}{% if sn.lend_start.hour or sn.lend_start.minute %} {{ sn.lend_start.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
-                                                <td class="small">{% if not sn.is_deleted and sn.lend_to_id and sn.returned_at is none and sn.lend_end %}{{ sn.lend_end.strftime('%d/%m/%Y') }}{% if sn.lend_end.hour or sn.lend_end.minute %} {{ sn.lend_end.strftime('%H:%M') }}{% endif %}{% else %}—{% endif %}</td>
+                                                <td class="small">{{ sn.lend_start | localtime('%d/%m/%Y %H:%M') if (not sn.is_deleted and sn.lend_to_id and sn.returned_at is none and sn.lend_start) else '—' }}</td>
+                                                <td class="small">{{ sn.lend_end | localtime('%d/%m/%Y %H:%M') if (not sn.is_deleted and sn.lend_to_id and sn.returned_at is none and sn.lend_end) else '—' }}</td>
                                                 <td>
                                                     {% if sn.is_deleted %}
-                                                    <span class="badge bg-danger" title="Removed by {{ sn.deleted_by.username if sn.deleted_by else 'unknown' }} on {{ sn.deleted_at.strftime('%Y-%m-%d %H:%M') if sn.deleted_at else '?' }}{% if sn.deleted_reason %} — {{ sn.deleted_reason }}{% endif %}">Removed</span>
+                                                    <span class="badge bg-danger" title="Removed by {{ sn.deleted_by.username if sn.deleted_by else 'unknown' }} on {{ sn.deleted_at | localtime if sn.deleted_at else '?' }}{% if sn.deleted_reason %} — {{ sn.deleted_reason }}{% endif %}">Removed</span>
                                                     {% if sn.deleted_reason %}<div class="text-muted" style="font-size:0.72rem">{{ sn.deleted_reason[:40] }}{% if sn.deleted_reason|length > 40 %}…{% endif %}</div>{% endif %}
                                                     {% elif sn.lend_to_id and sn.returned_at is none %}
                                                     <span class="badge bg-warning text-dark">Lending</span>
@@ -568,8 +568,8 @@ document.addEventListener('DOMContentLoaded', function() { renderDatasheets(); }
                     <strong><i class="bi bi-clock-history"></i> Created &amp; Updated:</strong>
                     <div class="mt-2">
                         <small class="text-muted">
-                            Created: {{ item.created_at.strftime('%Y-%m-%d %H:%M') }}{% if item.creator %} - by {{ item.creator.username }}{% endif %}<br>
-                            Updated: {{ item.updated_at.strftime('%Y-%m-%d %H:%M') }}{% if item.updater %} - by {{ item.updater.username }}{% endif %}
+                            Created: {{ item.created_at | localtime if item.created_at else 'N/A' }}{% if item.creator %} - by <a href="{{ url_for('contacts.contacts_settings') }}#user-{{ item.creator.id }}" class="badge bg-secondary text-decoration-none">{{ item.creator.name or item.creator.username }}</a>{% endif %}<br>
+                            Updated: {{ item.updated_at | localtime if item.updated_at else 'N/A' }}{% if item.updater %} - by <a href="{{ url_for('contacts.contacts_settings') }}#user-{{ item.updater.id }}" class="badge bg-secondary text-decoration-none">{{ item.updater.name or item.updater.username }}</a>{% endif %}
                         </small>
                     </div>
                 </div>
