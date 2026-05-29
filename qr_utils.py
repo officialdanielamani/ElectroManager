@@ -602,23 +602,28 @@ def render_template_to_svg(template, data):
                     # or /uploads/<relative_path> for item attachments
                     parts = picture_url.strip('/').split('/')
                     if len(parts) >= 2 and parts[0] == 'uploads':
-                        rel_path = '/'.join(parts[1:])
-                        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], rel_path)
-                        upload_root = os.path.realpath(current_app.config['UPLOAD_FOLDER'])
-                        real_file_path = os.path.realpath(file_path)
-                        if not real_file_path.startswith(upload_root + os.sep):
-                            print(f"[SVG] PICTURE path outside upload folder, skipping")
+                        # Reject any path traversal components before joining
+                        rel_parts = [p for p in parts[1:] if p and p != '.' and p != '..']
+                        if not rel_parts:
+                            print(f"[SVG] PICTURE path has no valid components, skipping")
                         else:
-                            ext = os.path.splitext(rel_path)[1].lower()
-                            mime_map = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-                                        '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml'}
-                            mime = mime_map.get(ext, 'image/png')
-                            if os.path.exists(real_file_path):
-                                with open(real_file_path, 'rb') as f:
-                                    img_b64 = base64.b64encode(f.read()).decode('utf-8')
-                                print(f"[SVG] PICTURE loaded {len(img_b64)} b64 chars from {real_file_path}")
+                            upload_root = os.path.realpath(current_app.config['UPLOAD_FOLDER'])
+                            file_path = os.path.join(upload_root, *rel_parts)
+                            real_file_path = os.path.realpath(file_path)
+                            if not real_file_path.startswith(upload_root + os.sep):
+                                print(f"[SVG] PICTURE path outside upload folder, skipping")
                             else:
-                                print(f"[SVG] PICTURE file not found: {real_file_path}")
+                                rel_path = os.path.join(*rel_parts)
+                                ext = os.path.splitext(rel_path)[1].lower()
+                                mime_map = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+                                            '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml'}
+                                mime = mime_map.get(ext, 'image/png')
+                                if os.path.exists(real_file_path):
+                                    with open(real_file_path, 'rb') as f:
+                                        img_b64 = base64.b64encode(f.read()).decode('utf-8')
+                                    print(f"[SVG] PICTURE loaded {len(img_b64)} b64 chars from {real_file_path}")
+                                else:
+                                    print(f"[SVG] PICTURE file not found: {real_file_path}")
                 except Exception as e:
                     print(f"[SVG] PICTURE load error: {e}")
             if img_b64:
