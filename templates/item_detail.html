@@ -62,7 +62,7 @@
                     </a>
                     {% endif %}
                     {% if current_user.has_permission('items', 'view_lending_history') %}
-                    <a href="{{ url_for('item.item_lending_history', uuid=item.uuid) }}" class="btn btn-outline-info btn-sm">
+                    <a href="{{ url_for('item.item_lending_history', uuid=item.uuid) }}" class="btn btn-info btn-sm">
                         <i class="bi bi-clock-history"></i> Lend &amp; Return History
                     </a>
                     {% endif %}

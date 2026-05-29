@@ -1198,7 +1198,7 @@ function openDrawer(rackName, drawerId, rackId) {
                 html += '<label class="form-label form-label-sm mb-1 fw-bold"><i class="bi bi-info-circle"></i> Short Info <small class="text-muted fw-normal">(max 128 chars)</small></label>';
                 html += `<div class="d-flex gap-1">`;
                 html += `<input type="text" class="form-control form-control-sm" id="drawerShortInfo" maxlength="128" placeholder="Optional note..." value="${(data.short_info || '').replace(/"/g, '&quot;')}">`;
-                html += `<button class="btn btn-sm btn-outline-primary text-nowrap" onclick="saveDrawerShortInfo()"><i class="bi bi-save"></i> Save</button>`;
+                html += `<button class="btn btn-sm btn-primary text-nowrap" onclick="saveDrawerShortInfo()"><i class="bi bi-save"></i> Save</button>`;
                 html += `</div>`;
                 html += '</div>';
                 html += '</div>'; // end icon+info row
@@ -1275,14 +1275,6 @@ function openDrawer(rackName, drawerId, rackId) {
                 html += '<div class="alert alert-info">This drawer is empty.</div>';
             }
 
-            let canCreate = {{ 'true' if current_user.has_permission('items', 'create') else 'false' }};
-            if (canCreate) {
-                html += `<div class="mt-3" id="drawerAddItemDiv"${data.is_unavailable ? ' style="display:none;"' : ''}>
-                    <a href="/item/new?rack_id=${rackId}&drawer=${encodeURIComponent(drawerId)}" class="btn btn-success">
-                        <i class="bi bi-plus-circle"></i> Add Item Here
-                    </a>
-                </div>`;
-            }
             {# endif #}
             
             document.getElementById('drawerModalBody').innerHTML = html;
