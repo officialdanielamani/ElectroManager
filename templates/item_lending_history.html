@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}Lending History – {{ item.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h5 class="mb-0">
+        <i class="bi bi-clock-history"></i> Lending History &mdash;
+        <a href="{{ url_for('item.item_detail', uuid=item.uuid) }}" class="text-decoration-none">{{ item.name }}</a>
+    </h5>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('item.item_detail', uuid=item.uuid) }}" class="btn btn-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Back to Item
+        </a>
+    </div>
+</div>
+
+{% set has_any = namespace(value=false) %}
+{% for bh in batch_histories %}
+    {% if bh.records %}{% set has_any.value = true %}{% endif %}
+{% endfor %}
+
+{% if not has_any.value %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> No lending history found for this item.
+</div>
+{% endif %}
+
+{% for bh in batch_histories %}
+{% if bh.records %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <strong><i class="bi bi-box-seam"></i> {{ bh.batch.get_display_label() }}</strong>
+            {% if bh.type == 'sn' %}
+            <span class="badge bg-dark ms-2"><i class="bi bi-upc-scan"></i> SN Tracking</span>
+            {% endif %}
+            <span class="badge bg-secondary ms-1">{{ bh.records|length }} record{{ 's' if bh.records|length != 1 }}</span>
+        </div>
+        <div class="d-flex gap-1 flex-wrap">
+            {% set active_count = bh.records | selectattr('status', 'in', ['Active', 'Overdue']) | list | length %}
+            {% if active_count > 0 %}
+            <span class="badge bg-primary">{{ active_count }} Active</span>
+            {% endif %}
+            {% set late_count = bh.records | selectattr('status', 'equalto', 'Late') | list | length %}
+            {% if late_count > 0 %}
+            <span class="badge bg-danger">{{ late_count }} Late</span>
+            {% endif %}
+            {% set overdue_count = bh.records | selectattr('status', 'equalto', 'Overdue') | list | length %}
+            {% if overdue_count > 0 %}
+            <span class="badge bg-warning text-dark">{{ overdue_count }} Overdue</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 align-middle" style="font-size:0.85rem;">
+                <thead class="table-light">
+                    <tr>
+                        <th width="30"><input type="checkbox" class="form-check-input batch-select-all" data-batch="{{ bh.batch.id }}"></th>
+                        <th>Start</th>
+                        <th>End</th>
+                        {% if bh.type == 'sn' %}
+                        <th>ISN</th>
+                        {% else %}
+                        <th>Qty</th>
+                        {% endif %}
+                        <th>Lending Session ID</th>
+                        <th>Lend To</th>
+                        <th>Approved By</th>
+                        <th>Lend Notes</th>
+                        <th>Notification</th>
+                        <th>Return On</th>
+                        <th>Accept By</th>
+                        <th>Status</th>
+                        <th>Return Session ID</th>
+                        <th>Return Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in bh.records %}
+                <tr>
+                    <td><input type="checkbox" class="form-check-input row-checkbox" data-batch="{{ bh.batch.id }}"></td>
+
+                    {# Start #}
+                    <td class="text-nowrap">
+                        {{ row.obj.lend_start | localtime if row.obj.lend_start else '-' }}
+                    </td>
+
+                    {# End (due date) #}
+                    <td class="text-nowrap">
+                        {% if row.obj.lend_end %}
+                            {% if row.status == 'Overdue' %}
+                            <span class="text-danger fw-semibold">{{ row.obj.lend_end | localtime }}</span>
+                            {% else %}
+                            {{ row.obj.lend_end | localtime }}
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+
+                    {# ISN or Qty #}
+                    {% if bh.type == 'sn' %}
+                    <td>
+                        <code class="small">{{ row.obj.internal_serial_number }}</code>
+                        {% if row.obj.serial_number %}
+                        <br><small class="text-muted">SN: {{ row.obj.serial_number }}</small>
+                        {% endif %}
+                    </td>
+                    {% else %}
+                    <td class="text-center fw-semibold">{{ row.obj.quantity }}</td>
+                    {% endif %}
+
+                    {# Lending Session ID #}
+                    <td>
+                        {% if row.lend_session_id %}
+                        <code class="small">{{ row.lend_session_id }}</code>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+
+                    {# Lend To #}
+                    <td>{{ row.lend_to or '—' }}</td>
+
+                    {# Approved By #}
+                    <td>{{ row.approved or '—' }}</td>
+
+                    {# Lend Notes #}
+                    <td>
+                        {% if row.obj.lend_note %}
+                        <span title="{{ row.obj.lend_note }}">
+                            {{ row.obj.lend_note | truncate(40) }}
+                        </span>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+
+                    {# Notification #}
+                    <td class="text-nowrap">
+                        {% if row.obj.lend_notify_enabled %}
+                        <i class="bi bi-bell-fill text-warning"></i>
+                        <small>{{ row.obj.lend_notify_before_days }} day{{ 's' if row.obj.lend_notify_before_days != 1 }}</small>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+
+                    {# Return On #}
+                    <td class="text-nowrap">
+                        {{ row.obj.returned_at | localtime if row.obj.returned_at else '—' }}
+                    </td>
+
+                    {# Accept By #}
+                    <td>{{ row.accept_by or '—' }}</td>
+
+                    {# Status badge #}
+                    <td class="text-nowrap">
+                        {% if row.status == 'On Time' %}
+                        <span class="badge bg-success">On Time</span>
+                        {% elif row.status == 'Late' %}
+                        <span class="badge bg-danger">Late</span>
+                        {% elif row.status == 'Overdue' %}
+                        <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> Overdue</span>
+                        {% else %}
+                        <span class="badge bg-primary">Active</span>
+                        {% endif %}
+                    </td>
+
+                    {# Return Session ID #}
+                    <td>
+                        {% if row.return_session_id %}
+                        <code class="small">{{ row.return_session_id }}</code>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+
+                    {# Return Notes #}
+                    <td>
+                        {% if row.return_notes %}
+                        <span title="{{ row.return_notes }}">
+                            {{ row.return_notes | truncate(40) }}
+                        </span>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+
+<script>
+// Select-all per batch
+document.querySelectorAll('.batch-select-all').forEach(function(masterCb) {
+    masterCb.addEventListener('change', function() {
+        var batchId = this.dataset.batch;
+        document.querySelectorAll('.row-checkbox[data-batch="' + batchId + '"]').forEach(function(cb) {
+            cb.checked = masterCb.checked;
+        });
+    });
+});
+</script>
+{% endblock %}

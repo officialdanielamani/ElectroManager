@@ -269,16 +269,16 @@
                     <tr>
                         <th>Name</th>
                         {% for col in user_columns %}
-                            {% if col == 'type_model' %}<th>Type/Model</th>{% endif %}
-                            {% if col == 'sku' %}<th>SKU</th>{% endif %}
-                            {% if col == 'category' %}<th>Category</th>{% endif %}
-                            {% if col == 'tags' %}<th>Tags</th>{% endif %}
-                            {% if col == 'footprint' %}<th>Footprint</th>{% endif %}
+                            {% if col == 'type_model' and can_view_info %}<th>Type/Model</th>{% endif %}
+                            {% if col == 'sku' and can_view_info %}<th>SKU</th>{% endif %}
+                            {% if col == 'category' and can_view_info %}<th>Category</th>{% endif %}
+                            {% if col == 'tags' and can_view_info %}<th>Tags</th>{% endif %}
+                            {% if col == 'footprint' and can_view_info %}<th>Footprint</th>{% endif %}
                             {% if col == 'quantity' %}<th>Overall Qty</th>{% endif %}
                             {% if col == 'available_quantity' %}<th>Available Qty</th>{% endif %}
-                            {% if col == 'price_per_unit' %}<th>Price/Unit</th>{% endif %}
-                            {% if col == 'total_price' %}<th>Total Price</th>{% endif %}
-                            {% if col == 'location' %}<th>Location</th>{% endif %}
+                            {% if col == 'price_per_unit' and can_view_price %}<th>Price/Unit</th>{% endif %}
+                            {% if col == 'total_price' and can_view_price %}<th>Total Price</th>{% endif %}
+                            {% if col == 'location' and can_view_info %}<th>Location</th>{% endif %}
                             {% if col == 'uuid' %}<th>UUID</th>{% endif %}
                             {% if col == 'status' %}<th>Status</th>{% endif %}
                         {% endfor %}
@@ -289,13 +289,13 @@
                     <tr>
                         <td><strong>{{ item.name }}</strong></td>
                         {% for col in user_columns %}
-                            {% if col == 'type_model' %}
+                            {% if col == 'type_model' and can_view_info %}
                                 <td>{{ item.info or '-' }}</td>
                             {% endif %}
-                            {% if col == 'sku' %}
+                            {% if col == 'sku' and can_view_info %}
                                 <td>{{ item.sku or '-' }}</td>
                             {% endif %}
-                            {% if col == 'category' %}
+                            {% if col == 'category' and can_view_info %}
                                 <td>
                                     {% if item.category %}
                                         <span class="badge" style="background-color: {{ item.category.color }}; color: white;">{{ item.category.name }}</span>
@@ -304,7 +304,7 @@
                                     {% endif %}
                                 </td>
                             {% endif %}
-                            {% if col == 'tags' %}
+                            {% if col == 'tags' and can_view_info %}
                                 <td>
                                     {% for tag in item.get_tags_list() %}
                                         <span class="badge" style="background-color: {{ tag.color }}; color: white;">{{ tag.name }}</span>
@@ -312,7 +312,7 @@
                                     {% if not item.get_tags_list() %}-{% endif %}
                                 </td>
                             {% endif %}
-                            {% if col == 'footprint' %}
+                            {% if col == 'footprint' and can_view_info %}
                                 <td>
                                     {% if item.footprint %}
                                         {{ item.footprint.name }}
@@ -327,7 +327,7 @@
                             {% if col == 'available_quantity' %}
                                 <td>{{ item.get_available_quantity() }}</td>
                             {% endif %}
-                            {% if col == 'price_per_unit' %}
+                            {% if col == 'price_per_unit' and can_view_price %}
                                 <td>
                                     {% if item.get_average_price() %}
                                         {{ item.get_average_price()|format_amount(currency_decimal_places) }}
@@ -336,7 +336,7 @@
                                     {% endif %}
                                 </td>
                             {% endif %}
-                            {% if col == 'total_price' %}
+                            {% if col == 'total_price' and can_view_price %}
                                 <td>
                                     {% if item.get_total_price() %}
                                         {{ item.get_total_price()|format_amount(currency_decimal_places) }}
@@ -345,7 +345,7 @@
                                     {% endif %}
                                 </td>
                             {% endif %}
-                            {% if col == 'location' %}
+                            {% if col == 'location' and can_view_info %}
                                 <td>
                                     {% if item.rack and item.drawer %}
                                         {{ item.rack.name }} - {{ item.drawer }}
@@ -386,26 +386,28 @@
                     <h6 title="{{ item.name }}">{{ item.name }}</h6>
                 </div>
                 <div class="print-card-body">
+                    {% if can_view_info %}
                     <p><strong>Model:</strong> {{ item.info or '-' }}</p>
                     <p><strong>SKU:</strong> {{ item.sku or '-' }}</p>
                     <p>
-                        <strong>Category:</strong> 
+                        <strong>Category:</strong>
                         {% if item.category %}
                             <span class="badge" style="background-color: {{ item.category.color }}; color: white; font-size: 0.65rem;">{{ item.category.name }}</span>
                         {% else %}
                             -
                         {% endif %}
                     </p>
+                    {% endif %}
                     <p class="text-muted"><small>{{ item.uuid }}</small></p>
-                    
+
                     <hr>
-                    
+
                     <!-- Picture -->
                     <div class="print-card-image">
                         {% set image_found = namespace(value=false) %}
                         {% for attachment in item.attachments %}
                             {% if not image_found.value and attachment.file_type and attachment.file_type in ['png', 'jpg', 'jpeg', 'gif', 'webp'] %}
-                                <img src="{{ url_for('uploaded_file', filename=attachment.filename) }}" 
+                                <img src="{{ url_for('uploaded_file', filename=attachment.filename) }}"
                                      alt="{{ item.name }}">
                                 {% set image_found.value = true %}
                             {% endif %}
@@ -414,11 +416,12 @@
                             <i class="bi bi-image"></i>
                         {% endif %}
                     </div>
-                    
+
                     <hr>
-                    
+
+                    {% if can_view_info %}
                     <p>
-                        <strong>Tags:</strong> 
+                        <strong>Tags:</strong>
                         {% for tag in item.get_tags_list() %}
                             <span class="badge" style="background-color: {{ tag.color }}; color: white; font-size: 0.65rem;">{{ tag.name }}</span>
                         {% endfor %}
@@ -426,7 +429,7 @@
                     </p>
                     <p><strong>Footprint:</strong> {{ item.footprint.name if item.footprint else '-' }}</p>
                     <p>
-                        <strong>Location:</strong> 
+                        <strong>Location:</strong>
                         {% if item.rack and item.drawer %}
                             {{ item.rack.name }} - {{ item.drawer }}
                         {% elif item.general_location %}
@@ -435,6 +438,7 @@
                             -
                         {% endif %}
                     </p>
+                    {% endif %}
                     <p>
                         <strong>Quantity:</strong> {{ item.get_overall_quantity() }}
                         {% if item.is_no_stock() %}
@@ -445,8 +449,10 @@
                             <span class="badge bg-success" style="font-size: 0.65rem;">OK</span>
                         {% endif %}
                     </p>
+                    {% if can_view_price %}
                     <p><strong>Price/Unit:</strong> {{ item.get_average_price()|format_amount(currency_decimal_places) if item.get_average_price() else '-' }}</p>
                     <p><strong>Total:</strong> {{ item.get_total_price()|format_amount(currency_decimal_places) if item.get_total_price() else '-' }}</p>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}

@@ -105,11 +105,14 @@
                     {% endif %}
                     <div style="flex:1;">
                         <div class="mb-2"><strong>UUID:</strong> <code>{{ item.uuid }}</code></div>
+                        {% if can_view_info %}
                         <div class="mb-2"><strong>SKU:</strong> {{ item.sku or 'N/A' }}</div>
                         <div><strong>Type / Model:</strong> {{ item.info or 'N/A' }}</div>
+                        {% endif %}
                     </div>
                 </div>
 
+                {% if can_view_info %}
                 <hr>
 
                 <!-- Category, Footprint, Location, Tags -->
@@ -128,6 +131,7 @@
                         {% endif %}
                     </div>
                 </div>
+                {% endif %}
 
                 <hr>
 
@@ -208,6 +212,7 @@
                         <strong>Available:</strong>
                         <h3 class="text-success">{{ item.get_available_quantity() }}</h3>
                     </div>
+                    {% if can_view_price %}
                     <div class="col-md-2">
                         <strong>Total Price:</strong>
                         <h4 class="text-success">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(item.get_overall_total_price()) }}</h4>
@@ -217,17 +222,20 @@
                         <strong>Total Value <small class="text-muted">(in stock)</small>:</strong>
                         <h4 class="text-secondary">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(item.get_overall_total_value()) }}</h4>
                     </div>
+                    {% endif %}
                 </div>
 
                 {% if item.is_no_stock() %}
                 <div class="alert alert-danger"><i class="bi bi-exclamation-circle-fill"></i> No Stock!</div>
                 {% elif item.is_low_stock() %}
-                <div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> Low Stock! (Min: {{ item.min_quantity }})</div>
+                <div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> Low Stock!{% if can_view_info %} (Min: {{ item.min_quantity }}){% endif %}</div>
                 {% endif %}
 
+                {% if can_view_info %}
                 <div class="mb-3">
                     <small class="text-muted">Min Quantity: {{ item.min_quantity }}</small>
                 </div>
+                {% endif %}
 
                 <hr>
 
@@ -253,8 +261,10 @@
                                 {% if batch.sn_tracking_enabled %}
                                 <span class="badge bg-dark"><i class="bi bi-upc-scan"></i> Tracking</span>
                                 {% endif %}
+                                {% if can_view_price %}
                                 <span class="badge bg-success">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.price_per_unit) }}/unit</span>
                                 <span class="badge bg-info">Price: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_price()) }}</span>
+                                {% endif %}
                                 {% if not batch.follow_main_location %}
                                 <span class="badge" style="background-color: {{ batch.get_effective_location_color() }};"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>
                                 {% endif %}
@@ -283,11 +293,13 @@
                                 <div class="row mb-2">
                                     <div class="col-md-3"><strong>Batch #:</strong> {{ batch.batch_number }}</div>
                                     <div class="col-md-3"><strong>Quantity:</strong> {{ batch.quantity }}</div>
+                                    {% if can_view_price %}
                                     <div class="col-md-3"><strong>Price/Unit:</strong> {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.price_per_unit) }}</div>
                                     <div class="col-md-3">
                                         <strong>Total Price:</strong> {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_price()) }}
                                         {% if batch.quantity == 0 %}<small class="text-muted d-block">(qty=0, shows 1×)</small>{% endif %}
                                     </div>
+                                    {% endif %}
                                 </div>
                                 <div class="row mb-2">
                                     <div class="col-md-3"><strong>Available Qty:</strong> {{ batch.get_available_quantity() }}</div>
@@ -319,7 +331,22 @@
                                         <i class="bi bi-qr-code"></i> Print QR Batch
                                     </a>
                                     {% endif %}
+                                    {% if current_user.has_permission('items', 'view_lending_history') %}
+                                    <a href="{{ url_for('item.item_lending_history', uuid=item.uuid) }}"
+                                       class="btn btn-outline-info btn-sm">
+                                        <i class="bi bi-clock-history"></i> Lend &amp; Return History
+                                    </a>
+                                    {% endif %}
                                 </div>
+                                {% else %}
+                                {% if current_user.has_permission('items', 'view_lending_history') %}
+                                <div class="mb-2">
+                                    <a href="{{ url_for('item.item_lending_history', uuid=item.uuid) }}"
+                                       class="btn btn-outline-info btn-sm">
+                                        <i class="bi bi-clock-history"></i> Lend &amp; Return History
+                                    </a>
+                                </div>
+                                {% endif %}
                                 {% endif %}
                                 {% set proj_names = batch.get_project_names_for_batch() %}
                                 {% if proj_names %}
@@ -335,26 +362,6 @@
                                     </table>
                                 </div>
                                 {% endif %}
-                                {% if not batch.sn_tracking_enabled and batch.get_lend_quantity() > 0 %}
-                                <div class="mb-2">
-                                    <strong>Lending <small class="text-muted">({{ batch.get_lend_quantity() }} total)</small></strong>
-                                    <table class="table table-sm table-bordered mt-1 mb-0 small">
-                                        <thead><tr><th>Lend To</th><th class="text-center">Qty</th><th>Start</th><th>Due Date</th><th class="text-center">Notify</th></tr></thead>
-                                        <tbody>
-                                        {% for rec in batch.lend_records if rec.returned_at is none %}
-                                        <tr>
-                                            <td>{{ rec.get_lend_to_display() or '—' }}</td>
-                                            <td class="text-center">{{ rec.quantity }}</td>
-                                            <td>{{ rec.lend_start | localtime('%d/%m/%Y %H:%M') if rec.lend_start else '—' }}</td>
-                                            <td>{{ rec.lend_end | localtime('%d/%m/%Y %H:%M') if rec.lend_end else '—' }}</td>
-                                            <td class="text-center">{% if rec.lend_notify_enabled %}<i class="bi bi-bell-fill text-warning" title="Remind {{ rec.lend_notify_before_days }} days before"></i>{% else %}—{% endif %}</td>
-                                        </tr>
-                                        {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                {% endif %}
-
                                 <!-- Serial Numbers Table (if enabled) -->
                                 {% if batch.sn_tracking_enabled and batch.serial_numbers|length > 0 %}
                                 <hr>

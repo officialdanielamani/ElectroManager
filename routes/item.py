@@ -171,7 +171,9 @@ def items():
                          all_locations=all_locations,
                          all_racks=all_racks,
                          all_tags_list=all_tags_list,
-                         racks_data_bulk=racks_data_bulk)
+                         racks_data_bulk=racks_data_bulk,
+                         can_view_info=current_user.has_permission('items', 'view_info'),
+                         can_view_price=current_user.has_permission('items', 'view_price'))
 
 # ============= ITEM ROUTES =============
 
@@ -380,7 +382,9 @@ def item_detail(uuid):
     return render_template('item_detail.html', item=item, attachment_form=attachment_form,
                          currency_symbol=currency_symbol, currency_decimal_places=currency_decimal_places, qr_templates=qr_templates,
                          download_all_item_attachments=Setting.get('download_all_item_attachments', True),
-                         download_all_item_share_files=Setting.get('download_all_item_share_files', True))
+                         download_all_item_share_files=Setting.get('download_all_item_share_files', True),
+                         can_view_info=current_user.has_permission('items', 'view_info'),
+                         can_view_price=current_user.has_permission('items', 'view_price'))
 
 
 @item_bp.route('/item/<string:uuid>/qr', endpoint='item_qr_svg')
@@ -1603,7 +1607,7 @@ def items_print():
     from datetime import datetime, timezone
     current_datetime = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
     
-    return render_template('items_print.html', 
+    return render_template('items_print.html',
                          items=items,
                          page=page,
                          per_page=per_page,
@@ -1612,7 +1616,9 @@ def items_print():
                          currency_symbol=currency_symbol,
                          currency_decimal_places=currency_decimal_places,
                          current_user=current_user,
-                         current_datetime=current_datetime)
+                         current_datetime=current_datetime,
+                         can_view_info=current_user.has_permission('items', 'view_info'),
+                         can_view_price=current_user.has_permission('items', 'view_price'))
 
 
 
@@ -1653,7 +1659,87 @@ def item_detail_print(uuid):
                          currency_decimal_places=currency_decimal_places,
                          current_user=current_user,
                          current_datetime=current_datetime,
-                         datasheets=datasheets)
+                         datasheets=datasheets,
+                         can_view_info=current_user.has_permission('items', 'view_info'),
+                         can_view_price=current_user.has_permission('items', 'view_price'))
+
+
+# ============= LENDING HISTORY ROUTE =============
+
+
+@item_bp.route('/item/<string:uuid>/lending-history', endpoint='item_lending_history')
+@login_required
+def item_lending_history(uuid):
+    """Per-item lending & return history page."""
+    from datetime import datetime, timezone
+    from models import BatchLendRecord, BatchSerialNumber
+
+    item = Item.query.filter_by(uuid=uuid).first_or_404()
+
+    if not current_user.has_permission('items', 'view'):
+        flash('You do not have permission to view items.', 'danger')
+        return redirect(url_for('item.items'))
+
+    if not current_user.has_permission('items', 'view_lending_history'):
+        flash('You do not have permission to view lending history.', 'danger')
+        return redirect(url_for('item.item_detail', uuid=uuid))
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    def _status(returned_at, lend_end):
+        if returned_at is None:
+            if lend_end and lend_end < now:
+                return 'Overdue'
+            return 'Active'
+        ret = returned_at.replace(tzinfo=None) if getattr(returned_at, 'tzinfo', None) else returned_at
+        due = lend_end.replace(tzinfo=None) if lend_end and getattr(lend_end, 'tzinfo', None) else lend_end
+        if due and ret > due:
+            return 'Late'
+        return 'On Time'
+
+    batch_histories = []
+    for batch in item.batches:
+        if batch.sn_tracking_enabled:
+            records = []
+            for sn in sorted(batch.serial_numbers, key=lambda s: s.sequence_number):
+                if sn.is_deleted:
+                    continue
+                if not sn.lend_start and not sn.lend_to_id:
+                    continue  # never lent
+                records.append({
+                    'obj': sn,
+                    'lend_to': sn.get_lend_to_display() or (sn.returned_from_label or ''),
+                    'approved': (sn.lending_session.creator.name or sn.lending_session.creator.username
+                                 if sn.lending_session and sn.lending_session.creator else ''),
+                    'accept_by': (sn.return_session.creator.name or sn.return_session.creator.username
+                                  if sn.return_session and sn.return_session.creator else ''),
+                    'lend_session_id': sn.lending_session.lending_id if sn.lending_session else '',
+                    'return_session_id': sn.return_session.lending_id if sn.return_session else '',
+                    'return_notes': sn.return_session.notes if sn.return_session else '',
+                    'status': _status(sn.returned_at, sn.lend_end),
+                })
+            batch_histories.append({'batch': batch, 'type': 'sn', 'records': records})
+        else:
+            records = []
+            for rec in sorted(batch.lend_records, key=lambda r: (r.lend_start or datetime.min)):
+                records.append({
+                    'obj': rec,
+                    'lend_to': rec.get_lend_to_display(),
+                    'approved': (rec.lending_session.creator.name or rec.lending_session.creator.username
+                                 if rec.lending_session and rec.lending_session.creator else ''),
+                    'accept_by': (rec.return_session.creator.name or rec.return_session.creator.username
+                                  if rec.return_session and rec.return_session.creator else ''),
+                    'lend_session_id': rec.lending_session.lending_id if rec.lending_session else '',
+                    'return_session_id': rec.return_session.lending_id if rec.return_session else '',
+                    'return_notes': rec.return_session.notes if rec.return_session else '',
+                    'status': _status(rec.returned_at, rec.lend_end),
+                })
+            batch_histories.append({'batch': batch, 'type': 'normal', 'records': records})
+
+    return render_template('item_lending_history.html',
+                           item=item,
+                           batch_histories=batch_histories,
+                           can_view_price=current_user.has_permission('items', 'view_price'))
 
 
 # ============= QR/BARCODE STICKER TEMPLATE ROUTES =============

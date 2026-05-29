@@ -50,18 +50,22 @@
                             {{ form.name(class="form-control form-control-sm" + (" is-invalid" if form.name.errors else
                             ""), disabled=(item_perms and not item_perms.can_edit_info)) }}
                         </div>
+                        {% if not item_perms or item_perms.can_view_info %}
                         <div class="col-md-4">
                             <label class="form-label form-label-sm">SKU</label>
                             {{ form.sku(class="form-control form-control-sm", disabled=(item_perms and not item_perms.can_edit_info)) }}
                         </div>
+                        {% endif %}
                     </div>
 
+                    {% if not item_perms or item_perms.can_view_info %}
                     <div class="row mb-2">
                         <div class="col-12">
                             <label class="form-label form-label-sm">Short Info</label>
                             {{ form.short_info(class="form-control form-control-sm", maxlength="128", placeholder="Brief summary shown on cards (max 128 chars)", disabled=(item_perms and not item_perms.can_edit_info)) }}
                         </div>
                     </div>
+                    {% endif %}
 
                     <!-- Thumbnail -->
                     <div class="mb-2">
@@ -94,6 +98,7 @@
                         <input type="hidden" name="thumbnail" id="thumbnailValue" value="{{ item.thumbnail or '' if item else '' }}">
                     </div>
 
+                    {% if not item_perms or item_perms.can_view_info %}
                     <div class="row mb-2">
                         <div class="col-md-6">
                             <label class="form-label form-label-sm">Type / Model</label>
@@ -232,6 +237,7 @@
                             </div>
                         </div>
                     </div>
+                    {% endif %}
 
                     <div class="row mb-2">
                         <div class="col-md-6">
@@ -239,12 +245,15 @@
                             <input type="text" class="form-control form-control-sm"
                                 value="{{ item.uuid if item else 'Auto-generated' }}" readonly>
                         </div>
+                        {% if not item_perms or item_perms.can_view_info %}
                         <div class="col-md-6">
                             <label class="form-label form-label-sm">Min Quantity</label>
                             {{ form.min_quantity(class="form-control form-control-sm", placeholder="0", disabled=(item_perms and not item_perms.can_edit_info)) }}
                         </div>
+                        {% endif %}
                     </div>
 
+                    {% if not item_perms or item_perms.can_view_info %}
                     <div class="row mb-0">
                         <div class="col-12">
                             <div class="form-check">
@@ -261,6 +270,7 @@
                             </div>
                         </div>
                     </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -282,7 +292,7 @@
                             <label class="form-label form-label-sm mb-0">
                                 <i class="bi bi-collection"></i> Batches
                                 <span class="badge {% if item.batches|length >= 32 %}bg-danger{% elif item.batches|length >= 28 %}bg-warning text-dark{% else %}bg-secondary{% endif %} ms-1">{{ item.batches|length }}/32</span>
-                                <small class="text-muted ms-2">Total Qty: {{ item.get_overall_quantity() }} | Price: {{ currency }}{{ "%.2f"|format(item.get_overall_total_price()) }} | Value: {{ currency }}{{ "%.2f"|format(item.get_overall_total_value()) }}</small>
+                                <small class="text-muted ms-2">Total Qty: {{ item.get_overall_quantity() }}{% if not item_perms or item_perms.can_view_price %} | Price: {{ currency }}{{ "%.2f"|format(item.get_overall_total_price()) }} | Value: {{ currency }}{{ "%.2f"|format(item.get_overall_total_value()) }}{% endif %}</small>
                             </label>
                             {% if item_perms and item_perms.can_edit_batch %}
                             <button type="button" class="btn btn-sm btn-success" id="addBatchBtn" onclick="pendingBatchAdd()" {% if item.batches|length >= 32 %}disabled title="Maximum 32 batches reached"{% endif %}>
@@ -304,8 +314,10 @@
                                     {% if batch.sn_tracking_enabled %}
                                     <span class="badge bg-dark"><i class="bi bi-upc-scan"></i> Tracking</span>
                                     {% endif %}
+                                    {% if not item_perms or item_perms.can_view_price %}
                                     <span class="badge bg-success">{{ currency }}{{ "%.2f"|format(batch.price_per_unit) }}/unit</span>
                                     <span class="badge bg-info">Price: {{ currency }}{{ "%.2f"|format(batch.get_batch_total_price()) }}</span>
+                                    {% endif %}
                                     {% if not batch.follow_main_location %}
                                     <span class="badge" style="background-color: {{ batch.get_effective_location_color() }};"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>
                                     {% endif %}
@@ -345,14 +357,18 @@
                                     <div class="row mb-2 small">
                                         <div class="col-md-3"><strong>Batch #:</strong> {{ batch.batch_number }}</div>
                                         <div class="col-md-3"><strong>Quantity:</strong> {{ batch.quantity }}</div>
+                                        {% if not item_perms or item_perms.can_view_price %}
                                         <div class="col-md-3"><strong>Price/Unit:</strong> {{ currency }}{{ "%.2f"|format(batch.price_per_unit) }}</div>
                                         <div class="col-md-3">
                                             <strong>Total Price:</strong> {{ currency }}{{ "%.2f"|format(batch.get_batch_total_price()) }}
                                             {% if batch.quantity == 0 %}<small class="text-muted d-block">(qty=0, shows 1×)</small>{% endif %}
                                         </div>
+                                        {% endif %}
                                     </div>
                                     <div class="row mb-1 small">
+                                        {% if not item_perms or item_perms.can_view_price %}
                                         <div class="col-md-3"><strong>Total Value:</strong> {{ currency }}{{ "%.2f"|format(batch.get_batch_total_value()) }}</div>
+                                        {% endif %}
                                         <div class="col-md-3"><strong>Available Qty:</strong> {{ batch.get_available_quantity() }}</div>
                                         <div class="col-md-3"><strong>Date of Purchase:</strong> {{ batch.purchase_date.strftime('%d/%m/%Y') if batch.purchase_date else 'N/A' }}</div>
                                         <div class="col-md-3"><strong>Note:</strong> {{ batch.note or 'N/A' }}</div>

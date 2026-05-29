@@ -200,8 +200,10 @@
         <div class="header-left">
             <div class="item-title">{{ item.name }}</div>
             <div>UUID: <span class="uuid-code">{{ item.uuid }}</span></div>
+            {% if can_view_info %}
             {% if item.sku %}<div>SKU: {{ item.sku }}</div>{% endif %}
             {% if item.info %}<div>Type/Model: {{ item.info }}</div>{% endif %}
+            {% endif %}
         </div>
         <div class="qr-block" id="qr-block">
             <img src="{{ url_for('item.item_qr_svg', uuid=item.uuid) }}" alt="QR Code">
@@ -222,6 +224,7 @@
     </div>
 
     <!-- Basic info -->
+    {% if can_view_info %}
     <div class="info-grid avoid-break">
         <div class="info-item">
             <div class="info-label">Category</div>
@@ -243,6 +246,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- Summary -->
     <div class="summary-box">
@@ -263,11 +267,14 @@
                 <div class="info-label">Available</div>
                 <div class="info-value"><strong>{{ item.get_available_quantity() }}</strong></div>
             </div>
+            {% if can_view_info %}
             <div class="info-item">
                 <div class="info-label">Min Quantity</div>
                 <div class="info-value">{{ item.min_quantity }}</div>
             </div>
+            {% endif %}
         </div>
+        {% if can_view_price %}
         <div class="info-grid">
             <div class="info-item">
                 <div class="info-label">Overall Total Price</div>
@@ -278,10 +285,11 @@
                 <div class="info-value">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(item.get_average_price()) }}</div>
             </div>
         </div>
+        {% endif %}
         {% if item.is_no_stock() %}
             <span class="badge badge-danger">No Stock</span>
         {% elif item.is_low_stock() %}
-            <span class="badge badge-warning">Low Stock (Min: {{ item.min_quantity }})</span>
+            <span class="badge badge-warning">Low Stock{% if can_view_info %} (Min: {{ item.min_quantity }}){% endif %}</span>
         {% else %}
             <span class="badge badge-success">OK</span>
         {% endif %}
@@ -293,7 +301,7 @@
         <div class="section-title">Batches ({{ item.batches|length }})</div>
         <table class="batch-table">
             <thead>
-                <tr><th>#</th><th>Label</th><th>Qty</th><th>Price/Unit</th><th>Total</th><th>Date</th><th>Location</th><th>Note</th></tr>
+                <tr><th>#</th><th>Label</th><th>Qty</th>{% if can_view_price %}<th>Price/Unit</th><th>Total</th>{% endif %}<th>Date</th><th>Location</th><th>Note</th></tr>
             </thead>
             <tbody>
                 {% for batch in item.batches %}
@@ -301,8 +309,10 @@
                     <td>{{ batch.batch_number }}</td>
                     <td>{{ batch.get_display_label() }}</td>
                     <td>{{ batch.quantity }}</td>
+                    {% if can_view_price %}
                     <td>{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.price_per_unit) }}</td>
                     <td>{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_price()) }}</td>
+                    {% endif %}
                     <td>{{ batch.purchase_date.strftime('%d/%m/%Y') if batch.purchase_date else '-' }}</td>
                     <td>{% if batch.follow_main_location %}<em>Follow Main</em>{% else %}{{ batch.get_effective_location_text() }}{% endif %}</td>
                     <td>{{ batch.note or '-' }}</td>
