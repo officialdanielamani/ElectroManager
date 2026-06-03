@@ -4,7 +4,7 @@ Kanban Routes Blueprint
 from flask import Blueprint, render_template, request, jsonify, abort
 from flask_login import login_required, current_user
 from models import (db, KanbanBoard, KanbanColumn, KanbanCard, KanbanTask,
-                    DEFAULT_KANBAN_COLUMNS)
+                    DEFAULT_KANBAN_COLUMNS, ContactPerson, ContactOrganization)
 from datetime import datetime, timezone, date
 import json
 import logging
@@ -39,6 +39,17 @@ def _task_or_404(task_id):
     return task
 
 
+def _task_to_dict(t):
+    return {
+        'id': t.id,
+        'title': t.title,
+        'completed': t.completed,
+        'start_date': t.start_date.isoformat() if t.start_date else '',
+        'due_date': t.due_date.isoformat() if t.due_date else '',
+        'position': t.position,
+    }
+
+
 def _card_to_dict(card):
     return {
         'id': card.id,
@@ -56,16 +67,7 @@ def _card_to_dict(card):
         'column_id': card.column_id,
         'task_count': card.task_count,
         'completed_task_count': card.completed_task_count,
-        'tasks': [
-            {
-                'id': t.id,
-                'title': t.title,
-                'completed': t.completed,
-                'due_date': t.due_date.isoformat() if t.due_date else '',
-                'position': t.position,
-            }
-            for t in card.tasks
-        ],
+        'tasks': [_task_to_dict(t) for t in card.tasks],
     }
 
 
@@ -349,18 +351,13 @@ def create_task(card_id):
     task = KanbanTask(
         card_id=card.id,
         title=title,
+        start_date=_parse_date(data.get('start_date')),
         due_date=_parse_date(data.get('due_date')),
         position=max_pos + 1,
     )
     db.session.add(task)
     db.session.commit()
-    return jsonify({
-        'id': task.id,
-        'title': task.title,
-        'completed': task.completed,
-        'due_date': task.due_date.isoformat() if task.due_date else '',
-        'position': task.position,
-    }), 201
+    return jsonify(_task_to_dict(task)), 201
 
 
 @kanban_bp.route('/kanban/tasks/<int:task_id>', methods=['PUT'])
@@ -375,15 +372,31 @@ def update_task(task_id):
         task.title = title
     if 'completed' in data:
         task.completed = bool(data['completed'])
+    if 'start_date' in data:
+        task.start_date = _parse_date(data['start_date'])
     if 'due_date' in data:
         task.due_date = _parse_date(data['due_date'])
     db.session.commit()
-    return jsonify({
-        'id': task.id,
-        'title': task.title,
-        'completed': task.completed,
-        'due_date': task.due_date.isoformat() if task.due_date else '',
-    })
+    return jsonify(_task_to_dict(task))
+
+
+# ── Contacts (for key persons picker) ────────────────────────────
+
+@kanban_bp.route('/kanban/contacts', methods=['GET'])
+@login_required
+def kanban_contacts():
+    if not current_user.has_permission('settings_sections.contacts', 'view_other'):
+        return jsonify({'error': 'No permission'}), 403
+    persons = ContactPerson.query.order_by(ContactPerson.name).all()
+    result = []
+    for p in persons:
+        org_name = ''
+        if p.organization_id:
+            org = ContactOrganization.query.get(p.organization_id)
+            if org:
+                org_name = org.name
+        result.append({'id': p.id, 'name': p.name, 'email': p.email or '', 'org': org_name})
+    return jsonify(result)
 
 
 @kanban_bp.route('/kanban/tasks/<int:task_id>', methods=['DELETE'])

@@ -3,125 +3,89 @@
 
 {% block content %}
 <style>
-.kanban-wrapper {
-    overflow-x: auto;
-    padding-bottom: 1rem;
-}
+.kanban-wrapper { overflow-x: auto; padding-bottom: 1rem; }
 .kanban-board {
-    display: flex;
-    gap: 1rem;
-    align-items: flex-start;
-    min-height: 60vh;
-    min-width: max-content;
+    display: flex; gap: 1rem; align-items: flex-start;
+    min-height: 60vh; min-width: max-content;
 }
 .kanban-col {
-    width: 280px;
-    flex-shrink: 0;
+    width: 300px; flex-shrink: 0;
     background: var(--bs-secondary-bg, #f8f9fa);
-    border-radius: .5rem;
-    display: flex;
-    flex-direction: column;
+    border-radius: .5rem; display: flex; flex-direction: column;
 }
-[data-theme="dark"] .kanban-col {
-    background: #2b2d31;
-}
+[data-theme="dark"] .kanban-col { background: #2b2d31; }
 .kanban-col-header {
-    padding: .6rem .75rem;
-    border-radius: .5rem .5rem 0 0;
-    display: flex;
-    align-items: center;
-    gap: .4rem;
-    font-weight: 600;
-    font-size: .88rem;
+    padding: .55rem .75rem; border-radius: .5rem .5rem 0 0;
+    display: flex; align-items: center; gap: .4rem;
+    font-weight: 600; font-size: .88rem;
 }
-.kanban-col-header .col-title {
-    flex: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.kanban-col-body {
-    flex: 1;
-    padding: .5rem;
-    min-height: 80px;
-}
+.kanban-col-header .col-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kanban-col-body { flex: 1; padding: .5rem; min-height: 60px; }
 .kanban-card {
     background: var(--bs-body-bg, #fff);
     border: 1px solid var(--bs-border-color, #dee2e6);
-    border-radius: .4rem;
-    padding: .5rem .6rem;
-    margin-bottom: .45rem;
+    border-radius: .4rem; margin-bottom: .45rem;
+    font-size: .82rem; transition: box-shadow .15s;
+}
+.kanban-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+.kanban-card.sortable-ghost { opacity: .4; background: var(--bs-primary-bg-subtle, #cfe2ff); }
+.kanban-card.sortable-chosen { box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+.card-top {
+    padding: .45rem .55rem .35rem;
     cursor: pointer;
-    font-size: .83rem;
-    transition: box-shadow .15s;
-    position: relative;
+    display: flex; align-items: flex-start; gap: .35rem;
 }
-.kanban-card:hover {
-    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+.card-label-strip { height: 4px; border-radius: 2px 2px 0 0; }
+.card-title-text { flex: 1; font-weight: 600; word-break: break-word; }
+.card-dates { padding: 0 .55rem .3rem; display: flex; gap: .3rem; flex-wrap: wrap; }
+.card-tasks { border-top: 1px solid var(--bs-border-color, #dee2e6); padding: .35rem .4rem; }
+.card-task-row {
+    display: flex; align-items: center; gap: .3rem;
+    padding: .18rem 0;
 }
-.kanban-card.sortable-ghost {
-    opacity: .4;
-    background: var(--bs-primary-bg-subtle, #cfe2ff);
+.card-task-row .task-title {
+    flex: 1; word-break: break-word; line-height: 1.3;
 }
-.kanban-card.sortable-chosen {
-    box-shadow: 0 4px 12px rgba(0,0,0,.2);
-}
-.card-label-strip {
-    height: 4px;
-    border-radius: 2px;
-    margin-bottom: .35rem;
-}
-.card-title-row {
-    font-weight: 600;
-    margin-bottom: .2rem;
-    word-break: break-word;
-}
-.card-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .25rem;
-    align-items: center;
-    margin-top: .3rem;
-}
-.priority-dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
+.card-task-row .task-title.done { text-decoration: line-through; color: var(--bs-secondary-color); }
+.card-persons {
+    padding: .25rem .55rem .4rem;
+    color: var(--bs-secondary-color); font-size: .78rem;
 }
 .kanban-add-card {
-    padding: .3rem .5rem;
-    border-top: 1px solid var(--bs-border-color, #dee2e6);
+    padding: .3rem .5rem; border-top: 1px solid var(--bs-border-color, #dee2e6);
 }
-.kanban-add-col-btn {
-    width: 52px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: flex-start;
-    padding-top: .1rem;
+/* Icon picker grid */
+#colIconGrid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+    gap: 3px; max-height: 320px; overflow-y: auto;
 }
+.icon-opt {
+    text-align: center; padding: .35rem .2rem; border-radius: .3rem; cursor: pointer;
+    font-size: 1.1rem; border: 2px solid transparent;
+}
+.icon-opt:hover { background: var(--bs-secondary-bg); }
+.icon-opt.selected { border-color: var(--bs-primary); background: var(--bs-primary-bg-subtle); }
+.icon-opt small { display: block; font-size: .6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Contact badge */
+.contact-badge {
+    display: inline-flex; align-items: center; gap: .25rem;
+    background: var(--bs-secondary-bg); border: 1px solid var(--bs-border-color);
+    border-radius: 999px; padding: .15rem .5rem; font-size: .8rem; margin: .15rem .15rem 0 0;
+}
+.contact-badge .remove-contact { cursor: pointer; color: var(--bs-danger); font-size: .85rem; }
 </style>
 
 {# ─── Top bar ─────────────────────────────────── #}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h5 class="mb-0"><i class="bi bi-kanban"></i> Kanban</h5>
-    <div class="d-flex gap-2 flex-wrap align-items-center">
-        {% if boards %}
-        <button class="btn btn-outline-secondary btn-sm" id="btn-manage-boards"
-                data-bs-toggle="modal" data-bs-target="#boardsModal">
-            <i class="bi bi-layout-three-columns"></i> Boards
-        </button>
-        {% endif %}
-        <button class="btn btn-primary btn-sm" id="btn-new-board"
-                data-bs-toggle="modal" data-bs-target="#newBoardModal">
+    <div class="d-flex gap-2 align-items-center">
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newBoardModal">
             <i class="bi bi-plus-lg"></i> New Board
         </button>
     </div>
 </div>
 
 {% if not boards %}
-{# ── Empty state ──────────────────────────────── #}
 <div class="text-center py-5 text-muted">
     <i class="bi bi-kanban display-4"></i>
     <p class="mt-3 mb-1 fs-5">No boards yet</p>
@@ -133,7 +97,7 @@
 {% else %}
 
 {# ── Board tabs ───────────────────────────────── #}
-<ul class="nav nav-tabs mb-3" id="boardTabs">
+<ul class="nav nav-tabs mb-3">
     {% for b in boards %}
     <li class="nav-item">
         <a class="nav-link{% if active_board and b.id == active_board.id %} active{% endif %}"
@@ -143,92 +107,130 @@
 </ul>
 
 {% if active_board %}
-{# ── Board header actions ─────────────────────── #}
 <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-    <span class="fw-semibold text-muted small">{{ active_board.name }}</span>
+    <span class="text-muted small fw-semibold">{{ active_board.name }}</span>
     <div class="d-flex gap-1">
-        <button class="btn btn-outline-secondary btn-sm"
-                data-bs-toggle="modal" data-bs-target="#renameBoardModal"
-                data-board-id="{{ active_board.id }}"
-                data-board-name="{{ active_board.name }}">
+        <button class="btn btn-outline-secondary btn-sm" id="btn-rename-board-open"
+                data-board-id="{{ active_board.id }}" data-board-name="{{ active_board.name }}"
+                data-bs-toggle="modal" data-bs-target="#renameBoardModal">
             <i class="bi bi-pencil"></i>
         </button>
         <button class="btn btn-outline-danger btn-sm"
-                data-bs-toggle="modal" data-bs-target="#deleteBoardModal"
-                data-board-id="{{ active_board.id }}"
-                data-board-name="{{ active_board.name }}">
+                data-board-id="{{ active_board.id }}" data-board-name="{{ active_board.name }}"
+                data-bs-toggle="modal" data-bs-target="#deleteBoardModal">
             <i class="bi bi-trash"></i>
         </button>
-        <button class="btn btn-outline-secondary btn-sm"
-                data-bs-toggle="modal" data-bs-target="#addColModal"
-                data-board-id="{{ active_board.id }}">
+        <button class="btn btn-outline-secondary btn-sm" id="btn-add-col"
+                data-board-id="{{ active_board.id }}"
+                data-bs-toggle="modal" data-bs-target="#colModal">
             <i class="bi bi-plus-lg"></i> Column
         </button>
     </div>
 </div>
 
-{# ── Kanban board ─────────────────────────────── #}
 <div class="kanban-wrapper">
     <div class="kanban-board" id="kanban-board" data-board-id="{{ active_board.id }}">
         {% for col in active_board.columns %}
+        {% set prio_colors = {1: '#6b7280', 2: '#3b82f6', 3: '#f59e0b', 4: '#ef4444'} %}
+        {% set prio_names = {1: 'Low', 2: 'Medium', 3: 'High', 4: 'Urgent'} %}
+        {% set prio_badge = {1: 'secondary', 2: 'primary', 3: 'warning', 4: 'danger'} %}
         <div class="kanban-col" id="col-{{ col.id }}" data-col-id="{{ col.id }}">
-            <div class="kanban-col-header" style="background:{{ col.color }}20; border-bottom: 3px solid {{ col.color }};">
+            <div class="kanban-col-header"
+                 style="background:{{ col.color }}18; border-bottom:3px solid {{ col.color }};">
                 <i class="bi {{ col.icon }}" style="color:{{ col.color }}"></i>
                 <span class="col-title" style="color:{{ col.color }}">{{ col.name }}</span>
-                <span class="badge rounded-pill bg-secondary ms-1" style="font-size:.7rem" id="col-count-{{ col.id }}">
-                    {{ col.cards|length }}
-                </span>
+                <span class="badge rounded-pill bg-secondary" style="font-size:.68rem"
+                      id="col-count-{{ col.id }}">{{ col.cards|length }}</span>
                 <div class="dropdown ms-1">
-                    <button class="btn btn-link btn-sm p-0 text-muted" data-bs-toggle="dropdown">
+                    <button class="btn btn-link btn-sm p-0 text-muted" data-bs-toggle="dropdown"
+                            aria-expanded="false">
                         <i class="bi bi-three-dots-vertical"></i>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="#" onclick="editCol({{ col.id }}, '{{ col.name|e }}', '{{ col.color }}', '{{ col.icon }}'); return false;">
-                            <i class="bi bi-pencil"></i> Rename</a></li>
-                        <li><a class="dropdown-item text-danger" href="#" onclick="confirmDeleteCol({{ col.id }}, '{{ col.name|e }}'); return false;">
-                            <i class="bi bi-trash"></i> Delete</a></li>
+                        <li>
+                            <button class="dropdown-item"
+                                    onclick="editCol({{ col.id }}, {{ col.name|tojson }}, {{ col.color|tojson }}, {{ col.icon|tojson }})">
+                                <i class="bi bi-pencil"></i> Rename
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item text-danger"
+                                    onclick="confirmDeleteCol({{ col.id }}, {{ col.name|tojson }})">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                        </li>
                     </ul>
                 </div>
             </div>
-            <div class="kanban-col-body sortable-cards" id="cards-{{ col.id }}" data-col-id="{{ col.id }}">
+            <div class="kanban-col-body sortable-cards" id="cards-{{ col.id }}"
+                 data-col-id="{{ col.id }}">
                 {% for card in col.cards %}
-                {% set prio_colors = {1: '#6b7280', 2: '#3b82f6', 3: '#f59e0b', 4: '#ef4444'} %}
-                {% set prio_names = {1: 'Low', 2: 'Medium', 3: 'High', 4: 'Urgent'} %}
-                <div class="kanban-card" id="card-{{ card.id }}" data-card-id="{{ card.id }}"
-                     onclick="openCard({{ card.id }})">
+                <div class="kanban-card" id="card-{{ card.id }}" data-card-id="{{ card.id }}">
                     {% if card.label_color %}
                     <div class="card-label-strip" style="background:{{ card.label_color }}"
                          title="{{ card.label_name }}"></div>
                     {% endif %}
-                    <div class="card-title-row">{{ card.title }}</div>
-                    <div class="card-meta">
-                        <span class="priority-dot" style="background:{{ prio_colors[card.priority] }}"
-                              title="Priority: {{ prio_names[card.priority] }}"></span>
+                    <div class="card-top" onclick="openCard({{ card.id }})">
+                        <span class="card-title-text">{{ card.title }}</span>
+                        <span class="badge bg-{{ prio_badge[card.priority] }}{% if card.priority == 3 %} text-dark{% endif %} flex-shrink-0"
+                              style="font-size:.7rem">{{ prio_names[card.priority] }}</span>
+                    </div>
+                    {% if card.start_date or card.due_date or card.completed_at %}
+                    <div class="card-dates">
+                        {% if card.start_date %}
+                        <span class="badge bg-secondary text-nowrap" style="font-size:.68rem">
+                            <i class="bi bi-play-circle"></i> {{ card.start_date.strftime('%d %b') }}
+                        </span>
+                        {% endif %}
                         {% if card.due_date %}
                         <span class="badge {% if card.is_overdue %}bg-danger{% else %}bg-secondary{% endif %} text-nowrap"
-                              style="font-size:.7rem">
-                            <i class="bi bi-calendar-event"></i>
-                            {{ card.due_date.strftime('%d %b') }}
+                              style="font-size:.68rem">
+                            <i class="bi bi-calendar-event"></i> {{ card.due_date.strftime('%d %b') }}
                         </span>
                         {% endif %}
                         {% if card.completed_at %}
-                        <span class="badge bg-success" style="font-size:.7rem">
+                        <span class="badge bg-success" style="font-size:.68rem">
                             <i class="bi bi-check-circle"></i> Done
                         </span>
                         {% endif %}
-                        {% if card.task_count > 0 %}
-                        <span class="badge bg-secondary" style="font-size:.7rem"
-                              title="{{ card.completed_task_count }}/{{ card.task_count }} tasks done">
-                            <i class="bi bi-check2-square"></i>
-                            {{ card.completed_task_count }}/{{ card.task_count }}
-                        </span>
-                        {% endif %}
-                        {% if card.get_key_persons() %}
-                        <span class="badge bg-info text-dark" style="font-size:.7rem">
-                            <i class="bi bi-person"></i> {{ card.get_key_persons()|length }}
-                        </span>
-                        {% endif %}
                     </div>
+                    {% endif %}
+                    {% if card.tasks %}
+                    <div class="card-tasks">
+                        {% for task in card.tasks %}
+                        <div class="card-task-row" id="task-row-{{ task.id }}">
+                            <input type="checkbox" class="form-check-input flex-shrink-0"
+                                   {% if task.completed %}checked{% endif %}
+                                   onchange="toggleTask({{ task.id }}, this.checked, {{ card.id }})">
+                            <span class="task-title{% if task.completed %} done{% endif %}">
+                                {{ task.title }}
+                            </span>
+                            {% if task.start_date or task.due_date %}
+                            <span class="text-muted text-nowrap" style="font-size:.72rem">
+                                {% if task.start_date %}{{ task.start_date.strftime('%d/%m') }}{% endif %}
+                                {% if task.start_date and task.due_date %}→{% endif %}
+                                {% if task.due_date %}{{ task.due_date.strftime('%d/%m') }}{% endif %}
+                            </span>
+                            {% endif %}
+                            <button class="btn btn-outline-warning btn-sm py-0 px-1 flex-shrink-0"
+                                    style="font-size:.72rem; line-height:1.4"
+                                    onclick="openTaskEdit({{ task.id }}, {{ task.title|tojson }},
+                                        '{{ task.start_date.isoformat() if task.start_date else '' }}',
+                                        '{{ task.due_date.isoformat() if task.due_date else '' }}')"
+                                    title="Edit task">
+                                Info
+                            </button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% set persons = card.get_key_persons() %}
+                    {% if persons %}
+                    <div class="card-persons">
+                        <i class="bi bi-person-fill"></i>
+                        {{ persons | map(attribute='name') | join(', ') }}
+                    </div>
+                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
@@ -248,7 +250,7 @@
 
 {# ════════════════════ MODALS ════════════════════ #}
 
-{# ── New Board Modal ──────────────────────────── #}
+{# ── New Board ───────────────────────────────── #}
 <div class="modal fade" id="newBoardModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -259,7 +261,7 @@
             <div class="modal-body">
                 <label class="form-label">Board name</label>
                 <input type="text" class="form-control" id="new-board-name" maxlength="128"
-                       placeholder="e.g. Work, Personal, Release v2…">
+                       placeholder="e.g. Work, Personal, Sprint…">
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -269,7 +271,7 @@
     </div>
 </div>
 
-{# ── Rename Board Modal ───────────────────────── #}
+{# ── Rename Board ────────────────────────────── #}
 <div class="modal fade" id="renameBoardModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -279,7 +281,6 @@
             </div>
             <div class="modal-body">
                 <input type="hidden" id="rename-board-id">
-                <label class="form-label">Board name</label>
                 <input type="text" class="form-control" id="rename-board-name" maxlength="128">
             </div>
             <div class="modal-footer">
@@ -290,7 +291,7 @@
     </div>
 </div>
 
-{# ── Delete Board Modal ───────────────────────── #}
+{# ── Delete Board ────────────────────────────── #}
 <div class="modal fade" id="deleteBoardModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -300,8 +301,8 @@
             </div>
             <div class="modal-body">
                 <input type="hidden" id="delete-board-id">
-                Delete board <strong id="delete-board-name"></strong>?
-                All columns and cards will be permanently removed.
+                Delete board <strong id="delete-board-name"></strong>? All columns and cards will be
+                permanently removed.
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -311,12 +312,12 @@
     </div>
 </div>
 
-{# ── Add / Edit Column Modal ───────────────────── #}
-<div class="modal fade" id="addColModal" tabindex="-1">
+{# ── Add / Edit Column ────────────────────────── #}
+<div class="modal fade" id="colModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="addColModalTitle"><i class="bi bi-plus-lg"></i> Add Column</h5>
+                <h5 class="modal-title" id="colModalTitle"><i class="bi bi-plus-lg"></i> Add Column</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -326,15 +327,25 @@
                     <label class="form-label">Column name</label>
                     <input type="text" class="form-control" id="col-name-input" maxlength="64">
                 </div>
-                <div class="row g-2">
+                <div class="row g-2 mb-3">
                     <div class="col-6">
                         <label class="form-label">Color</label>
-                        <input type="color" class="form-control form-control-color" id="col-color-input" value="#6b7280">
+                        <input type="color" class="form-control form-control-color w-100"
+                               id="col-color-input" value="#6b7280">
                     </div>
                     <div class="col-6">
-                        <label class="form-label">Icon <small class="text-muted">(Bootstrap Icons class)</small></label>
-                        <input type="text" class="form-control" id="col-icon-input" value="bi-circle" maxlength="32"
-                               placeholder="bi-circle">
+                        <label class="form-label">Icon</label>
+                        <div class="input-group">
+                            <span class="input-group-text" id="col-icon-preview">
+                                <i class="bi bi-circle" id="col-icon-preview-i"></i>
+                            </span>
+                            <input type="text" class="form-control" id="col-icon-input"
+                                   value="bi-circle" maxlength="32" readonly placeholder="Pick icon…">
+                            <button class="btn btn-outline-secondary" type="button"
+                                    onclick="openColIconPicker()">
+                                <i class="bi bi-grid-3x3-gap"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -346,7 +357,26 @@
     </div>
 </div>
 
-{# ── Delete Column Confirm Modal ───────────────── #}
+{# ── Icon Picker (for column icon) ───────────── #}
+<div class="modal fade" id="colIconPickerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-grid-3x3-gap"></i> Pick Icon</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" class="form-control form-control-sm mb-3" id="colIconSearch"
+                       placeholder="Search icons…" oninput="renderColIcons()">
+                <div id="colIconGrid">
+                    <p class="text-muted text-center py-4">Loading…</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── Delete Column Confirm ────────────────────── #}
 <div class="modal fade" id="deleteColModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -366,7 +396,7 @@
     </div>
 </div>
 
-{# ── New Card Modal ────────────────────────────── #}
+{# ── Quick Add Card ───────────────────────────── #}
 <div class="modal fade" id="newCardModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -381,7 +411,7 @@
                     <label class="form-label">Title <span class="text-danger">*</span></label>
                     <input type="text" class="form-control" id="new-card-title" maxlength="256">
                 </div>
-                <div class="mb-3">
+                <div class="mb-2">
                     <label class="form-label">Priority</label>
                     <select class="form-select" id="new-card-priority">
                         <option value="1">Low</option>
@@ -404,24 +434,23 @@
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="cardModalTitle"><i class="bi bi-card-heading"></i> Card</h5>
-                <div class="d-flex gap-1 ms-auto me-2">
-                    <button class="btn btn-outline-danger btn-sm" id="btn-delete-card-modal">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </div>
+                <h5 class="modal-title"><i class="bi bi-card-heading"></i>
+                    <span id="cardModalTitle">Card</span>
+                </h5>
+                <button type="button" class="btn btn-outline-danger btn-sm ms-auto me-2"
+                        id="btn-delete-card-modal">
+                    <i class="bi bi-trash"></i> Delete
+                </button>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="card-modal-id">
 
-                {# Title #}
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Title</label>
                     <input type="text" class="form-control" id="card-modal-title" maxlength="256">
                 </div>
 
-                {# Priority + Label #}
                 <div class="row g-2 mb-3">
                     <div class="col-md-4">
                         <label class="form-label">Priority</label>
@@ -434,15 +463,16 @@
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Label name</label>
-                        <input type="text" class="form-control" id="card-modal-label-name" maxlength="64" placeholder="Optional">
+                        <input type="text" class="form-control" id="card-modal-label-name"
+                               maxlength="64" placeholder="Optional">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Label color</label>
-                        <input type="color" class="form-control form-control-color" id="card-modal-label-color" value="#3b82f6">
+                        <input type="color" class="form-control form-control-color w-100"
+                               id="card-modal-label-color" value="#3b82f6">
                     </div>
                 </div>
 
-                {# Dates #}
                 <div class="row g-2 mb-3">
                     <div class="col-md-4">
                         <label class="form-label">Start date</label>
@@ -452,7 +482,7 @@
                         <label class="form-label">Due date</label>
                         <input type="date" class="form-control" id="card-modal-due-date">
                     </div>
-                    <div class="col-md-4 d-flex align-items-end">
+                    <div class="col-md-4 d-flex align-items-end pb-1">
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="card-modal-completed">
                             <label class="form-check-label" for="card-modal-completed">Mark done</label>
@@ -460,16 +490,25 @@
                     </div>
                 </div>
 
-                {# Key persons #}
+                {# Key persons contact picker #}
                 <div class="mb-3">
-                    <label class="form-label">Key persons
-                        <small class="text-muted">(one per line)</small>
-                    </label>
-                    <textarea class="form-control" id="card-modal-persons" rows="2"
-                              placeholder="Alice&#10;Bob"></textarea>
+                    <label class="form-label">Key persons</label>
+                    <div id="contact-no-perm" class="text-muted small d-none">
+                        <i class="bi bi-lock"></i> No permission to view contacts.
+                    </div>
+                    <div id="contact-picker-wrap">
+                        <div class="input-group input-group-sm mb-1">
+                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            <input type="text" class="form-control" id="contact-search-input"
+                                   placeholder="Search contacts…" oninput="filterContacts()">
+                        </div>
+                        <div id="contact-search-results" class="border rounded p-1 mb-1"
+                             style="max-height:130px;overflow-y:auto;font-size:.83rem;display:none;"></div>
+                        <div id="selected-contacts"></div>
+                    </div>
+                    <input type="hidden" id="card-modal-persons-json" value="[]">
                 </div>
 
-                {# Description #}
                 <div class="mb-3">
                     <label class="form-label">Description</label>
                     <textarea class="form-control" id="card-modal-desc" rows="4"
@@ -478,8 +517,7 @@
 
                 <hr>
 
-                {# Tasks / checklist #}
-                <div class="mb-2 d-flex justify-content-between align-items-center">
+                <div class="d-flex justify-content-between align-items-center mb-2">
                     <label class="form-label mb-0 fw-semibold">
                         <i class="bi bi-check2-square"></i> Tasks
                         <span id="task-progress-label" class="text-muted fw-normal small"></span>
@@ -502,18 +540,54 @@
     </div>
 </div>
 
+{# ── Task Edit Modal ──────────────────────────── #}
+<div class="modal fade" id="taskEditModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" style="font-size:.95rem">
+                    <i class="bi bi-check2-square"></i> Edit Task
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="task-edit-id">
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Title</label>
+                    <input type="text" class="form-control form-control-sm" id="task-edit-title"
+                           maxlength="256">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Start date</label>
+                    <input type="date" class="form-control form-control-sm" id="task-edit-start">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label form-label-sm">Due date</label>
+                    <input type="date" class="form-control form-control-sm" id="task-edit-due">
+                </div>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-outline-danger btn-sm" id="btn-delete-task">
+                    <i class="bi bi-trash"></i>
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm"
+                        data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm"
+                        id="btn-save-task-edit">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {# ════════════════════ SCRIPTS ═══════════════════ #}
 <script src="{{ url_for('static', filename='lib/sortable.min.js') }}"></script>
 <script>
 const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
 const BOARD_ID = {{ active_board.id if active_board else 'null' }};
 
-// ── AJAX helpers ─────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────
 async function api(method, url, body) {
-    const opts = {
-        method,
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
-    };
+    const opts = { method, headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF } };
     if (body !== undefined) opts.body = JSON.stringify(body);
     const r = await fetch(url, opts);
     if (!r.ok) {
@@ -522,88 +596,142 @@ async function api(method, url, body) {
     }
     return r.json();
 }
-
-function showError(msg) {
-    console.error(msg);
-    alert('Error: ' + msg);
+function showErr(msg) { alert('Error: ' + msg); }
+function escHtml(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+function getModal(id) { return bootstrap.Modal.getOrCreateInstance(document.getElementById(id)); }
+function hideModal(id) { getModal(id).hide(); }
 
 // ── Board modals ─────────────────────────────────────────────────
-document.getElementById('btn-create-board')?.addEventListener('click', async () => {
-    const name = document.getElementById('new-board-name').value.trim();
-    if (!name) return;
-    try {
-        const b = await api('POST', '/kanban/boards', { name });
-        window.location.href = '/kanban?board=' + b.id;
-    } catch (e) { showError(e.message); }
-});
-
 document.getElementById('newBoardModal')?.addEventListener('show.bs.modal', () => {
     document.getElementById('new-board-name').value = '';
 });
 document.getElementById('new-board-name')?.addEventListener('keydown', e => {
     if (e.key === 'Enter') document.getElementById('btn-create-board').click();
 });
+document.getElementById('btn-create-board')?.addEventListener('click', async () => {
+    const name = document.getElementById('new-board-name').value.trim();
+    if (!name) return;
+    try {
+        const b = await api('POST', '/kanban/boards', { name });
+        location.href = '/kanban?board=' + b.id;
+    } catch(e) { showErr(e.message); }
+});
 
 document.getElementById('renameBoardModal')?.addEventListener('show.bs.modal', e => {
     const btn = e.relatedTarget;
-    document.getElementById('rename-board-id').value = btn.dataset.boardId;
-    document.getElementById('rename-board-name').value = btn.dataset.boardName;
+    document.getElementById('rename-board-id').value = btn?.dataset.boardId || '';
+    document.getElementById('rename-board-name').value = btn?.dataset.boardName || '';
 });
-
 document.getElementById('btn-rename-board')?.addEventListener('click', async () => {
     const id = document.getElementById('rename-board-id').value;
     const name = document.getElementById('rename-board-name').value.trim();
     if (!name) return;
-    try {
-        await api('PUT', '/kanban/boards/' + id, { name });
-        window.location.reload();
-    } catch (e) { showError(e.message); }
+    try { await api('PUT', '/kanban/boards/' + id, { name }); location.reload(); }
+    catch(e) { showErr(e.message); }
 });
 
 document.getElementById('deleteBoardModal')?.addEventListener('show.bs.modal', e => {
     const btn = e.relatedTarget;
-    document.getElementById('delete-board-id').value = btn.dataset.boardId;
-    document.getElementById('delete-board-name').textContent = btn.dataset.boardName;
+    document.getElementById('delete-board-id').value = btn?.dataset.boardId || '';
+    document.getElementById('delete-board-name').textContent = btn?.dataset.boardName || '';
 });
-
 document.getElementById('btn-delete-board')?.addEventListener('click', async () => {
     const id = document.getElementById('delete-board-id').value;
-    try {
-        await api('DELETE', '/kanban/boards/' + id);
-        window.location.href = '/kanban';
-    } catch (e) { showError(e.message); }
+    try { await api('DELETE', '/kanban/boards/' + id); location.href = '/kanban'; }
+    catch(e) { showErr(e.message); }
 });
 
-// ── Column modals ────────────────────────────────────────────────
+// ── Column modal ─────────────────────────────────────────────────
+let _colIconsCache = null;
+let _selectedColIcon = 'bi-circle';
+
+document.getElementById('colModal')?.addEventListener('show.bs.modal', e => {
+    const btn = e.relatedTarget;
+    if (btn && btn.dataset.boardId) {
+        // Adding new column
+        document.getElementById('col-edit-id').value = '';
+        document.getElementById('col-board-id').value = btn.dataset.boardId;
+        document.getElementById('col-name-input').value = '';
+        document.getElementById('col-color-input').value = '#6b7280';
+        setColIcon('bi-circle');
+        document.getElementById('colModalTitle').innerHTML = '<i class="bi bi-plus-lg"></i> Add Column';
+    }
+});
+
+document.getElementById('col-icon-input')?.addEventListener('input', () => {
+    setColIcon(document.getElementById('col-icon-input').value.trim() || 'bi-circle');
+});
+
+function setColIcon(iconClass) {
+    _selectedColIcon = iconClass;
+    const inp = document.getElementById('col-icon-input');
+    const previewI = document.getElementById('col-icon-preview-i');
+    if (inp) inp.value = iconClass;
+    if (previewI) previewI.className = 'bi ' + iconClass;
+}
+
 function editCol(id, name, color, icon) {
     document.getElementById('col-edit-id').value = id;
     document.getElementById('col-board-id').value = '';
     document.getElementById('col-name-input').value = name;
     document.getElementById('col-color-input').value = color || '#6b7280';
-    document.getElementById('col-icon-input').value = icon || 'bi-circle';
-    document.getElementById('addColModalTitle').innerHTML = '<i class="bi bi-pencil"></i> Edit Column';
-    new bootstrap.Modal(document.getElementById('addColModal')).show();
+    setColIcon(icon || 'bi-circle');
+    document.getElementById('colModalTitle').innerHTML = '<i class="bi bi-pencil"></i> Edit Column';
+    // Close dropdown first, then show modal
+    setTimeout(() => getModal('colModal').show(), 50);
 }
 
-document.getElementById('addColModal')?.addEventListener('show.bs.modal', e => {
-    const btn = e.relatedTarget;
-    if (btn && btn.dataset.boardId) {
-        document.getElementById('col-edit-id').value = '';
-        document.getElementById('col-board-id').value = btn.dataset.boardId;
-        document.getElementById('col-name-input').value = '';
-        document.getElementById('col-color-input').value = '#6b7280';
-        document.getElementById('col-icon-input').value = 'bi-circle';
-        document.getElementById('addColModalTitle').innerHTML = '<i class="bi bi-plus-lg"></i> Add Column';
+function openColIconPicker() {
+    // Show icon picker on top of column modal
+    getModal('colIconPickerModal').show();
+    if (!_colIconsCache) loadColIcons();
+    else renderColIcons();
+}
+
+async function loadColIcons() {
+    document.getElementById('colIconGrid').innerHTML =
+        '<p class="text-muted text-center py-4">Loading…</p>';
+    try {
+        const r = await fetch('/api/icons');
+        _colIconsCache = await r.json();
+        renderColIcons();
+    } catch(e) {
+        document.getElementById('colIconGrid').innerHTML =
+            '<p class="text-danger text-center py-4">Error loading icons.</p>';
     }
-});
+}
+
+function renderColIcons() {
+    const grid = document.getElementById('colIconGrid');
+    if (!grid || !_colIconsCache) return;
+    const q = (document.getElementById('colIconSearch')?.value || '').toLowerCase();
+    const filtered = q ? _colIconsCache.filter(ic => ic.name.includes(q)) : _colIconsCache;
+    const cur = _selectedColIcon.replace(/^bi-/, '');
+    grid.innerHTML = filtered.slice(0, 300).map(ic =>
+        `<div class="icon-opt${ic.name === cur ? ' selected' : ''}"
+              onclick="pickColIcon('bi-${ic.name}')"
+              title="${escHtml(ic.name)}">
+            <i class="bi bi-${ic.name}"></i>
+            <small>${escHtml(ic.name)}</small>
+        </div>`
+    ).join('') || '<p class="text-muted text-center py-4" style="grid-column:1/-1">No icons found.</p>';
+}
+
+function pickColIcon(iconClass) {
+    setColIcon(iconClass);
+    renderColIcons();
+    hideModal('colIconPickerModal');
+}
 
 document.getElementById('btn-save-col')?.addEventListener('click', async () => {
     const editId = document.getElementById('col-edit-id').value;
     const boardId = document.getElementById('col-board-id').value;
     const name = document.getElementById('col-name-input').value.trim();
     const color = document.getElementById('col-color-input').value;
-    const icon = document.getElementById('col-icon-input').value.trim() || 'bi-circle';
+    const icon = _selectedColIcon;
     if (!name) return;
     try {
         if (editId) {
@@ -611,22 +739,19 @@ document.getElementById('btn-save-col')?.addEventListener('click', async () => {
         } else {
             await api('POST', '/kanban/boards/' + boardId + '/columns', { name, color, icon });
         }
-        window.location.reload();
-    } catch (e) { showError(e.message); }
+        location.reload();
+    } catch(e) { showErr(e.message); }
 });
 
 function confirmDeleteCol(id, name) {
     document.getElementById('delete-col-id').value = id;
     document.getElementById('delete-col-name').textContent = name;
-    new bootstrap.Modal(document.getElementById('deleteColModal')).show();
+    setTimeout(() => getModal('deleteColModal').show(), 50);
 }
-
 document.getElementById('btn-delete-col')?.addEventListener('click', async () => {
     const id = document.getElementById('delete-col-id').value;
-    try {
-        await api('DELETE', '/kanban/columns/' + id);
-        window.location.reload();
-    } catch (e) { showError(e.message); }
+    try { await api('DELETE', '/kanban/columns/' + id); location.reload(); }
+    catch(e) { showErr(e.message); }
 });
 
 // ── New card ─────────────────────────────────────────────────────
@@ -635,9 +760,11 @@ function openNewCard(boardId, colId) {
     document.getElementById('new-card-col-id').value = colId;
     document.getElementById('new-card-title').value = '';
     document.getElementById('new-card-priority').value = '2';
-    new bootstrap.Modal(document.getElementById('newCardModal')).show();
+    getModal('newCardModal').show();
 }
-
+document.getElementById('new-card-title')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('btn-create-card').click();
+});
 document.getElementById('btn-create-card')?.addEventListener('click', async () => {
     const boardId = document.getElementById('new-card-board-id').value;
     const colId = document.getElementById('new-card-col-id').value;
@@ -645,17 +772,88 @@ document.getElementById('btn-create-card')?.addEventListener('click', async () =
     const priority = parseInt(document.getElementById('new-card-priority').value);
     if (!title) return;
     try {
-        const card = await api('POST', '/kanban/boards/' + boardId + '/cards', {
-            column_id: parseInt(colId), title, priority
-        });
-        bootstrap.Modal.getInstance(document.getElementById('newCardModal')).hide();
-        insertCardEl(card);
-    } catch (e) { showError(e.message); }
+        const card = await api('POST', '/kanban/boards/' + boardId + '/cards',
+            { column_id: parseInt(colId), title, priority });
+        hideModal('newCardModal');
+        appendCardEl(card);
+    } catch(e) { showErr(e.message); }
 });
 
-document.getElementById('new-card-title')?.addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('btn-create-card').click();
-});
+// ── Contacts picker ──────────────────────────────────────────────
+let _allContacts = null;
+let _selectedContacts = []; // [{id, name}]
+let _contactsPermission = true;
+
+async function loadContacts() {
+    if (_allContacts !== null) return;
+    try {
+        const data = await api('GET', '/kanban/contacts');
+        _allContacts = data;
+    } catch(e) {
+        _allContacts = [];
+        if (e.message.includes('permission') || e.message.includes('403')) {
+            _contactsPermission = false;
+        }
+    }
+}
+
+function filterContacts() {
+    const q = (document.getElementById('contact-search-input')?.value || '').toLowerCase();
+    const resultsDiv = document.getElementById('contact-search-results');
+    if (!resultsDiv) return;
+    if (!q) { resultsDiv.style.display = 'none'; return; }
+    if (!_allContacts || !_allContacts.length) { resultsDiv.style.display = 'none'; return; }
+    const selectedIds = new Set(_selectedContacts.map(c => c.id));
+    const matches = _allContacts.filter(c =>
+        !selectedIds.has(c.id) && (c.name.toLowerCase().includes(q) ||
+        (c.email && c.email.toLowerCase().includes(q)) ||
+        (c.org && c.org.toLowerCase().includes(q)))
+    ).slice(0, 8);
+    if (!matches.length) { resultsDiv.style.display = 'none'; return; }
+    resultsDiv.innerHTML = matches.map(c =>
+        `<div class="py-1 px-2 rounded" style="cursor:pointer"
+              onmouseover="this.style.background='var(--bs-secondary-bg)'"
+              onmouseout="this.style.background=''"
+              onclick="addContact(${c.id}, ${JSON.stringify(escHtml(c.name))})">
+            <strong>${escHtml(c.name)}</strong>
+            ${c.org ? `<small class="text-muted"> · ${escHtml(c.org)}</small>` : ''}
+            ${c.email ? `<small class="text-muted"> · ${escHtml(c.email)}</small>` : ''}
+        </div>`
+    ).join('');
+    resultsDiv.style.display = 'block';
+}
+
+function addContact(id, name) {
+    if (_selectedContacts.some(c => c.id === id)) return;
+    _selectedContacts.push({ id, name });
+    renderSelectedContacts();
+    savePersonsJson();
+    document.getElementById('contact-search-input').value = '';
+    document.getElementById('contact-search-results').style.display = 'none';
+}
+
+function removeContact(id) {
+    _selectedContacts = _selectedContacts.filter(c => c.id !== id);
+    renderSelectedContacts();
+    savePersonsJson();
+}
+
+function renderSelectedContacts() {
+    const div = document.getElementById('selected-contacts');
+    if (!div) return;
+    div.innerHTML = _selectedContacts.map(c =>
+        `<span class="contact-badge">
+            <i class="bi bi-person-fill text-muted" style="font-size:.75rem"></i>
+            ${escHtml(c.name)}
+            <span class="remove-contact" onclick="removeContact(${c.id})">&times;</span>
+        </span>`
+    ).join('');
+}
+
+function savePersonsJson() {
+    document.getElementById('card-modal-persons-json').value =
+        JSON.stringify(_selectedContacts);
+}
 
 // ── Card detail modal ────────────────────────────────────────────
 let _currentCardId = null;
@@ -664,15 +862,15 @@ async function openCard(cardId) {
     try {
         const card = await api('GET', '/kanban/cards/' + cardId);
         _currentCardId = card.id;
+        await loadContacts();
         populateCardModal(card);
-        new bootstrap.Modal(document.getElementById('cardModal')).show();
-    } catch (e) { showError(e.message); }
+        getModal('cardModal').show();
+    } catch(e) { showErr(e.message); }
 }
 
 function populateCardModal(card) {
     document.getElementById('card-modal-id').value = card.id;
-    document.getElementById('cardModalTitle').innerHTML =
-        '<i class="bi bi-card-heading"></i> ' + escHtml(card.title);
+    document.getElementById('cardModalTitle').textContent = card.title;
     document.getElementById('card-modal-title').value = card.title;
     document.getElementById('card-modal-priority').value = card.priority;
     document.getElementById('card-modal-label-name').value = card.label_name;
@@ -680,75 +878,95 @@ function populateCardModal(card) {
     document.getElementById('card-modal-start-date').value = card.start_date;
     document.getElementById('card-modal-due-date').value = card.due_date;
     document.getElementById('card-modal-completed').checked = !!card.completed_at;
-    document.getElementById('card-modal-persons').value = card.key_persons.join('\n');
     document.getElementById('card-modal-desc').value = card.description;
-    renderTaskList(card.tasks, card.task_count, card.completed_task_count);
+
+    // Contacts
+    _selectedContacts = (card.key_persons || []).filter(p => p.name);
+    renderSelectedContacts();
+    savePersonsJson();
+    const noPerm = document.getElementById('contact-no-perm');
+    const wrap = document.getElementById('contact-picker-wrap');
+    if (!_contactsPermission) {
+        noPerm?.classList.remove('d-none');
+        wrap?.classList.add('d-none');
+    } else {
+        noPerm?.classList.add('d-none');
+        wrap?.classList.remove('d-none');
+    }
+
+    renderModalTaskList(card.tasks, card.task_count, card.completed_task_count);
 }
 
-function renderTaskList(tasks, total, done) {
+function renderModalTaskList(tasks, total, done) {
     const list = document.getElementById('task-list');
     const label = document.getElementById('task-progress-label');
-    label.textContent = total > 0 ? ` (${done}/${total})` : '';
-    list.innerHTML = tasks.map(t => `
-        <div class="form-check d-flex align-items-center gap-1 mb-1" id="task-row-${t.id}">
+    if (label) label.textContent = total > 0 ? ` (${done}/${total})` : '';
+    if (!list) return;
+    list.innerHTML = tasks.map(t => {
+        const dates = (t.start_date || t.due_date)
+            ? `<small class="text-muted text-nowrap ms-1">
+                ${t.start_date || ''}${t.start_date && t.due_date ? '→' : ''}${t.due_date || ''}</small>`
+            : '';
+        return `<div class="form-check d-flex align-items-center gap-1 mb-1" id="m-task-row-${t.id}">
             <input class="form-check-input flex-shrink-0" type="checkbox" ${t.completed ? 'checked' : ''}
-                   onchange="toggleTask(${t.id}, this.checked)">
+                   onchange="toggleTaskModal(${t.id}, this.checked)">
             <span class="flex-grow-1 ${t.completed ? 'text-decoration-line-through text-muted' : ''}"
                   style="font-size:.85rem">${escHtml(t.title)}</span>
-            ${t.due_date ? `<small class="text-muted text-nowrap">${t.due_date}</small>` : ''}
-            <button class="btn btn-link btn-sm p-0 text-danger ms-1" onclick="deleteTask(${t.id})" title="Remove">
-                <i class="bi bi-x"></i>
-            </button>
-        </div>
-    `).join('');
+            ${dates}
+            <button class="btn btn-link btn-sm p-0 text-warning ms-1"
+                    onclick="openTaskEdit(${t.id}, ${JSON.stringify(escHtml(t.title))}, '${t.start_date}', '${t.due_date}')"
+                    title="Edit task"><i class="bi bi-pencil-square"></i></button>
+            <button class="btn btn-link btn-sm p-0 text-danger ms-1"
+                    onclick="deleteTaskModal(${t.id})" title="Delete"><i class="bi bi-x"></i></button>
+        </div>`;
+    }).join('');
 }
 
-document.getElementById('btn-add-task')?.addEventListener('click', addTask);
+document.getElementById('btn-add-task')?.addEventListener('click', addTaskModal);
 document.getElementById('new-task-input')?.addEventListener('keydown', e => {
-    if (e.key === 'Enter') addTask();
+    if (e.key === 'Enter') addTaskModal();
 });
 
-async function addTask() {
-    const input = document.getElementById('new-task-input');
-    const title = input.value.trim();
+async function addTaskModal() {
+    const inp = document.getElementById('new-task-input');
+    const title = inp.value.trim();
     if (!title || !_currentCardId) return;
     try {
         await api('POST', '/kanban/cards/' + _currentCardId + '/tasks', { title });
-        input.value = '';
-        await refreshTaskList();
-    } catch (e) { showError(e.message); }
+        inp.value = '';
+        await refreshModalTasks();
+        refreshBoardCard(_currentCardId);
+    } catch(e) { showErr(e.message); }
 }
 
-async function toggleTask(taskId, completed) {
+async function toggleTaskModal(taskId, completed) {
     try {
         await api('PUT', '/kanban/tasks/' + taskId, { completed });
-        await refreshTaskList();
-    } catch (e) { showError(e.message); }
+        await refreshModalTasks();
+        refreshBoardCard(_currentCardId);
+    } catch(e) { showErr(e.message); }
 }
 
-async function deleteTask(taskId) {
+async function deleteTaskModal(taskId) {
     try {
         await api('DELETE', '/kanban/tasks/' + taskId);
-        await refreshTaskList();
-    } catch (e) { showError(e.message); }
+        await refreshModalTasks();
+        refreshBoardCard(_currentCardId);
+    } catch(e) { showErr(e.message); }
 }
 
-async function refreshTaskList() {
+async function refreshModalTasks() {
     const card = await api('GET', '/kanban/cards/' + _currentCardId);
-    renderTaskList(card.tasks, card.task_count, card.completed_task_count);
-    // Update mini badge on board
-    const cardEl = document.getElementById('card-' + _currentCardId);
-    if (cardEl) refreshCardEl(cardEl, card);
+    renderModalTaskList(card.tasks, card.task_count, card.completed_task_count);
 }
 
 document.getElementById('btn-save-card')?.addEventListener('click', async () => {
     const id = _currentCardId;
     if (!id) return;
-    const personsRaw = document.getElementById('card-modal-persons').value;
-    const persons = personsRaw.split('\n').map(s => s.trim()).filter(Boolean);
+    const persons = JSON.parse(document.getElementById('card-modal-persons-json').value || '[]');
     const completed = document.getElementById('card-modal-completed').checked;
     try {
-        const card = await api('PUT', '/kanban/cards/' + id, {
+        await api('PUT', '/kanban/cards/' + id, {
             title: document.getElementById('card-modal-title').value.trim(),
             priority: parseInt(document.getElementById('card-modal-priority').value),
             label_name: document.getElementById('card-modal-label-name').value.trim(),
@@ -759,10 +977,9 @@ document.getElementById('btn-save-card')?.addEventListener('click', async () => 
             key_persons: persons,
             description: document.getElementById('card-modal-desc').value,
         });
-        bootstrap.Modal.getInstance(document.getElementById('cardModal')).hide();
-        const cardEl = document.getElementById('card-' + id);
-        if (cardEl) refreshCardEl(cardEl, card);
-    } catch (e) { showError(e.message); }
+        hideModal('cardModal');
+        location.reload();
+    } catch(e) { showErr(e.message); }
 });
 
 document.getElementById('btn-delete-card-modal')?.addEventListener('click', async () => {
@@ -770,114 +987,176 @@ document.getElementById('btn-delete-card-modal')?.addEventListener('click', asyn
     if (!confirm('Delete this card and all its tasks?')) return;
     try {
         await api('DELETE', '/kanban/cards/' + _currentCardId);
-        bootstrap.Modal.getInstance(document.getElementById('cardModal')).hide();
-        const cardEl = document.getElementById('card-' + _currentCardId);
-        if (cardEl) {
-            const colBody = cardEl.closest('.sortable-cards');
-            cardEl.remove();
-            if (colBody) updateColCount(colBody.dataset.colId);
-        }
+        hideModal('cardModal');
+        const el = document.getElementById('card-' + _currentCardId);
+        if (el) { const col = el.closest('.sortable-cards'); el.remove(); if (col) updateColCount(col.dataset.colId); }
         _currentCardId = null;
-    } catch (e) { showError(e.message); }
+    } catch(e) { showErr(e.message); }
 });
 
-// ── Card DOM helpers ─────────────────────────────────────────────
-const PRIO_COLORS = { 1: '#6b7280', 2: '#3b82f6', 3: '#f59e0b', 4: '#ef4444' };
-const PRIO_NAMES  = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Urgent' };
+// ── Task edit modal ──────────────────────────────────────────────
+let _editingTaskCardId = null;
 
-function insertCardEl(card) {
-    const colBody = document.getElementById('cards-' + card.column_id);
-    if (!colBody) return;
-    const div = buildCardEl(card);
-    colBody.appendChild(div);
-    updateColCount(card.column_id);
+function openTaskEdit(taskId, title, startDate, dueDate) {
+    _editingTaskCardId = _currentCardId;
+    document.getElementById('task-edit-id').value = taskId;
+    document.getElementById('task-edit-title').value = title;
+    document.getElementById('task-edit-start').value = startDate || '';
+    document.getElementById('task-edit-due').value = dueDate || '';
+    getModal('taskEditModal').show();
 }
 
-function buildCardEl(card) {
+document.getElementById('btn-save-task-edit')?.addEventListener('click', async () => {
+    const taskId = document.getElementById('task-edit-id').value;
+    const title = document.getElementById('task-edit-title').value.trim();
+    if (!title) return;
+    try {
+        await api('PUT', '/kanban/tasks/' + taskId, {
+            title,
+            start_date: document.getElementById('task-edit-start').value,
+            due_date: document.getElementById('task-edit-due').value,
+        });
+        hideModal('taskEditModal');
+        if (_editingTaskCardId) {
+            const cardInModal = _currentCardId === _editingTaskCardId;
+            if (cardInModal) await refreshModalTasks();
+            refreshBoardCard(_editingTaskCardId);
+        }
+    } catch(e) { showErr(e.message); }
+});
+
+document.getElementById('btn-delete-task')?.addEventListener('click', async () => {
+    const taskId = document.getElementById('task-edit-id').value;
+    try {
+        await api('DELETE', '/kanban/tasks/' + taskId);
+        hideModal('taskEditModal');
+        if (_editingTaskCardId) {
+            if (_currentCardId === _editingTaskCardId) await refreshModalTasks();
+            refreshBoardCard(_editingTaskCardId);
+        }
+    } catch(e) { showErr(e.message); }
+});
+
+// ── Board card helpers ───────────────────────────────────────────
+function updateColCount(colId) {
+    const body = document.getElementById('cards-' + colId);
+    const counter = document.getElementById('col-count-' + colId);
+    if (body && counter) counter.textContent = body.querySelectorAll('.kanban-card').length;
+}
+
+const PRIO_BADGE = { 1:'secondary', 2:'primary', 3:'warning', 4:'danger' };
+const PRIO_NAMES = { 1:'Low', 2:'Medium', 3:'High', 4:'Urgent' };
+
+function cardHtml(card) {
+    let h = '';
+    if (card.label_color)
+        h += `<div class="card-label-strip" style="background:${escHtml(card.label_color)}"
+                   title="${escHtml(card.label_name)}"></div>`;
+    const darkText = card.priority === 3 ? ' text-dark' : '';
+    h += `<div class="card-top" onclick="openCard(${card.id})">
+        <span class="card-title-text">${escHtml(card.title)}</span>
+        <span class="badge bg-${PRIO_BADGE[card.priority]||'secondary'}${darkText} flex-shrink-0"
+              style="font-size:.7rem">${PRIO_NAMES[card.priority]||''}</span>
+    </div>`;
+    const hasDate = card.start_date || card.due_date || card.completed_at;
+    if (hasDate) {
+        h += '<div class="card-dates">';
+        if (card.start_date) {
+            const d = new Date(card.start_date+'T00:00:00');
+            h += `<span class="badge bg-secondary text-nowrap" style="font-size:.68rem">
+                <i class="bi bi-play-circle"></i> ${d.toLocaleDateString(undefined,{day:'2-digit',month:'short'})}</span>`;
+        }
+        if (card.due_date) {
+            const d = new Date(card.due_date+'T00:00:00');
+            const cls = card.is_overdue ? 'bg-danger' : 'bg-secondary';
+            h += `<span class="badge ${cls} text-nowrap" style="font-size:.68rem">
+                <i class="bi bi-calendar-event"></i> ${d.toLocaleDateString(undefined,{day:'2-digit',month:'short'})}</span>`;
+        }
+        if (card.completed_at)
+            h += `<span class="badge bg-success" style="font-size:.68rem"><i class="bi bi-check-circle"></i> Done</span>`;
+        h += '</div>';
+    }
+    if (card.tasks && card.tasks.length) {
+        h += '<div class="card-tasks">';
+        card.tasks.forEach(t => {
+            const dates = (t.start_date || t.due_date)
+                ? `<span class="text-muted text-nowrap" style="font-size:.72rem">
+                    ${t.start_date||''}${t.start_date&&t.due_date?'→':''}${t.due_date||''}</span>`
+                : '';
+            h += `<div class="card-task-row" id="task-row-${t.id}">
+                <input type="checkbox" class="form-check-input flex-shrink-0"
+                       ${t.completed?'checked':''}
+                       onchange="toggleTask(${t.id},this.checked,${card.id})">
+                <span class="task-title${t.completed?' done':''}">${escHtml(t.title)}</span>
+                ${dates}
+                <button class="btn btn-outline-warning btn-sm py-0 px-1 flex-shrink-0"
+                        style="font-size:.72rem;line-height:1.4"
+                        onclick="openTaskEdit(${t.id},${JSON.stringify(escHtml(t.title))},'${t.start_date||''}','${t.due_date||''}')"
+                        title="Edit task">Info</button>
+            </div>`;
+        });
+        h += '</div>';
+    }
+    if (card.key_persons && card.key_persons.length) {
+        const names = card.key_persons.map(p=>escHtml(p.name)).join(', ');
+        h += `<div class="card-persons"><i class="bi bi-person-fill"></i> ${names}</div>`;
+    }
+    return h;
+}
+
+function appendCardEl(card) {
+    const col = document.getElementById('cards-' + card.column_id);
+    if (!col) return;
     const div = document.createElement('div');
     div.className = 'kanban-card';
     div.id = 'card-' + card.id;
     div.dataset.cardId = card.id;
-    div.onclick = () => openCard(card.id);
-    div.innerHTML = cardInnerHtml(card);
-    return div;
+    div.innerHTML = cardHtml(card);
+    col.appendChild(div);
+    updateColCount(card.column_id);
 }
 
-function refreshCardEl(el, card) {
-    el.innerHTML = cardInnerHtml(card);
-    el.onclick = () => openCard(card.id);
+async function refreshBoardCard(cardId) {
+    try {
+        const card = await api('GET', '/kanban/cards/' + cardId);
+        const el = document.getElementById('card-' + cardId);
+        if (el) el.innerHTML = cardHtml(card);
+    } catch(_) {}
 }
 
-function cardInnerHtml(card) {
-    let html = '';
-    if (card.label_color) {
-        html += `<div class="card-label-strip" style="background:${escHtml(card.label_color)}"
-                      title="${escHtml(card.label_name)}"></div>`;
-    }
-    html += `<div class="card-title-row">${escHtml(card.title)}</div>`;
-    html += '<div class="card-meta">';
-    html += `<span class="priority-dot" style="background:${PRIO_COLORS[card.priority]||'#6b7280'}"
-                   title="Priority: ${PRIO_NAMES[card.priority]||''}"></span>`;
-    if (card.due_date) {
-        const overdue = card.is_overdue;
-        const d = new Date(card.due_date + 'T00:00:00');
-        const label = d.toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
-        html += `<span class="badge ${overdue ? 'bg-danger' : 'bg-secondary'} text-nowrap" style="font-size:.7rem">
-                    <i class="bi bi-calendar-event"></i> ${label}</span>`;
-    }
-    if (card.completed_at) {
-        html += `<span class="badge bg-success" style="font-size:.7rem"><i class="bi bi-check-circle"></i> Done</span>`;
-    }
-    if (card.task_count > 0) {
-        html += `<span class="badge bg-secondary" style="font-size:.7rem"
-                       title="${card.completed_task_count}/${card.task_count} tasks done">
-                    <i class="bi bi-check2-square"></i> ${card.completed_task_count}/${card.task_count}</span>`;
-    }
-    if (card.key_persons && card.key_persons.length > 0) {
-        html += `<span class="badge bg-info text-dark" style="font-size:.7rem">
-                    <i class="bi bi-person"></i> ${card.key_persons.length}</span>`;
-    }
-    html += '</div>';
-    return html;
+// Inline checkbox toggle (on board, outside modal)
+async function toggleTask(taskId, completed, cardId) {
+    try {
+        await api('PUT', '/kanban/tasks/' + taskId, { completed });
+        const row = document.getElementById('task-row-' + taskId);
+        if (row) {
+            const titleEl = row.querySelector('.task-title');
+            if (titleEl) titleEl.classList.toggle('done', completed);
+        }
+    } catch(e) { showErr(e.message); }
 }
 
-function updateColCount(colId) {
-    const body = document.getElementById('cards-' + colId);
-    const counter = document.getElementById('col-count-' + colId);
-    if (body && counter) {
-        counter.textContent = body.querySelectorAll('.kanban-card').length;
-    }
-}
-
-// ── Drag and drop (SortableJS) ───────────────────────────────────
+// ── Drag and drop ────────────────────────────────────────────────
 document.querySelectorAll('.sortable-cards').forEach(el => {
     Sortable.create(el, {
         group: 'cards',
         animation: 150,
         ghostClass: 'sortable-ghost',
         chosenClass: 'sortable-chosen',
-        onEnd: async (evt) => {
-            const boardEl = document.getElementById('kanban-board');
-            if (!boardEl) return;
-            const colBodies = boardEl.querySelectorAll('.sortable-cards');
-            const columnsData = Array.from(colBodies).map(colBody => ({
-                column_id: parseInt(colBody.dataset.colId),
-                card_ids: Array.from(colBody.querySelectorAll('.kanban-card'))
-                              .map(c => parseInt(c.dataset.cardId)),
+        handle: '.card-top',
+        onEnd: async () => {
+            const board = document.getElementById('kanban-board');
+            if (!board) return;
+            const cols = Array.from(board.querySelectorAll('.sortable-cards')).map(c => ({
+                column_id: parseInt(c.dataset.colId),
+                card_ids: Array.from(c.querySelectorAll('.kanban-card'))
+                              .map(x => parseInt(x.dataset.cardId)),
             }));
-            // Update counts
-            colBodies.forEach(b => updateColCount(b.dataset.colId));
-            try {
-                await api('POST', '/kanban/cards/reorder', { columns: columnsData });
-            } catch (e) { console.error('Reorder failed', e); }
+            cols.forEach(c => updateColCount(c.column_id));
+            try { await api('POST', '/kanban/cards/reorder', { columns: cols }); }
+            catch(e) { console.error('Reorder failed', e); }
         }
     });
 });
-
-// ── Utility ──────────────────────────────────────────────────────
-function escHtml(str) {
-    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
-                            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
 </script>
 {% endblock %}

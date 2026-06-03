@@ -1658,7 +1658,7 @@ class KanbanCard(db.Model):
     priority    = db.Column(db.Integer, default=1)   # 1=Low 2=Medium 3=High 4=Urgent
     label_color = db.Column(db.String(7))
     label_name  = db.Column(db.String(64))
-    key_persons = db.Column(db.Text)                 # JSON list of strings
+    key_persons = db.Column(db.Text)                 # JSON list of {id, name} dicts
     start_date  = db.Column(db.Date)
     due_date    = db.Column(db.Date)
     completed_at = db.Column(db.DateTime)
@@ -1672,8 +1672,16 @@ class KanbanCard(db.Model):
                             order_by='KanbanTask.position')
 
     def get_key_persons(self):
+        """Return list of {id, name} dicts; handles legacy plain-string lists."""
         try:
-            return json.loads(self.key_persons) if self.key_persons else []
+            data = json.loads(self.key_persons) if self.key_persons else []
+            normalized = []
+            for item in data:
+                if isinstance(item, dict):
+                    normalized.append({'id': item.get('id'), 'name': item.get('name', '')})
+                else:
+                    normalized.append({'id': None, 'name': str(item)})
+            return normalized
         except (json.JSONDecodeError, TypeError):
             return []
 
@@ -1699,6 +1707,7 @@ class KanbanTask(db.Model):
     card_id    = db.Column(db.Integer, db.ForeignKey('kanban_cards.id'), nullable=False)
     title      = db.Column(db.String(256), nullable=False)
     completed  = db.Column(db.Boolean, default=False)
+    start_date = db.Column(db.Date)
     due_date   = db.Column(db.Date)
     position   = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
