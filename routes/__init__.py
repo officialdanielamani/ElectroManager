@@ -36,6 +36,7 @@ def register_blueprints(app: Flask):
     from routes.share import share_bp
     from routes.in_out import in_out_bp
     from routes.api_v1 import api_v1_bp
+    from routes.kanban import kanban_bp
 
     # Register blueprints
     app.register_blueprint(auth_bp)
@@ -59,5 +60,6 @@ def register_blueprints(app: Flask):
     app.register_blueprint(share_bp)
     app.register_blueprint(in_out_bp)
     app.register_blueprint(api_v1_bp)
+    app.register_blueprint(kanban_bp)
 
     logger.info("✓ All blueprints registered successfully")
