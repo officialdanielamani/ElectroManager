@@ -373,6 +373,7 @@ def _apply_column_migrations():
         ("lending_sessions",     "is_api",               "BOOLEAN DEFAULT 0"),
         ("users",                "api_key_hash",         "VARCHAR(64)"),
         ("users",                "api_key_prefix",       "VARCHAR(16)"),
+        ("kanban_tasks",         "start_date",           "DATE"),
     ]
     with db.engine.connect() as conn:
         for table, col, col_type in additions:

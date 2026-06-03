@@ -7,11 +7,57 @@ from models import (db, KanbanBoard, KanbanColumn, KanbanCard, KanbanTask,
                     DEFAULT_KANBAN_COLUMNS, ContactPerson, ContactOrganization)
 from datetime import datetime, timezone, date
 import json
+import re
 import logging
 
 logger = logging.getLogger(__name__)
 
 kanban_bp = Blueprint('kanban', __name__)
+
+# ── Char limits ──────────────────────────────────────────────────
+_LIMITS = {
+    'board_name':    128,
+    'col_name':       64,
+    'col_icon':       48,
+    'col_color':       7,
+    'card_title':    256,
+    'card_desc':    2048,
+    'card_label_n':   64,
+    'card_label_c':    7,
+    'task_title':    256,
+}
+_COLOR_RE = re.compile(r'^#[0-9a-fA-F]{3,6}$')
+
+
+def _strip(text, max_len):
+    """Strip leading/trailing whitespace and truncate to max_len."""
+    return (text or '').strip()[:max_len]
+
+
+def _safe_color(val, default='#6b7280'):
+    v = (val or '').strip()
+    return v if _COLOR_RE.match(v) else default
+
+
+def _safe_icon(val, default='bi-circle'):
+    v = re.sub(r'[^a-z0-9-]', '', (val or 'bi-circle').lower().strip())
+    if not v.startswith('bi-'):
+        v = 'bi-' + v
+    return v[:_LIMITS['col_icon']] or default
+
+
+def _safe_persons(raw_list):
+    """Validate and sanitize key_persons list of {id, name} dicts."""
+    if not isinstance(raw_list, list):
+        return []
+    out = []
+    for item in raw_list[:20]:   # max 20 persons
+        if isinstance(item, dict):
+            pid = item.get('id')
+            name = _strip(str(item.get('name', '')), 256)
+            if name:
+                out.append({'id': int(pid) if pid is not None else None, 'name': name})
+    return out
 
 
 def _board_or_404(board_id):
@@ -95,7 +141,7 @@ def kanban():
 @login_required
 def create_board():
     data = request.get_json(silent=True) or {}
-    name = (data.get('name') or '').strip()
+    name = _strip(data.get('name'), _LIMITS['board_name'])
     if not name:
         return jsonify({'error': 'Board name required'}), 400
 
@@ -118,7 +164,7 @@ def create_board():
 def update_board(board_id):
     board = _board_or_404(board_id)
     data = request.get_json(silent=True) or {}
-    name = (data.get('name') or '').strip()
+    name = _strip(data.get('name'), _LIMITS['board_name'])
     if not name:
         return jsonify({'error': 'Board name required'}), 400
     board.name = name
@@ -153,7 +199,7 @@ def reorder_boards():
 def create_column(board_id):
     board = _board_or_404(board_id)
     data = request.get_json(silent=True) or {}
-    name = (data.get('name') or '').strip()
+    name = _strip(data.get('name'), _LIMITS['col_name'])
     if not name:
         return jsonify({'error': 'Column name required'}), 400
 
@@ -161,8 +207,8 @@ def create_column(board_id):
     col = KanbanColumn(
         board_id=board.id,
         name=name,
-        color=data.get('color', '#6b7280'),
-        icon=data.get('icon', 'bi-circle'),
+        color=_safe_color(data.get('color')),
+        icon=_safe_icon(data.get('icon')),
         position=max_pos + 1,
     )
     db.session.add(col)
@@ -176,14 +222,14 @@ def update_column(col_id):
     col = _column_or_404(col_id)
     data = request.get_json(silent=True) or {}
     if 'name' in data:
-        name = data['name'].strip()
+        name = _strip(data['name'], _LIMITS['col_name'])
         if not name:
             return jsonify({'error': 'Column name required'}), 400
         col.name = name
     if 'color' in data:
-        col.color = data['color']
+        col.color = _safe_color(data['color'], col.color)
     if 'icon' in data:
-        col.icon = data['icon']
+        col.icon = _safe_icon(data['icon'])
     db.session.commit()
     return jsonify({'id': col.id, 'name': col.name, 'color': col.color, 'icon': col.icon})
 
@@ -219,7 +265,7 @@ def reorder_columns():
 def create_card(board_id):
     board = _board_or_404(board_id)
     data = request.get_json(silent=True) or {}
-    title = (data.get('title') or '').strip()
+    title = _strip(data.get('title'), _LIMITS['card_title'])
     col_id = data.get('column_id')
     if not title:
         return jsonify({'error': 'Card title required'}), 400
@@ -228,16 +274,17 @@ def create_card(board_id):
     if not col:
         return jsonify({'error': 'Invalid column'}), 400
 
+    prio = max(1, min(4, int(data.get('priority', 1))))
     max_pos = db.session.query(db.func.max(KanbanCard.position)).filter_by(column_id=col.id).scalar() or 0
     card = KanbanCard(
         board_id=board.id,
         column_id=col.id,
         title=title,
-        description=data.get('description', ''),
-        priority=int(data.get('priority', 1)),
-        label_color=data.get('label_color', ''),
-        label_name=data.get('label_name', ''),
-        key_persons=json.dumps(data.get('key_persons', [])),
+        description=_strip(data.get('description'), _LIMITS['card_desc']),
+        priority=prio,
+        label_color=_safe_color(data.get('label_color'), ''),
+        label_name=_strip(data.get('label_name'), _LIMITS['card_label_n']),
+        key_persons=json.dumps(_safe_persons(data.get('key_persons', []))),
         start_date=_parse_date(data.get('start_date')),
         due_date=_parse_date(data.get('due_date')),
         position=max_pos + 1,
@@ -261,20 +308,20 @@ def update_card(card_id):
     data = request.get_json(silent=True) or {}
 
     if 'title' in data:
-        title = data['title'].strip()
+        title = _strip(data['title'], _LIMITS['card_title'])
         if not title:
             return jsonify({'error': 'Title required'}), 400
         card.title = title
     if 'description' in data:
-        card.description = data['description']
+        card.description = _strip(data['description'], _LIMITS['card_desc'])
     if 'priority' in data:
-        card.priority = int(data['priority'])
+        card.priority = max(1, min(4, int(data['priority'])))
     if 'label_color' in data:
-        card.label_color = data['label_color']
+        card.label_color = _safe_color(data['label_color'], card.label_color or '')
     if 'label_name' in data:
-        card.label_name = data['label_name']
+        card.label_name = _strip(data['label_name'], _LIMITS['card_label_n'])
     if 'key_persons' in data:
-        card.key_persons = json.dumps(data['key_persons'])
+        card.key_persons = json.dumps(_safe_persons(data['key_persons']))
     if 'start_date' in data:
         card.start_date = _parse_date(data['start_date'])
     if 'due_date' in data:
@@ -343,7 +390,7 @@ def reorder_cards():
 def create_task(card_id):
     card = _card_or_404(card_id)
     data = request.get_json(silent=True) or {}
-    title = (data.get('title') or '').strip()
+    title = _strip(data.get('title'), _LIMITS['task_title'])
     if not title:
         return jsonify({'error': 'Task title required'}), 400
 
@@ -366,7 +413,7 @@ def update_task(task_id):
     task = _task_or_404(task_id)
     data = request.get_json(silent=True) or {}
     if 'title' in data:
-        title = data['title'].strip()
+        title = _strip(data['title'], _LIMITS['task_title'])
         if not title:
             return jsonify({'error': 'Task title required'}), 400
         task.title = title
