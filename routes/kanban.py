@@ -4,7 +4,8 @@ Kanban Routes Blueprint
 from flask import Blueprint, render_template, request, jsonify, abort
 from flask_login import login_required, current_user
 from models import (db, KanbanBoard, KanbanColumn, KanbanCard, KanbanTask,
-                    DEFAULT_KANBAN_COLUMNS, ContactPerson, ContactOrganization)
+                    KanbanCategory, DEFAULT_KANBAN_COLUMNS,
+                    ContactPerson, ContactOrganization)
 from datetime import datetime, timezone, date
 import json
 import re
@@ -16,21 +17,19 @@ kanban_bp = Blueprint('kanban', __name__)
 
 # ── Char limits ──────────────────────────────────────────────────
 _LIMITS = {
-    'board_name':    128,
-    'col_name':       64,
-    'col_icon':       48,
-    'col_color':       7,
-    'card_title':    256,
-    'card_desc':    2048,
-    'card_label_n':   64,
-    'card_label_c':    7,
-    'task_title':    256,
+    'board_name':  128,
+    'col_name':     64,
+    'col_icon':     48,
+    'col_color':     7,
+    'card_title':  256,
+    'card_desc':  2048,
+    'cat_name':     64,
+    'task_title':  256,
 }
 _COLOR_RE = re.compile(r'^#[0-9a-fA-F]{3,6}$')
 
 
 def _strip(text, max_len):
-    """Strip leading/trailing whitespace and truncate to max_len."""
     return (text or '').strip()[:max_len]
 
 
@@ -47,11 +46,10 @@ def _safe_icon(val, default='bi-circle'):
 
 
 def _safe_persons(raw_list):
-    """Validate and sanitize key_persons list of {id, name} dicts."""
     if not isinstance(raw_list, list):
         return []
     out = []
-    for item in raw_list[:20]:   # max 20 persons
+    for item in raw_list[:20]:
         if isinstance(item, dict):
             pid = item.get('id')
             name = _strip(str(item.get('name', '')), 256)
@@ -59,6 +57,8 @@ def _safe_persons(raw_list):
                 out.append({'id': int(pid) if pid is not None else None, 'name': name})
     return out
 
+
+# ── Auth helpers ─────────────────────────────────────────────────
 
 def _board_or_404(board_id):
     board = KanbanBoard.query.filter_by(id=board_id, user_id=current_user.id).first()
@@ -85,6 +85,14 @@ def _task_or_404(task_id):
     return task
 
 
+def _category_or_404(cat_id):
+    cat = KanbanCategory.query.get_or_404(cat_id)
+    _board_or_404(cat.board_id)
+    return cat
+
+
+# ── Serializers ──────────────────────────────────────────────────
+
 def _task_to_dict(t):
     return {
         'id': t.id,
@@ -103,7 +111,8 @@ def _card_to_dict(card):
         'description': card.description or '',
         'priority': card.priority,
         'label_color': card.label_color or '',
-        'label_name': card.label_name or '',
+        'category_id': card.category_id,
+        'category_name': card.category.name if card.category_id and card.category else '',
         'key_persons': card.get_key_persons(),
         'start_date': card.start_date.isoformat() if card.start_date else '',
         'due_date': card.due_date.isoformat() if card.due_date else '',
@@ -159,19 +168,6 @@ def create_board():
     return jsonify({'id': board.id, 'name': board.name}), 201
 
 
-@kanban_bp.route('/kanban/boards/<int:board_id>', methods=['PUT'])
-@login_required
-def update_board(board_id):
-    board = _board_or_404(board_id)
-    data = request.get_json(silent=True) or {}
-    name = _strip(data.get('name'), _LIMITS['board_name'])
-    if not name:
-        return jsonify({'error': 'Board name required'}), 400
-    board.name = name
-    db.session.commit()
-    return jsonify({'id': board.id, 'name': board.name})
-
-
 @kanban_bp.route('/kanban/boards/<int:board_id>', methods=['DELETE'])
 @login_required
 def delete_board(board_id):
@@ -192,6 +188,90 @@ def reorder_boards():
     return jsonify({'ok': True})
 
 
+# ── Board Settings ───────────────────────────────────────────────
+
+@kanban_bp.route('/kanban/boards/<int:board_id>/settings', methods=['GET'])
+@login_required
+def get_board_settings(board_id):
+    board = _board_or_404(board_id)
+    return jsonify({
+        'id': board.id,
+        'name': board.name,
+        'notify_start_enabled': board.notify_start_enabled or False,
+        'notify_start_days': board.notify_start_days or 1,
+        'notify_due_enabled': board.notify_due_enabled or False,
+        'notify_due_days': board.notify_due_days or 1,
+        'categories': [
+            {'id': c.id, 'name': c.name, 'position': c.position}
+            for c in board.categories
+        ],
+    })
+
+
+@kanban_bp.route('/kanban/boards/<int:board_id>/settings', methods=['PUT'])
+@login_required
+def update_board_settings(board_id):
+    board = _board_or_404(board_id)
+    data = request.get_json(silent=True) or {}
+    if 'name' in data:
+        name = _strip(data['name'], _LIMITS['board_name'])
+        if not name:
+            return jsonify({'error': 'Board name required'}), 400
+        board.name = name
+    if 'notify_start_enabled' in data:
+        board.notify_start_enabled = bool(data['notify_start_enabled'])
+    if 'notify_start_days' in data:
+        board.notify_start_days = max(1, min(365, int(data.get('notify_start_days') or 1)))
+    if 'notify_due_enabled' in data:
+        board.notify_due_enabled = bool(data['notify_due_enabled'])
+    if 'notify_due_days' in data:
+        board.notify_due_days = max(1, min(365, int(data.get('notify_due_days') or 1)))
+    db.session.commit()
+    return jsonify({'ok': True, 'name': board.name})
+
+
+# ── Category CRUD ────────────────────────────────────────────────
+
+@kanban_bp.route('/kanban/boards/<int:board_id>/categories', methods=['POST'])
+@login_required
+def create_category(board_id):
+    board = _board_or_404(board_id)
+    data = request.get_json(silent=True) or {}
+    name = _strip(data.get('name'), _LIMITS['cat_name'])
+    if not name:
+        return jsonify({'error': 'Category name required'}), 400
+    max_pos = db.session.query(db.func.max(KanbanCategory.position)).filter_by(board_id=board.id).scalar() or 0
+    cat = KanbanCategory(board_id=board.id, name=name, position=max_pos + 1)
+    db.session.add(cat)
+    db.session.commit()
+    return jsonify({'id': cat.id, 'name': cat.name, 'position': cat.position}), 201
+
+
+@kanban_bp.route('/kanban/categories/<int:cat_id>', methods=['PUT'])
+@login_required
+def update_category(cat_id):
+    cat = _category_or_404(cat_id)
+    data = request.get_json(silent=True) or {}
+    name = _strip(data.get('name'), _LIMITS['cat_name'])
+    if not name:
+        return jsonify({'error': 'Category name required'}), 400
+    cat.name = name
+    # Keep label_name in sync for all cards using this category
+    KanbanCard.query.filter_by(category_id=cat.id).update({'label_name': name})
+    db.session.commit()
+    return jsonify({'id': cat.id, 'name': cat.name})
+
+
+@kanban_bp.route('/kanban/categories/<int:cat_id>', methods=['DELETE'])
+@login_required
+def delete_category(cat_id):
+    cat = _category_or_404(cat_id)
+    KanbanCard.query.filter_by(category_id=cat.id).update({'category_id': None, 'label_name': ''})
+    db.session.delete(cat)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
 # ── Column CRUD ──────────────────────────────────────────────────
 
 @kanban_bp.route('/kanban/boards/<int:board_id>/columns', methods=['POST'])
@@ -202,18 +282,15 @@ def create_column(board_id):
     name = _strip(data.get('name'), _LIMITS['col_name'])
     if not name:
         return jsonify({'error': 'Column name required'}), 400
-
     max_pos = db.session.query(db.func.max(KanbanColumn.position)).filter_by(board_id=board.id).scalar() or 0
-    col = KanbanColumn(
-        board_id=board.id,
-        name=name,
-        color=_safe_color(data.get('color')),
-        icon=_safe_icon(data.get('icon')),
-        position=max_pos + 1,
-    )
+    col = KanbanColumn(board_id=board.id, name=name,
+                       color=_safe_color(data.get('color')),
+                       icon=_safe_icon(data.get('icon')),
+                       position=max_pos + 1)
     db.session.add(col)
     db.session.commit()
-    return jsonify({'id': col.id, 'name': col.name, 'color': col.color, 'icon': col.icon, 'position': col.position}), 201
+    return jsonify({'id': col.id, 'name': col.name, 'color': col.color,
+                    'icon': col.icon, 'position': col.position}), 201
 
 
 @kanban_bp.route('/kanban/columns/<int:col_id>', methods=['PUT'])
@@ -275,6 +352,16 @@ def create_card(board_id):
         return jsonify({'error': 'Invalid column'}), 400
 
     prio = max(1, min(4, int(data.get('priority', 1))))
+    cat_id = data.get('category_id')
+    cat_name = ''
+    if cat_id:
+        cat = KanbanCategory.query.filter_by(id=cat_id, board_id=board.id).first()
+        if cat:
+            cat_id = cat.id
+            cat_name = cat.name
+        else:
+            cat_id = None
+
     max_pos = db.session.query(db.func.max(KanbanCard.position)).filter_by(column_id=col.id).scalar() or 0
     card = KanbanCard(
         board_id=board.id,
@@ -283,7 +370,8 @@ def create_card(board_id):
         description=_strip(data.get('description'), _LIMITS['card_desc']),
         priority=prio,
         label_color=_safe_color(data.get('label_color'), ''),
-        label_name=_strip(data.get('label_name'), _LIMITS['card_label_n']),
+        category_id=cat_id,
+        label_name=cat_name,
         key_persons=json.dumps(_safe_persons(data.get('key_persons', []))),
         start_date=_parse_date(data.get('start_date')),
         due_date=_parse_date(data.get('due_date')),
@@ -318,8 +406,15 @@ def update_card(card_id):
         card.priority = max(1, min(4, int(data['priority'])))
     if 'label_color' in data:
         card.label_color = _safe_color(data['label_color'], card.label_color or '')
-    if 'label_name' in data:
-        card.label_name = _strip(data['label_name'], _LIMITS['card_label_n'])
+    if 'category_id' in data:
+        cat_id = data['category_id']
+        if cat_id:
+            cat = KanbanCategory.query.filter_by(id=cat_id, board_id=card.board_id).first()
+            card.category_id = cat.id if cat else None
+            card.label_name = cat.name if cat else ''
+        else:
+            card.category_id = None
+            card.label_name = ''
     if 'key_persons' in data:
         card.key_persons = json.dumps(_safe_persons(data['key_persons']))
     if 'start_date' in data:
@@ -327,8 +422,7 @@ def update_card(card_id):
     if 'due_date' in data:
         card.due_date = _parse_date(data['due_date'])
     if 'completed_at' in data:
-        val = data['completed_at']
-        card.completed_at = datetime.now(timezone.utc) if val else None
+        card.completed_at = datetime.now(timezone.utc) if data['completed_at'] else None
     card.updated_at = datetime.now(timezone.utc)
     db.session.commit()
     return jsonify(_card_to_dict(card))
@@ -343,30 +437,10 @@ def delete_card(card_id):
     return jsonify({'ok': True})
 
 
-@kanban_bp.route('/kanban/cards/<int:card_id>/move', methods=['POST'])
-@login_required
-def move_card(card_id):
-    card = _card_or_404(card_id)
-    data = request.get_json(silent=True) or {}
-    col_id = data.get('column_id')
-    position = data.get('position', 0)
-
-    col = KanbanColumn.query.filter_by(id=col_id, board_id=card.board_id).first()
-    if not col:
-        return jsonify({'error': 'Invalid column'}), 400
-
-    card.column_id = col.id
-    card.position = position
-    card.updated_at = datetime.now(timezone.utc)
-    db.session.commit()
-    return jsonify({'ok': True})
-
-
 @kanban_bp.route('/kanban/cards/reorder', methods=['POST'])
 @login_required
 def reorder_cards():
     data = request.get_json(silent=True) or {}
-    # [{column_id, card_ids: [...]}, ...]
     columns_data = data.get('columns', [])
     for col_data in columns_data:
         col_id = col_data.get('column_id')
@@ -393,7 +467,6 @@ def create_task(card_id):
     title = _strip(data.get('title'), _LIMITS['task_title'])
     if not title:
         return jsonify({'error': 'Task title required'}), 400
-
     max_pos = db.session.query(db.func.max(KanbanTask.position)).filter_by(card_id=card.id).scalar() or 0
     task = KanbanTask(
         card_id=card.id,
@@ -427,7 +500,16 @@ def update_task(task_id):
     return jsonify(_task_to_dict(task))
 
 
-# ── Contacts (for key persons picker) ────────────────────────────
+@kanban_bp.route('/kanban/tasks/<int:task_id>', methods=['DELETE'])
+@login_required
+def delete_task(task_id):
+    task = _task_or_404(task_id)
+    db.session.delete(task)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+# ── Contacts ─────────────────────────────────────────────────────
 
 @kanban_bp.route('/kanban/contacts', methods=['GET'])
 @login_required
@@ -446,16 +528,7 @@ def kanban_contacts():
     return jsonify(result)
 
 
-@kanban_bp.route('/kanban/tasks/<int:task_id>', methods=['DELETE'])
-@login_required
-def delete_task(task_id):
-    task = _task_or_404(task_id)
-    db.session.delete(task)
-    db.session.commit()
-    return jsonify({'ok': True})
-
-
-# ── Helper ───────────────────────────────────────────────────────
+# ── Helpers ──────────────────────────────────────────────────────
 
 def _parse_date(val):
     if not val:

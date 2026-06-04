@@ -374,6 +374,11 @@ def _apply_column_migrations():
         ("users",                "api_key_hash",         "VARCHAR(64)"),
         ("users",                "api_key_prefix",       "VARCHAR(16)"),
         ("kanban_tasks",         "start_date",           "DATE"),
+        ("kanban_boards",        "notify_start_enabled", "BOOLEAN DEFAULT 0"),
+        ("kanban_boards",        "notify_start_days",    "INTEGER DEFAULT 1"),
+        ("kanban_boards",        "notify_due_enabled",   "BOOLEAN DEFAULT 0"),
+        ("kanban_boards",        "notify_due_days",      "INTEGER DEFAULT 1"),
+        ("kanban_cards",         "category_id",          "INTEGER"),
     ]
     with db.engine.connect() as conn:
         for table, col, col_type in additions:

@@ -1619,20 +1619,36 @@ DEFAULT_KANBAN_COLUMNS = [
 ]
 
 
+class KanbanCategory(db.Model):
+    __tablename__ = 'kanban_categories'
+    id         = db.Column(db.Integer, primary_key=True)
+    board_id   = db.Column(db.Integer, db.ForeignKey('kanban_boards.id'), nullable=False)
+    name       = db.Column(db.String(64), nullable=False)
+    position   = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 class KanbanBoard(db.Model):
     __tablename__ = 'kanban_boards'
     id         = db.Column(db.Integer, primary_key=True)
     user_id    = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     name       = db.Column(db.String(128), nullable=False)
     position   = db.Column(db.Integer, default=0)
+    notify_start_enabled = db.Column(db.Boolean, default=False)
+    notify_start_days    = db.Column(db.Integer, default=1)
+    notify_due_enabled   = db.Column(db.Boolean, default=False)
+    notify_due_days      = db.Column(db.Integer, default=1)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
-    user    = db.relationship('User', backref='kanban_boards')
-    columns = db.relationship('KanbanColumn', backref='board', lazy=True,
-                              cascade='all, delete-orphan',
-                              order_by='KanbanColumn.position')
-    cards   = db.relationship('KanbanCard', backref='board', lazy=True,
-                              cascade='all, delete-orphan')
+    user       = db.relationship('User', backref='kanban_boards')
+    columns    = db.relationship('KanbanColumn', backref='board', lazy=True,
+                                 cascade='all, delete-orphan',
+                                 order_by='KanbanColumn.position')
+    cards      = db.relationship('KanbanCard', backref='board', lazy=True,
+                                 cascade='all, delete-orphan')
+    categories = db.relationship('KanbanCategory', backref='board', lazy=True,
+                                 cascade='all, delete-orphan',
+                                 order_by='KanbanCategory.position')
 
 
 class KanbanColumn(db.Model):
@@ -1657,7 +1673,8 @@ class KanbanCard(db.Model):
     description = db.Column(db.Text)
     priority    = db.Column(db.Integer, default=1)   # 1=Low 2=Medium 3=High 4=Urgent
     label_color = db.Column(db.String(7))
-    label_name  = db.Column(db.String(64))
+    label_name  = db.Column(db.String(64))           # kept for backward-compat; UI uses category_id
+    category_id = db.Column(db.Integer, db.ForeignKey('kanban_categories.id'), nullable=True)
     key_persons = db.Column(db.Text)                 # JSON list of {id, name} dicts
     start_date  = db.Column(db.Date)
     due_date    = db.Column(db.Date)
@@ -1670,6 +1687,7 @@ class KanbanCard(db.Model):
     tasks = db.relationship('KanbanTask', backref='card', lazy=True,
                             cascade='all, delete-orphan',
                             order_by='KanbanTask.position')
+    category = db.relationship('KanbanCategory', foreign_keys=[category_id], lazy='joined')
 
     def get_key_persons(self):
         """Return list of {id, name} dicts; handles legacy plain-string lists."""
