@@ -362,6 +362,11 @@ def create_card(board_id):
         else:
             cat_id = None
 
+    start_date = _parse_date(data.get('start_date'))
+    due_date   = _parse_date(data.get('due_date'))
+    if not _dates_valid(start_date, due_date):
+        return jsonify({'error': 'Start date must be on or before the due date'}), 400
+
     max_pos = db.session.query(db.func.max(KanbanCard.position)).filter_by(column_id=col.id).scalar() or 0
     card = KanbanCard(
         board_id=board.id,
@@ -373,8 +378,8 @@ def create_card(board_id):
         category_id=cat_id,
         label_name=cat_name,
         key_persons=json.dumps(_safe_persons(data.get('key_persons', []))),
-        start_date=_parse_date(data.get('start_date')),
-        due_date=_parse_date(data.get('due_date')),
+        start_date=start_date,
+        due_date=due_date,
         position=max_pos + 1,
     )
     db.session.add(card)
@@ -421,6 +426,8 @@ def update_card(card_id):
         card.start_date = _parse_date(data['start_date'])
     if 'due_date' in data:
         card.due_date = _parse_date(data['due_date'])
+    if not _dates_valid(card.start_date, card.due_date):
+        return jsonify({'error': 'Start date must be on or before the due date'}), 400
     if 'completed_at' in data:
         card.completed_at = datetime.now(timezone.utc) if data['completed_at'] else None
     card.updated_at = datetime.now(timezone.utc)
@@ -467,12 +474,16 @@ def create_task(card_id):
     title = _strip(data.get('title'), _LIMITS['task_title'])
     if not title:
         return jsonify({'error': 'Task title required'}), 400
+    start_date = _parse_date(data.get('start_date'))
+    due_date   = _parse_date(data.get('due_date'))
+    if not _dates_valid(start_date, due_date):
+        return jsonify({'error': 'Task start date must be on or before the due date'}), 400
     max_pos = db.session.query(db.func.max(KanbanTask.position)).filter_by(card_id=card.id).scalar() or 0
     task = KanbanTask(
         card_id=card.id,
         title=title,
-        start_date=_parse_date(data.get('start_date')),
-        due_date=_parse_date(data.get('due_date')),
+        start_date=start_date,
+        due_date=due_date,
         position=max_pos + 1,
     )
     db.session.add(task)
@@ -496,6 +507,8 @@ def update_task(task_id):
         task.start_date = _parse_date(data['start_date'])
     if 'due_date' in data:
         task.due_date = _parse_date(data['due_date'])
+    if not _dates_valid(task.start_date, task.due_date):
+        return jsonify({'error': 'Task start date must be on or before the due date'}), 400
     db.session.commit()
     return jsonify(_task_to_dict(task))
 
@@ -537,3 +550,8 @@ def _parse_date(val):
         return date.fromisoformat(str(val))
     except (ValueError, TypeError):
         return None
+
+
+def _dates_valid(start, end):
+    """Return False if both dates are present and start is after end."""
+    return not (start and end and start > end)

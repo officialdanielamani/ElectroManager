@@ -198,13 +198,19 @@
                 {% set hdr_bg = 'background:' ~ (card.label_color ~ '33;') if card.label_color else '' %}
                 <div class="kanban-card" id="card-{{ card.id }}" data-card-id="{{ card.id }}">
                     {# Colored header band with title #}
-                    <div class="card-header-band js-open-card"
+                    <div class="card-header-band"
                          style="{{ hdr_bg }}"
                          data-card-id="{{ card.id }}">
-                        <span class="card-title-text">{{ card.title }}</span>
+                        <span class="card-title-text js-open-card"
+                              data-card-id="{{ card.id }}">{{ card.title }}</span>
+                        <button class="btn btn-link btn-sm p-0 text-muted flex-shrink-0 js-open-card"
+                                data-card-id="{{ card.id }}" title="Card details"
+                                style="font-size:.8rem">
+                            <i class="bi bi-info-circle"></i>
+                        </button>
                         {% if card.tasks %}
                         <button class="btn btn-link btn-sm p-0 text-muted flex-shrink-0 js-toggle-tasks"
-                                data-card-id="{{ card.id }}" title="Toggle tasks"
+                                data-card-id="{{ card.id }}" title="Collapse/expand tasks"
                                 style="font-size:.8rem">
                             <i class="bi bi-chevron-up"></i>
                         </button>
@@ -261,18 +267,13 @@
                                 {% if task.due_date %}{{ task.due_date.strftime('%d/%m') }}{% endif %}
                             </span>
                             {% endif %}
-                            <button class="btn btn-link btn-sm p-0 text-primary flex-shrink-0 js-task-edit"
+                            <button class="btn btn-link btn-sm p-0 text-muted flex-shrink-0 js-task-edit"
                                     data-task-id="{{ task.id }}"
                                     data-task-title="{{ task.title|e }}"
                                     data-task-start="{{ task.start_date.isoformat() if task.start_date else '' }}"
                                     data-task-due="{{ task.due_date.isoformat() if task.due_date else '' }}"
                                     style="font-size:.72rem;line-height:1.4" title="Edit task">
                                 <i class="bi bi-pencil-square"></i>
-                            </button>
-                            <button class="btn btn-link btn-sm p-0 text-danger flex-shrink-0 js-task-del-board"
-                                    data-task-id="{{ task.id }}" data-card-id="{{ card.id }}"
-                                    style="font-size:.72rem;line-height:1.4" title="Delete task">
-                                <i class="bi bi-x-lg"></i>
                             </button>
                         </div>
                         {% endfor %}
@@ -747,13 +748,36 @@ function escHtml(s) {
 function getModal(id) { return bootstrap.Modal.getOrCreateInstance(document.getElementById(id)); }
 function hideModal(id) { getModal(id).hide(); }
 
+// Returns false and shows error when start > due date
+function validateDates(startVal, dueVal, label) {
+    if (startVal && dueVal && startVal > dueVal) {
+        showErr((label || 'Start date') + ' must be on or before the end/due date.');
+        return false;
+    }
+    return true;
+}
+
+// Enable/disable "Mark done" based on task completion state.
+// Rule: if any task is unchecked → force off + disable. No tasks → freely toggleable.
+function updateMarkDoneState(taskTotal, taskDone) {
+    const cb = document.getElementById('card-modal-completed');
+    if (!cb) return;
+    if (taskTotal === 0) {
+        cb.disabled = false;
+        return;
+    }
+    if (taskDone < taskTotal) {
+        cb.checked  = false;
+        cb.disabled = true;
+    } else {
+        cb.disabled = false;
+    }
+}
+
 // ── Event delegation ─────────────────────────────────────────────
 document.addEventListener('click', function(e) {
-    // Open card
-    const openBtn = e.target.closest('.js-open-card');
-    if (openBtn) { openCard(parseInt(openBtn.dataset.cardId)); return; }
-
-    // Toggle tasks collapse
+    // Toggle tasks collapse — must be checked BEFORE js-open-card because the
+    // chevron button lives inside the header band which also contains js-open-card spans.
     const toggleBtn = e.target.closest('.js-toggle-tasks');
     if (toggleBtn) {
         e.stopPropagation();
@@ -768,12 +792,9 @@ document.addEventListener('click', function(e) {
         return;
     }
 
-    // Board card click area (not toggle button)
-    const headerBand = e.target.closest('.card-header-band');
-    if (headerBand && !e.target.closest('.js-toggle-tasks') && !e.target.closest('button')) {
-        const cardId = headerBand.dataset.cardId;
-        if (cardId) { openCard(parseInt(cardId)); return; }
-    }
+    // Open card (title span or [i] button — both carry js-open-card + data-card-id)
+    const openBtn = e.target.closest('.js-open-card');
+    if (openBtn) { openCard(parseInt(openBtn.dataset.cardId)); return; }
 
     // Task edit (board view)
     const taskEditBtn = e.target.closest('.js-task-edit');
@@ -785,14 +806,6 @@ document.addEventListener('click', function(e) {
             taskEditBtn.dataset.taskStart || '',
             taskEditBtn.dataset.taskDue || ''
         );
-        return;
-    }
-
-    // Task delete (board view)
-    const taskDelBoardBtn = e.target.closest('.js-task-del-board');
-    if (taskDelBoardBtn) {
-        e.stopPropagation();
-        deleteBoardTask(parseInt(taskDelBoardBtn.dataset.taskId), parseInt(taskDelBoardBtn.dataset.cardId));
         return;
     }
 
@@ -1392,12 +1405,14 @@ function populateCardModal(card) {
     document.getElementById('new-task-due').value = '';
 
     renderModalTaskList(card.tasks, card.task_count, card.completed_task_count);
+    updateMarkDoneState(card.task_count, card.completed_task_count);
 }
 
 function renderModalTaskList(tasks, total, done) {
     const list  = document.getElementById('task-list');
     const label = document.getElementById('task-progress-label');
     if (label) label.textContent = total > 0 ? ` (${done}/${total})` : '';
+    updateMarkDoneState(total, done);
     if (!list) return;
     list.innerHTML = tasks.map(t => {
         const dateStr = (t.start_date || t.due_date)
@@ -1448,6 +1463,7 @@ async function addTaskModal() {
     const due   = document.getElementById('new-task-due');
     const title = inp?.value.trim();
     if (!title || !_currentCardId) return;
+    if (!validateDates(start?.value, due?.value, 'Task start date')) return;
     try {
         await api('POST', '/kanban/cards/' + _currentCardId + '/tasks', {
             title,
@@ -1488,6 +1504,11 @@ document.getElementById('btn-save-card')?.addEventListener('click', async () => 
     const completed = document.getElementById('card-modal-completed').checked;
     const title = document.getElementById('card-modal-title').value.trim();
     if (!title) { showErr('Title is required'); return; }
+    if (!validateDates(
+        document.getElementById('card-modal-start-date').value,
+        document.getElementById('card-modal-due-date').value,
+        'Card start date'
+    )) return;
     const catVal = document.getElementById('card-modal-category').value;
     try {
         await api('PUT', '/kanban/cards/' + id, {
@@ -1529,6 +1550,11 @@ document.getElementById('btn-save-task-edit')?.addEventListener('click', async (
     const taskId = document.getElementById('task-edit-id').value;
     const title  = document.getElementById('task-edit-title').value.trim();
     if (!title) return;
+    if (!validateDates(
+        document.getElementById('task-edit-start').value,
+        document.getElementById('task-edit-due').value,
+        'Task start date'
+    )) return;
     try {
         await api('PUT', '/kanban/tasks/' + taskId, {
             title,
