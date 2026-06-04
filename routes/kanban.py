@@ -131,7 +131,13 @@ def _card_to_dict(card):
 @kanban_bp.route('/kanban')
 @login_required
 def kanban():
-    boards = KanbanBoard.query.filter_by(user_id=current_user.id).order_by(KanbanBoard.position).all()
+    all_boards = KanbanBoard.query.filter_by(user_id=current_user.id).order_by(KanbanBoard.position).all()
+    # Pinned boards first, then shown; hidden boards are excluded from tabs
+    boards = sorted(
+        [b for b in all_boards if (b.board_status or 'shown') != 'hidden'],
+        key=lambda b: (0 if (b.board_status or 'shown') == 'pinned' else 1, b.position)
+    )
+
     active_board_id = request.args.get('board', type=int)
     active_board = None
 
@@ -141,7 +147,7 @@ def kanban():
     if not active_board and boards:
         active_board = boards[0]
 
-    return render_template('kanban.html', boards=boards, active_board=active_board)
+    return render_template('kanban.html', boards=boards, all_boards=all_boards, active_board=active_board)
 
 
 # ── Board CRUD ───────────────────────────────────────────────────
@@ -197,6 +203,9 @@ def get_board_settings(board_id):
     return jsonify({
         'id': board.id,
         'name': board.name,
+        'board_icon': board.board_icon or 'bi-kanban',
+        'board_color': board.board_color or '#6b7280',
+        'board_status': board.board_status or 'shown',
         'notify_start_enabled': board.notify_start_enabled or False,
         'notify_start_days': board.notify_start_days or 1,
         'notify_due_enabled': board.notify_due_enabled or False,
@@ -218,6 +227,12 @@ def update_board_settings(board_id):
         if not name:
             return jsonify({'error': 'Board name required'}), 400
         board.name = name
+    if 'board_icon' in data:
+        board.board_icon = _safe_icon(data['board_icon'], 'bi-kanban')
+    if 'board_color' in data:
+        board.board_color = _safe_color(data['board_color'], '#6b7280')
+    if 'board_status' in data and data['board_status'] in ('pinned', 'shown', 'hidden'):
+        board.board_status = data['board_status']
     if 'notify_start_enabled' in data:
         board.notify_start_enabled = bool(data['notify_start_enabled'])
     if 'notify_start_days' in data:
@@ -228,6 +243,30 @@ def update_board_settings(board_id):
         board.notify_due_days = max(1, min(365, int(data.get('notify_due_days') or 1)))
     db.session.commit()
     return jsonify({'ok': True, 'name': board.name})
+
+
+@kanban_bp.route('/kanban/boards/listing', methods=['PUT'])
+@login_required
+def update_boards_listing():
+    """Batch-update board order and status from the Board Listing tab."""
+    data = request.get_json(silent=True) or {}
+    items = data.get('boards', [])
+    user_board_ids = {
+        b.id for b in KanbanBoard.query.filter_by(user_id=current_user.id).all()
+    }
+    for item in items:
+        bid = item.get('id')
+        if bid not in user_board_ids:
+            continue
+        updates = {}
+        if 'position' in item:
+            updates['position'] = int(item['position'])
+        if 'board_status' in item and item['board_status'] in ('pinned', 'shown', 'hidden'):
+            updates['board_status'] = item['board_status']
+        if updates:
+            KanbanBoard.query.filter_by(id=bid).update(updates)
+    db.session.commit()
+    return jsonify({'ok': True})
 
 
 # ── Category CRUD ────────────────────────────────────────────────

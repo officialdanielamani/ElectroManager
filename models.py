@@ -1634,6 +1634,9 @@ class KanbanBoard(db.Model):
     user_id    = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     name       = db.Column(db.String(128), nullable=False)
     position   = db.Column(db.Integer, default=0)
+    board_icon   = db.Column(db.String(48),  default='bi-kanban')
+    board_color  = db.Column(db.String(7),   default='#6b7280')
+    board_status = db.Column(db.String(10),  default='shown')   # pinned / shown / hidden
     notify_start_enabled = db.Column(db.Boolean, default=False)
     notify_start_days    = db.Column(db.Integer, default=1)
     notify_due_enabled   = db.Column(db.Boolean, default=False)

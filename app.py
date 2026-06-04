@@ -379,6 +379,9 @@ def _apply_column_migrations():
         ("kanban_boards",        "notify_due_enabled",   "BOOLEAN DEFAULT 0"),
         ("kanban_boards",        "notify_due_days",      "INTEGER DEFAULT 1"),
         ("kanban_cards",         "category_id",          "INTEGER"),
+        ("kanban_boards",        "board_icon",            "VARCHAR(48) DEFAULT 'bi-kanban'"),
+        ("kanban_boards",        "board_color",           "VARCHAR(7) DEFAULT '#6b7280'"),
+        ("kanban_boards",        "board_status",          "VARCHAR(10) DEFAULT 'shown'"),
     ]
     with db.engine.connect() as conn:
         for table, col, col_type in additions:
