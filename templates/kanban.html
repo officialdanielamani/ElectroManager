@@ -138,9 +138,19 @@
 {# ─── Top bar ──────────────────────────────────────────── #}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h5 class="mb-0"><i class="bi bi-kanban"></i> Kanban</h5>
-    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newBoardModal">
-        <i class="bi bi-plus-lg"></i> New Board
-    </button>
+    <div class="d-flex gap-1">
+        {% set _gear_board_id = active_board.id if active_board else (all_boards[0].id if all_boards else none) %}
+        {% if _gear_board_id %}
+        <button class="btn btn-outline-secondary btn-sm js-open-board-settings"
+                data-board-id="{{ _gear_board_id }}"
+                {% if not active_board %}data-open-listing="1"{% endif %}>
+            <i class="bi bi-gear"></i>
+        </button>
+        {% endif %}
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newBoardModal">
+            <i class="bi bi-plus-lg"></i> New Board
+        </button>
+    </div>
 </div>
 
 {% if not boards %}
@@ -177,11 +187,6 @@
 <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
     <span class="text-muted small fw-semibold">{{ active_board.name }}</span>
     <div class="d-flex gap-1">
-        {# Gear = Board Settings #}
-        <button class="btn btn-outline-secondary btn-sm js-open-board-settings"
-                data-board-id="{{ active_board.id }}">
-            <i class="bi bi-gear"></i>
-        </button>
         <button class="btn btn-outline-secondary btn-sm"
                 data-bs-toggle="modal" data-bs-target="#colModal"
                 data-board-id="{{ active_board.id }}">
@@ -252,7 +257,7 @@
                         </button>
                         {% endif %}
                     </div>
-                    {# Meta row: priority + category + task count #}
+                    {# Meta row: priority + category + task count + done badge #}
                     <div class="card-meta-row">
                         <span class="badge bg-{{ prio_badge[card.priority] }}{% if card.priority == 3 %} text-dark{% endif %}"
                               style="font-size:.68rem">{{ prio_names[card.priority] }}</span>
@@ -267,9 +272,13 @@
                             {{ card.completed_task_count }}/{{ card.task_count }}
                         </span>
                         {% endif %}
+                        <span class="badge bg-success card-done-badge{% if not card.completed_at %} d-none{% endif %}"
+                              style="font-size:.65rem">
+                            <i class="bi bi-check2-all"></i> Done
+                        </span>
                     </div>
                     {# Dates row #}
-                    {% if card.start_date or card.due_date or card.completed_at or card.is_overdue %}
+                    {% if card.start_date or card.due_date or card.is_overdue %}
                     <div class="card-dates-row">
                         {% if card.start_date and card.due_date %}
                         <span>{{ card.start_date.strftime('%d %b') }} – {{ card.due_date.strftime('%d %b') }}</span>
@@ -278,9 +287,7 @@
                         {% elif card.due_date %}
                         <span>Due: {{ card.due_date.strftime('%d %b') }}</span>
                         {% endif %}
-                        {% if card.completed_at %}
-                        <span class="badge bg-success" style="font-size:.65rem">Done</span>
-                        {% elif card.is_overdue %}
+                        {% if card.is_overdue %}
                         <span class="badge bg-danger" style="font-size:.65rem">Overdue</span>
                         {% endif %}
                     </div>
@@ -716,7 +723,9 @@
                 <div class="col-md-4 d-flex align-items-end pb-1">
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" id="card-modal-completed">
-                        <label class="form-check-label" for="card-modal-completed">Mark done</label>
+                        <label class="form-check-label" for="card-modal-completed">
+                            <i class="bi bi-check2-all"></i> Mark done
+                        </label>
                     </div>
                 </div>
             </div>
@@ -858,7 +867,8 @@ function validateDates(startVal, dueVal, label) {
 }
 
 // Enable/disable "Mark done" based on task completion state.
-// Rule: if any task is unchecked → force off + disable. No tasks → freely toggleable.
+// Rules: no tasks → freely toggleable. All done → auto-check, allow manual uncheck.
+// Any task undone → force off + disable.
 function updateMarkDoneState(taskTotal, taskDone) {
     const cb = document.getElementById('card-modal-completed');
     if (!cb) return;
@@ -870,6 +880,7 @@ function updateMarkDoneState(taskTotal, taskDone) {
         cb.checked  = false;
         cb.disabled = true;
     } else {
+        cb.checked  = true;
         cb.disabled = false;
     }
 }
@@ -919,7 +930,7 @@ document.addEventListener('click', function(e) {
     // Board settings gear
     const settingsBtn = e.target.closest('.js-open-board-settings');
     if (settingsBtn) {
-        openBoardSettings(parseInt(settingsBtn.dataset.boardId));
+        openBoardSettings(parseInt(settingsBtn.dataset.boardId), settingsBtn.dataset.openListing === '1');
         return;
     }
 
@@ -1019,7 +1030,7 @@ document.getElementById('btn-create-board')?.addEventListener('click', async () 
 let _boardCategories = [];
 let _selectedBoardIcon = 'bi-kanban';
 
-async function openBoardSettings(boardId) {
+async function openBoardSettings(boardId, openListing) {
     try {
         const s = await api('GET', '/kanban/boards/' + boardId + '/settings');
         document.getElementById('settings-board-id').value = boardId;
@@ -1036,9 +1047,15 @@ async function openBoardSettings(boardId) {
         document.getElementById('settings-notify-due-days').value = s.notify_due_days;
         _boardCategories = s.categories || [];
         renderCatList();
-        // Switch to Board Settings tab by default
-        const tab = document.querySelector('#kanbanSettingsTabs [data-bs-target="#ks-tab-board"]');
-        if (tab) bootstrap.Tab.getOrCreateInstance(tab).show();
+        // Switch to appropriate tab
+        if (openListing) {
+            const tab = document.querySelector('#kanbanSettingsTabs [data-bs-target="#ks-tab-listing"]');
+            if (tab) bootstrap.Tab.getOrCreateInstance(tab).show();
+            initBoardListing();
+        } else {
+            const tab = document.querySelector('#kanbanSettingsTabs [data-bs-target="#ks-tab-board"]');
+            if (tab) bootstrap.Tab.getOrCreateInstance(tab).show();
+        }
         getModal('boardSettingsModal').show();
     } catch(e) { showErr(e.message); }
 }
@@ -1796,7 +1813,20 @@ async function toggleTaskBoard(taskId, completed, cardId) {
             const span = row.querySelector('.task-title');
             if (span) span.classList.toggle('done', completed);
             const cardEl = row.closest('.kanban-card');
-            if (cardEl) updateCardTaskBadge(cardEl);
+            if (cardEl) {
+                updateCardTaskBadge(cardEl);
+                // Auto-manage Done state based on task completion
+                const total = cardEl.querySelectorAll('.js-task-check').length;
+                const done  = cardEl.querySelectorAll('.js-task-check:checked').length;
+                const doneBadge = cardEl.querySelector('.card-done-badge');
+                if (total > 0 && done === total) {
+                    await api('PUT', '/kanban/cards/' + cardId, { completed_at: 'now' });
+                    if (doneBadge) doneBadge.classList.remove('d-none');
+                } else {
+                    await api('PUT', '/kanban/cards/' + cardId, { completed_at: '' });
+                    if (doneBadge) doneBadge.classList.add('d-none');
+                }
+            }
         }
     } catch(e) { showErr(e.message); }
 }
