@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, request, jsonify, abort
 from flask_login import login_required, current_user
 from models import (db, KanbanBoard, KanbanColumn, KanbanCard, KanbanTask,
                     KanbanCategory, DEFAULT_KANBAN_COLUMNS,
-                    ContactPerson, ContactOrganization)
+                    ContactPerson, ContactOrganization, ContactGroup, User)
 from datetime import datetime, timezone, date
 import json
 import re
@@ -45,6 +45,8 @@ def _safe_icon(val, default='bi-circle'):
     return v[:_LIMITS['col_icon']] or default
 
 
+_VALID_PERSON_TYPES = {'user', 'person', 'organization', 'group'}
+
 def _safe_persons(raw_list):
     if not isinstance(raw_list, list):
         return []
@@ -53,8 +55,11 @@ def _safe_persons(raw_list):
         if isinstance(item, dict):
             pid = item.get('id')
             name = _strip(str(item.get('name', '')), 256)
+            ptype = item.get('type', 'person')
+            if ptype not in _VALID_PERSON_TYPES:
+                ptype = 'person'
             if name:
-                out.append({'id': int(pid) if pid is not None else None, 'name': name})
+                out.append({'id': int(pid) if pid is not None else None, 'name': name, 'type': ptype})
     return out
 
 
@@ -566,18 +571,30 @@ def delete_task(task_id):
 @kanban_bp.route('/kanban/contacts', methods=['GET'])
 @login_required
 def kanban_contacts():
-    if not current_user.has_permission('settings_sections.contacts', 'view_other'):
+    can_users = current_user.has_permission('settings_sections.contacts', 'view_users')
+    can_other = current_user.has_permission('settings_sections.contacts', 'view_other')
+    if not can_users and not can_other:
         return jsonify({'error': 'No permission'}), 403
-    persons = ContactPerson.query.order_by(ContactPerson.name).all()
-    result = []
-    for p in persons:
-        org_name = ''
-        if p.organization_id:
-            org = ContactOrganization.query.get(p.organization_id)
-            if org:
-                org_name = org.name
-        result.append({'id': p.id, 'name': p.name, 'email': p.email or '', 'org': org_name})
-    return jsonify(result)
+
+    results = []
+
+    if can_users:
+        for u in User.query.filter_by(is_active=True).order_by(User.username).all():
+            name = u.name or u.username
+            results.append({'id': u.id, 'type': 'user', 'label': name, 'extra': u.username or ''})
+
+    if can_other:
+        for p in ContactPerson.query.order_by(ContactPerson.name).all():
+            extra = p.organization.name if p.organization else (p.email or '')
+            results.append({'id': p.id, 'type': 'person', 'label': p.name, 'extra': extra})
+
+        for o in ContactOrganization.query.order_by(ContactOrganization.name).all():
+            results.append({'id': o.id, 'type': 'organization', 'label': o.name, 'extra': o.email or ''})
+
+        for g in ContactGroup.query.order_by(ContactGroup.name).all():
+            results.append({'id': g.id, 'type': 'group', 'label': g.name, 'extra': g.description or ''})
+
+    return jsonify(results)
 
 
 # ── Helpers ──────────────────────────────────────────────────────

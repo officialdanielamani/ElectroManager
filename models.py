@@ -1693,15 +1693,19 @@ class KanbanCard(db.Model):
     category = db.relationship('KanbanCategory', foreign_keys=[category_id], lazy='joined')
 
     def get_key_persons(self):
-        """Return list of {id, name} dicts; handles legacy plain-string lists."""
+        """Return list of {id, name, type} dicts; handles legacy plain-string lists."""
         try:
             data = json.loads(self.key_persons) if self.key_persons else []
             normalized = []
             for item in data:
                 if isinstance(item, dict):
-                    normalized.append({'id': item.get('id'), 'name': item.get('name', '')})
+                    normalized.append({
+                        'id': item.get('id'),
+                        'name': item.get('name', ''),
+                        'type': item.get('type', 'person'),
+                    })
                 else:
-                    normalized.append({'id': None, 'name': str(item)})
+                    normalized.append({'id': None, 'name': str(item), 'type': 'person'})
             return normalized
         except (json.JSONDecodeError, TypeError):
             return []

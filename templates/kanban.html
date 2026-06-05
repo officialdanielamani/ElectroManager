@@ -325,9 +325,11 @@
                     {# Key persons #}
                     {% set persons = card.get_key_persons() %}
                     {% if persons %}
+                    {% set _type_icons = {'user':'bi-person-badge-fill','person':'bi-person-fill','organization':'bi-building','group':'bi-people-fill'} %}
                     <div class="card-persons">
-                        <i class="bi bi-person-fill"></i>
-                        {{ persons | map(attribute='name') | join(', ') }}
+                        {% for p in persons %}
+                        <i class="bi {{ _type_icons.get(p.get('type','person'), 'bi-person-fill') }}"></i>{{ p.name }}{% if not loop.last %}, {% endif %}
+                        {% endfor %}
                     </div>
                     {% endif %}
                 </div>
@@ -958,14 +960,14 @@ document.addEventListener('click', function(e) {
     // Remove contact badge
     const rmContact = e.target.closest('.remove-contact');
     if (rmContact) {
-        removeContact(parseInt(rmContact.dataset.contactId));
+        removeContact(parseInt(rmContact.dataset.contactId), rmContact.dataset.contactType || 'person');
         return;
     }
 
     // Contact search result
     const contactRow = e.target.closest('.js-contact-result');
     if (contactRow) {
-        addContact(parseInt(contactRow.dataset.id), contactRow.dataset.name);
+        addContact(parseInt(contactRow.dataset.id), contactRow.dataset.name, contactRow.dataset.type);
         return;
     }
 
@@ -1503,6 +1505,12 @@ let _allContacts = null;
 let _selectedContacts = [];
 let _contactsPermission = true;
 
+const _CONTACT_ICONS  = {user:'bi-person-badge-fill', person:'bi-person-fill', organization:'bi-building', group:'bi-people-fill'};
+const _CONTACT_LABELS = {user:'User', person:'Contact', organization:'Org', group:'Group'};
+
+function _contactIcon(type) { return _CONTACT_ICONS[type] || 'bi-person-fill'; }
+function _contactLabel(type) { return _CONTACT_LABELS[type] || type; }
+
 async function loadContacts() {
     if (_allContacts !== null) return;
     try {
@@ -1523,32 +1531,33 @@ function filterContacts() {
     const resultsDiv = document.getElementById('contact-search-results');
     if (!resultsDiv) return;
     if (!q) { resultsDiv.style.display = 'none'; return; }
-    const selectedIds = new Set(_selectedContacts.map(c => c.id));
+    const selectedIds = new Set(_selectedContacts.map(c => c.id + ':' + c.type));
     const matches = (_allContacts || []).filter(c =>
-        !selectedIds.has(c.id) && (
-            c.name.toLowerCase().includes(q) ||
-            (c.email && c.email.toLowerCase().includes(q)) ||
-            (c.org && c.org.toLowerCase().includes(q))
+        !selectedIds.has(c.id + ':' + c.type) && (
+            c.label.toLowerCase().includes(q) ||
+            (c.extra && c.extra.toLowerCase().includes(q))
         )
-    ).slice(0, 8);
+    ).slice(0, 10);
     if (!matches.length) { resultsDiv.style.display = 'none'; return; }
     resultsDiv.innerHTML = matches.map(c =>
         `<div class="py-1 px-2 rounded js-contact-result"
               style="cursor:pointer"
-              data-id="${c.id}" data-name="${escHtml(c.name)}"
+              data-id="${c.id}" data-name="${escHtml(c.label)}" data-type="${escHtml(c.type)}"
               onmouseover="this.style.background='var(--bs-secondary-bg)'"
               onmouseout="this.style.background=''">
-            <strong>${escHtml(c.name)}</strong>
-            ${c.org ? `<small class="text-muted"> · ${escHtml(c.org)}</small>` : ''}
-            ${c.email ? `<small class="text-muted"> · ${escHtml(c.email)}</small>` : ''}
+            <i class="bi ${_contactIcon(c.type)} text-muted me-1" style="font-size:.8rem"></i>
+            <strong>${escHtml(c.label)}</strong>
+            ${c.extra ? `<small class="text-muted"> · ${escHtml(c.extra)}</small>` : ''}
+            <span class="badge bg-secondary ms-1" style="font-size:.65rem">${escHtml(_contactLabel(c.type))}</span>
         </div>`
     ).join('');
     resultsDiv.style.display = 'block';
 }
 
-function addContact(id, name) {
-    if (_selectedContacts.some(c => c.id === id)) return;
-    _selectedContacts.push({ id, name });
+function addContact(id, name, type) {
+    const t = type || 'person';
+    if (_selectedContacts.some(c => c.id === id && c.type === t)) return;
+    _selectedContacts.push({ id, name, type: t });
     renderSelectedContacts();
     savePersonsJson();
     const inp = document.getElementById('contact-search-input');
@@ -1557,8 +1566,8 @@ function addContact(id, name) {
     if (res) res.style.display = 'none';
 }
 
-function removeContact(id) {
-    _selectedContacts = _selectedContacts.filter(c => c.id !== id);
+function removeContact(id, type) {
+    _selectedContacts = _selectedContacts.filter(c => !(c.id === id && c.type === (type || c.type)));
     renderSelectedContacts();
     savePersonsJson();
 }
@@ -1568,9 +1577,9 @@ function renderSelectedContacts() {
     if (!div) return;
     div.innerHTML = _selectedContacts.map(c =>
         `<span class="contact-badge">
-            <i class="bi bi-person-fill text-muted" style="font-size:.75rem"></i>
+            <i class="bi ${_contactIcon(c.type)} text-muted" style="font-size:.75rem"></i>
             ${escHtml(c.name)}
-            <span class="remove-contact" data-contact-id="${c.id}">&times;</span>
+            <span class="remove-contact" data-contact-id="${c.id}" data-contact-type="${escHtml(c.type || 'person')}">&times;</span>
         </span>`
     ).join('');
 }
@@ -1623,7 +1632,9 @@ function populateCardModal(card) {
 
     populateCategoryDropdown(card.category_id || null);
 
-    _selectedContacts = (card.key_persons || []).filter(p => p && p.name);
+    _selectedContacts = (card.key_persons || []).filter(p => p && p.name).map(p => ({
+        id: p.id, name: p.name, type: p.type || 'person',
+    }));
     renderSelectedContacts();
     savePersonsJson();
 
