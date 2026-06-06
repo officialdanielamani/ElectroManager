@@ -138,7 +138,8 @@
 {# ─── Top bar ──────────────────────────────────────────── #}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h5 class="mb-0"><i class="bi bi-kanban"></i> Kanban</h5>
-    <div class="d-flex gap-1">
+    <div class="d-flex align-items-center gap-1">
+        <div id="kanban-presence-bar" class="d-flex align-items-center gap-1"></div>
         {% set _gear_board_id = active_board.id if active_board else (listing_boards[0]['id'] if listing_boards else 0) %}
         <button class="btn btn-outline-secondary btn-sm js-open-board-settings"
                 data-board-id="{{ _gear_board_id }}"
@@ -187,7 +188,6 @@
 </ul>
 
 {% if active_board %}
-<div id="kanban-presence-bar" class="d-flex align-items-center gap-1 mb-1" style="min-height:30px"></div>
 <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
     <div class="d-flex align-items-center gap-2">
         <span class="text-muted small fw-semibold">{{ active_board.name }}</span>
@@ -349,11 +349,10 @@
                     {% endif %}
                     {# Card created / updated timestamps #}
                     {% if card.created_at %}
-                    <div class="card-dates-row" style="border-top:1px solid var(--bs-border-color,#dee2e6)">
-                        <i class="bi bi-clock" style="font-size:.7rem"></i>
-                        {{ card.created_at.strftime('%d %b %Y') }}
-                        {% if card.updated_at and card.updated_at.strftime('%d %b %Y') != card.created_at.strftime('%d %b %Y') %}
-                        <span>· <i class="bi bi-pencil" style="font-size:.65rem"></i> {{ card.updated_at.strftime('%d %b %Y') }}</span>
+                    <div class="card-dates-row" style="border-top:1px solid var(--bs-border-color,#dee2e6);flex-direction:column;align-items:flex-start;gap:1px">
+                        <span><i class="bi bi-clock" style="font-size:.65rem"></i> {{ card.created_at.strftime('%d %b %Y | %H:%M') }}{% if card.created_by %} · {{ (card.created_by.name or '') }}{% endif %}</span>
+                        {% if card.updated_at %}
+                        <span><i class="bi bi-pencil" style="font-size:.65rem"></i> {{ card.updated_at.strftime('%d %b %Y | %H:%M') }}{% if card.updated_by %} · {{ (card.updated_by.name or '') }}{% endif %}</span>
                         {% endif %}
                     </div>
                     {% endif %}
@@ -1828,18 +1827,25 @@ function filterContacts() {
         )
     ).slice(0, 10);
     if (!matches.length) { resultsDiv.style.display = 'none'; return; }
-    resultsDiv.innerHTML = matches.map(c =>
-        `<div class="py-1 px-2 rounded js-contact-result"
+    resultsDiv.innerHTML = matches.map(c => {
+        const avatar = (c.type === 'user' && c.pic)
+            ? `<img src="${escHtml(c.pic)}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;flex-shrink:0" alt="">`
+            : `<span style="width:22px;height:22px;border-radius:50%;background:var(--bs-secondary-bg);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.65rem"><i class="bi ${_contactIcon(c.type)} text-muted"></i></span>`;
+        const title = c.type === 'user' && c.extra
+            ? `<small class="text-muted ms-1">${escHtml(c.extra)}</small>`
+            : (c.extra ? `<small class="text-muted"> · ${escHtml(c.extra)}</small>` : '');
+        return `<div class="py-1 px-2 rounded js-contact-result d-flex align-items-center gap-2"
               style="cursor:pointer"
               data-id="${c.id}" data-name="${escHtml(c.label)}" data-type="${escHtml(c.type)}"
               onmouseover="this.style.background='var(--bs-secondary-bg)'"
               onmouseout="this.style.background=''">
-            <i class="bi ${_contactIcon(c.type)} text-muted me-1" style="font-size:.8rem"></i>
-            <strong>${escHtml(c.label)}</strong>
-            ${c.extra ? `<small class="text-muted"> · ${escHtml(c.extra)}</small>` : ''}
-            <span class="badge bg-secondary ms-1" style="font-size:.65rem">${escHtml(_contactLabel(c.type))}</span>
-        </div>`
-    ).join('');
+            ${avatar}
+            <div class="d-flex flex-column" style="line-height:1.2;min-width:0">
+                <span><strong>${escHtml(c.label)}</strong>${title}</span>
+            </div>
+            <span class="badge bg-secondary ms-auto" style="font-size:.6rem;flex-shrink:0">${escHtml(_contactLabel(c.type))}</span>
+        </div>`;
+    }).join('');
     resultsDiv.style.display = 'block';
 }
 
@@ -2129,13 +2135,24 @@ document.getElementById('btn-delete-card-modal')?.addEventListener('click', asyn
 });
 
 // ── Task edit modal ──────────────────────────────────────────────
-function openTaskEdit(taskId, title, startDate, dueDate) {
+function openTaskEdit(taskId, title, startDate, dueDate, cardId) {
     document.getElementById('task-edit-id').value = taskId;
     document.getElementById('task-edit-title').value = title || '';
     document.getElementById('task-edit-start').value = startDate || '';
     document.getElementById('task-edit-due').value = dueDate || '';
+    // Set editing card ID for presence (look up from DOM if not provided)
+    const resolvedCardId = cardId ||
+        parseInt(document.querySelector(`.js-task-check[data-task-id="${taskId}"]`)?.dataset.cardId || 0) ||
+        parseInt(document.getElementById('card-modal-id')?.value || 0);
+    _editingCardId = resolvedCardId || null;
     getModal('taskEditModal').show();
 }
+document.getElementById('taskEditModal')?.addEventListener('hide.bs.modal', () => {
+    // Only clear if card modal isn't also open
+    if (!document.getElementById('cardModal')?.classList.contains('show')) {
+        _editingCardId = null;
+    }
+});
 
 document.getElementById('btn-save-task-edit')?.addEventListener('click', async () => {
     const taskId = document.getElementById('task-edit-id').value;
@@ -2280,12 +2297,11 @@ function _rtcHandleEvent(ev) {
 }
 function _rtcOnTaskUpdated(ev) {
     const { task, card_id, card_task_count, card_completed_task_count } = ev;
-    const cb = document.querySelector(`.js-task-check[data-task-id="${task.id}"]`);
-    if (cb) cb.checked = task.completed;
+    // Rebuild entire task row to sync title, dates, completion
     const row = document.getElementById('task-row-' + task.id);
     if (row) {
-        const s = row.querySelector('.task-title');
-        if (s) { s.textContent = task.title; s.classList.toggle('done', task.completed); }
+        const newHtml = _rtcTaskRowHtml(task, card_id);
+        row.outerHTML = newHtml;
     }
     _rtcTaskBadge(card_id, card_task_count, card_completed_task_count);
     if (_rtcModalOpenFor(card_id)) refreshModalTasks(card_id);
@@ -2327,6 +2343,9 @@ function _rtcOnCardUpdated(ev) {
             pb.className = 'badge bg-'+(pc[card.priority]||'secondary');
             if (card.priority===3) pb.classList.add('text-dark');
         }
+        // Sync Done badge
+        const doneBadge = cardEl.querySelector('.card-done-badge');
+        if (doneBadge) doneBadge.classList.toggle('d-none', !card.completed_at);
     }
     _rtcTaskBadge(card.id, card.task_count, card.completed_task_count);
     if (_rtcModalOpenFor(card.id)) populateCardModal(card);

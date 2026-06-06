@@ -71,6 +71,13 @@ _LIMITS = {
 }
 _COLOR_RE = re.compile(r'^#[0-9a-fA-F]{3,6}$')
 
+# ── Hard limits ───────────────────────────────────────────────────
+_MAX_BOARDS_PER_USER   = 24
+_MAX_COLS_PER_BOARD    = 16
+_MAX_CARDS_PER_BOARD   = 64
+_MAX_TASKS_PER_CARD    = 64
+_MAX_CATS_PER_BOARD    = 32
+
 
 def _strip(text, max_len):
     return (text or '').strip()[:max_len]
@@ -387,6 +394,10 @@ def create_board():
     if not name:
         return jsonify({'error': 'Board name required'}), 400
 
+    board_count = KanbanBoard.query.filter_by(user_id=current_user.id).count()
+    if board_count >= _MAX_BOARDS_PER_USER:
+        return jsonify({'error': f'Maximum {_MAX_BOARDS_PER_USER} boards allowed per user'}), 400
+
     max_pos = db.session.query(db.func.max(KanbanBoard.position)).filter_by(user_id=current_user.id).scalar() or 0
     board = KanbanBoard(user_id=current_user.id, name=name, position=max_pos + 1)
     db.session.add(board)
@@ -620,6 +631,9 @@ def create_category(board_id):
     name = _strip(data.get('name'), _LIMITS['cat_name'])
     if not name:
         return jsonify({'error': 'Category name required'}), 400
+    cat_count = KanbanCategory.query.filter_by(board_id=board.id).count()
+    if cat_count >= _MAX_CATS_PER_BOARD:
+        return jsonify({'error': f'Maximum {_MAX_CATS_PER_BOARD} categories per board'}), 400
     max_pos = db.session.query(db.func.max(KanbanCategory.position)).filter_by(board_id=board.id).scalar() or 0
     cat = KanbanCategory(board_id=board.id, name=name, position=max_pos + 1)
     db.session.add(cat)
@@ -662,6 +676,9 @@ def create_column(board_id):
     name = _strip(data.get('name'), _LIMITS['col_name'])
     if not name:
         return jsonify({'error': 'Column name required'}), 400
+    col_count = KanbanColumn.query.filter_by(board_id=board.id).count()
+    if col_count >= _MAX_COLS_PER_BOARD:
+        return jsonify({'error': f'Maximum {_MAX_COLS_PER_BOARD} columns per board'}), 400
     max_pos = db.session.query(db.func.max(KanbanColumn.position)).filter_by(board_id=board.id).scalar() or 0
     col = KanbanColumn(board_id=board.id, name=name,
                        color=_safe_color(data.get('color')),
@@ -730,6 +747,10 @@ def create_card(board_id):
     col = KanbanColumn.query.filter_by(id=col_id, board_id=board.id).first()
     if not col:
         return jsonify({'error': 'Invalid column'}), 400
+
+    card_count = KanbanCard.query.filter_by(board_id=board.id).count()
+    if card_count >= _MAX_CARDS_PER_BOARD:
+        return jsonify({'error': f'Maximum {_MAX_CARDS_PER_BOARD} cards per board'}), 400
 
     prio = max(1, min(4, int(data.get('priority', 1))))
     cat_id = data.get('category_id')
@@ -873,6 +894,9 @@ def create_task(card_id):
     due_date   = _parse_date(data.get('due_date'))
     if not _dates_valid(start_date, due_date):
         return jsonify({'error': 'Task start date must be on or before the due date'}), 400
+    task_count = KanbanTask.query.filter_by(card_id=card.id).count()
+    if task_count >= _MAX_TASKS_PER_CARD:
+        return jsonify({'error': f'Maximum {_MAX_TASKS_PER_CARD} tasks per card'}), 400
     max_pos = db.session.query(db.func.max(KanbanTask.position)).filter_by(card_id=card.id).scalar() or 0
     task = KanbanTask(
         card_id=card.id,
@@ -965,8 +989,20 @@ def kanban_contacts():
 
     if can_users:
         for u in User.query.filter_by(is_active=True).order_by(User.name).all():
-            name = u.name or u.username
-            results.append({'id': u.id, 'type': 'user', 'label': name, 'extra': ''})
+            if not u.name:
+                continue  # skip users with no display name
+            pic_url = ''
+            if u.profile_photo:
+                if u.profile_photo.startswith('share/'):
+                    pic_url = f"/uploads/share/profile/{u.profile_photo[6:]}"
+                else:
+                    pic_url = f"/uploads/userpicture/{u.profile_photo}"
+            results.append({
+                'id': u.id, 'type': 'user',
+                'label': u.name,
+                'extra': u.short_info or '',
+                'pic': pic_url,
+            })
 
     if can_other:
         for p in ContactPerson.query.order_by(ContactPerson.name).all():
