@@ -179,6 +179,7 @@
             <i class="bi {{ b.board_icon or 'bi-kanban' }} me-1"></i>{{ b.name }}
             {% if bshare == 'public' %}<span class="badge bg-secondary ms-1" style="font-size:.6rem;vertical-align:middle">Public</span>
             {% elif bshare == 'view_only' %}<span class="badge bg-info text-dark ms-1" style="font-size:.6rem;vertical-align:middle">View Only</span>
+            {% elif bshare == 'edit' %}<span class="badge bg-success text-white ms-1" style="font-size:.6rem;vertical-align:middle">View & Edit</span>
             {% endif %}
         </a>
     </li>
@@ -186,12 +187,16 @@
 </ul>
 
 {% if active_board %}
+<div id="kanban-presence-bar" class="d-flex align-items-center gap-1 mb-1" style="min-height:30px"></div>
 <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
     <div class="d-flex align-items-center gap-2">
         <span class="text-muted small fw-semibold">{{ active_board.name }}</span>
         {% if not is_owner %}
-        <span class="badge bg-{{ 'secondary' if active_share_type == 'public' else 'info text-dark' }}" style="font-size:.68rem">
-            <i class="bi bi-eye"></i> {{ 'Public' if active_share_type == 'public' else 'View Only' }} · by {{ board_owners.get(active_board.id, '') }}
+        <span class="badge bg-{{ 'secondary' if active_share_type == 'public' else ('success' if active_share_type == 'edit' else 'info text-dark') }}" style="font-size:.68rem">
+            {% if active_share_type == 'edit' %}<i class="bi bi-pencil"></i> View & Edit
+            {% elif active_share_type == 'public' %}<i class="bi bi-eye"></i> Public
+            {% else %}<i class="bi bi-eye"></i> View Only{% endif %}
+            · by {{ board_owners.get(active_board.id, '') }}
         </span>
         {% endif %}
     </div>
@@ -255,6 +260,10 @@
                     <div class="card-header-band"
                          style="{{ hdr_bg }}"
                          data-card-id="{{ card.id }}">
+                        <i class="bi bi-circle-fill text-danger card-editing-indicator d-none"
+                           id="edit-ind-{{ card.id }}"
+                           style="font-size:.55rem;vertical-align:middle;margin-right:2px"
+                           title="Being edited by another user"></i>
                         <span class="card-title-text js-open-card"
                               data-card-id="{{ card.id }}">{{ card.title }}</span>
                         <button class="btn btn-link btn-sm p-0 text-muted flex-shrink-0 js-open-card"
@@ -313,7 +322,7 @@
                             <input type="checkbox" class="form-check-input flex-shrink-0 js-task-check"
                                    data-task-id="{{ task.id }}" data-card-id="{{ card.id }}"
                                    {% if task.completed %}checked{% endif %}
-                                   {% if not is_owner %}disabled{% endif %}>
+                                   {% if active_share_type not in ['own', 'edit'] %}disabled{% endif %}>
                             <span class="task-title{% if task.completed %} done{% endif %}">
                                 {{- task.title -}}
                             </span>
@@ -324,7 +333,7 @@
                                 {% if task.due_date %}{{ task.due_date.strftime('%d/%m') }}{% endif %}
                             </span>
                             {% endif %}
-                            {% if is_owner %}
+                            {% if active_share_type in ['own', 'edit'] %}
                             <button class="btn btn-link btn-sm p-0 text-muted flex-shrink-0 js-task-edit"
                                     data-task-id="{{ task.id }}"
                                     data-task-title="{{ task.title|e }}"
@@ -361,7 +370,7 @@
                 </div>
                 {% endfor %}
             </div>
-            {% if is_owner %}
+            {% if active_share_type in ['own', 'edit'] %}
             <div class="kanban-add-card">
                 <button class="btn btn-link btn-sm text-muted w-100 text-start py-1 js-add-card"
                         data-board-id="{{ active_board.id }}" data-col-id="{{ col.id }}">
@@ -934,6 +943,9 @@ const LOGOUT_URL    = '{{ url_for("auth.logout") }}';
 const CAN_SHARE_BOARD = {{ can_share_board | tojson }};
 const IS_OWNER        = {{ is_owner | tojson }};
 const ACTIVE_SHARE_TYPE = {{ active_share_type | tojson }};
+const CAN_EDIT = IS_OWNER || ACTIVE_SHARE_TYPE === 'edit';
+const CURRENT_USER_ID   = {{ current_user.id | tojson }};
+const CURRENT_USER_NAME = {{ (current_user.name or current_user.username) | tojson }};
 
 // ── Helpers ──────────────────────────────────────────────────────
 async function api(method, url, body) {
@@ -1481,6 +1493,8 @@ function renderBoardListing() {
             shareBadge = `<span class="badge bg-secondary ms-1" style="font-size:.65rem">Public</span>`;
         } else if (b.share_type === 'view_only') {
             shareBadge = `<span class="badge bg-info text-dark ms-1" style="font-size:.65rem">View Only</span>`;
+        } else if (b.share_type === 'edit') {
+            shareBadge = `<span class="badge bg-success ms-1" style="font-size:.65rem">View & Edit</span>`;
         }
         const ownerStr = b.is_own ? '' :
             `<span class="text-muted ms-1" style="font-size:.76rem">by ${escHtml(b.owner_name)}</span>`;
@@ -1912,6 +1926,7 @@ function _updateCardModalTimestamps(card) {
 // ── Card detail modal ────────────────────────────────────────────
 let _currentCardId = null;
 let _currentBoardCategories = [];
+let _editingCardId = null;
 
 async function openCard(cardId) {
     try {
@@ -1926,6 +1941,7 @@ async function openCard(cardId) {
         }
         await loadContacts();
         populateCardModal(card);
+        _editingCardId = card.id;
         getModal('cardModal').show();
     } catch(e) { showErr(e.message); }
 }
@@ -1975,7 +1991,7 @@ function populateCardModal(card) {
 
     renderModalTaskList(card.tasks, card.task_count, card.completed_task_count);
     updateMarkDoneState(card.task_count, card.completed_task_count);
-    _applyCardModalReadOnly(!IS_OWNER);
+    _applyCardModalReadOnly(!CAN_EDIT);
     _updateCardModalTimestamps(card);
 }
 
@@ -1992,7 +2008,7 @@ function renderModalTaskList(tasks, total, done) {
                 t.start_date && t.due_date ? '–' : ''}${
                 t.due_date ? t.due_date : ''}</small>`
             : '';
-        const taskBtns = IS_OWNER
+        const taskBtns = CAN_EDIT
             ? `<button class="btn btn-link btn-sm p-0 text-primary ms-1 js-modal-task-info"
                     data-task-id="${t.id}"
                     data-task-title="${escHtml(t.title)}"
@@ -2194,8 +2210,197 @@ function updateCardTaskBadge(cardEl) {
     }
 }
 
+// ── Real-time presence & sync ─────────────────────────────────────
+let _pollTs = 0, _pollTimer = null, _heartbeatTimer = null;
+
+function _rtcStart(boardId) {
+    if (!boardId) return;
+    _rtcStop();
+    _pollTs = Date.now() / 1000 - 0.5;
+    _rtcHeartbeat(boardId);
+    _heartbeatTimer = setInterval(() => _rtcHeartbeat(boardId), 5000);
+    _pollTimer      = setInterval(() => _rtcPoll(boardId), 2000);
+}
+function _rtcStop() {
+    clearInterval(_pollTimer); _pollTimer = null;
+    clearInterval(_heartbeatTimer); _heartbeatTimer = null;
+}
+async function _rtcHeartbeat(boardId) {
+    try {
+        await fetch('/kanban/boards/' + boardId + '/presence', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','X-CSRFToken':CSRF},
+            body: JSON.stringify({editing_card_id: _editingCardId}),
+        });
+    } catch(e) {}
+}
+async function _rtcPoll(boardId) {
+    try {
+        const r = await fetch('/kanban/boards/' + boardId + '/poll?since=' + _pollTs,
+            {headers: {'X-CSRFToken': CSRF}});
+        if (!r.ok) return;
+        const data = await r.json();
+        _pollTs = data.ts;
+        _rtcUpdatePresence(data.presence || []);
+        for (const ev of (data.events || [])) {
+            if (ev.user_id === CURRENT_USER_ID) continue;
+            _rtcHandleEvent(ev);
+        }
+    } catch(e) {}
+}
+function _rtcUpdatePresence(presence) {
+    const bar = document.getElementById('kanban-presence-bar');
+    if (!bar) return;
+    const others = presence.filter(p => p.id !== CURRENT_USER_ID);
+    if (others.length === 0) { bar.innerHTML = ''; }
+    else {
+        bar.innerHTML = others.map(p => {
+            const ini = (p.name||'?').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';
+            const col = p.access === 'edit' ? '#0d6efd' : '#6c757d';
+            const ring = p.editing_card_id ? ';outline:2px solid #dc3545;outline-offset:2px' : '';
+            const tip = escHtml(p.name) + ' (' + (p.access==='edit'?'Edit':'View') + ')' + (p.editing_card_id?' — editing':'');
+            return `<span title="${tip}" style="background:${col}${ring};width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:#fff;cursor:default;flex-shrink:0">${escHtml(ini)}</span>`;
+        }).join('');
+    }
+    const editingSet = new Set(
+        presence.filter(p => p.id !== CURRENT_USER_ID && p.editing_card_id).map(p => p.editing_card_id)
+    );
+    document.querySelectorAll('.card-editing-indicator').forEach(ind => {
+        const cardId = parseInt(ind.closest('.kanban-card')?.dataset.cardId || 0);
+        ind.classList.toggle('d-none', !editingSet.has(cardId));
+    });
+}
+function _rtcHandleEvent(ev) {
+    if (ev.type === 'task_updated')    return _rtcOnTaskUpdated(ev);
+    if (ev.type === 'task_created')    return _rtcOnTaskCreated(ev);
+    if (ev.type === 'task_deleted')    return _rtcOnTaskDeleted(ev);
+    if (ev.type === 'card_updated')    return _rtcOnCardUpdated(ev);
+    if (ev.type === 'card_created')    return _rtcOnCardCreated(ev);
+    if (ev.type === 'cards_reordered') return _rtcOnCardsReordered(ev);
+}
+function _rtcOnTaskUpdated(ev) {
+    const { task, card_id, card_task_count, card_completed_task_count } = ev;
+    const cb = document.querySelector(`.js-task-check[data-task-id="${task.id}"]`);
+    if (cb) cb.checked = task.completed;
+    const row = document.getElementById('task-row-' + task.id);
+    if (row) {
+        const s = row.querySelector('.task-title');
+        if (s) { s.textContent = task.title; s.classList.toggle('done', task.completed); }
+    }
+    _rtcTaskBadge(card_id, card_task_count, card_completed_task_count);
+    if (_rtcModalOpenFor(card_id)) refreshModalTasks(card_id);
+}
+function _rtcOnTaskCreated(ev) {
+    const { task, card_id, card_task_count, card_completed_task_count } = ev;
+    let tasksDiv = document.getElementById('tasks-' + card_id);
+    if (!tasksDiv) {
+        const cardEl = document.getElementById('card-' + card_id);
+        if (cardEl) {
+            tasksDiv = document.createElement('div');
+            tasksDiv.className = 'card-tasks';
+            tasksDiv.id = 'tasks-' + card_id;
+            const tsRow = cardEl.querySelector('.card-dates-row[style*="border-top"]');
+            if (tsRow) cardEl.insertBefore(tasksDiv, tsRow);
+            else cardEl.appendChild(tasksDiv);
+        }
+    }
+    if (tasksDiv) tasksDiv.insertAdjacentHTML('beforeend', _rtcTaskRowHtml(task, card_id));
+    _rtcTaskBadge(card_id, card_task_count, card_completed_task_count);
+    if (_rtcModalOpenFor(card_id)) refreshModalTasks(card_id);
+}
+function _rtcOnTaskDeleted(ev) {
+    document.getElementById('task-row-' + ev.task_id)?.remove();
+    _rtcTaskBadge(ev.card_id, ev.card_task_count, ev.card_completed_task_count);
+    if (_rtcModalOpenFor(ev.card_id)) refreshModalTasks(ev.card_id);
+}
+function _rtcOnCardUpdated(ev) {
+    const card = ev.card;
+    const cardEl = document.getElementById('card-' + card.id);
+    if (cardEl) {
+        const ts = cardEl.querySelector('.card-title-text');
+        if (ts) ts.textContent = card.title;
+        const pb = cardEl.querySelector('.card-meta-row .badge:first-child');
+        if (pb) {
+            const pn = {1:'Low',2:'Medium',3:'High',4:'Urgent'};
+            const pc = {1:'secondary',2:'primary',3:'warning',4:'danger'};
+            pb.textContent = pn[card.priority]||'Low';
+            pb.className = 'badge bg-'+(pc[card.priority]||'secondary');
+            if (card.priority===3) pb.classList.add('text-dark');
+        }
+    }
+    _rtcTaskBadge(card.id, card.task_count, card.completed_task_count);
+    if (_rtcModalOpenFor(card.id)) populateCardModal(card);
+}
+function _rtcOnCardCreated(ev) {
+    const card = ev.card;
+    const colBody = document.getElementById('cards-' + card.column_id);
+    if (!colBody) return;
+    colBody.insertAdjacentHTML('beforeend', _rtcCardHtml(card));
+    const counter = document.getElementById('col-count-' + card.column_id);
+    if (counter) counter.textContent = colBody.querySelectorAll('.kanban-card').length;
+}
+function _rtcOnCardsReordered(ev) {
+    for (const col of ev.columns) {
+        const colBody = document.getElementById('cards-' + col.column_id);
+        if (!colBody) continue;
+        col.card_ids.forEach(id => {
+            const el = document.getElementById('card-' + id);
+            if (el) colBody.appendChild(el);
+        });
+        const counter = document.getElementById('col-count-' + col.column_id);
+        if (counter) counter.textContent = colBody.querySelectorAll('.kanban-card').length;
+    }
+}
+function _rtcTaskBadge(cardId, total, done) {
+    const cardEl = document.getElementById('card-' + cardId);
+    if (!cardEl) return;
+    let badge = cardEl.querySelector('.task-count-badge');
+    if (total > 0) {
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'badge bg-secondary task-count-badge';
+            badge.style.fontSize = '.68rem';
+            cardEl.querySelector('.card-meta-row')?.appendChild(badge);
+        }
+        badge.innerHTML = '<i class="bi bi-check2-square"></i> ' + done + '/' + total;
+    } else if (badge) badge.remove();
+}
+function _rtcModalOpenFor(cardId) {
+    const m = document.getElementById('cardModal');
+    return m?.classList.contains('show') && parseInt(document.getElementById('card-modal-id')?.value) === cardId;
+}
+function _rtcTaskRowHtml(task, cardId) {
+    const doneClass = task.completed ? ' done' : '';
+    const checked   = task.completed ? 'checked' : '';
+    const disabled  = CAN_EDIT ? '' : 'disabled';
+    const editBtn   = CAN_EDIT ? `<button class="btn btn-link btn-sm p-0 text-muted flex-shrink-0 js-task-edit" data-task-id="${task.id}" data-task-title="${escHtml(task.title)}" data-task-start="${task.start_date||''}" data-task-due="${task.due_date||''}" style="font-size:.72rem;line-height:1.4" title="Edit task"><i class="bi bi-pencil-square"></i></button>` : '';
+    return `<div class="card-task-row" id="task-row-${task.id}"><input type="checkbox" class="form-check-input flex-shrink-0 js-task-check" data-task-id="${task.id}" data-card-id="${cardId}" ${checked} ${disabled}><span class="task-title${doneClass}">${escHtml(task.title)}</span>${editBtn}</div>`;
+}
+function _rtcCardHtml(card) {
+    const pn={1:'Low',2:'Medium',3:'High',4:'Urgent'}, pc={1:'secondary',2:'primary',3:'warning',4:'danger'};
+    const hdr = card.label_color ? `background:${card.label_color}33;` : '';
+    return `<div class="kanban-card" id="card-${card.id}" data-card-id="${card.id}">
+  <div class="card-header-band" style="${hdr}" data-card-id="${card.id}">
+    <i class="bi bi-circle-fill text-danger card-editing-indicator d-none" id="edit-ind-${card.id}" style="font-size:.55rem;vertical-align:middle;margin-right:2px" title="Being edited"></i>
+    <span class="card-title-text js-open-card" data-card-id="${card.id}">${escHtml(card.title)}</span>
+    <button class="btn btn-link btn-sm p-0 text-muted flex-shrink-0 js-open-card" data-card-id="${card.id}" title="Card details" style="font-size:.8rem"><i class="bi bi-info-circle"></i></button>
+  </div>
+  <div class="card-meta-row">
+    <span class="badge bg-${pc[card.priority]||'secondary'}" style="font-size:.68rem">${pn[card.priority]||'Low'}</span>
+    ${card.category_name?`<span class="badge bg-info text-dark" style="font-size:.68rem">${escHtml(card.category_name)}</span>`:''}
+    ${card.task_count>0?`<span class="badge bg-secondary task-count-badge" style="font-size:.68rem"><i class="bi bi-check2-square"></i> ${card.completed_task_count}/${card.task_count}</span>`:''}
+  </div></div>`;
+}
+
+// Start polling when page has an active board
+if (BOARD_ID) _rtcStart(BOARD_ID);
+window.addEventListener('beforeunload', _rtcStop);
+
+// Track card editing state for presence
+document.getElementById('cardModal')?.addEventListener('hide.bs.modal', () => { _editingCardId = null; });
+
 // ── Drag and drop (owners only) ──────────────────────────────────
-if (IS_OWNER) {
+if (CAN_EDIT) {
     document.querySelectorAll('.sortable-cards').forEach(el => {
         Sortable.create(el, {
             group: 'cards',

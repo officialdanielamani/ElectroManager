@@ -10,10 +10,40 @@ from datetime import datetime, timezone, date
 import json
 import re
 import logging
+import threading
+import time
+from collections import defaultdict, deque
 
 logger = logging.getLogger(__name__)
 
 kanban_bp = Blueprint('kanban', __name__)
+
+# ── Real-time collaboration ───────────────────────────────────────
+_PRESENCE_TTL = 12
+_MAX_EVENTS   = 300
+_store_lock   = threading.Lock()
+_presence: dict     = defaultdict(dict)   # board_id -> {user_id: {...}}
+_board_events: dict = defaultdict(deque)  # board_id -> deque[(ts, event)]
+
+def _push_event(board_id: int, event: dict):
+    with _store_lock:
+        q = _board_events[board_id]
+        q.append((time.time(), event))
+        while len(q) > _MAX_EVENTS:
+            q.popleft()
+
+def _collect_events_since(board_id: int, since_ts: float) -> list:
+    with _store_lock:
+        return [ev for ts, ev in _board_events[board_id] if ts > since_ts]
+
+def _collect_presence(board_id: int) -> list:
+    now = time.time()
+    with _store_lock:
+        stale = [uid for uid, p in _presence[board_id].items()
+                 if now - p['last_seen'] > _PRESENCE_TTL]
+        for uid in stale:
+            del _presence[board_id][uid]
+        return list(_presence[board_id].values())
 
 
 @kanban_bp.before_request
@@ -94,15 +124,28 @@ def _safe_share_users(raw_list):
 # ── Auth helpers ─────────────────────────────────────────────────
 
 def _board_or_404(board_id):
-    """Requires current user to OWN the board (for write operations)."""
+    """Requires current user to OWN the board (board management operations)."""
     board = KanbanBoard.query.filter_by(id=board_id, user_id=current_user.id).first()
     if not board:
         abort(404)
     return board
 
+def _writable_board_or_404(board_id):
+    """Returns board if current user owns it OR has edit-shared access; 403 otherwise."""
+    board = KanbanBoard.query.filter_by(id=board_id, user_id=current_user.id).first()
+    if board:
+        return board
+    board = db.session.get(KanbanBoard, board_id)
+    if board and board.share_edit_users:
+        try:
+            if any(u.get('id') == current_user.id for u in json.loads(board.share_edit_users)):
+                return board
+        except (json.JSONDecodeError, TypeError):
+            pass
+    abort(403)
 
 def _accessible_board_or_404(board_id):
-    """Returns (board, is_owner). Allows owner, public, and view-shared access."""
+    """Returns (board, is_owner). Allows: own, edit-shared, view-shared, public."""
     board = KanbanBoard.query.filter_by(id=board_id, user_id=current_user.id).first()
     if board:
         return board, True
@@ -110,36 +153,34 @@ def _accessible_board_or_404(board_id):
     if board:
         if board.is_public:
             return board, False
-        if board.share_view_users:
-            try:
-                users = json.loads(board.share_view_users)
-                if any(u.get('id') == current_user.id for u in users):
-                    return board, False
-            except (json.JSONDecodeError, TypeError):
-                pass
+        for attr in ('share_edit_users', 'share_view_users'):
+            raw = getattr(board, attr, None)
+            if raw:
+                try:
+                    if any(u.get('id') == current_user.id for u in json.loads(raw)):
+                        return board, False
+                except (json.JSONDecodeError, TypeError):
+                    pass
     abort(404)
-
 
 def _column_or_404(col_id):
     col = KanbanColumn.query.get_or_404(col_id)
     _board_or_404(col.board_id)
     return col
 
-
 def _card_or_404(card_id):
+    """Card write access: requires own or edit-shared board."""
     card = KanbanCard.query.get_or_404(card_id)
-    _board_or_404(card.board_id)
+    _writable_board_or_404(card.board_id)
     return card
 
-
 def _card_readable_or_404(card_id):
-    """Returns card if current user can read it (owns board OR has shared view access)."""
+    """Returns card if current user can read it (owns board OR has any shared access)."""
     card = db.session.get(KanbanCard, card_id)
     if not card:
         abort(404)
     _accessible_board_or_404(card.board_id)
     return card
-
 
 def _task_or_404(task_id):
     task = KanbanTask.query.get_or_404(task_id)
@@ -230,8 +271,24 @@ def kanban():
         except (json.JSONDecodeError, TypeError):
             pass
 
+    # ── Edit-shared boards ─────────────────────────────────────────
+    edit_boards = []
+    for b in KanbanBoard.query.filter(
+        KanbanBoard.user_id != current_user.id,
+        KanbanBoard.is_public == False,
+        KanbanBoard.share_edit_users.isnot(None),
+    ).all():
+        if b.id in public_ids:
+            continue
+        try:
+            if any(u.get('id') == current_user.id
+                   for u in json.loads(b.share_edit_users or '[]')):
+                edit_boards.append(b)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
     # ── Per-user state for non-own boards ───────────────────────
-    non_own_ids = {b.id for b in public_boards + view_only_boards}
+    non_own_ids = {b.id for b in public_boards + view_only_boards + edit_boards}
     user_states = {}
     if non_own_ids:
         for s in KanbanBoardUserState.query.filter(
@@ -261,7 +318,8 @@ def kanban():
     all_meta = (
         [_meta(b, 'own') for b in own_boards] +
         [_meta(b, 'public') for b in public_boards] +
-        [_meta(b, 'view_only') for b in view_only_boards]
+        [_meta(b, 'view_only') for b in view_only_boards] +
+        [_meta(b, 'edit') for b in edit_boards]
     )
 
     # Visible (not hidden), pinned first
@@ -446,7 +504,10 @@ def update_board_settings(board_id):
             if 'share_view_users' in data:
                 board.share_view_users = json.dumps(_safe_share_users(data['share_view_users']))
             if 'share_edit_users' in data:
-                board.share_edit_users = json.dumps(_safe_share_users(data['share_edit_users']))
+                edit_users = _safe_share_users(data['share_edit_users'])
+                if len(edit_users) > 5:
+                    return jsonify({'error': 'Maximum 5 users can have edit access'}), 400
+                board.share_edit_users = json.dumps(edit_users)
         board.updated_at = datetime.now(timezone.utc)
     else:
         # Non-owner can only save their personal notification preferences
@@ -509,6 +570,44 @@ def update_boards_listing():
                 ))
     db.session.commit()
     return jsonify({'ok': True})
+
+
+@kanban_bp.route('/kanban/boards/<int:board_id>/presence', methods=['POST'])
+@login_required
+def board_presence(board_id):
+    board, is_owner = _accessible_board_or_404(board_id)
+    data = request.get_json(silent=True) or {}
+    editing_card_id = data.get('editing_card_id')
+    name = current_user.name or current_user.username
+    access = 'edit'
+    if not is_owner:
+        access = 'view'
+        if board.share_edit_users:
+            try:
+                if any(u.get('id') == current_user.id for u in json.loads(board.share_edit_users)):
+                    access = 'edit'
+            except (json.JSONDecodeError, TypeError):
+                pass
+    with _store_lock:
+        _presence[board_id][current_user.id] = {
+            'id': current_user.id, 'name': name,
+            'last_seen': time.time(),
+            'editing_card_id': int(editing_card_id) if editing_card_id else None,
+            'access': access,
+        }
+    return jsonify({'ok': True})
+
+
+@kanban_bp.route('/kanban/boards/<int:board_id>/poll')
+@login_required
+def board_poll(board_id):
+    _accessible_board_or_404(board_id)
+    since = request.args.get('since', type=float, default=0.0)
+    return jsonify({
+        'events':   _collect_events_since(board_id, since),
+        'presence': _collect_presence(board_id),
+        'ts':       time.time(),
+    })
 
 
 # ── Category CRUD ────────────────────────────────────────────────
@@ -621,7 +720,7 @@ def reorder_columns():
 @kanban_bp.route('/kanban/boards/<int:board_id>/cards', methods=['POST'])
 @login_required
 def create_card(board_id):
-    board = _board_or_404(board_id)
+    board = _writable_board_or_404(board_id)
     data = request.get_json(silent=True) or {}
     title = _strip(data.get('title'), _LIMITS['card_title'])
     col_id = data.get('column_id')
@@ -667,6 +766,7 @@ def create_card(board_id):
     )
     db.session.add(card)
     db.session.commit()
+    _push_event(board.id, {'type': 'card_created', 'user_id': current_user.id, 'card': _card_to_dict(card)})
     return jsonify(_card_to_dict(card)), 201
 
 
@@ -716,6 +816,7 @@ def update_card(card_id):
     card.updated_at = datetime.now(timezone.utc)
     card.updated_by_id = current_user.id
     db.session.commit()
+    _push_event(card.board_id, {'type': 'card_updated', 'user_id': current_user.id, 'card': _card_to_dict(card)})
     return jsonify(_card_to_dict(card))
 
 
@@ -733,20 +834,28 @@ def delete_card(card_id):
 def reorder_cards():
     data = request.get_json(silent=True) or {}
     columns_data = data.get('columns', [])
+    board_id_pushed = None
     for col_data in columns_data:
         col_id = col_data.get('column_id')
         card_ids = col_data.get('card_ids', [])
         col = KanbanColumn.query.get(col_id)
         if not col:
             continue
-        _board_or_404(col.board_id)
+        _writable_board_or_404(col.board_id)
         now = datetime.now(timezone.utc)
         for pos, cid in enumerate(card_ids):
             KanbanCard.query.filter_by(id=cid, board_id=col.board_id).update(
                 {'column_id': col_id, 'position': pos,
                  'updated_at': now, 'updated_by_id': current_user.id}
             )
+        board_id_pushed = col.board_id
     db.session.commit()
+    if board_id_pushed:
+        _push_event(board_id_pushed, {
+            'type': 'cards_reordered', 'user_id': current_user.id,
+            'columns': [{'column_id': cd.get('column_id'), 'card_ids': cd.get('card_ids', [])}
+                        for cd in columns_data],
+        })
     return jsonify({'ok': True})
 
 
@@ -776,6 +885,12 @@ def create_task(card_id):
     card.updated_at = datetime.now(timezone.utc)
     card.updated_by_id = current_user.id
     db.session.commit()
+    _push_event(card.board_id, {
+        'type': 'task_created', 'user_id': current_user.id,
+        'task': _task_to_dict(task), 'card_id': card.id,
+        'card_task_count': card.task_count,
+        'card_completed_task_count': card.completed_task_count,
+    })
     return jsonify(_task_to_dict(task)), 201
 
 
@@ -802,6 +917,13 @@ def update_task(task_id):
         card.updated_at = datetime.now(timezone.utc)
         card.updated_by_id = current_user.id
     db.session.commit()
+    if card:
+        _push_event(card.board_id, {
+            'type': 'task_updated', 'user_id': current_user.id,
+            'task': _task_to_dict(task), 'card_id': card.id,
+            'card_task_count': card.task_count,
+            'card_completed_task_count': card.completed_task_count,
+        })
     return jsonify(_task_to_dict(task))
 
 
@@ -809,12 +931,23 @@ def update_task(task_id):
 @login_required
 def delete_task(task_id):
     task = _task_or_404(task_id)
+    saved_task_id = task.id
     card = db.session.get(KanbanCard, task.card_id)
+    saved_card_id = card.id if card else None
+    saved_board_id = card.board_id if card else None
     db.session.delete(task)
     if card:
         card.updated_at = datetime.now(timezone.utc)
         card.updated_by_id = current_user.id
     db.session.commit()
+    if saved_board_id and card:
+        db.session.refresh(card)
+        _push_event(saved_board_id, {
+            'type': 'task_deleted', 'user_id': current_user.id,
+            'task_id': saved_task_id, 'card_id': saved_card_id,
+            'card_task_count': card.task_count,
+            'card_completed_task_count': card.completed_task_count,
+        })
     return jsonify({'ok': True})
 
 
