@@ -871,6 +871,12 @@
                            id="new-task-due" title="Task due date">
                 </div>
             </div>
+
+            {# Card created / updated timestamps #}
+            <div id="card-modal-timestamps" class="mt-3 pt-2 border-top text-muted" style="font-size:.8rem">
+                <div id="card-modal-created-info"></div>
+                <div id="card-modal-updated-info" class="mt-1"></div>
+            </div>
         </div>
         <div class="modal-footer justify-content-between">
             {# Delete button on the left #}
@@ -1872,6 +1878,22 @@ function _applyCardModalReadOnly(readOnly) {
     if (notice) notice.style.display = readOnly ? '' : 'none';
 }
 
+function _updateCardModalTimestamps(card) {
+    const createdEl = document.getElementById('card-modal-created-info');
+    const updatedEl = document.getElementById('card-modal-updated-info');
+    if (createdEl) {
+        createdEl.innerHTML = card.created_at
+            ? `<i class="bi bi-clock me-1" style="font-size:.85em"></i>Created: <span class="font-monospace">${escHtml(card.created_at)}</span>${card.created_by_name ? ' &mdash; by ' + escHtml(card.created_by_name) : ''}`
+            : '';
+    }
+    if (updatedEl) {
+        const showUpdated = card.updated_at && card.updated_at !== card.created_at;
+        updatedEl.innerHTML = showUpdated
+            ? `<i class="bi bi-pencil me-1" style="font-size:.85em"></i>Updated: <span class="font-monospace">${escHtml(card.updated_at)}</span>${card.updated_by_name ? ' &mdash; by ' + escHtml(card.updated_by_name) : ''}`
+            : '';
+    }
+}
+
 // ── Card detail modal ────────────────────────────────────────────
 let _currentCardId = null;
 let _currentBoardCategories = [];
@@ -1939,6 +1961,7 @@ function populateCardModal(card) {
     renderModalTaskList(card.tasks, card.task_count, card.completed_task_count);
     updateMarkDoneState(card.task_count, card.completed_task_count);
     _applyCardModalReadOnly(!IS_OWNER);
+    _updateCardModalTimestamps(card);
 }
 
 function renderModalTaskList(tasks, total, done) {
@@ -2031,6 +2054,7 @@ async function refreshModalTasks() {
     if (!_currentCardId) return;
     const card = await api('GET', '/kanban/cards/' + _currentCardId);
     renderModalTaskList(card.tasks, card.task_count, card.completed_task_count);
+    _updateCardModalTimestamps(card);
 }
 
 document.getElementById('btn-save-card')?.addEventListener('click', async () => {

@@ -1705,16 +1705,20 @@ class KanbanCard(db.Model):
     key_persons = db.Column(db.Text)                 # JSON list of {id, name} dicts
     start_date  = db.Column(db.Date)
     due_date    = db.Column(db.Date)
-    completed_at = db.Column(db.DateTime)
-    position    = db.Column(db.Integer, default=0)
-    created_at  = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at  = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
-                            onupdate=lambda: datetime.now(timezone.utc))
+    completed_at  = db.Column(db.DateTime)
+    position      = db.Column(db.Integer, default=0)
+    created_at    = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at    = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                              onupdate=lambda: datetime.now(timezone.utc))
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    updated_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
-    tasks = db.relationship('KanbanTask', backref='card', lazy=True,
-                            cascade='all, delete-orphan',
-                            order_by='KanbanTask.position')
-    category = db.relationship('KanbanCategory', foreign_keys=[category_id], lazy='joined')
+    tasks      = db.relationship('KanbanTask', backref='card', lazy=True,
+                                 cascade='all, delete-orphan',
+                                 order_by='KanbanTask.position')
+    category   = db.relationship('KanbanCategory', foreign_keys=[category_id], lazy='joined')
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    updated_by = db.relationship('User', foreign_keys=[updated_by_id])
 
     def get_key_persons(self):
         """Return list of {id, name, type} dicts; handles legacy plain-string lists."""

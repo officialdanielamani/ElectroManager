@@ -185,8 +185,10 @@ def _card_to_dict(card):
         'task_count': card.task_count,
         'completed_task_count': card.completed_task_count,
         'tasks': [_task_to_dict(t) for t in card.tasks],
-        'created_at': card.created_at.strftime('%d %b %Y') if card.created_at else '',
-        'updated_at': card.updated_at.strftime('%d %b %Y') if card.updated_at else '',
+        'created_at': card.created_at.strftime('%Y-%m-%d %H:%M') if card.created_at else '',
+        'updated_at': card.updated_at.strftime('%Y-%m-%d %H:%M') if card.updated_at else '',
+        'created_by_name': (card.created_by.name or card.created_by.username) if card.created_by else '',
+        'updated_by_name': (card.updated_by.name or card.updated_by.username) if card.updated_by else '',
     }
 
 
@@ -624,6 +626,8 @@ def create_card(board_id):
         start_date=start_date,
         due_date=due_date,
         position=max_pos + 1,
+        created_by_id=current_user.id,
+        updated_by_id=current_user.id,
     )
     db.session.add(card)
     db.session.commit()
@@ -674,6 +678,7 @@ def update_card(card_id):
     if 'completed_at' in data:
         card.completed_at = datetime.now(timezone.utc) if data['completed_at'] else None
     card.updated_at = datetime.now(timezone.utc)
+    card.updated_by_id = current_user.id
     db.session.commit()
     return jsonify(_card_to_dict(card))
 
@@ -699,9 +704,11 @@ def reorder_cards():
         if not col:
             continue
         _board_or_404(col.board_id)
+        now = datetime.now(timezone.utc)
         for pos, cid in enumerate(card_ids):
             KanbanCard.query.filter_by(id=cid, board_id=col.board_id).update(
-                {'column_id': col_id, 'position': pos}
+                {'column_id': col_id, 'position': pos,
+                 'updated_at': now, 'updated_by_id': current_user.id}
             )
     db.session.commit()
     return jsonify({'ok': True})
@@ -730,6 +737,8 @@ def create_task(card_id):
         position=max_pos + 1,
     )
     db.session.add(task)
+    card.updated_at = datetime.now(timezone.utc)
+    card.updated_by_id = current_user.id
     db.session.commit()
     return jsonify(_task_to_dict(task)), 201
 
@@ -752,6 +761,10 @@ def update_task(task_id):
         task.due_date = _parse_date(data['due_date'])
     if not _dates_valid(task.start_date, task.due_date):
         return jsonify({'error': 'Task start date must be on or before the due date'}), 400
+    card = db.session.get(KanbanCard, task.card_id)
+    if card:
+        card.updated_at = datetime.now(timezone.utc)
+        card.updated_by_id = current_user.id
     db.session.commit()
     return jsonify(_task_to_dict(task))
 
@@ -760,7 +773,11 @@ def update_task(task_id):
 @login_required
 def delete_task(task_id):
     task = _task_or_404(task_id)
+    card = db.session.get(KanbanCard, task.card_id)
     db.session.delete(task)
+    if card:
+        card.updated_at = datetime.now(timezone.utc)
+        card.updated_by_id = current_user.id
     db.session.commit()
     return jsonify({'ok': True})
 
