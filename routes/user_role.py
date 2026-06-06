@@ -471,8 +471,9 @@ def role_new():
                 "contacts":           {"view_users": False, "view_other": False, "edit": False, "delete": False},
                 "share_files":        {"view": False, "add": False, "edit": False, "delete": False},
             },
+            "kanban": {"view_manage": False, "share_board": False},
         }
-        
+
         role = Role(
             name=form.name.data,
             description=form.description.data,
