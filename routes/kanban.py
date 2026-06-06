@@ -371,6 +371,22 @@ def get_board_settings(board_id):
     board, viewer_is_owner = _accessible_board_or_404(board_id)
     owner = board.user
     owner_display = _owner_display(owner)
+
+    # Notification prefs: owner uses board-level fields; non-owner uses their user state
+    if viewer_is_owner:
+        notify_start_enabled = board.notify_start_enabled or False
+        notify_start_days    = board.notify_start_days or 1
+        notify_due_enabled   = board.notify_due_enabled or False
+        notify_due_days      = board.notify_due_days or 1
+    else:
+        state = KanbanBoardUserState.query.filter_by(
+            board_id=board.id, user_id=current_user.id
+        ).first()
+        notify_start_enabled = state.notify_start_enabled if state else False
+        notify_start_days    = state.notify_start_days    if state else 1
+        notify_due_enabled   = state.notify_due_enabled   if state else False
+        notify_due_days      = state.notify_due_days      if state else 1
+
     return jsonify({
         'id': board.id,
         'name': board.name,
@@ -381,10 +397,10 @@ def get_board_settings(board_id):
         'is_public': board.is_public or False,
         'share_view_users': json.loads(board.share_view_users) if board.share_view_users else [],
         'share_edit_users': json.loads(board.share_edit_users) if board.share_edit_users else [],
-        'notify_start_enabled': board.notify_start_enabled or False,
-        'notify_start_days': board.notify_start_days or 1,
-        'notify_due_enabled': board.notify_due_enabled or False,
-        'notify_due_days': board.notify_due_days or 1,
+        'notify_start_enabled': notify_start_enabled,
+        'notify_start_days':    notify_start_days,
+        'notify_due_enabled':   notify_due_enabled,
+        'notify_due_days':      notify_due_days,
         'categories': [
             {'id': c.id, 'name': c.name, 'position': c.position}
             for c in board.categories
@@ -399,36 +415,56 @@ def get_board_settings(board_id):
 @kanban_bp.route('/kanban/boards/<int:board_id>/settings', methods=['PUT'])
 @login_required
 def update_board_settings(board_id):
-    board = _board_or_404(board_id)
+    board, is_owner = _accessible_board_or_404(board_id)
     data = request.get_json(silent=True) or {}
-    if 'name' in data:
-        name = _strip(data['name'], _LIMITS['board_name'])
-        if not name:
-            return jsonify({'error': 'Board name required'}), 400
-        board.name = name
-    if 'board_icon' in data:
-        board.board_icon = _safe_icon(data['board_icon'], 'bi-kanban')
-    if 'board_color' in data:
-        board.board_color = _safe_color(data['board_color'], '#6b7280')
-    if 'board_status' in data and data['board_status'] in ('pinned', 'shown', 'hidden'):
-        board.board_status = data['board_status']
-    if 'notify_start_enabled' in data:
-        board.notify_start_enabled = bool(data['notify_start_enabled'])
-    if 'notify_start_days' in data:
-        board.notify_start_days = max(1, min(365, int(data.get('notify_start_days') or 1)))
-    if 'notify_due_enabled' in data:
-        board.notify_due_enabled = bool(data['notify_due_enabled'])
-    if 'notify_due_days' in data:
-        board.notify_due_days = max(1, min(365, int(data.get('notify_due_days') or 1)))
-    # Sharing fields — only saved if caller has share_board permission
-    if current_user.has_permission('kanban', 'share_board'):
-        if 'is_public' in data:
-            board.is_public = bool(data['is_public'])
-        if 'share_view_users' in data:
-            board.share_view_users = json.dumps(_safe_share_users(data['share_view_users']))
-        if 'share_edit_users' in data:
-            board.share_edit_users = json.dumps(_safe_share_users(data['share_edit_users']))
-    board.updated_at = datetime.now(timezone.utc)
+
+    if is_owner:
+        # Owner can change all board-level settings
+        if 'name' in data:
+            name = _strip(data['name'], _LIMITS['board_name'])
+            if not name:
+                return jsonify({'error': 'Board name required'}), 400
+            board.name = name
+        if 'board_icon' in data:
+            board.board_icon = _safe_icon(data['board_icon'], 'bi-kanban')
+        if 'board_color' in data:
+            board.board_color = _safe_color(data['board_color'], '#6b7280')
+        if 'board_status' in data and data['board_status'] in ('pinned', 'shown', 'hidden'):
+            board.board_status = data['board_status']
+        if 'notify_start_enabled' in data:
+            board.notify_start_enabled = bool(data['notify_start_enabled'])
+        if 'notify_start_days' in data:
+            board.notify_start_days = max(1, min(365, int(data.get('notify_start_days') or 1)))
+        if 'notify_due_enabled' in data:
+            board.notify_due_enabled = bool(data['notify_due_enabled'])
+        if 'notify_due_days' in data:
+            board.notify_due_days = max(1, min(365, int(data.get('notify_due_days') or 1)))
+        # Sharing fields — only saved if caller has share_board permission
+        if current_user.has_permission('kanban', 'share_board'):
+            if 'is_public' in data:
+                board.is_public = bool(data['is_public'])
+            if 'share_view_users' in data:
+                board.share_view_users = json.dumps(_safe_share_users(data['share_view_users']))
+            if 'share_edit_users' in data:
+                board.share_edit_users = json.dumps(_safe_share_users(data['share_edit_users']))
+        board.updated_at = datetime.now(timezone.utc)
+    else:
+        # Non-owner can only save their personal notification preferences
+        state = KanbanBoardUserState.query.filter_by(
+            board_id=board.id, user_id=current_user.id
+        ).first()
+        if not state:
+            state = KanbanBoardUserState(board_id=board.id, user_id=current_user.id)
+            db.session.add(state)
+        if 'notify_start_enabled' in data:
+            state.notify_start_enabled = bool(data['notify_start_enabled'])
+        if 'notify_start_days' in data:
+            state.notify_start_days = max(1, min(365, int(data.get('notify_start_days') or 1)))
+        if 'notify_due_enabled' in data:
+            state.notify_due_enabled = bool(data['notify_due_enabled'])
+        if 'notify_due_days' in data:
+            state.notify_due_days = max(1, min(365, int(data.get('notify_due_days') or 1)))
+
     db.session.commit()
     return jsonify({'ok': True, 'name': board.name})
 

@@ -19,10 +19,13 @@
 
         <div class="list-group">
             {% for notif in notifications %}
+            {% set is_kanban = notif.kanban_board is defined and notif.kanban_board %}
             {% if notif.item %}
             <a href="{{ url_for('item.item_detail', uuid=notif.item.uuid) }}" class="list-group-item list-group-item-action">
             {% elif notif.project is defined and notif.project %}
             <a href="{{ url_for('project.project_detail', project_id=notif.project.project_id) }}" class="list-group-item list-group-item-action">
+            {% elif is_kanban %}
+            <a href="{{ url_for('kanban.kanban_page') }}?board={{ notif.kanban_board.id }}" class="list-group-item list-group-item-action">
             {% else %}
             <div class="list-group-item">
             {% endif %}
@@ -30,16 +33,28 @@
                     <div class="d-flex gap-3 align-items-start flex-grow-1">
                         <!-- Icon -->
                         <div class="mt-1">
-                            {% if notif.type in ['overdue', 'lend_overdue', 'project_overdue'] %}
+                            {% if notif.type in ['overdue', 'lend_overdue', 'project_overdue', 'kanban_card_overdue', 'kanban_task_overdue'] %}
                             <i class="bi bi-exclamation-triangle-fill text-danger fs-5"></i>
-                            {% elif notif.type in ['due', 'lend_due', 'project_due'] %}
+                            {% elif notif.type in ['due', 'lend_due', 'project_due', 'kanban_card_due', 'kanban_task_due'] %}
                             <i class="bi bi-exclamation-circle-fill text-warning fs-5"></i>
                             {% else %}
                             <i class="bi bi-info-circle-fill text-primary fs-5"></i>
                             {% endif %}
                         </div>
                         <div>
-                            <h6 class="mb-1">{% if notif.item %}{{ notif.item.name }}{% elif notif.project is defined and notif.project %}<i class="bi bi-kanban me-1"></i>{{ notif.project.name }}{% endif %}</h6>
+                            <h6 class="mb-1">
+                                {% if notif.item %}{{ notif.item.name }}
+                                {% elif notif.project is defined and notif.project %}<i class="bi bi-kanban me-1"></i>{{ notif.project.name }}
+                                {% elif is_kanban %}
+                                <i class="bi bi-kanban me-1" style="color:{{ notif.kanban_board.board_color or '#6b7280' }}"></i>{{ notif.kanban_board.name }}
+                                {% if notif.kanban_card is defined and notif.kanban_card %}
+                                <span class="text-muted fw-normal">/ {{ notif.kanban_card.title }}</span>
+                                {% if notif.kanban_task is defined and notif.kanban_task %}
+                                <span class="text-muted fw-normal">/ {{ notif.kanban_task.title }}</span>
+                                {% endif %}
+                                {% endif %}
+                                {% endif %}
+                            </h6>
                             <p class="mb-1 small">{{ notif.message }}</p>
                             <div class="text-muted small">
                                 {% if notif.session_label is defined and notif.session_label %}
@@ -57,20 +72,14 @@
                         </div>
                     </div>
                     <div class="text-end flex-shrink-0">
-                        {% if notif.type in ['overdue', 'lend_overdue'] %}
+                        {% if notif.type in ['overdue', 'lend_overdue', 'project_overdue', 'kanban_card_overdue', 'kanban_task_overdue'] %}
                         <span class="badge bg-danger">Overdue</span>
-                        {% elif notif.type in ['due', 'lend_due'] %}
+                        {% elif notif.type in ['due', 'lend_due', 'project_due', 'kanban_card_due', 'kanban_task_due'] %}
                         <span class="badge bg-warning text-dark">Due Today</span>
                         {% elif notif.type == 'active' %}
                         <span class="badge bg-info">Active</span>
-                        {% elif notif.type == 'lend_soon' %}
+                        {% elif notif.type in ['lend_soon', 'project_soon', 'kanban_card_soon', 'kanban_task_soon'] %}
                         <span class="badge bg-primary">Due Soon</span>
-                        {% elif notif.type == 'project_overdue' %}
-                        <span class="badge bg-danger">Overdue</span>
-                        {% elif notif.type == 'project_due' %}
-                        <span class="badge bg-warning text-dark">Due Today</span>
-                        {% elif notif.type == 'project_soon' %}
-                        <span class="badge bg-info">Due Soon</span>
                         {% endif %}
                         {% if notif.type in ['lend_overdue', 'lend_due', 'lend_soon'] %}
                         <div><span class="badge bg-secondary mt-1"><i class="bi bi-hand-index-thumb"></i> Lending</span></div>
@@ -78,9 +87,15 @@
                         {% if notif.type in ['project_overdue', 'project_due', 'project_soon'] %}
                         <div><span class="badge bg-secondary mt-1"><i class="bi bi-kanban"></i> Project</span></div>
                         {% endif %}
+                        {% if notif.type in ['kanban_card_overdue', 'kanban_card_due', 'kanban_card_soon'] %}
+                        <div><span class="badge bg-secondary mt-1"><i class="bi bi-card-text"></i> Kanban Card</span></div>
+                        {% endif %}
+                        {% if notif.type in ['kanban_task_overdue', 'kanban_task_due', 'kanban_task_soon'] %}
+                        <div><span class="badge bg-secondary mt-1"><i class="bi bi-check2-square"></i> Kanban Task</span></div>
+                        {% endif %}
                     </div>
                 </div>
-            {% if notif.item or (notif.project is defined and notif.project) %}</a>{% else %}</div>{% endif %}
+            {% if notif.item or (notif.project is defined and notif.project) or is_kanban %}</a>{% else %}</div>{% endif %}
             {% endfor %}
         </div>
         {% else %}

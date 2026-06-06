@@ -592,7 +592,7 @@
         <div class="modal-footer" id="ks-footer-board">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             <button type="button" class="btn btn-primary" id="btn-save-board-settings">
-                <i class="bi bi-check-lg"></i> Save Settings
+                <i class="bi bi-check-lg"></i> <span class="save-btn-label">Save Settings</span>
             </button>
         </div>
     </div></div>
@@ -1126,6 +1126,7 @@ document.getElementById('btn-create-board')?.addEventListener('click', async () 
 // ── Board Settings ───────────────────────────────────────────────
 let _boardCategories = [];
 let _selectedBoardIcon = 'bi-kanban';
+let _settingsIsOwner = IS_OWNER;
 
 async function openBoardSettings(boardId, openListing) {
     if (!boardId) {
@@ -1159,25 +1160,35 @@ async function openBoardSettings(boardId, openListing) {
         if (createdEl) createdEl.textContent = s.created_at || '—';
         const updatedEl = document.getElementById('settings-updated-at');
         if (updatedEl) updatedEl.textContent = s.updated_at || '—';
-        // Toggle edit controls for non-owners
-        const _settingsEditable = s.is_owner;
-        ['settings-board-name','settings-notify-start','settings-notify-start-days',
-         'settings-notify-due','settings-notify-due-days'].forEach(id => {
+        // Track owner status for save handler
+        _settingsIsOwner = s.is_owner;
+        // Toggle edit controls for non-owners (owner-only fields)
+        ['settings-board-name'].forEach(id => {
             const el = document.getElementById(id);
-            if (el) el.disabled = !_settingsEditable;
+            if (el) el.disabled = !s.is_owner;
         });
         const _colorEl = document.getElementById('settings-board-color');
-        if (_colorEl) _colorEl.disabled = !_settingsEditable;
+        if (_colorEl) _colorEl.disabled = !s.is_owner;
         const _iconPickerBtn = document.getElementById('btn-open-board-icon-picker');
-        if (_iconPickerBtn) _iconPickerBtn.disabled = !_settingsEditable;
+        if (_iconPickerBtn) _iconPickerBtn.disabled = !s.is_owner;
         const _renameBtn = document.getElementById('btn-rename-board-settings');
-        if (_renameBtn) _renameBtn.style.display = _settingsEditable ? '' : 'none';
+        if (_renameBtn) _renameBtn.style.display = s.is_owner ? '' : 'none';
+        // Notification inputs always editable by all users
+        ['settings-notify-start','settings-notify-start-days',
+         'settings-notify-due','settings-notify-due-days'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.disabled = false;
+        });
         const _saveSettingsBtn = document.getElementById('btn-save-board-settings');
-        if (_saveSettingsBtn) _saveSettingsBtn.style.display = _settingsEditable ? '' : 'none';
+        if (_saveSettingsBtn) {
+            _saveSettingsBtn.style.display = '';
+            _saveSettingsBtn.querySelector('.save-btn-label').textContent =
+                s.is_owner ? 'Save Settings' : 'Save Preferences';
+        }
         const _delBoardBtn = document.getElementById('btn-delete-board-settings');
-        if (_delBoardBtn) _delBoardBtn.style.display = _settingsEditable ? '' : 'none';
+        if (_delBoardBtn) _delBoardBtn.style.display = s.is_owner ? '' : 'none';
         const _addCatBtn = document.getElementById('btn-show-add-cat');
-        if (_addCatBtn) _addCatBtn.style.display = _settingsEditable ? '' : 'none';
+        if (_addCatBtn) _addCatBtn.style.display = s.is_owner ? '' : 'none';
         // Icon & color
         _selectedBoardIcon = s.board_icon || 'bi-kanban';
         document.getElementById('settings-board-icon').value = _selectedBoardIcon;
@@ -1333,21 +1344,25 @@ document.getElementById('btn-rename-board-settings')?.addEventListener('click', 
 
 document.getElementById('btn-save-board-settings')?.addEventListener('click', async () => {
     const id = document.getElementById('settings-board-id').value;
+    // Notification prefs — always included (every user can set their own)
     const payload = {
-        name: document.getElementById('settings-board-name').value.trim(),
-        board_icon: _selectedBoardIcon || 'bi-kanban',
-        board_color: document.getElementById('settings-board-color').value,
         notify_start_enabled: document.getElementById('settings-notify-start').checked,
         notify_start_days: parseInt(document.getElementById('settings-notify-start-days').value) || 1,
         notify_due_enabled: document.getElementById('settings-notify-due').checked,
         notify_due_days: parseInt(document.getElementById('settings-notify-due-days').value) || 1,
     };
-    if (CAN_SHARE_BOARD) {
-        payload.is_public = document.getElementById('settings-is-public')?.checked || false;
-        payload.share_view_users = _shareViewUsers;
-        payload.share_edit_users = _shareEditUsers;
+    if (_settingsIsOwner) {
+        // Owner-only fields
+        payload.name = document.getElementById('settings-board-name').value.trim();
+        payload.board_icon = _selectedBoardIcon || 'bi-kanban';
+        payload.board_color = document.getElementById('settings-board-color').value;
+        if (!payload.name) { showErr('Board name required'); return; }
+        if (CAN_SHARE_BOARD) {
+            payload.is_public = document.getElementById('settings-is-public')?.checked || false;
+            payload.share_view_users = _shareViewUsers;
+            payload.share_edit_users = _shareEditUsers;
+        }
     }
-    if (!payload.name) { showErr('Board name required'); return; }
     try {
         await api('PUT', '/kanban/boards/' + id + '/settings', payload);
         hideModal('boardSettingsModal');

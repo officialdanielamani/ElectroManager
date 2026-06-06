@@ -392,6 +392,10 @@ def _apply_column_migrations():
         ("kanban_cards",         "updated_at",            "DATETIME"),
         ("kanban_cards",         "created_by_id",         "INTEGER"),
         ("kanban_cards",         "updated_by_id",         "INTEGER"),
+        ("kanban_board_user_states", "notify_start_enabled", "BOOLEAN DEFAULT 0"),
+        ("kanban_board_user_states", "notify_start_days",    "INTEGER DEFAULT 1"),
+        ("kanban_board_user_states", "notify_due_enabled",   "BOOLEAN DEFAULT 0"),
+        ("kanban_board_user_states", "notify_due_days",      "INTEGER DEFAULT 1"),
     ]
     with db.engine.connect() as conn:
         for table, col, col_type in additions:

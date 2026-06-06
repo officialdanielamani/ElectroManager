@@ -1666,13 +1666,18 @@ class KanbanBoard(db.Model):
 
 
 class KanbanBoardUserState(db.Model):
-    """Per-user view state (pin/show/hide + position) for boards shared with that user."""
+    """Per-user view state (pin/show/hide + position) and notification prefs for shared boards."""
     __tablename__ = 'kanban_board_user_states'
     id       = db.Column(db.Integer, primary_key=True)
     board_id = db.Column(db.Integer, db.ForeignKey('kanban_boards.id', ondelete='CASCADE'), nullable=False)
     user_id  = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     status   = db.Column(db.String(10), default='shown')  # pinned / shown / hidden
     position = db.Column(db.Integer, default=999)
+    # Per-user notification preferences (independent of board owner's settings)
+    notify_start_enabled = db.Column(db.Boolean, default=False)
+    notify_start_days    = db.Column(db.Integer, default=1)
+    notify_due_enabled   = db.Column(db.Boolean, default=False)
+    notify_due_days      = db.Column(db.Integer, default=1)
     __table_args__ = (db.UniqueConstraint('board_id', 'user_id', name='uq_kanban_board_user'),)
 
     board = db.relationship('KanbanBoard', backref=db.backref('user_states', cascade='all, delete-orphan', passive_deletes=True))
