@@ -1,6 +1,7 @@
 """
 QR/Barcode Sticker Template Utilities
 """
+import html as _html
 import json
 import os
 from io import BytesIO
@@ -351,10 +352,17 @@ def generate_session_qr_svg(lending_id, size_px=120):
 
 
 def replace_placeholders(text, data_dict):
-    """Replace {Placeholder} with actual values"""
+    """Replace {Placeholder} with actual values (raw — for QR/barcode data)."""
     result = text
     for key, value in data_dict.items():
         result = result.replace(f'{{{key}}}', str(value))
+    return result
+
+def replace_placeholders_escaped(text, data_dict):
+    """Replace {Placeholder} with HTML-escaped values for safe embedding in SVG/HTML text nodes."""
+    result = text
+    for key, value in data_dict.items():
+        result = result.replace(f'{{{key}}}', _html.escape(str(value)))
     return result
 
 def _get_format(ext):
@@ -520,11 +528,8 @@ def render_template_to_svg(template, data):
 
             # Split on newlines; render each line as a <tspan>
             lines = content.split('\n') if '\n' in content else [content]
-            # Escape XML in each line
-            escaped = [
-                l.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
-                for l in lines
-            ]
+            # Escape XML special characters using html.escape (CodeQL-recognized sanitizer)
+            escaped = [_html.escape(l) for l in lines]
 
             svg += (
                 f'  <text x="{x_text}" y="{y_px}" font-size="{font_size}" '
