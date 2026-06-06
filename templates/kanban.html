@@ -401,7 +401,7 @@
             {# ─── Tab 1: Board Settings ───────────── #}
             <div class="tab-pane fade show active" id="ks-tab-board">
 
-                {# Board Name #}
+                {# Board Name + UUID #}
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Board Name</label>
                     <div class="input-group">
@@ -409,6 +409,9 @@
                         <button class="btn btn-outline-primary" id="btn-rename-board-settings">
                             <i class="bi bi-check-lg"></i> Rename
                         </button>
+                    </div>
+                    <div class="mt-1">
+                        <small class="text-muted">Board ID: <code id="settings-board-uuid" class="user-select-all"></code></small>
                     </div>
                 </div>
 
@@ -434,6 +437,49 @@
                                id="settings-board-color" value="#6b7280">
                     </div>
                 </div>
+
+                {# Board Sharing (only visible to users with share_board + view_users perms) #}
+                {% if can_share_board %}
+                <div class="mb-3" id="board-sharing-section">
+                    <p class="fw-semibold mb-2"><i class="bi bi-share"></i> Board Sharing</p>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="settings-is-public">
+                        <label class="form-check-label" for="settings-is-public">
+                            Set this board as Public (View Only)
+                        </label>
+                    </div>
+                    <div id="sharing-user-pickers">
+                        {# Can view only #}
+                        <div class="mb-2">
+                            <label class="form-label form-label-sm fw-semibold">
+                                <i class="bi bi-eye"></i> Can view only
+                            </label>
+                            <div class="input-group input-group-sm mb-1">
+                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                <input type="text" class="form-control" id="share-view-search"
+                                       placeholder="Search users to add…">
+                            </div>
+                            <div id="share-view-results" class="border rounded p-1 mb-1"
+                                 style="max-height:110px;overflow-y:auto;font-size:.83rem;display:none"></div>
+                            <div id="share-view-badges"></div>
+                        </div>
+                        {# Can view & edit #}
+                        <div class="mb-2">
+                            <label class="form-label form-label-sm fw-semibold">
+                                <i class="bi bi-pencil-square"></i> Can view &amp; edit
+                            </label>
+                            <div class="input-group input-group-sm mb-1">
+                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                <input type="text" class="form-control" id="share-edit-search"
+                                       placeholder="Search users to add…">
+                            </div>
+                            <div id="share-edit-results" class="border rounded p-1 mb-1"
+                                 style="max-height:110px;overflow-y:auto;font-size:.83rem;display:none"></div>
+                            <div id="share-edit-badges"></div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
 
                 {# Categories #}
                 <div class="mb-3">
@@ -839,6 +885,7 @@ const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
 const BOARD_ID = {{ active_board.id if active_board else 'null' }};
 const VERIFY_PW_URL = '{{ url_for("auth.verify_password") }}';
 const LOGOUT_URL    = '{{ url_for("auth.logout") }}';
+const CAN_SHARE_BOARD = {{ can_share_board | tojson }};
 
 // ── Helpers ──────────────────────────────────────────────────────
 async function api(method, url, body) {
@@ -1037,11 +1084,23 @@ async function openBoardSettings(boardId, openListing) {
         const s = await api('GET', '/kanban/boards/' + boardId + '/settings');
         document.getElementById('settings-board-id').value = boardId;
         document.getElementById('settings-board-name').value = s.name;
+        const uuidEl = document.getElementById('settings-board-uuid');
+        if (uuidEl) uuidEl.textContent = s.board_uuid || '';
         // Icon & color
         _selectedBoardIcon = s.board_icon || 'bi-kanban';
         document.getElementById('settings-board-icon').value = _selectedBoardIcon;
         document.getElementById('settings-board-icon-preview').className = 'bi ' + _selectedBoardIcon;
         document.getElementById('settings-board-color').value = s.board_color || '#6b7280';
+        // Sharing (only if section is rendered)
+        if (CAN_SHARE_BOARD) {
+            document.getElementById('settings-is-public').checked = s.is_public || false;
+            _shareViewUsers = s.share_view_users || [];
+            _shareEditUsers = s.share_edit_users || [];
+            renderShareBadges('view');
+            renderShareBadges('edit');
+            syncSharingPublicState();
+            await loadContacts();
+        }
         // Notifications
         document.getElementById('settings-notify-start').checked = s.notify_start_enabled;
         document.getElementById('settings-notify-start-days').value = s.notify_start_days;
@@ -1061,6 +1120,99 @@ async function openBoardSettings(boardId, openListing) {
         getModal('boardSettingsModal').show();
     } catch(e) { showErr(e.message); }
 }
+
+// ── Board Sharing ─────────────────────────────────────────────────
+let _shareViewUsers = [];   // [{id, name}]
+let _shareEditUsers = [];   // [{id, name}]
+
+function syncSharingPublicState() {
+    const isPublic = document.getElementById('settings-is-public')?.checked;
+    const pickers = document.getElementById('sharing-user-pickers');
+    if (pickers) {
+        pickers.style.opacity = isPublic ? '.45' : '';
+        pickers.style.pointerEvents = isPublic ? 'none' : '';
+    }
+}
+
+document.getElementById('settings-is-public')?.addEventListener('change', syncSharingPublicState);
+
+function renderShareBadges(type) {
+    const list = type === 'view' ? _shareViewUsers : _shareEditUsers;
+    const container = document.getElementById('share-' + type + '-badges');
+    if (!container) return;
+    container.innerHTML = list.map(u =>
+        `<span class="contact-badge">
+            <i class="bi bi-person-badge-fill text-muted" style="font-size:.75rem"></i>
+            ${escHtml(u.name)}
+            <span class="remove-share-user" data-uid="${u.id}" data-share-type="${type}" style="cursor:pointer;color:var(--bs-danger)">&times;</span>
+        </span>`
+    ).join('');
+}
+
+function addShareUser(id, name, type) {
+    const other = type === 'view' ? _shareEditUsers : _shareViewUsers;
+    if (other.some(u => u.id === id)) {
+        showErr('This user is already in the other sharing list. Remove them first.');
+        return;
+    }
+    const list = type === 'view' ? _shareViewUsers : _shareEditUsers;
+    if (list.some(u => u.id === id)) return;
+    list.push({ id, name });
+    renderShareBadges(type);
+    const inp = document.getElementById('share-' + type + '-search');
+    const res = document.getElementById('share-' + type + '-results');
+    if (inp) inp.value = '';
+    if (res) res.style.display = 'none';
+}
+
+function removeShareUser(id, type) {
+    if (type === 'view') _shareViewUsers = _shareViewUsers.filter(u => u.id !== id);
+    else _shareEditUsers = _shareEditUsers.filter(u => u.id !== id);
+    renderShareBadges(type);
+}
+
+function filterShareSearch(type) {
+    const q = (document.getElementById('share-' + type + '-search')?.value || '').toLowerCase();
+    const resultsDiv = document.getElementById('share-' + type + '-results');
+    if (!resultsDiv) return;
+    if (!q) { resultsDiv.style.display = 'none'; return; }
+    const viewIds  = new Set(_shareViewUsers.map(u => u.id));
+    const editIds  = new Set(_shareEditUsers.map(u => u.id));
+    const taken = type === 'view' ? viewIds : editIds;
+    const matches = (_allContacts || []).filter(c =>
+        c.type === 'user' && !taken.has(c.id) &&
+        c.label.toLowerCase().includes(q)
+    ).slice(0, 8);
+    if (!matches.length) { resultsDiv.style.display = 'none'; return; }
+    resultsDiv.innerHTML = matches.map(c =>
+        `<div class="py-1 px-2 rounded js-share-user-result"
+              style="cursor:pointer"
+              data-uid="${c.id}" data-name="${escHtml(c.label)}" data-share-type="${type}"
+              onmouseover="this.style.background='var(--bs-secondary-bg)'"
+              onmouseout="this.style.background=''">
+            <i class="bi bi-person-badge-fill text-muted me-1" style="font-size:.8rem"></i>
+            <strong>${escHtml(c.label)}</strong>
+        </div>`
+    ).join('');
+    resultsDiv.style.display = 'block';
+}
+
+document.getElementById('share-view-search')?.addEventListener('input', () => filterShareSearch('view'));
+document.getElementById('share-edit-search')?.addEventListener('input', () => filterShareSearch('edit'));
+
+// Delegation for share user result clicks and remove badges
+document.addEventListener('click', function(e) {
+    const shareResult = e.target.closest('.js-share-user-result');
+    if (shareResult) {
+        addShareUser(parseInt(shareResult.dataset.uid), shareResult.dataset.name, shareResult.dataset.shareType);
+        return;
+    }
+    const removeShare = e.target.closest('.remove-share-user');
+    if (removeShare) {
+        removeShareUser(parseInt(removeShare.dataset.uid), removeShare.dataset.shareType);
+        return;
+    }
+});
 
 // Board icon picker button
 document.getElementById('btn-open-board-icon-picker')?.addEventListener('click', () => {
@@ -1098,6 +1250,11 @@ document.getElementById('btn-save-board-settings')?.addEventListener('click', as
         notify_due_enabled: document.getElementById('settings-notify-due').checked,
         notify_due_days: parseInt(document.getElementById('settings-notify-due-days').value) || 1,
     };
+    if (CAN_SHARE_BOARD) {
+        payload.is_public = document.getElementById('settings-is-public')?.checked || false;
+        payload.share_view_users = _shareViewUsers;
+        payload.share_edit_users = _shareEditUsers;
+    }
     if (!payload.name) { showErr('Board name required'); return; }
     try {
         await api('PUT', '/kanban/boards/' + id + '/settings', payload);

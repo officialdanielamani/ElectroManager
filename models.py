@@ -1633,10 +1633,14 @@ class KanbanBoard(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
     user_id    = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     name       = db.Column(db.String(128), nullable=False)
+    board_uuid = db.Column(db.String(12), unique=True)
     position   = db.Column(db.Integer, default=0)
     board_icon   = db.Column(db.String(48),  default='bi-kanban')
     board_color  = db.Column(db.String(7),   default='#6b7280')
     board_status = db.Column(db.String(10),  default='shown')   # pinned / shown / hidden
+    is_public       = db.Column(db.Boolean, default=False)
+    share_view_users = db.Column(db.Text)   # JSON [{id, name}] – view-only access
+    share_edit_users = db.Column(db.Text)   # JSON [{id, name}] – view+edit access
     notify_start_enabled = db.Column(db.Boolean, default=False)
     notify_start_days    = db.Column(db.Integer, default=1)
     notify_due_enabled   = db.Column(db.Boolean, default=False)
@@ -1652,6 +1656,12 @@ class KanbanBoard(db.Model):
     categories = db.relationship('KanbanCategory', backref='board', lazy=True,
                                  cascade='all, delete-orphan',
                                  order_by='KanbanCategory.position')
+
+    def __init__(self, **kwargs):
+        super(KanbanBoard, self).__init__(**kwargs)
+        if not self.board_uuid:
+            chars = string.ascii_uppercase + string.digits
+            self.board_uuid = ''.join(secrets.choice(chars) for _ in range(11)) + 'K'
 
 
 class KanbanColumn(db.Model):

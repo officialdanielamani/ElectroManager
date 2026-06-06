@@ -1,7 +1,7 @@
 """
 Kanban Routes Blueprint
 """
-from flask import Blueprint, render_template, request, jsonify, abort
+from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, flash
 from flask_login import login_required, current_user
 from models import (db, KanbanBoard, KanbanColumn, KanbanCard, KanbanTask,
                     KanbanCategory, DEFAULT_KANBAN_COLUMNS,
@@ -14,6 +14,19 @@ import logging
 logger = logging.getLogger(__name__)
 
 kanban_bp = Blueprint('kanban', __name__)
+
+
+@kanban_bp.before_request
+def _require_kanban_perm():
+    """Block all kanban routes for users without view_manage permission."""
+    if not current_user.is_authenticated:
+        return  # individual @login_required decorators handle unauthenticated redirect
+    if not current_user.has_permission('kanban', 'view_manage'):
+        if request.path == '/kanban' and request.method == 'GET':
+            flash('You do not have permission to access Kanban.', 'danger')
+            return redirect(url_for('index'))
+        return jsonify({'error': 'No permission to access Kanban'}), 403
+
 
 # ── Char limits ──────────────────────────────────────────────────
 _LIMITS = {
@@ -60,6 +73,21 @@ def _safe_persons(raw_list):
                 ptype = 'person'
             if name:
                 out.append({'id': int(pid) if pid is not None else None, 'name': name, 'type': ptype})
+    return out
+
+
+def _safe_share_users(raw_list):
+    """Validate a list of {id, name} user dicts for board sharing."""
+    if not isinstance(raw_list, list):
+        return []
+    out, seen = [], set()
+    for item in raw_list[:50]:
+        if isinstance(item, dict):
+            uid = item.get('id')
+            name = _strip(str(item.get('name', '')), 256)
+            if uid is not None and name and uid not in seen:
+                out.append({'id': int(uid), 'name': name})
+                seen.add(uid)
     return out
 
 
@@ -152,7 +180,12 @@ def kanban():
     if not active_board and boards:
         active_board = boards[0]
 
-    return render_template('kanban.html', boards=boards, all_boards=all_boards, active_board=active_board)
+    can_share_board = (
+        current_user.has_permission('kanban', 'share_board') and
+        current_user.has_permission('settings_sections.contacts', 'view_users')
+    )
+    return render_template('kanban.html', boards=boards, all_boards=all_boards,
+                           active_board=active_board, can_share_board=can_share_board)
 
 
 # ── Board CRUD ───────────────────────────────────────────────────
@@ -208,9 +241,13 @@ def get_board_settings(board_id):
     return jsonify({
         'id': board.id,
         'name': board.name,
+        'board_uuid': board.board_uuid or '',
         'board_icon': board.board_icon or 'bi-kanban',
         'board_color': board.board_color or '#6b7280',
         'board_status': board.board_status or 'shown',
+        'is_public': board.is_public or False,
+        'share_view_users': json.loads(board.share_view_users) if board.share_view_users else [],
+        'share_edit_users': json.loads(board.share_edit_users) if board.share_edit_users else [],
         'notify_start_enabled': board.notify_start_enabled or False,
         'notify_start_days': board.notify_start_days or 1,
         'notify_due_enabled': board.notify_due_enabled or False,
@@ -246,6 +283,14 @@ def update_board_settings(board_id):
         board.notify_due_enabled = bool(data['notify_due_enabled'])
     if 'notify_due_days' in data:
         board.notify_due_days = max(1, min(365, int(data.get('notify_due_days') or 1)))
+    # Sharing fields — only saved if caller has share_board permission
+    if current_user.has_permission('kanban', 'share_board'):
+        if 'is_public' in data:
+            board.is_public = bool(data['is_public'])
+        if 'share_view_users' in data:
+            board.share_view_users = json.dumps(_safe_share_users(data['share_view_users']))
+        if 'share_edit_users' in data:
+            board.share_edit_users = json.dumps(_safe_share_users(data['share_edit_users']))
     db.session.commit()
     return jsonify({'ok': True, 'name': board.name})
 
@@ -579,9 +624,9 @@ def kanban_contacts():
     results = []
 
     if can_users:
-        for u in User.query.filter_by(is_active=True).order_by(User.username).all():
+        for u in User.query.filter_by(is_active=True).order_by(User.name).all():
             name = u.name or u.username
-            results.append({'id': u.id, 'type': 'user', 'label': name, 'extra': u.username or ''})
+            results.append({'id': u.id, 'type': 'user', 'label': name, 'extra': ''})
 
     if can_other:
         for p in ContactPerson.query.order_by(ContactPerson.name).all():

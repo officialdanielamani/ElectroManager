@@ -382,6 +382,10 @@ def _apply_column_migrations():
         ("kanban_boards",        "board_icon",            "VARCHAR(48) DEFAULT 'bi-kanban'"),
         ("kanban_boards",        "board_color",           "VARCHAR(7) DEFAULT '#6b7280'"),
         ("kanban_boards",        "board_status",          "VARCHAR(10) DEFAULT 'shown'"),
+        ("kanban_boards",        "board_uuid",            "VARCHAR(12)"),
+        ("kanban_boards",        "is_public",             "BOOLEAN DEFAULT 0"),
+        ("kanban_boards",        "share_view_users",      "TEXT"),
+        ("kanban_boards",        "share_edit_users",      "TEXT"),
     ]
     with db.engine.connect() as conn:
         for table, col, col_type in additions:
@@ -410,6 +414,24 @@ def _apply_column_migrations():
                 conn.execute(db.text("UPDATE users SET user_uid = :uid WHERE id = :id"), {"uid": uid, "id": uid_row})
             conn.commit()
             logger.info(f"DB migration: backfilled user_uid for {len(rows)} user(s)")
+
+    # Backfill board_uuid for existing kanban boards that don't have one yet
+    def _gen_board_uuid():
+        chars = string.ascii_uppercase + string.digits
+        return ''.join(secrets.choice(chars) for _ in range(11)) + 'K'
+
+    with db.engine.connect() as conn:
+        rows = conn.execute(db.text("SELECT id FROM kanban_boards WHERE board_uuid IS NULL")).fetchall()
+        if rows:
+            existing = {r[0] for r in conn.execute(db.text("SELECT board_uuid FROM kanban_boards WHERE board_uuid IS NOT NULL")).fetchall()}
+            for (bid,) in rows:
+                uid = _gen_board_uuid()
+                while uid in existing:
+                    uid = _gen_board_uuid()
+                existing.add(uid)
+                conn.execute(db.text("UPDATE kanban_boards SET board_uuid = :uid WHERE id = :id"), {"uid": uid, "id": bid})
+            conn.commit()
+            logger.info(f"DB migration: backfilled board_uuid for {len(rows)} board(s)")
 
 
 with app.app_context():
