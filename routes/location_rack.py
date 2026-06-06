@@ -21,6 +21,7 @@ import string
 import logging
 
 _COLOR_RE = re.compile(r'^#[0-9A-Fa-f]{6}$')
+_DRAWER_ID_RE = re.compile(r'^[A-Za-z0-9_-]+$')
 
 def _sanitize_color(value, default='#6c757d'):
     """Return value if valid hex color, else default."""
@@ -31,6 +32,11 @@ def _sanitize_name(value, max_len=128):
     """Strip and truncate a name field."""
     return (value or '').strip()[:max_len]
 
+def _sanitize_drawer_id(value):
+    """Normalize and validate a drawer identifier."""
+    v = (value or '').strip()
+    return v if _DRAWER_ID_RE.match(v) else None
+
 def _safe_download_name(raw, fallback='download.bin'):
     """Return a safe Content-Disposition filename; never empty."""
     from werkzeug.utils import secure_filename as _sf
@@ -39,9 +45,15 @@ def _safe_download_name(raw, fallback='download.bin'):
 def _bytes_response(buf, mimetype, filename):
     """Return a Flask response for an in-memory BytesIO without using send_file,
     eliminating any path-expression concern for static analysis tools."""
+    safe_mimetypes = {'application/pdf', 'application/zip'}
+    safe_mimetype = mimetype if mimetype in safe_mimetypes else 'application/octet-stream'
     buf.seek(0)
-    response = make_response(buf.read())
-    response.headers['Content-Type'] = mimetype
+    payload = buf.read()
+    if not isinstance(payload, (bytes, bytearray)):
+        payload = bytes(payload)
+    response = make_response(payload)
+    response.headers['Content-Type'] = safe_mimetype
+    response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['Content-Disposition'] = (
         f'attachment; filename="{_safe_download_name(filename)}"'
     )
@@ -1007,11 +1019,14 @@ def drawer_qr_sticker(uuid, drawer_id):
     """Display QR sticker page for a single rack drawer (backward compat)."""
     if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
         abort(403)
+    safe_drawer_id = _sanitize_drawer_id(drawer_id)
+    if not safe_drawer_id:
+        abort(400)
     rack = Rack.query.filter_by(uuid=uuid).first_or_404()
     templates = StickerTemplate.query.filter_by(template_type='Drawer').all()
     return render_template('drawer_qr_sticker.html',
                            rack=rack,
-                           drawer_ids=[drawer_id],
+                           drawer_ids=[safe_drawer_id],
                            templates=templates)
 
 
@@ -1023,7 +1038,8 @@ def drawers_qr_sticker(uuid):
         abort(403)
     rack = Rack.query.filter_by(uuid=uuid).first_or_404()
     raw = request.args.get('drawers', '')
-    drawer_ids = [d.strip() for d in raw.split(',') if d.strip()]
+    drawer_ids = [_sanitize_drawer_id(d) for d in raw.split(',')]
+    drawer_ids = [d for d in drawer_ids if d]
     if not drawer_ids:
         abort(400)
     templates = StickerTemplate.query.filter_by(template_type='Drawer').all()
@@ -1039,12 +1055,15 @@ def api_drawer_sticker_preview(uuid, drawer_id, template_id):
     """Generate sticker preview SVG for a rack drawer"""
     if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
         return jsonify({'error': 'Permission denied'}), 403
+    safe_drawer_id = _sanitize_drawer_id(drawer_id)
+    if not safe_drawer_id:
+        return jsonify({'error': 'Invalid drawer ID'}), 400
     from qr_utils import get_drawer_data, render_template_to_svg
     rack = Rack.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
     if template.template_type != 'Drawer':
         return jsonify({'error': 'Template must be Drawer type'}), 400
-    data = get_drawer_data(rack, drawer_id)
+    data = get_drawer_data(rack, safe_drawer_id)
     svg_data = render_template_to_svg(template, data)
     return jsonify({
         'svg': svg_data,
@@ -1060,20 +1079,21 @@ def api_drawer_sticker_print(uuid, drawer_id, template_id):
     """Generate PDF sticker for a rack drawer"""
     if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
         return jsonify({'error': 'Permission denied'}), 403
-    if not re.match(r'^[A-Za-z0-9_-]+$', drawer_id):
+    safe_drawer_id = _sanitize_drawer_id(drawer_id)
+    if not safe_drawer_id:
         return jsonify({'error': 'Invalid drawer ID'}), 400
     from qr_utils import get_drawer_data, generate_single_sticker_pdf
     rack = Rack.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
     if template.template_type != 'Drawer':
         return jsonify({'error': 'Template must be Drawer type'}), 400
-    data = get_drawer_data(rack, drawer_id)
-    output = generate_single_sticker_pdf(template, data, f"{rack.uuid}_{drawer_id}")
+    data = get_drawer_data(rack, safe_drawer_id)
+    output = generate_single_sticker_pdf(template, data, f"{rack.uuid}_{safe_drawer_id}")
     if not isinstance(output, BytesIO):
         return jsonify({'error': 'Failed to generate PDF'}), 500
     log_audit(current_user.id, 'print', 'rack', rack.id,
-              f'Printed drawer sticker: {template.name} drawer {drawer_id}')
-    dl_name = f'{template.name}_{rack.uuid}_{drawer_id}.pdf'
+              f'Printed drawer sticker: {template.name} drawer {safe_drawer_id}')
+    dl_name = f'{template.name}_{rack.uuid}_{safe_drawer_id}.pdf'
     return _bytes_response(output, 'application/pdf', dl_name)
 
 
@@ -1089,10 +1109,8 @@ def api_drawers_sticker_print(uuid, template_id):
     if template.template_type != 'Drawer':
         return jsonify({'error': 'Template must be Drawer type'}), 400
     raw = request.args.get('drawers', '')
-    drawer_ids = [d.strip() for d in raw.split(',') if d.strip()]
-    if not drawer_ids:
-        return jsonify({'error': 'No drawers specified'}), 400
-    drawer_ids = [d for d in drawer_ids if re.match(r'^[A-Za-z0-9_-]+$', d)]
+    drawer_ids = [_sanitize_drawer_id(d) for d in raw.split(',')]
+    drawer_ids = [d for d in drawer_ids if d]
     if not drawer_ids:
         return jsonify({'error': 'No valid drawer IDs'}), 400
     output = generate_batch_stickers_pdf(template, drawer_ids, lambda did: get_drawer_data(rack, did))
