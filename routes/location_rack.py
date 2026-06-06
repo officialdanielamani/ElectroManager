@@ -57,6 +57,10 @@ def _bytes_response(buf, mimetype, filename):
     response.headers['Content-Disposition'] = (
         f'attachment; filename="{_safe_download_name(filename)}"'
     )
+    response.headers['Content-Security-Policy'] = "default-src 'none'; sandbox"
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'no-referrer'
+    response.headers['Cache-Control'] = 'no-store'
     return response
 
 logger = logging.getLogger(__name__)
