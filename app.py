@@ -388,6 +388,8 @@ def _apply_column_migrations():
         ("kanban_boards",        "share_edit_users",      "TEXT"),
         ("kanban_boards",        "created_at",            "DATETIME"),
         ("kanban_boards",        "updated_at",            "DATETIME"),
+        ("kanban_cards",         "created_at",            "DATETIME"),
+        ("kanban_cards",         "updated_at",            "DATETIME"),
     ]
     with db.engine.connect() as conn:
         for table, col, col_type in additions:

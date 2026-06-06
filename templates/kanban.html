@@ -139,14 +139,12 @@
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h5 class="mb-0"><i class="bi bi-kanban"></i> Kanban</h5>
     <div class="d-flex gap-1">
-        {% set _gear_board_id = active_board.id if active_board else (boards[0].id if boards else none) %}
-        {% if _gear_board_id %}
+        {% set _gear_board_id = active_board.id if active_board else (listing_boards[0]['id'] if listing_boards else 0) %}
         <button class="btn btn-outline-secondary btn-sm js-open-board-settings"
                 data-board-id="{{ _gear_board_id }}"
                 {% if not active_board %}data-open-listing="1"{% endif %}>
             <i class="bi bi-gear"></i>
         </button>
-        {% endif %}
         <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newBoardModal">
             <i class="bi bi-plus-lg"></i> New Board
         </button>
@@ -340,6 +338,16 @@
                         {% endfor %}
                     </div>
                     {% endif %}
+                    {# Card created / updated timestamps #}
+                    {% if card.created_at %}
+                    <div class="card-dates-row" style="border-top:1px solid var(--bs-border-color,#dee2e6)">
+                        <i class="bi bi-clock" style="font-size:.7rem"></i>
+                        {{ card.created_at.strftime('%d %b %Y') }}
+                        {% if card.updated_at and card.updated_at.strftime('%d %b %Y') != card.created_at.strftime('%d %b %Y') %}
+                        <span>· <i class="bi bi-pencil" style="font-size:.65rem"></i> {{ card.updated_at.strftime('%d %b %Y') }}</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                     {# Key persons #}
                     {% set persons = card.get_key_persons() %}
                     {% if persons %}
@@ -421,7 +429,7 @@
             {# ─── Tab 1: Board Settings ───────────── #}
             <div class="tab-pane fade show active" id="ks-tab-board">
 
-                {# Board Name + UUID #}
+                {# Board Name #}
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Board Name</label>
                     <div class="input-group">
@@ -429,19 +437,6 @@
                         <button class="btn btn-outline-primary" id="btn-rename-board-settings">
                             <i class="bi bi-check-lg"></i> Rename
                         </button>
-                    </div>
-                    <div class="mt-1">
-                        <small class="text-muted">Board ID: <code id="settings-board-uuid" class="user-select-all"></code></small>
-                    </div>
-                    <div class="mt-1">
-                        <small class="text-muted">Board Owner: <span id="settings-owner-display" class="fw-semibold"></span></small>
-                    </div>
-                    <div class="mt-1">
-                        <small class="text-muted">
-                            Created: <span id="settings-created-at"></span>
-                            &nbsp;·&nbsp;
-                            Updated: <span id="settings-updated-at"></span>
-                        </small>
                     </div>
                 </div>
 
@@ -465,6 +460,21 @@
                         <label class="form-label fw-semibold">Board Color</label>
                         <input type="color" class="form-control form-control-color w-100"
                                id="settings-board-color" value="#6b7280">
+                    </div>
+                </div>
+
+                {# Board info: ID, Owner, Timestamps #}
+                <div class="mb-3">
+                    <div class="d-flex flex-wrap gap-3">
+                        <small class="text-muted">Board ID: <code id="settings-board-uuid" class="user-select-all"></code></small>
+                        <small class="text-muted">Owner: <span id="settings-owner-display" class="fw-semibold"></span></small>
+                    </div>
+                    <div class="mt-1">
+                        <small class="text-muted">
+                            Created: <span id="settings-created-at"></span>
+                            &nbsp;·&nbsp;
+                            Updated: <span id="settings-updated-at"></span>
+                        </small>
                     </div>
                 </div>
 
@@ -1112,6 +1122,24 @@ let _boardCategories = [];
 let _selectedBoardIcon = 'bi-kanban';
 
 async function openBoardSettings(boardId, openListing) {
+    if (!boardId) {
+        // No boards exist yet — show blank settings modal in listing tab
+        ['settings-board-id','settings-board-name'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        ['settings-board-uuid','settings-owner-display','settings-created-at','settings-updated-at'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = '';
+        });
+        _boardCategories = [];
+        renderCatList();
+        const tab = document.querySelector('#kanbanSettingsTabs [data-bs-target="#ks-tab-listing"]');
+        if (tab) bootstrap.Tab.getOrCreateInstance(tab).show();
+        initBoardListing();
+        getModal('boardSettingsModal').show();
+        return;
+    }
     try {
         const s = await api('GET', '/kanban/boards/' + boardId + '/settings');
         document.getElementById('settings-board-id').value = boardId;

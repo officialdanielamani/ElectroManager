@@ -185,6 +185,8 @@ def _card_to_dict(card):
         'task_count': card.task_count,
         'completed_task_count': card.completed_task_count,
         'tasks': [_task_to_dict(t) for t in card.tasks],
+        'created_at': card.created_at.strftime('%d %b %Y') if card.created_at else '',
+        'updated_at': card.updated_at.strftime('%d %b %Y') if card.updated_at else '',
     }
 
 
