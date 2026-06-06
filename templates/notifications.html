@@ -93,6 +93,9 @@
                         {% if notif.type in ['kanban_task_overdue', 'kanban_task_due', 'kanban_task_soon'] %}
                         <div><span class="badge bg-secondary mt-1"><i class="bi bi-check2-square"></i> Kanban Task</span></div>
                         {% endif %}
+                        {% if notif.type == 'kanban_board_transfer' %}
+                        <div><span class="badge bg-info mt-1"><i class="bi bi-arrow-left-right"></i> Board Transfer</span></div>
+                        {% endif %}
                     </div>
                 </div>
             {% if notif.item or (notif.project is defined and notif.project) or is_kanban %}</a>{% else %}</div>{% endif %}

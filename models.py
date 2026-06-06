@@ -1645,6 +1645,9 @@ class KanbanBoard(db.Model):
     notify_start_days    = db.Column(db.Integer, default=1)
     notify_due_enabled   = db.Column(db.Boolean, default=False)
     notify_due_days      = db.Column(db.Integer, default=1)
+    last_transfer_from_id   = db.Column(db.Integer, nullable=True)
+    last_transfer_from_name = db.Column(db.String(128), nullable=True)
+    last_transfer_at        = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 

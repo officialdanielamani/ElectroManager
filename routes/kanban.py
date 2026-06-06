@@ -7,6 +7,7 @@ from models import (db, KanbanBoard, KanbanBoardUserState, KanbanColumn, KanbanC
                     KanbanTask, KanbanCategory, DEFAULT_KANBAN_COLUMNS,
                     ContactPerson, ContactOrganization, ContactGroup, User)
 from datetime import datetime, timezone, date
+from utils import log_audit
 import json
 import re
 import logging
@@ -429,6 +430,68 @@ def delete_board(board_id):
     return jsonify({'ok': True})
 
 
+@kanban_bp.route('/kanban/boards/<int:board_id>/transfer', methods=['POST'])
+@login_required
+def transfer_board(board_id):
+    """Transfer board ownership to another user. Previous owner becomes view-only."""
+    board = _board_or_404(board_id)  # only owner can transfer
+    data = request.get_json(silent=True) or {}
+    new_owner_id = data.get('new_owner_id')
+    if not new_owner_id:
+        return jsonify({'error': 'new_owner_id required'}), 400
+    if int(new_owner_id) == current_user.id:
+        return jsonify({'error': 'Cannot transfer to yourself'}), 400
+    from models import User
+    new_owner = db.session.get(User, int(new_owner_id))
+    if not new_owner:
+        return jsonify({'error': 'User not found'}), 404
+
+    prev_owner_id = current_user.id
+    prev_owner_name = current_user.name or current_user.username
+
+    # Get current share lists
+    edit_users = json.loads(board.share_edit_users or '[]')
+    view_users = json.loads(board.share_view_users or '[]')
+
+    # Remove new owner from any share lists (they'll become owner)
+    edit_users = [u for u in edit_users if u.get('id') != int(new_owner_id)]
+    view_users = [u for u in view_users if u.get('id') != int(new_owner_id)]
+
+    # Add previous owner to view-only (unless already in edit list — move to view only)
+    edit_users = [u for u in edit_users if u.get('id') != prev_owner_id]
+    if not any(u.get('id') == prev_owner_id for u in view_users):
+        # build pic url for previous owner
+        pic_url = ''
+        if current_user.profile_photo:
+            if current_user.profile_photo.startswith('share/'):
+                pic_url = f"/uploads/share/profile/{current_user.profile_photo[6:]}"
+            else:
+                pic_url = f"/uploads/userpicture/{current_user.profile_photo}"
+        view_users.append({'id': prev_owner_id, 'name': prev_owner_name, 'pic': pic_url})
+
+    # Apply transfer
+    board.user_id = int(new_owner_id)
+    board.share_edit_users = json.dumps(edit_users)
+    board.share_view_users = json.dumps(view_users)
+    board.updated_at = datetime.now(timezone.utc)
+
+    # Store transfer notification info on the board so the new owner sees it in /notifications
+    board.last_transfer_from_id = prev_owner_id
+    board.last_transfer_from_name = prev_owner_name
+    board.last_transfer_at = datetime.now(timezone.utc)
+
+    # Ensure new owner has a KanbanBoardUserState row
+    state = KanbanBoardUserState.query.filter_by(board_id=board.id, user_id=int(new_owner_id)).first()
+    if not state:
+        state = KanbanBoardUserState(board_id=board.id, user_id=int(new_owner_id))
+        db.session.add(state)
+
+    db.session.commit()
+    log_audit(current_user.id, 'transfer', 'kanban_board', board.id,
+              f'Transferred board "{board.name}" to user {new_owner_id}')
+    return jsonify({'ok': True})
+
+
 @kanban_bp.route('/kanban/boards/reorder', methods=['POST'])
 @login_required
 def reorder_boards():
@@ -527,6 +590,12 @@ def update_board_settings(board_id):
                 if len(edit_users) > 5:
                     return jsonify({'error': 'Maximum 5 users can have edit access'}), 400
                 board.share_edit_users = json.dumps(edit_users)
+                # Sync: remove edit users from view list to avoid duplicate access
+                edit_ids = {u['id'] for u in edit_users}
+                if board.share_view_users:
+                    view_list = json.loads(board.share_view_users)
+                    view_list = [u for u in view_list if u.get('id') not in edit_ids]
+                    board.share_view_users = json.dumps(view_list)
         board.updated_at = datetime.now(timezone.utc)
     else:
         # Non-owner can only save their personal notification preferences

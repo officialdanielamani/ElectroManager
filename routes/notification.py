@@ -330,6 +330,25 @@ def notifications():
         except Exception:
             pass
 
+    # --- Kanban board transfer notifications ---
+    from datetime import timedelta
+    transfer_threshold = today - timedelta(days=30)
+    transferred_boards = KanbanBoard.query.filter(
+        KanbanBoard.user_id == current_user.id,
+        KanbanBoard.last_transfer_at.isnot(None),
+    ).all()
+    for board in transferred_boards:
+        try:
+            if board.last_transfer_at and board.last_transfer_at.date() >= transfer_threshold:
+                from_name = board.last_transfer_from_name or 'Someone'
+                notifications.append({
+                    'kanban_board': board,
+                    'message': f'Board "{board.name}" was transferred to you by {from_name}',
+                    'type': 'kanban_board_transfer',
+                })
+        except Exception:
+            pass
+
     return render_template('notifications.html', notifications=notifications, can_edit_notifications=can_edit)
 
 
