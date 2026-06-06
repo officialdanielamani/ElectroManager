@@ -1604,6 +1604,37 @@ document.getElementById('transfer-search')?.addEventListener('input', async func
     resultsDiv.style.display = 'block';
 });
 
+// Delegation for transfer result clicks
+document.addEventListener('click', function(e) {
+    const transferResult = e.target.closest('.js-transfer-user-result');
+    if (transferResult) {
+        _transferSelectedUser = {
+            id: parseInt(transferResult.dataset.uid),
+            name: transferResult.dataset.name,
+            pic: transferResult.dataset.pic || '',
+        };
+        const selectedDiv = document.getElementById('transfer-selected');
+        if (selectedDiv) {
+            const avatar = _transferSelectedUser.pic
+                ? `<img src="${escHtml(_transferSelectedUser.pic)}" style="width:18px;height:18px;border-radius:50%;object-fit:cover;flex-shrink:0;vertical-align:middle" alt="">`
+                : `<i class="bi bi-person-badge-fill text-muted" style="font-size:.75rem"></i>`;
+            selectedDiv.innerHTML = `<span class="contact-badge">${avatar} ${escHtml(_transferSelectedUser.name)}
+                <span class="js-clear-transfer-user" style="cursor:pointer;color:var(--bs-danger)">&times;</span></span>`;
+        }
+        const inp = document.getElementById('transfer-search');
+        const res = document.getElementById('transfer-results');
+        if (inp) inp.value = '';
+        if (res) res.style.display = 'none';
+        return;
+    }
+    if (e.target.closest('.js-clear-transfer-user')) {
+        _transferSelectedUser = null;
+        const selectedDiv = document.getElementById('transfer-selected');
+        if (selectedDiv) selectedDiv.innerHTML = '';
+        return;
+    }
+});
+
 document.getElementById('btn-transfer-board-settings')?.addEventListener('click', () => {
     if (!_transferSelectedUser) { showErr('Please select a user to transfer to.'); return; }
     const id = document.getElementById('settings-board-id').value;
