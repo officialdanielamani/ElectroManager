@@ -109,12 +109,16 @@ def _safe_persons(raw_list):
             if ptype not in _VALID_PERSON_TYPES:
                 ptype = 'person'
             if name:
-                out.append({'id': int(pid) if pid is not None else None, 'name': name, 'type': ptype})
+                entry = {'id': int(pid) if pid is not None else None, 'name': name, 'type': ptype}
+                pic = item.get('pic', '')
+                if pic and isinstance(pic, str):
+                    entry['pic'] = pic[:512]
+                out.append(entry)
     return out
 
 
 def _safe_share_users(raw_list):
-    """Validate a list of {id, name} user dicts for board sharing."""
+    """Validate a list of {id, name, pic?} user dicts for board sharing."""
     if not isinstance(raw_list, list):
         return []
     out, seen = [], set()
@@ -123,7 +127,11 @@ def _safe_share_users(raw_list):
             uid = item.get('id')
             name = _strip(str(item.get('name', '')), 256)
             if uid is not None and name and uid not in seen:
-                out.append({'id': int(uid), 'name': name})
+                entry = {'id': int(uid), 'name': name}
+                pic = item.get('pic', '')
+                if pic and isinstance(pic, str):
+                    entry['pic'] = pic[:512]
+                out.append(entry)
                 seen.add(uid)
     return out
 
@@ -599,12 +607,19 @@ def board_presence(board_id):
                     access = 'edit'
             except (json.JSONDecodeError, TypeError):
                 pass
+    pic_url = ''
+    if current_user.profile_photo:
+        if current_user.profile_photo.startswith('share/'):
+            pic_url = f"/uploads/share/profile/{current_user.profile_photo[6:]}"
+        else:
+            pic_url = f"/uploads/userpicture/{current_user.profile_photo}"
     with _store_lock:
         _presence[board_id][current_user.id] = {
             'id': current_user.id, 'name': name,
             'last_seen': time.time(),
             'editing_card_id': int(editing_card_id) if editing_card_id else None,
             'access': access,
+            'pic': pic_url,
         }
     return jsonify({'ok': True})
 

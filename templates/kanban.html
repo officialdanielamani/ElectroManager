@@ -1073,7 +1073,7 @@ document.addEventListener('click', function(e) {
     // Contact search result
     const contactRow = e.target.closest('.js-contact-result');
     if (contactRow) {
-        addContact(parseInt(contactRow.dataset.id), contactRow.dataset.name, contactRow.dataset.type);
+        addContact(parseInt(contactRow.dataset.id), contactRow.dataset.name, contactRow.dataset.type, contactRow.dataset.pic || '');
         return;
     }
 
@@ -1254,16 +1254,20 @@ function renderShareBadges(type) {
     const list = type === 'view' ? _shareViewUsers : _shareEditUsers;
     const container = document.getElementById('share-' + type + '-badges');
     if (!container) return;
-    container.innerHTML = list.map(u =>
-        `<span class="contact-badge">
-            <i class="bi bi-person-badge-fill text-muted" style="font-size:.75rem"></i>
+    container.innerHTML = list.map(u => {
+        const picUrl = u.pic || _lookupContactPic(u.id);
+        const avatar = picUrl
+            ? `<img src="${escHtml(picUrl)}" style="width:18px;height:18px;border-radius:50%;object-fit:cover;flex-shrink:0;vertical-align:middle" alt="">`
+            : `<i class="bi bi-person-badge-fill text-muted" style="font-size:.75rem"></i>`;
+        return `<span class="contact-badge">
+            ${avatar}
             ${escHtml(u.name)}
             <span class="remove-share-user" data-uid="${u.id}" data-share-type="${type}" style="cursor:pointer;color:var(--bs-danger)">&times;</span>
-        </span>`
-    ).join('');
+        </span>`;
+    }).join('');
 }
 
-function addShareUser(id, name, type) {
+function addShareUser(id, name, pic, type) {
     const other = type === 'view' ? _shareEditUsers : _shareViewUsers;
     if (other.some(u => u.id === id)) {
         showErr('This user is already in the other sharing list. Remove them first.');
@@ -1271,7 +1275,7 @@ function addShareUser(id, name, type) {
     }
     const list = type === 'view' ? _shareViewUsers : _shareEditUsers;
     if (list.some(u => u.id === id)) return;
-    list.push({ id, name });
+    list.push({ id, name, pic: pic || '' });
     renderShareBadges(type);
     const inp = document.getElementById('share-' + type + '-search');
     const res = document.getElementById('share-' + type + '-results');
@@ -1298,16 +1302,20 @@ function filterShareSearch(type) {
         c.label.toLowerCase().includes(q)
     ).slice(0, 8);
     if (!matches.length) { resultsDiv.style.display = 'none'; return; }
-    resultsDiv.innerHTML = matches.map(c =>
-        `<div class="py-1 px-2 rounded js-share-user-result"
+    resultsDiv.innerHTML = matches.map(c => {
+        const avatar = c.pic
+            ? `<img src="${escHtml(c.pic)}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;flex-shrink:0" alt="">`
+            : `<i class="bi bi-person-badge-fill text-muted" style="font-size:.8rem;flex-shrink:0"></i>`;
+        const extra = c.extra ? `<small class="text-muted ms-1">${escHtml(c.extra)}</small>` : '';
+        return `<div class="py-1 px-2 rounded js-share-user-result d-flex align-items-center gap-2"
               style="cursor:pointer"
-              data-uid="${c.id}" data-name="${escHtml(c.label)}" data-share-type="${type}"
+              data-uid="${c.id}" data-name="${escHtml(c.label)}" data-pic="${escHtml(c.pic||'')}" data-share-type="${type}"
               onmouseover="this.style.background='var(--bs-secondary-bg)'"
               onmouseout="this.style.background=''">
-            <i class="bi bi-person-badge-fill text-muted me-1" style="font-size:.8rem"></i>
-            <strong>${escHtml(c.label)}</strong>
-        </div>`
-    ).join('');
+            ${avatar}
+            <strong>${escHtml(c.label)}</strong>${extra}
+        </div>`;
+    }).join('');
     resultsDiv.style.display = 'block';
 }
 
@@ -1318,7 +1326,7 @@ document.getElementById('share-edit-search')?.addEventListener('input', () => fi
 document.addEventListener('click', function(e) {
     const shareResult = e.target.closest('.js-share-user-result');
     if (shareResult) {
-        addShareUser(parseInt(shareResult.dataset.uid), shareResult.dataset.name, shareResult.dataset.shareType);
+        addShareUser(parseInt(shareResult.dataset.uid), shareResult.dataset.name, shareResult.dataset.pic || '', shareResult.dataset.shareType);
         return;
     }
     const removeShare = e.target.closest('.remove-share-user');
@@ -1798,6 +1806,10 @@ const _CONTACT_LABELS = {user:'User', person:'Contact', organization:'Org', grou
 
 function _contactIcon(type) { return _CONTACT_ICONS[type] || 'bi-person-fill'; }
 function _contactLabel(type) { return _CONTACT_LABELS[type] || type; }
+function _lookupContactPic(id) {
+    const c = (_allContacts || []).find(c => c.type === 'user' && c.id === id);
+    return c ? (c.pic || '') : '';
+}
 
 async function loadContacts() {
     if (_allContacts !== null) return;
@@ -1836,7 +1848,7 @@ function filterContacts() {
             : (c.extra ? `<small class="text-muted"> · ${escHtml(c.extra)}</small>` : '');
         return `<div class="py-1 px-2 rounded js-contact-result d-flex align-items-center gap-2"
               style="cursor:pointer"
-              data-id="${c.id}" data-name="${escHtml(c.label)}" data-type="${escHtml(c.type)}"
+              data-id="${c.id}" data-name="${escHtml(c.label)}" data-type="${escHtml(c.type)}" data-pic="${escHtml(c.pic||'')}"
               onmouseover="this.style.background='var(--bs-secondary-bg)'"
               onmouseout="this.style.background=''">
             ${avatar}
@@ -1849,10 +1861,10 @@ function filterContacts() {
     resultsDiv.style.display = 'block';
 }
 
-function addContact(id, name, type) {
+function addContact(id, name, type, pic) {
     const t = type || 'person';
     if (_selectedContacts.some(c => c.id === id && c.type === t)) return;
-    _selectedContacts.push({ id, name, type: t });
+    _selectedContacts.push({ id, name, type: t, pic: pic || '' });
     renderSelectedContacts();
     savePersonsJson();
     const inp = document.getElementById('contact-search-input');
@@ -1870,13 +1882,17 @@ function removeContact(id, type) {
 function renderSelectedContacts() {
     const div = document.getElementById('selected-contacts');
     if (!div) return;
-    div.innerHTML = _selectedContacts.map(c =>
-        `<span class="contact-badge">
-            <i class="bi ${_contactIcon(c.type)} text-muted" style="font-size:.75rem"></i>
+    div.innerHTML = _selectedContacts.map(c => {
+        const picUrl = c.pic || (c.type === 'user' ? _lookupContactPic(c.id) : '');
+        const avatar = picUrl
+            ? `<img src="${escHtml(picUrl)}" style="width:18px;height:18px;border-radius:50%;object-fit:cover;flex-shrink:0;vertical-align:middle" alt="">`
+            : `<i class="bi ${_contactIcon(c.type)} text-muted" style="font-size:.75rem"></i>`;
+        return `<span class="contact-badge">
+            ${avatar}
             ${escHtml(c.name)}
             <span class="remove-contact" data-contact-id="${c.id}" data-contact-type="${escHtml(c.type || 'person')}">&times;</span>
-        </span>`
-    ).join('');
+        </span>`;
+    }).join('');
 }
 
 function savePersonsJson() {
@@ -1975,7 +1991,7 @@ function populateCardModal(card) {
     populateCategoryDropdown(card.category_id || null);
 
     _selectedContacts = (card.key_persons || []).filter(p => p && p.name).map(p => ({
-        id: p.id, name: p.name, type: p.type || 'person',
+        id: p.id, name: p.name, type: p.type || 'person', pic: p.pic || '',
     }));
     renderSelectedContacts();
     savePersonsJson();
@@ -2272,11 +2288,15 @@ function _rtcUpdatePresence(presence) {
     if (others.length === 0) { bar.innerHTML = ''; }
     else {
         bar.innerHTML = others.map(p => {
-            const ini = (p.name||'?').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';
             const col = p.access === 'edit' ? '#0d6efd' : '#6c757d';
             const ring = p.editing_card_id ? ';outline:2px solid #dc3545;outline-offset:2px' : '';
             const tip = escHtml(p.name) + ' (' + (p.access==='edit'?'Edit':'View') + ')' + (p.editing_card_id?' — editing':'');
-            return `<span title="${tip}" style="background:${col}${ring};width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:#fff;cursor:default;flex-shrink:0">${escHtml(ini)}</span>`;
+            const baseStyle = `width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;cursor:default;overflow:hidden${ring}`;
+            if (p.pic) {
+                return `<span title="${tip}" style="${baseStyle};border:2px solid ${col}"><img src="${escHtml(p.pic)}" style="width:100%;height:100%;object-fit:cover" alt=""></span>`;
+            }
+            const ini = (p.name||'?').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';
+            return `<span title="${tip}" style="background:${col};${baseStyle};font-size:.65rem;font-weight:700;color:#fff">${escHtml(ini)}</span>`;
         }).join('');
     }
     const editingSet = new Set(
