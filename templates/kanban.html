@@ -139,7 +139,7 @@
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h5 class="mb-0"><i class="bi bi-kanban"></i> Kanban</h5>
     <div class="d-flex gap-1">
-        {% set _gear_board_id = active_board.id if active_board else (all_boards[0].id if all_boards else none) %}
+        {% set _gear_board_id = active_board.id if active_board else (boards[0].id if boards else none) %}
         {% if _gear_board_id %}
         <button class="btn btn-outline-secondary btn-sm js-open-board-settings"
                 data-board-id="{{ _gear_board_id }}"
@@ -169,15 +169,19 @@
     {% for b in boards %}
     {% set is_active = active_board and b.id == active_board.id %}
     {% set bcolor = b.board_color or '#6b7280' %}
+    {% set bshare = board_share_types.get(b.id, 'own') %}
     <li class="nav-item flex-shrink-0">
         <a class="nav-link board-colored{% if is_active %} active{% endif %}"
            href="{{ url_for('kanban.kanban', board=b.id) }}"
            style="--brd-color:{{ bcolor }}"
-           title="{{ b.name }}">
-            {% if b.board_status == 'pinned' %}
+           title="{{ b.name }}{% if bshare != 'own' %} · by {{ board_owners.get(b.id, '') }}{% endif %}">
+            {% if bshare == 'own' and b.board_status == 'pinned' %}
             <i class="bi bi-pin-angle-fill me-1" style="font-size:.75rem;opacity:.7"></i>
             {% endif %}
             <i class="bi {{ b.board_icon or 'bi-kanban' }} me-1"></i>{{ b.name }}
+            {% if bshare == 'public' %}<span class="badge bg-secondary ms-1" style="font-size:.6rem;vertical-align:middle">Public</span>
+            {% elif bshare == 'view_only' %}<span class="badge bg-info text-dark ms-1" style="font-size:.6rem;vertical-align:middle">View Only</span>
+            {% endif %}
         </a>
     </li>
     {% endfor %}
@@ -185,13 +189,22 @@
 
 {% if active_board %}
 <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-    <span class="text-muted small fw-semibold">{{ active_board.name }}</span>
+    <div class="d-flex align-items-center gap-2">
+        <span class="text-muted small fw-semibold">{{ active_board.name }}</span>
+        {% if not is_owner %}
+        <span class="badge bg-{{ 'secondary' if active_share_type == 'public' else 'info text-dark' }}" style="font-size:.68rem">
+            <i class="bi bi-eye"></i> {{ 'Public' if active_share_type == 'public' else 'View Only' }} · by {{ board_owners.get(active_board.id, '') }}
+        </span>
+        {% endif %}
+    </div>
     <div class="d-flex gap-1">
+        {% if is_owner %}
         <button class="btn btn-outline-secondary btn-sm"
                 data-bs-toggle="modal" data-bs-target="#colModal"
                 data-board-id="{{ active_board.id }}">
             <i class="bi bi-plus-lg"></i> Column
         </button>
+        {% endif %}
     </div>
 </div>
 
@@ -207,6 +220,7 @@
                 <span class="col-title" style="color:{{ col.color }}">{{ col.name }}</span>
                 <span class="badge rounded-pill bg-secondary" style="font-size:.68rem"
                       id="col-count-{{ col.id }}">{{ col.cards|length }}</span>
+                {% if is_owner %}
                 <div class="dropdown ms-1">
                     <button class="btn btn-link btn-sm p-0 text-muted" data-bs-toggle="dropdown"
                             aria-expanded="false">
@@ -231,6 +245,7 @@
                         </li>
                     </ul>
                 </div>
+                {% endif %}
             </div>
             <div class="kanban-col-body sortable-cards" id="cards-{{ col.id }}"
                  data-col-id="{{ col.id }}">
@@ -299,7 +314,8 @@
                         <div class="card-task-row" id="task-row-{{ task.id }}">
                             <input type="checkbox" class="form-check-input flex-shrink-0 js-task-check"
                                    data-task-id="{{ task.id }}" data-card-id="{{ card.id }}"
-                                   {% if task.completed %}checked{% endif %}>
+                                   {% if task.completed %}checked{% endif %}
+                                   {% if not is_owner %}disabled{% endif %}>
                             <span class="task-title{% if task.completed %} done{% endif %}">
                                 {{- task.title -}}
                             </span>
@@ -310,6 +326,7 @@
                                 {% if task.due_date %}{{ task.due_date.strftime('%d/%m') }}{% endif %}
                             </span>
                             {% endif %}
+                            {% if is_owner %}
                             <button class="btn btn-link btn-sm p-0 text-muted flex-shrink-0 js-task-edit"
                                     data-task-id="{{ task.id }}"
                                     data-task-title="{{ task.title|e }}"
@@ -318,6 +335,7 @@
                                     style="font-size:.72rem;line-height:1.4" title="Edit task">
                                 <i class="bi bi-pencil-square"></i>
                             </button>
+                            {% endif %}
                         </div>
                         {% endfor %}
                     </div>
@@ -335,12 +353,14 @@
                 </div>
                 {% endfor %}
             </div>
+            {% if is_owner %}
             <div class="kanban-add-card">
                 <button class="btn btn-link btn-sm text-muted w-100 text-start py-1 js-add-card"
                         data-board-id="{{ active_board.id }}" data-col-id="{{ col.id }}">
                     <i class="bi bi-plus"></i> Add card
                 </button>
             </div>
+            {% endif %}
         </div>
         {% endfor %}
     </div>
@@ -412,6 +432,16 @@
                     </div>
                     <div class="mt-1">
                         <small class="text-muted">Board ID: <code id="settings-board-uuid" class="user-select-all"></code></small>
+                    </div>
+                    <div class="mt-1">
+                        <small class="text-muted">Board Owner: <span id="settings-owner-display" class="fw-semibold"></span></small>
+                    </div>
+                    <div class="mt-1">
+                        <small class="text-muted">
+                            Created: <span id="settings-created-at"></span>
+                            &nbsp;·&nbsp;
+                            Updated: <span id="settings-updated-at"></span>
+                        </small>
                     </div>
                 </div>
 
@@ -886,6 +916,8 @@ const BOARD_ID = {{ active_board.id if active_board else 'null' }};
 const VERIFY_PW_URL = '{{ url_for("auth.verify_password") }}';
 const LOGOUT_URL    = '{{ url_for("auth.logout") }}';
 const CAN_SHARE_BOARD = {{ can_share_board | tojson }};
+const IS_OWNER        = {{ is_owner | tojson }};
+const ACTIVE_SHARE_TYPE = {{ active_share_type | tojson }};
 
 // ── Helpers ──────────────────────────────────────────────────────
 async function api(method, url, body) {
@@ -1086,6 +1118,32 @@ async function openBoardSettings(boardId, openListing) {
         document.getElementById('settings-board-name').value = s.name;
         const uuidEl = document.getElementById('settings-board-uuid');
         if (uuidEl) uuidEl.textContent = s.board_uuid || '';
+        // Owner info + timestamps
+        const ownerEl = document.getElementById('settings-owner-display');
+        if (ownerEl) ownerEl.textContent = s.owner_display || '';
+        const createdEl = document.getElementById('settings-created-at');
+        if (createdEl) createdEl.textContent = s.created_at || '—';
+        const updatedEl = document.getElementById('settings-updated-at');
+        if (updatedEl) updatedEl.textContent = s.updated_at || '—';
+        // Toggle edit controls for non-owners
+        const _settingsEditable = s.is_owner;
+        ['settings-board-name','settings-notify-start','settings-notify-start-days',
+         'settings-notify-due','settings-notify-due-days'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.disabled = !_settingsEditable;
+        });
+        const _colorEl = document.getElementById('settings-board-color');
+        if (_colorEl) _colorEl.disabled = !_settingsEditable;
+        const _iconPickerBtn = document.getElementById('btn-open-board-icon-picker');
+        if (_iconPickerBtn) _iconPickerBtn.disabled = !_settingsEditable;
+        const _renameBtn = document.getElementById('btn-rename-board-settings');
+        if (_renameBtn) _renameBtn.style.display = _settingsEditable ? '' : 'none';
+        const _saveSettingsBtn = document.getElementById('btn-save-board-settings');
+        if (_saveSettingsBtn) _saveSettingsBtn.style.display = _settingsEditable ? '' : 'none';
+        const _delBoardBtn = document.getElementById('btn-delete-board-settings');
+        if (_delBoardBtn) _delBoardBtn.style.display = _settingsEditable ? '' : 'none';
+        const _addCatBtn = document.getElementById('btn-show-add-cat');
+        if (_addCatBtn) _addCatBtn.style.display = _settingsEditable ? '' : 'none';
         // Icon & color
         _selectedBoardIcon = s.board_icon || 'bi-kanban';
         document.getElementById('settings-board-icon').value = _selectedBoardIcon;
@@ -1341,12 +1399,15 @@ let _listingSortable = null;
 
 // Populate listing from server-side data injected into the page
 function initBoardListing() {
-    _listingBoards = [{% if all_boards is defined %}{% for b in all_boards %}{"id":{{ b.id }},"name":{{ b.name|tojson }},"board_icon":{{ (b.board_icon or 'bi-kanban')|tojson }},"board_color":{{ (b.board_color or '#6b7280')|tojson }},"board_status":{{ (b.board_status or 'shown')|tojson }},"position":{{ b.position }}}{% if not loop.last %},{% endif %}{% endfor %}{% endif %}].map(b => ({
+    _listingBoards = ({{ listing_boards | tojson }}).map(b => ({
         id: b.id, name: b.name,
-        board_icon: b.board_icon || 'bi-kanban',
-        board_color: b.board_color || '#6b7280',
+        board_icon:   b.board_icon   || 'bi-kanban',
+        board_color:  b.board_color  || '#6b7280',
         board_status: b.board_status || 'shown',
-        position: b.position,
+        position:     b.position,
+        share_type:   b.share_type   || 'own',
+        owner_name:   b.owner_name   || '',
+        is_own:       b.is_own !== false,
     }));
     renderBoardListing();
 }
@@ -1366,10 +1427,18 @@ function renderBoardListing() {
                         <i class="bi ${icons[s]}"></i> <span class="d-none d-sm-inline">${labels[s]}</span>
                     </button>`;
         }).join('');
+        let shareBadge = '';
+        if (b.share_type === 'public') {
+            shareBadge = `<span class="badge bg-secondary ms-1" style="font-size:.65rem">Public</span>`;
+        } else if (b.share_type === 'view_only') {
+            shareBadge = `<span class="badge bg-info text-dark ms-1" style="font-size:.65rem">View Only</span>`;
+        }
+        const ownerStr = b.is_own ? '' :
+            `<span class="text-muted ms-1" style="font-size:.76rem">by ${escHtml(b.owner_name)}</span>`;
         return `<div class="board-listing-item" data-board-id="${b.id}">
             <span class="drag-handle"><i class="bi bi-grip-vertical"></i></span>
             <i class="bi ${escHtml(b.board_icon)}" style="color:${escHtml(b.board_color)};flex-shrink:0"></i>
-            <span class="board-name">${escHtml(b.name)}</span>
+            <span class="board-name">${escHtml(b.name)}${shareBadge}${ownerStr}</span>
             <div class="d-flex gap-1 flex-shrink-0">${btns}</div>
         </div>`;
     }).join('') || '<p class="text-muted small">No boards yet.</p>';
@@ -1402,7 +1471,7 @@ document.addEventListener('click', function(eInner) {
 
 document.getElementById('btn-save-listing')?.addEventListener('click', async () => {
     const boards = _listingBoards.map((b, idx) => ({
-        id: b.id, position: idx, board_status: b.board_status,
+        id: b.id, position: idx, board_status: b.board_status, is_own: b.is_own,
     }));
     try {
         await api('PUT', '/kanban/boards/listing', { boards });
@@ -1746,6 +1815,35 @@ function savePersonsJson() {
     if (el) el.value = JSON.stringify(_selectedContacts);
 }
 
+function _applyCardModalReadOnly(readOnly) {
+    ['card-modal-title','card-modal-priority','card-modal-category','card-modal-label-color',
+     'card-modal-start-date','card-modal-due-date','card-modal-completed',
+     'contact-search-input','card-modal-desc'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = readOnly;
+    });
+    const saveBtn = document.getElementById('btn-save-card');
+    const delBtn  = document.getElementById('btn-delete-card-modal');
+    if (saveBtn) saveBtn.style.display = readOnly ? 'none' : '';
+    if (delBtn)  delBtn.style.display  = readOnly ? 'none' : '';
+    // Task add row
+    const taskInputGroup = document.querySelector('#cardModal .input-group.input-group-sm.mb-1');
+    const taskDateRow    = document.querySelector('#cardModal .row.g-1');
+    if (taskInputGroup) taskInputGroup.style.display = readOnly ? 'none' : '';
+    if (taskDateRow)    taskDateRow.style.display    = readOnly ? 'none' : '';
+    // View-only notice in footer
+    let notice = document.getElementById('card-modal-readonly-notice');
+    if (!notice && readOnly) {
+        notice = document.createElement('small');
+        notice.id = 'card-modal-readonly-notice';
+        notice.className = 'text-muted';
+        notice.innerHTML = '<i class="bi bi-eye me-1"></i>View Only';
+        const footer = document.querySelector('#cardModal .modal-footer');
+        if (footer) footer.insertBefore(notice, footer.firstChild);
+    }
+    if (notice) notice.style.display = readOnly ? '' : 'none';
+}
+
 // ── Card detail modal ────────────────────────────────────────────
 let _currentCardId = null;
 let _currentBoardCategories = [];
@@ -1812,6 +1910,7 @@ function populateCardModal(card) {
 
     renderModalTaskList(card.tasks, card.task_count, card.completed_task_count);
     updateMarkDoneState(card.task_count, card.completed_task_count);
+    _applyCardModalReadOnly(!IS_OWNER);
 }
 
 function renderModalTaskList(tasks, total, done) {
@@ -1827,20 +1926,23 @@ function renderModalTaskList(tasks, total, done) {
                 t.start_date && t.due_date ? '–' : ''}${
                 t.due_date ? t.due_date : ''}</small>`
             : '';
-        return `<div class="d-flex align-items-center gap-1 mb-1 py-1 border-bottom" id="m-task-row-${t.id}">
-            <input class="form-check-input flex-shrink-0 js-modal-task-check"
-                   type="checkbox" data-task-id="${t.id}" ${t.completed ? 'checked' : ''}>
-            <span class="flex-grow-1 ${t.completed ? 'text-decoration-line-through text-muted' : ''}"
-                  style="font-size:.85rem">${escHtml(t.title)}</span>
-            ${dateStr}
-            <button class="btn btn-link btn-sm p-0 text-primary ms-1 js-modal-task-info"
+        const taskBtns = IS_OWNER
+            ? `<button class="btn btn-link btn-sm p-0 text-primary ms-1 js-modal-task-info"
                     data-task-id="${t.id}"
                     data-task-title="${escHtml(t.title)}"
                     data-task-start="${t.start_date || ''}"
                     data-task-due="${t.due_date || ''}"
                     title="Edit task"><i class="bi bi-pencil-square"></i></button>
-            <button class="btn btn-link btn-sm p-0 text-danger ms-1 js-modal-task-del"
-                    data-task-id="${t.id}" title="Delete"><i class="bi bi-trash"></i></button>
+               <button class="btn btn-link btn-sm p-0 text-danger ms-1 js-modal-task-del"
+                    data-task-id="${t.id}" title="Delete"><i class="bi bi-trash"></i></button>`
+            : '';
+        return `<div class="d-flex align-items-center gap-1 mb-1 py-1 border-bottom" id="m-task-row-${t.id}">
+            <input class="form-check-input flex-shrink-0 js-modal-task-check"
+                   type="checkbox" data-task-id="${t.id}" ${t.completed ? 'checked' : ''} ${IS_OWNER ? '' : 'disabled'}>
+            <span class="flex-grow-1 ${t.completed ? 'text-decoration-line-through text-muted' : ''}"
+                  style="font-size:.85rem">${escHtml(t.title)}</span>
+            ${dateStr}
+            ${taskBtns}
         </div>`;
     }).join('');
 
@@ -2025,31 +2127,33 @@ function updateCardTaskBadge(cardEl) {
     }
 }
 
-// ── Drag and drop ────────────────────────────────────────────────
-document.querySelectorAll('.sortable-cards').forEach(el => {
-    Sortable.create(el, {
-        group: 'cards',
-        animation: 150,
-        ghostClass: 'sortable-ghost',
-        chosenClass: 'sortable-chosen',
-        handle: '.card-header-band',
-        filter: '.js-task-edit,.js-task-del-board,.js-task-check,.js-toggle-tasks',
-        onEnd: async () => {
-            const board = document.getElementById('kanban-board');
-            if (!board) return;
-            const cols = Array.from(board.querySelectorAll('.sortable-cards')).map(c => ({
-                column_id: parseInt(c.dataset.colId),
-                card_ids: Array.from(c.querySelectorAll('.kanban-card'))
-                              .map(x => parseInt(x.dataset.cardId)),
-            }));
-            cols.forEach(c => {
-                const counter = document.getElementById('col-count-' + c.column_id);
-                if (counter) counter.textContent = c.card_ids.length;
-            });
-            try { await api('POST', '/kanban/cards/reorder', { columns: cols }); }
-            catch(e) { console.error('Reorder failed', e); }
-        }
+// ── Drag and drop (owners only) ──────────────────────────────────
+if (IS_OWNER) {
+    document.querySelectorAll('.sortable-cards').forEach(el => {
+        Sortable.create(el, {
+            group: 'cards',
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            handle: '.card-header-band',
+            filter: '.js-task-edit,.js-task-del-board,.js-task-check,.js-toggle-tasks',
+            onEnd: async () => {
+                const board = document.getElementById('kanban-board');
+                if (!board) return;
+                const cols = Array.from(board.querySelectorAll('.sortable-cards')).map(c => ({
+                    column_id: parseInt(c.dataset.colId),
+                    card_ids: Array.from(c.querySelectorAll('.kanban-card'))
+                                  .map(x => parseInt(x.dataset.cardId)),
+                }));
+                cols.forEach(c => {
+                    const counter = document.getElementById('col-count-' + c.column_id);
+                    if (counter) counter.textContent = c.card_ids.length;
+                });
+                try { await api('POST', '/kanban/cards/reorder', { columns: cols }); }
+                catch(e) { console.error('Reorder failed', e); }
+            }
+        });
     });
-});
+}
 </script>
 {% endblock %}

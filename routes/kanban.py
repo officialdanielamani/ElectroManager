@@ -3,8 +3,8 @@ Kanban Routes Blueprint
 """
 from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, flash
 from flask_login import login_required, current_user
-from models import (db, KanbanBoard, KanbanColumn, KanbanCard, KanbanTask,
-                    KanbanCategory, DEFAULT_KANBAN_COLUMNS,
+from models import (db, KanbanBoard, KanbanBoardUserState, KanbanColumn, KanbanCard,
+                    KanbanTask, KanbanCategory, DEFAULT_KANBAN_COLUMNS,
                     ContactPerson, ContactOrganization, ContactGroup, User)
 from datetime import datetime, timezone, date
 import json
@@ -94,10 +94,30 @@ def _safe_share_users(raw_list):
 # ── Auth helpers ─────────────────────────────────────────────────
 
 def _board_or_404(board_id):
+    """Requires current user to OWN the board (for write operations)."""
     board = KanbanBoard.query.filter_by(id=board_id, user_id=current_user.id).first()
     if not board:
         abort(404)
     return board
+
+
+def _accessible_board_or_404(board_id):
+    """Returns (board, is_owner). Allows owner, public, and view-shared access."""
+    board = KanbanBoard.query.filter_by(id=board_id, user_id=current_user.id).first()
+    if board:
+        return board, True
+    board = db.session.get(KanbanBoard, board_id)
+    if board:
+        if board.is_public:
+            return board, False
+        if board.share_view_users:
+            try:
+                users = json.loads(board.share_view_users)
+                if any(u.get('id') == current_user.id for u in users):
+                    return board, False
+            except (json.JSONDecodeError, TypeError):
+                pass
+    abort(404)
 
 
 def _column_or_404(col_id):
@@ -109,6 +129,15 @@ def _column_or_404(col_id):
 def _card_or_404(card_id):
     card = KanbanCard.query.get_or_404(card_id)
     _board_or_404(card.board_id)
+    return card
+
+
+def _card_readable_or_404(card_id):
+    """Returns card if current user can read it (owns board OR has shared view access)."""
+    card = db.session.get(KanbanCard, card_id)
+    if not card:
+        abort(404)
+    _accessible_board_or_404(card.board_id)
     return card
 
 
@@ -161,31 +190,129 @@ def _card_to_dict(card):
 
 # ── Main board view ──────────────────────────────────────────────
 
+def _owner_display(user):
+    """Returns 'Name - title' or just 'Name' for a board owner."""
+    if not user:
+        return 'Unknown'
+    name = user.name or user.username
+    return f"{name} - {user.short_info}" if user.short_info else name
+
+
 @kanban_bp.route('/kanban')
 @login_required
 def kanban():
-    all_boards = KanbanBoard.query.filter_by(user_id=current_user.id).order_by(KanbanBoard.position).all()
-    # Pinned boards first, then shown; hidden boards are excluded from tabs
-    boards = sorted(
-        [b for b in all_boards if (b.board_status or 'shown') != 'hidden'],
-        key=lambda b: (0 if (b.board_status or 'shown') == 'pinned' else 1, b.position)
+    # ── Own boards ──────────────────────────────────────────────
+    own_boards = KanbanBoard.query.filter_by(user_id=current_user.id).order_by(KanbanBoard.position).all()
+
+    # ── Public boards (other users) ────────────────────────────
+    public_boards = KanbanBoard.query.filter(
+        KanbanBoard.user_id != current_user.id,
+        KanbanBoard.is_public == True
+    ).order_by(KanbanBoard.id).all()
+
+    # ── View-only shared boards ─────────────────────────────────
+    view_only_boards = []
+    public_ids = {b.id for b in public_boards}
+    for b in KanbanBoard.query.filter(
+        KanbanBoard.user_id != current_user.id,
+        KanbanBoard.is_public == False,
+        KanbanBoard.share_view_users.isnot(None),
+    ).all():
+        if b.id in public_ids:
+            continue
+        try:
+            if any(u.get('id') == current_user.id for u in json.loads(b.share_view_users or '[]')):
+                view_only_boards.append(b)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    # ── Per-user state for non-own boards ───────────────────────
+    non_own_ids = {b.id for b in public_boards + view_only_boards}
+    user_states = {}
+    if non_own_ids:
+        for s in KanbanBoardUserState.query.filter(
+            KanbanBoardUserState.user_id == current_user.id,
+            KanbanBoardUserState.board_id.in_(non_own_ids)
+        ).all():
+            user_states[s.board_id] = s
+
+    def _meta(board, share_type):
+        if share_type == 'own':
+            return {
+                'board': board, 'share_type': 'own', 'is_own': True,
+                'status': board.board_status or 'shown',
+                'position': board.position,
+                'owner_name': _owner_display(board.user),
+                'owner_id': board.user_id,
+            }
+        st = user_states.get(board.id)
+        return {
+            'board': board, 'share_type': share_type, 'is_own': False,
+            'status': st.status if st else 'shown',
+            'position': st.position if st else 999,
+            'owner_name': _owner_display(board.user),
+            'owner_id': board.user_id,
+        }
+
+    all_meta = (
+        [_meta(b, 'own') for b in own_boards] +
+        [_meta(b, 'public') for b in public_boards] +
+        [_meta(b, 'view_only') for b in view_only_boards]
     )
 
+    # Visible (not hidden), pinned first
+    visible_meta = sorted(
+        [m for m in all_meta if m['status'] != 'hidden'],
+        key=lambda m: (0 if m['status'] == 'pinned' else 1, m['position'])
+    )
+    boards = [m['board'] for m in visible_meta]
+
+    # Board share type + owner lookup dicts (for template)
+    board_share_types = {m['board'].id: m['share_type'] for m in all_meta}
+    board_owners      = {m['board'].id: m['owner_name'] for m in all_meta}
+
+    # Active board selection
     active_board_id = request.args.get('board', type=int)
-    active_board = None
-
+    active_meta = None
     if active_board_id:
-        active_board = KanbanBoard.query.filter_by(id=active_board_id, user_id=current_user.id).first()
+        active_meta = next((m for m in all_meta if m['board'].id == active_board_id), None)
+    if not active_meta and visible_meta:
+        active_meta = visible_meta[0]
+    active_board   = active_meta['board'] if active_meta else None
+    is_owner        = active_meta['is_own'] if active_meta else True
+    active_share_type = active_meta['share_type'] if active_meta else 'own'
 
-    if not active_board and boards:
-        active_board = boards[0]
+    # Listing data for Board Listing JS (all accessible boards)
+    listing_boards = [
+        {
+            'id':          m['board'].id,
+            'name':        m['board'].name,
+            'board_icon':  m['board'].board_icon or 'bi-kanban',
+            'board_color': m['board'].board_color or '#6b7280',
+            'board_status': m['status'],
+            'position':    m['position'],
+            'share_type':  m['share_type'],
+            'owner_name':  m['owner_name'],
+            'is_own':      m['is_own'],
+        }
+        for m in all_meta
+    ]
 
     can_share_board = (
         current_user.has_permission('kanban', 'share_board') and
         current_user.has_permission('settings_sections.contacts', 'view_users')
     )
-    return render_template('kanban.html', boards=boards, all_boards=all_boards,
-                           active_board=active_board, can_share_board=can_share_board)
+    return render_template('kanban.html',
+        boards=boards,
+        all_boards=own_boards,
+        active_board=active_board,
+        is_owner=is_owner,
+        active_share_type=active_share_type,
+        board_share_types=board_share_types,
+        board_owners=board_owners,
+        listing_boards=listing_boards,
+        can_share_board=can_share_board,
+    )
 
 
 # ── Board CRUD ───────────────────────────────────────────────────
@@ -237,7 +364,9 @@ def reorder_boards():
 @kanban_bp.route('/kanban/boards/<int:board_id>/settings', methods=['GET'])
 @login_required
 def get_board_settings(board_id):
-    board = _board_or_404(board_id)
+    board, viewer_is_owner = _accessible_board_or_404(board_id)
+    owner = board.user
+    owner_display = _owner_display(owner)
     return jsonify({
         'id': board.id,
         'name': board.name,
@@ -256,6 +385,10 @@ def get_board_settings(board_id):
             {'id': c.id, 'name': c.name, 'position': c.position}
             for c in board.categories
         ],
+        'owner_display': owner_display,
+        'created_at': board.created_at.strftime('%Y-%m-%d %H:%M') if board.created_at else '',
+        'updated_at': board.updated_at.strftime('%Y-%m-%d %H:%M') if board.updated_at else '',
+        'is_owner': viewer_is_owner,
     })
 
 
@@ -291,6 +424,7 @@ def update_board_settings(board_id):
             board.share_view_users = json.dumps(_safe_share_users(data['share_view_users']))
         if 'share_edit_users' in data:
             board.share_edit_users = json.dumps(_safe_share_users(data['share_edit_users']))
+    board.updated_at = datetime.now(timezone.utc)
     db.session.commit()
     return jsonify({'ok': True, 'name': board.name})
 
@@ -298,23 +432,41 @@ def update_board_settings(board_id):
 @kanban_bp.route('/kanban/boards/listing', methods=['PUT'])
 @login_required
 def update_boards_listing():
-    """Batch-update board order and status from the Board Listing tab."""
+    """Batch-update board order and status from the Board Listing tab.
+    Own boards: update board.position / board.board_status directly.
+    Shared boards: upsert KanbanBoardUserState per user.
+    """
     data = request.get_json(silent=True) or {}
     items = data.get('boards', [])
-    user_board_ids = {
+    own_board_ids = {
         b.id for b in KanbanBoard.query.filter_by(user_id=current_user.id).all()
     }
+    valid_statuses = ('pinned', 'shown', 'hidden')
     for item in items:
         bid = item.get('id')
-        if bid not in user_board_ids:
+        if not bid:
             continue
-        updates = {}
-        if 'position' in item:
-            updates['position'] = int(item['position'])
-        if 'board_status' in item and item['board_status'] in ('pinned', 'shown', 'hidden'):
-            updates['board_status'] = item['board_status']
-        if updates:
-            KanbanBoard.query.filter_by(id=bid).update(updates)
+        new_pos    = int(item.get('position', 0))
+        new_status = item.get('board_status', 'shown')
+        if new_status not in valid_statuses:
+            new_status = 'shown'
+        if bid in own_board_ids:
+            KanbanBoard.query.filter_by(id=bid).update(
+                {'position': new_pos, 'board_status': new_status}
+            )
+        elif item.get('is_own') is False:
+            # Shared board — upsert per-user state
+            state = KanbanBoardUserState.query.filter_by(
+                board_id=bid, user_id=current_user.id
+            ).first()
+            if state:
+                state.position = new_pos
+                state.status   = new_status
+            else:
+                db.session.add(KanbanBoardUserState(
+                    board_id=bid, user_id=current_user.id,
+                    position=new_pos, status=new_status
+                ))
     db.session.commit()
     return jsonify({'ok': True})
 
@@ -479,7 +631,7 @@ def create_card(board_id):
 @kanban_bp.route('/kanban/cards/<int:card_id>', methods=['GET'])
 @login_required
 def get_card(card_id):
-    card = _card_or_404(card_id)
+    card = _card_readable_or_404(card_id)
     return jsonify(_card_to_dict(card))
 
 
