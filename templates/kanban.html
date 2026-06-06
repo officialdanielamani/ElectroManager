@@ -944,6 +944,31 @@ const CAN_EDIT = IS_OWNER || ACTIVE_SHARE_TYPE === 'edit';
 const CURRENT_USER_ID   = {{ current_user.id | tojson }};
 const CURRENT_USER_NAME = {{ (current_user.name or current_user.username) | tojson }};
 
+// ── Card collapse persistence (localStorage) ─────────────────────
+function _collapseKey() { return `kc_${CURRENT_USER_ID}_${BOARD_ID}`; }
+function _collapseLoad() {
+    try { return new Set(JSON.parse(localStorage.getItem(_collapseKey()) || '[]')); }
+    catch(e) { return new Set(); }
+}
+function _collapseSave(set) {
+    try { localStorage.setItem(_collapseKey(), JSON.stringify([...set])); }
+    catch(e) {}
+}
+function _applyCollapseState() {
+    if (!BOARD_ID) return;
+    const collapsed = _collapseLoad();
+    let pruned = false;
+    collapsed.forEach(cardId => {
+        const tasksDiv = document.getElementById('tasks-' + cardId);
+        if (!tasksDiv) { collapsed.delete(cardId); pruned = true; return; }
+        tasksDiv.classList.add('collapsed');
+        const btn = document.querySelector(`.js-toggle-tasks[data-card-id="${cardId}"]`);
+        const icon = btn?.querySelector('i');
+        if (icon) icon.className = 'bi bi-chevron-down';
+    });
+    if (pruned) _collapseSave(collapsed);
+}
+
 // ── Helpers ──────────────────────────────────────────────────────
 async function api(method, url, body) {
     const opts = { method, headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF } };
@@ -998,13 +1023,16 @@ document.addEventListener('click', function(e) {
     const toggleBtn = e.target.closest('.js-toggle-tasks');
     if (toggleBtn) {
         e.stopPropagation();
-        const cardId = toggleBtn.dataset.cardId;
+        const cardId = parseInt(toggleBtn.dataset.cardId);
         const tasksDiv = document.getElementById('tasks-' + cardId);
         const icon = toggleBtn.querySelector('i');
         if (tasksDiv) {
             tasksDiv.classList.toggle('collapsed');
-            if (icon) icon.className = tasksDiv.classList.contains('collapsed')
-                ? 'bi bi-chevron-down' : 'bi bi-chevron-up';
+            const isCollapsed = tasksDiv.classList.contains('collapsed');
+            if (icon) icon.className = isCollapsed ? 'bi bi-chevron-down' : 'bi bi-chevron-up';
+            const collapsed = _collapseLoad();
+            if (isCollapsed) collapsed.add(cardId); else collapsed.delete(cardId);
+            _collapseSave(collapsed);
         }
         return;
     }
@@ -2444,7 +2472,8 @@ function _rtcCardHtml(card) {
   </div></div>`;
 }
 
-// Start polling when page has an active board
+// Restore card collapse states from localStorage, then start polling
+_applyCollapseState();
 if (BOARD_ID) _rtcStart(BOARD_ID);
 window.addEventListener('beforeunload', _rtcStop);
 
