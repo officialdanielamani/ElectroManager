@@ -61,6 +61,7 @@
 /* tasks inside card */
 .card-tasks { border-top: 1px solid var(--bs-border-color, #dee2e6); padding: .3rem .45rem; }
 .card-tasks.collapsed { display: none; }
+.card-tasks.collapsed ~ .card-updated-row { display: none; }
 .card-task-row {
     display: flex; align-items: center; gap: .3rem; padding: .16rem 0;
 }
@@ -347,13 +348,10 @@
                         {% endfor %}
                     </div>
                     {% endif %}
-                    {# Card created / updated timestamps #}
-                    {% if card.created_at %}
-                    <div class="card-dates-row" style="border-top:1px solid var(--bs-border-color,#dee2e6);flex-direction:column;align-items:flex-start;gap:1px">
-                        <span><i class="bi bi-clock" style="font-size:.65rem"></i> {{ card.created_at.strftime('%d %b %Y | %H:%M') }}{% if card.created_by %} · {{ (card.created_by.name or '') }}{% endif %}</span>
-                        {% if card.updated_at %}
+                    {# Updated timestamp — hidden when tasks are collapsed #}
+                    {% if card.updated_at %}
+                    <div class="card-dates-row card-updated-row" style="border-top:1px solid var(--bs-border-color,#dee2e6)">
                         <span><i class="bi bi-pencil" style="font-size:.65rem"></i> {{ card.updated_at.strftime('%d %b %Y | %H:%M') }}{% if card.updated_by %} · {{ (card.updated_by.name or '') }}{% endif %}</span>
-                        {% endif %}
                     </div>
                     {% endif %}
                     {# Key persons #}
@@ -2335,7 +2333,7 @@ function _rtcOnTaskCreated(ev) {
             tasksDiv = document.createElement('div');
             tasksDiv.className = 'card-tasks';
             tasksDiv.id = 'tasks-' + card_id;
-            const tsRow = cardEl.querySelector('.card-dates-row[style*="border-top"]');
+            const tsRow = cardEl.querySelector('.card-updated-row');
             if (tsRow) cardEl.insertBefore(tasksDiv, tsRow);
             else cardEl.appendChild(tasksDiv);
         }
@@ -2366,6 +2364,21 @@ function _rtcOnCardUpdated(ev) {
         // Sync Done badge
         const doneBadge = cardEl.querySelector('.card-done-badge');
         if (doneBadge) doneBadge.classList.toggle('d-none', !card.completed_at);
+        // Sync updated timestamp row
+        let updRow = cardEl.querySelector('.card-updated-row');
+        if (card.updated_at) {
+            const byPart = card.updated_by_name ? ` · ${escHtml(card.updated_by_name)}` : '';
+            const inner = `<span><i class="bi bi-pencil" style="font-size:.65rem"></i> ${escHtml(card.updated_at)}${byPart}</span>`;
+            if (updRow) {
+                updRow.innerHTML = inner;
+            } else {
+                const newRow = document.createElement('div');
+                newRow.className = 'card-dates-row card-updated-row';
+                newRow.style.borderTop = '1px solid var(--bs-border-color,#dee2e6)';
+                newRow.innerHTML = inner;
+                cardEl.appendChild(newRow);
+            }
+        }
     }
     _rtcTaskBadge(card.id, card.task_count, card.completed_task_count);
     if (_rtcModalOpenFor(card.id)) populateCardModal(card);
