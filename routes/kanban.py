@@ -615,6 +615,23 @@ def update_board_settings(board_id):
             state.notify_due_days = max(1, min(365, int(data.get('notify_due_days') or 1)))
 
     db.session.commit()
+
+    # Push RTC event so active sessions notice sharing changes immediately
+    if is_owner and current_user.has_permission('kanban', 'share_board'):
+        try:
+            edit_ids = [u['id'] for u in json.loads(board.share_edit_users or '[]')]
+            view_ids = [u['id'] for u in json.loads(board.share_view_users or '[]')]
+        except Exception:
+            edit_ids, view_ids = [], []
+        _push_event(board.id, {
+            'type': 'board_settings_changed',
+            'by_user_id': current_user.id,
+            'board_owner_id': board.user_id,
+            'is_public': board.is_public,
+            'share_edit_user_ids': edit_ids,
+            'share_view_user_ids': view_ids,
+        })
+
     return jsonify({'ok': True, 'name': board.name})
 
 

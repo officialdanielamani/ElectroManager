@@ -2515,12 +2515,31 @@ function _rtcUpdatePresence(presence) {
     });
 }
 function _rtcHandleEvent(ev) {
-    if (ev.type === 'task_updated')    return _rtcOnTaskUpdated(ev);
-    if (ev.type === 'task_created')    return _rtcOnTaskCreated(ev);
-    if (ev.type === 'task_deleted')    return _rtcOnTaskDeleted(ev);
-    if (ev.type === 'card_updated')    return _rtcOnCardUpdated(ev);
-    if (ev.type === 'card_created')    return _rtcOnCardCreated(ev);
-    if (ev.type === 'cards_reordered') return _rtcOnCardsReordered(ev);
+    if (ev.type === 'task_updated')         return _rtcOnTaskUpdated(ev);
+    if (ev.type === 'task_created')         return _rtcOnTaskCreated(ev);
+    if (ev.type === 'task_deleted')         return _rtcOnTaskDeleted(ev);
+    if (ev.type === 'card_updated')         return _rtcOnCardUpdated(ev);
+    if (ev.type === 'card_created')         return _rtcOnCardCreated(ev);
+    if (ev.type === 'cards_reordered')      return _rtcOnCardsReordered(ev);
+    if (ev.type === 'board_settings_changed') return _rtcOnBoardSettingsChanged(ev);
+}
+function _rtcOnBoardSettingsChanged(ev) {
+    // The user who made the change already has the latest state — skip self
+    if (ev.by_user_id === CURRENT_USER_ID) return;
+    // Board owner's access is never revoked by this event
+    if (CURRENT_USER_ID === ev.board_owner_id) return;
+
+    const inEdit = Array.isArray(ev.share_edit_user_ids) && ev.share_edit_user_ids.includes(CURRENT_USER_ID);
+    const inView = Array.isArray(ev.share_view_user_ids) && ev.share_view_user_ids.includes(CURRENT_USER_ID);
+    const hasAccess = inEdit || inView || ev.is_public;
+
+    if (!hasAccess) {
+        // Access fully revoked — send back to board list
+        window.location.href = '/kanban';
+        return;
+    }
+    // Access level may have changed (e.g. edit → view-only); reload to get correct CAN_EDIT state
+    window.location.reload();
 }
 function _rtcOnTaskUpdated(ev) {
     const { task, card_id, card_task_count, card_completed_task_count } = ev;
