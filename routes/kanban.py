@@ -20,11 +20,13 @@ logger = logging.getLogger(__name__)
 kanban_bp = Blueprint('kanban', __name__)
 
 # ── Real-time collaboration ───────────────────────────────────────
-_PRESENCE_TTL = 12
-_MAX_EVENTS   = 300
+_PRESENCE_TTL    = 12
+_MAX_EVENTS      = 300
+_MAX_USER_EVENTS = 50
 _store_lock   = threading.Lock()
 _presence: dict     = defaultdict(dict)   # board_id -> {user_id: {...}}
 _board_events: dict = defaultdict(deque)  # board_id -> deque[(ts, event)]
+_user_events: dict  = defaultdict(deque)  # user_id  -> deque[(ts, event)]
 
 def _push_event(board_id: int, event: dict):
     with _store_lock:
@@ -33,9 +35,20 @@ def _push_event(board_id: int, event: dict):
         while len(q) > _MAX_EVENTS:
             q.popleft()
 
+def _push_user_event(user_id: int, event: dict):
+    with _store_lock:
+        q = _user_events[user_id]
+        q.append((time.time(), event))
+        while len(q) > _MAX_USER_EVENTS:
+            q.popleft()
+
 def _collect_events_since(board_id: int, since_ts: float) -> list:
     with _store_lock:
         return [ev for ts, ev in _board_events[board_id] if ts > since_ts]
+
+def _collect_user_events_since(user_id: int, since_ts: float) -> list:
+    with _store_lock:
+        return [ev for ts, ev in _user_events[user_id] if ts > since_ts]
 
 def _collect_presence(board_id: int) -> list:
     now = time.time()
@@ -581,15 +594,26 @@ def update_board_settings(board_id):
             board.notify_due_days = max(1, min(365, int(data.get('notify_due_days') or 1)))
         # Sharing fields — only saved if caller has share_board permission
         if current_user.has_permission('kanban', 'share_board'):
+            # Snapshot old shared-user sets before mutation (for diff notifications)
+            try:
+                _old_edit_ids = {u['id'] for u in json.loads(board.share_edit_users or '[]')}
+                _old_view_ids = {u['id'] for u in json.loads(board.share_view_users or '[]')}
+            except Exception:
+                _old_edit_ids, _old_view_ids = set(), set()
+            _sharing_changed = False
+
             if 'is_public' in data:
                 board.is_public = bool(data['is_public'])
+                _sharing_changed = True
             if 'share_view_users' in data:
                 board.share_view_users = json.dumps(_safe_share_users(data['share_view_users']))
+                _sharing_changed = True
             if 'share_edit_users' in data:
                 edit_users = _safe_share_users(data['share_edit_users'])
                 if len(edit_users) > 5:
                     return jsonify({'error': 'Maximum 5 users can have edit access'}), 400
                 board.share_edit_users = json.dumps(edit_users)
+                _sharing_changed = True
                 # Sync: remove edit users from view list to avoid duplicate access
                 edit_ids = {u['id'] for u in edit_users}
                 if board.share_view_users:
@@ -617,12 +641,13 @@ def update_board_settings(board_id):
     db.session.commit()
 
     # Push RTC event so active sessions notice sharing changes immediately
-    if is_owner and current_user.has_permission('kanban', 'share_board'):
+    if is_owner and current_user.has_permission('kanban', 'share_board') and _sharing_changed:
         try:
             edit_ids = [u['id'] for u in json.loads(board.share_edit_users or '[]')]
             view_ids = [u['id'] for u in json.loads(board.share_view_users or '[]')]
         except Exception:
             edit_ids, view_ids = [], []
+        # Board-level event: updates CAN_EDIT / access for users already on the board page
         _push_event(board.id, {
             'type': 'board_settings_changed',
             'by_user_id': current_user.id,
@@ -631,6 +656,12 @@ def update_board_settings(board_id):
             'share_edit_user_ids': edit_ids,
             'share_view_user_ids': view_ids,
         })
+        # User-level events: notify users whose listing page needs to update
+        new_shared_ids = set(edit_ids) | set(view_ids)
+        old_shared_ids = _old_edit_ids | _old_view_ids
+        affected_ids = new_shared_ids.symmetric_difference(old_shared_ids)
+        for uid in affected_ids:
+            _push_user_event(uid, {'type': 'boards_changed'})
 
     return jsonify({'ok': True, 'name': board.name})
 
@@ -719,6 +750,16 @@ def board_poll(board_id):
         'events':   _collect_events_since(board_id, since),
         'presence': _collect_presence(board_id),
         'ts':       time.time(),
+    })
+
+
+@kanban_bp.route('/kanban/user-events/poll')
+@login_required
+def user_events_poll():
+    since = request.args.get('since', type=float, default=0.0)
+    return jsonify({
+        'events': _collect_user_events_since(current_user.id, since),
+        'ts': time.time(),
     })
 
 
