@@ -382,6 +382,7 @@
                     <div class="alert alert-info py-2 mb-4">
                         <i class="bi bi-info-circle"></i>
                         <strong>Max Files:</strong> Set to <code>-1</code> for unlimited uploads, or <code>0</code> to disable new uploads entirely (existing files are never affected).
+                        When set to a positive number, it is a <strong>total limit</strong> — the existing file count plus the new batch must not exceed it.
                     </div>
 
                     <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-box"></i> Item Uploads</h6>
@@ -730,12 +731,17 @@
                 <p class="small mb-2">Sets the maximum rows and columns allowed when creating or editing racks. Prevents excessively large grids (max 32×32).</p>
 
                 <h6 class="mt-3"><i class="bi bi-cloud-upload"></i> File Upload Settings</h6>
-                <p class="small mb-1">Each section has three columns: <strong>Allowed Types</strong> (comma-separated extensions), <strong>Max Size (MB)</strong> per file, and <strong>Max Files</strong> per upload batch. For Max Files: <code>-1</code> = unlimited, <code>0</code> = new uploads disabled (existing files are never removed).</p>
+                <p class="small mb-1">Each section has three columns: <strong>Allowed Types</strong> (comma-separated extensions), <strong>Max Size (MB)</strong> per file, and <strong>Max Files</strong>. For Max Files:</p>
+                <ul class="small ps-3 mb-1">
+                    <li><code>-1</code> — Unlimited (no file count restriction).</li>
+                    <li><code>0</code> — New uploads disabled; existing files are never removed.</li>
+                    <li><code>N</code> (positive) — <strong>Total limit</strong>: the number of existing files plus the new batch must not exceed N. Example: limit is 5, item already has 4 files → only 1 more can be added. Lowering the limit below the current count blocks new uploads but does not delete existing files.</li>
+                </ul>
                 <ul class="small ps-3 mb-2">
-                    <li><strong>Item Uploads</strong> — Controls file attachments on item pages.</li>
-                    <li><strong>Project Uploads</strong> — Per-type limits: Pictures, Documents, Schematics, 2D Design, 3D Design, Programs.</li>
-                    <li><strong>Kanban</strong> — Card attachments (images and documents attached to individual Kanban cards). Board owner and all shared users (View & Edit or View Only) can upload and delete.</li>
-                    <li><strong>Share Files</strong> — Shared file library (item, project, sticker, icon). Profile uploads are always fixed to JPEG/PNG, 1 MB, 1 file.</li>
+                    <li><strong>Item Uploads</strong> — Controls file attachments on item pages. Limit is per item.</li>
+                    <li><strong>Project Uploads</strong> — Per-type limits: Pictures, Documents, Schematics, 2D Design, 3D Design, Programs. Limit is per project per type.</li>
+                    <li><strong>Kanban</strong> — Card attachments (images and documents on individual cards). Limit is per card. Board owner and all shared users (edit or view) can upload.</li>
+                    <li><strong>Share Files</strong> — Shared file library (item, project, sticker, icon). Limit is per category across all files in that category. Profile uploads are always fixed to JPEG/PNG, 1 MB, 1 file.</li>
                 </ul>
 
                 <div class="alert alert-info small mb-0 mt-3">

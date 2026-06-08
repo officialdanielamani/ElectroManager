@@ -117,11 +117,16 @@
 .board-listing-item .board-name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── Contact picker ──────────────────────────────────────── */
+#selected-contacts {
+    display: flex; flex-wrap: wrap; align-items: center; gap: .2rem;
+}
 .contact-badge {
     display: inline-flex; align-items: center; gap: .25rem;
     background: var(--bs-secondary-bg); border: 1px solid var(--bs-border-color);
-    border-radius: 999px; padding: .15rem .5rem; font-size: .8rem; margin: .15rem .15rem 0 0;
+    border-radius: 999px; padding: .15rem .5rem; font-size: .8rem;
+    line-height: 1.2; white-space: nowrap;
 }
+.contact-badge img { display: block; flex-shrink: 0; }
 .contact-badge .remove-contact { cursor: pointer; color: var(--bs-danger); font-size: .85rem; }
 
 /* ── Board settings category list ───────────────────────── */
@@ -2476,8 +2481,8 @@ function renderSelectedContacts() {
     div.innerHTML = _selectedContacts.map(c => {
         const picUrl = c.pic || (c.type === 'user' ? _lookupContactPic(c.id) : '');
         const avatar = picUrl
-            ? `<img src="${escHtml(picUrl)}" style="width:18px;height:18px;border-radius:50%;object-fit:cover;flex-shrink:0;vertical-align:middle" alt="">`
-            : `<i class="bi ${_contactIcon(c.type)} text-muted" style="font-size:.75rem"></i>`;
+            ? `<img src="${escHtml(picUrl)}" style="width:18px;height:18px;border-radius:50%;object-fit:cover;" alt="">`
+            : `<i class="bi ${_contactIcon(c.type)} text-muted" style="font-size:.75rem;line-height:1;"></i>`;
         return `<span class="contact-badge">
             ${avatar}
             ${escHtml(c.name)}
@@ -2541,6 +2546,7 @@ let _currentCardId = null;
 let _currentBoardCategories = [];
 let _editingCardId = null;
 let _cardShareFileIds = new Set();
+let _cardAttachmentCount = 0;
 
 async function openCard(cardId) {
     try {
@@ -2709,6 +2715,7 @@ async function refreshModalTasks() {
 // ── Card attachments ─────────────────────────────────────────────
 
 function renderCardAttachments(attachments) {
+    _cardAttachmentCount = (attachments || []).length;
     const container = document.getElementById('card-attachments');
     const section   = document.getElementById('card-upload-section');
     const hint      = document.getElementById('card-upload-hint');
@@ -2798,9 +2805,16 @@ async function uploadCardFiles() {
         alert('File uploads are currently disabled by the administrator.');
         return;
     }
-    if (KANBAN_UPLOAD_MAX_FILES > 0 && files.length > KANBAN_UPLOAD_MAX_FILES) {
-        alert(`Too many files selected (${files.length}). Maximum allowed per upload is ${KANBAN_UPLOAD_MAX_FILES}.`);
-        return;
+    if (KANBAN_UPLOAD_MAX_FILES > 0) {
+        if (_cardAttachmentCount >= KANBAN_UPLOAD_MAX_FILES) {
+            alert(`Upload limit reached. This card already has ${_cardAttachmentCount} file(s) (max ${KANBAN_UPLOAD_MAX_FILES}).`);
+            return;
+        }
+        if (_cardAttachmentCount + files.length > KANBAN_UPLOAD_MAX_FILES) {
+            const remaining = KANBAN_UPLOAD_MAX_FILES - _cardAttachmentCount;
+            alert(`Too many files. Selecting ${files.length} would exceed the limit (max ${KANBAN_UPLOAD_MAX_FILES}, already ${_cardAttachmentCount}, room for ${remaining} more).`);
+            return;
+        }
     }
 
     const fd = new FormData();

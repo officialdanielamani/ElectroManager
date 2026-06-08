@@ -1011,15 +1011,22 @@ def project_upload(project_id, attachment_type):
 
     files = request.files.getlist('files')
 
-    # Enforce max number of files per upload (-1=unlimited, 0=disabled, >0=batch limit)
+    # Enforce max number of files per upload (-1=unlimited, 0=disabled, >0=total limit)
     max_files = int(Setting.get(f'project_upload_{attachment_type}_max_files', '5'))
     valid_files = [f for f in files if f and f.filename]
     if max_files == 0:
         flash('File uploads are currently disabled for this attachment type.', 'danger')
         return redirect(url_for('project.project_edit', project_id=project_id))
-    if max_files > 0 and len(valid_files) > max_files:
-        flash(f'Too many files selected ({len(valid_files)}). Maximum allowed per upload is {max_files}.', 'danger')
-        return redirect(url_for('project.project_edit', project_id=project_id))
+    if max_files > 0:
+        existing_count = ProjectAttachment.query.filter_by(
+            project_id=project.id, attachment_type=attachment_type).count()
+        if existing_count >= max_files:
+            flash(f'Upload limit reached. This project already has {existing_count} {attachment_type} file(s) (max {max_files}).', 'danger')
+            return redirect(url_for('project.project_edit', project_id=project_id))
+        if existing_count + len(valid_files) > max_files:
+            remaining = max_files - existing_count
+            flash(f'Too many files. Selecting {len(valid_files)} would exceed the limit (max {max_files}, already {existing_count}, room for {remaining} more).', 'danger')
+            return redirect(url_for('project.project_edit', project_id=project_id))
 
     uploaded = 0
     for file in valid_files:

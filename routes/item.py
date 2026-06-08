@@ -1011,7 +1011,7 @@ def upload_attachment(item_id):
     max_file_upload_count = int(Setting.get('max_file_upload_count', '5'))
 
     # Count non-empty files and enforce max_file_upload_count
-    # -1 = unlimited, 0 = uploads disabled, >0 = batch limit
+    # -1 = unlimited, 0 = uploads disabled, >0 = total limit (existing + new)
     valid_files = [f for f in files if f and f.filename]
     if max_file_upload_count == 0:
         return jsonify({
@@ -1019,12 +1019,21 @@ def upload_attachment(item_id):
             'uploaded': 0,
             'errors': ['File uploads are currently disabled by the administrator.'],
         }), 400
-    if max_file_upload_count > 0 and len(valid_files) > max_file_upload_count:
-        return jsonify({
-            'success': False,
-            'uploaded': 0,
-            'errors': [f'Too many files selected ({len(valid_files)}). Maximum allowed per upload is {max_file_upload_count}.'],
-        }), 400
+    if max_file_upload_count > 0:
+        existing_count = Attachment.query.filter_by(item_id=item.id).count()
+        if existing_count >= max_file_upload_count:
+            return jsonify({
+                'success': False,
+                'uploaded': 0,
+                'errors': [f'Upload limit reached. This item already has {existing_count} file(s) (max {max_file_upload_count}).'],
+            }), 400
+        if existing_count + len(valid_files) > max_file_upload_count:
+            remaining = max_file_upload_count - existing_count
+            return jsonify({
+                'success': False,
+                'uploaded': 0,
+                'errors': [f'Too many files. Selecting {len(valid_files)} would exceed the limit (max {max_file_upload_count}, already {existing_count}, room for {remaining} more).'],
+            }), 400
 
     uploaded_count = 0
     errors = []

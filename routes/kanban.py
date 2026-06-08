@@ -1078,9 +1078,15 @@ def upload_card_attachment(card_id):
     if max_files == 0:
         return jsonify({'success': False, 'uploaded': 0,
                         'errors': ['File uploads are currently disabled.']}), 400
-    if max_files > 0 and len(valid_files) > max_files:
-        return jsonify({'success': False, 'uploaded': 0,
-                        'errors': [f'Too many files ({len(valid_files)}). Maximum allowed is {max_files}.']}), 400
+    if max_files > 0:
+        existing_count = KanbanAttachment.query.filter_by(card_id=card.id).count()
+        if existing_count >= max_files:
+            return jsonify({'success': False, 'uploaded': 0,
+                            'errors': [f'Upload limit reached. This card already has {existing_count} file(s) (max {max_files}).']}), 400
+        if existing_count + len(valid_files) > max_files:
+            remaining = max_files - existing_count
+            return jsonify({'success': False, 'uploaded': 0,
+                            'errors': [f'Too many files. Selecting {len(valid_files)} would exceed the limit (max {max_files}, already {existing_count}, room for {remaining} more).']}), 400
 
     upload_folder = current_app.config['UPLOAD_FOLDER']
     card_folder   = os.path.join(upload_folder, 'kanban', str(card.id))
