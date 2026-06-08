@@ -255,8 +255,8 @@ def _card_to_dict(card):
         'task_count': card.task_count,
         'completed_task_count': card.completed_task_count,
         'tasks': [_task_to_dict(t) for t in card.tasks],
-        'created_at': card.created_at.strftime('%Y-%m-%d %H:%M') if card.created_at else '',
-        'updated_at': card.updated_at.strftime('%Y-%m-%d %H:%M') if card.updated_at else '',
+        'created_at': card.created_at.strftime('%Y-%m-%dT%H:%M:%SZ') if card.created_at else '',
+        'updated_at': card.updated_at.strftime('%Y-%m-%dT%H:%M:%SZ') if card.updated_at else '',
         'created_by_name': (card.created_by.name or card.created_by.username) if card.created_by else '',
         'updated_by_name': (card.updated_by.name or card.updated_by.username) if card.updated_by else '',
     }
@@ -559,8 +559,8 @@ def get_board_settings(board_id):
             for c in board.categories
         ],
         'owner_display': owner_display,
-        'created_at': board.created_at.strftime('%Y-%m-%d %H:%M') if board.created_at else '',
-        'updated_at': board.updated_at.strftime('%Y-%m-%d %H:%M') if board.updated_at else '',
+        'created_at': board.created_at.strftime('%Y-%m-%dT%H:%M:%SZ') if board.created_at else '',
+        'updated_at': board.updated_at.strftime('%Y-%m-%dT%H:%M:%SZ') if board.updated_at else '',
         'is_owner': viewer_is_owner,
     })
 
