@@ -1010,10 +1010,19 @@ def project_upload(project_id, attachment_type):
     project = Project.query.filter_by(project_id=project_id).first_or_404()
 
     files = request.files.getlist('files')
+
+    # Enforce max number of files per upload (-1=unlimited, 0=disabled, >0=batch limit)
+    max_files = int(Setting.get(f'project_upload_{attachment_type}_max_files', '5'))
+    valid_files = [f for f in files if f and f.filename]
+    if max_files == 0:
+        flash('File uploads are currently disabled for this attachment type.', 'danger')
+        return redirect(url_for('project.project_edit', project_id=project_id))
+    if max_files > 0 and len(valid_files) > max_files:
+        flash(f'Too many files selected ({len(valid_files)}). Maximum allowed per upload is {max_files}.', 'danger')
+        return redirect(url_for('project.project_edit', project_id=project_id))
+
     uploaded = 0
-    for file in files:
-        if not file or not file.filename:
-            continue
+    for file in valid_files:
         result, error = save_project_file(file, project.project_id, attachment_type)
         if error:
             flash(error, 'danger')

@@ -657,8 +657,18 @@ def settings_system():
                 for ptype in ['picture', 'document', 'schematic', '2d_design', '3d_design', 'program']:
                     pext = request.form.get(f'project_upload_{ptype}_extensions', '').strip()
                     psize = request.form.get(f'project_upload_{ptype}_max_size', '10')
+                    pfiles = request.form.get(f'project_upload_{ptype}_max_files', '5')
                     if pext: Setting.set(f'project_upload_{ptype}_extensions', pext)
                     if psize: Setting.set(f'project_upload_{ptype}_max_size', psize)
+                    try:
+                        pfiles_int = int(pfiles)
+                        if pfiles_int < -1 or pfiles_int > 50:
+                            flash(f'Project {ptype} max files must be between -1 and 50!', 'danger')
+                            return redirect(url_for('settings.settings_system'))
+                        Setting.set(f'project_upload_{ptype}_max_files', pfiles_int, f'Project {ptype} max number of files per upload (-1=unlimited, 0=disabled)')
+                    except ValueError:
+                        flash(f'Invalid max files value for project {ptype}!', 'danger')
+                        return redirect(url_for('settings.settings_system'))
                 for stype in ['item', 'project', 'sticker', 'icon']:
                     sext = request.form.get(f'share_{stype}_extensions', '').strip()
                     ssize = request.form.get(f'share_{stype}_max_size', '10')
@@ -839,12 +849,12 @@ def settings_system():
                           instance_disk_total=instance_disk_total,
                           instance_disk_pct=instance_disk_pct,
                           project_upload_settings={
-                              'picture': {'extensions': Setting.get('project_upload_picture_extensions', 'webp,png,svg,jpeg,jpg'), 'max_size': Setting.get('project_upload_picture_max_size', '10')},
-                              'document': {'extensions': Setting.get('project_upload_document_extensions', 'txt,doc,docx,pdf'), 'max_size': Setting.get('project_upload_document_max_size', '10')},
-                              'schematic': {'extensions': Setting.get('project_upload_schematic_extensions', 'pdf,zip'), 'max_size': Setting.get('project_upload_schematic_max_size', '20')},
-                              '2d_design': {'extensions': Setting.get('project_upload_2d_design_extensions', 'pdf,zip'), 'max_size': Setting.get('project_upload_2d_design_max_size', '20')},
-                              '3d_design': {'extensions': Setting.get('project_upload_3d_design_extensions', 'pdf,zip,stl,step'), 'max_size': Setting.get('project_upload_3d_design_max_size', '50')},
-                              'program': {'extensions': Setting.get('project_upload_program_extensions', 'zip,txt,cpp,py'), 'max_size': Setting.get('project_upload_program_max_size', '10')},
+                              'picture':   {'extensions': Setting.get('project_upload_picture_extensions',   'webp,png,svg,jpeg,jpg'),  'max_size': Setting.get('project_upload_picture_max_size',   '10'), 'max_files': Setting.get('project_upload_picture_max_files',   '5')},
+                              'document':  {'extensions': Setting.get('project_upload_document_extensions',  'txt,doc,docx,pdf'),        'max_size': Setting.get('project_upload_document_max_size',  '10'), 'max_files': Setting.get('project_upload_document_max_files',  '5')},
+                              'schematic': {'extensions': Setting.get('project_upload_schematic_extensions', 'pdf,zip'),                 'max_size': Setting.get('project_upload_schematic_max_size', '20'), 'max_files': Setting.get('project_upload_schematic_max_files', '5')},
+                              '2d_design': {'extensions': Setting.get('project_upload_2d_design_extensions', 'pdf,zip'),                 'max_size': Setting.get('project_upload_2d_design_max_size', '20'), 'max_files': Setting.get('project_upload_2d_design_max_files', '5')},
+                              '3d_design': {'extensions': Setting.get('project_upload_3d_design_extensions', 'pdf,zip,stl,step'),        'max_size': Setting.get('project_upload_3d_design_max_size', '50'), 'max_files': Setting.get('project_upload_3d_design_max_files', '5')},
+                              'program':   {'extensions': Setting.get('project_upload_program_extensions',   'zip,txt,cpp,py'),          'max_size': Setting.get('project_upload_program_max_size',   '10'), 'max_files': Setting.get('project_upload_program_max_files',   '5')},
                           },
                           share_upload_settings={
                               'item':    {'extensions': Setting.get('share_item_extensions',    'pdf,png,jpg,jpeg,gif,txt,doc,docx'), 'max_size': Setting.get('share_item_max_size',    '10'), 'max_files': Setting.get('share_item_max_files',    '100')},
