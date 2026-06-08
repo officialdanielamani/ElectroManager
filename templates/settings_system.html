@@ -148,14 +148,7 @@
                     {% endif %}
                     {% set uploads_other_cls = 'bg-danger' if uploads_disk_pct > 80 else ('bg-warning' if uploads_disk_pct > 70 else 'bg-success') %}
                     <div class="mb-3">
-                        <div class="d-flex justify-content-between small mb-1">
-                            <span><i class="bi bi-folder2-open text-primary"></i> <strong>uploads/</strong></span>
-                            <span class="text-muted">
-                                App: <strong>{{ (uploads_size / 1048576) | round(2) }} MB</strong>
-                                &nbsp;·&nbsp;
-                                Disk: <strong>{{ uploads_disk_pct }}%</strong> of {{ (uploads_disk_total / 1073741824) | round(1) }} GB total
-                            </span>
-                        </div>
+                        <div class="small mb-1"><i class="bi bi-folder2-open text-primary"></i> <strong>uploads/</strong></div>
                         <div class="progress" style="height:16px;">
                             <div class="progress-bar bg-primary"
                                  role="progressbar"
@@ -167,9 +160,10 @@
                                  title="Other system usage"></div>
                         </div>
                         <div class="d-flex gap-3 small mt-1 text-muted">
-                            <span><span class="badge bg-primary">&nbsp;</span> This app: {{ (uploads_size / 1048576) | round(2) }} MB</span>
-                            <span><span class="badge {{ uploads_other_cls }}">&nbsp;</span> Other: {{ ((uploads_disk_pct - uploads_app_pct) | round(1)) if uploads_disk_total > 0 else 0 }}% of disk</span>
-                            <span>Free: {{ (100 - uploads_disk_pct) | round(1) }}%</span>
+                            <span><span class="badge bg-primary">&nbsp;</span> This app: <strong>{{ (uploads_size / 1048576) | round(2) }} MB</strong></span>
+                            <span><span class="badge {{ uploads_other_cls }}">&nbsp;</span> Other: <strong>{{ ((uploads_disk_pct - uploads_app_pct) | round(1)) if uploads_disk_total > 0 else 0 }}%</strong></span>
+                            <span>Free: <strong>{{ (100 - uploads_disk_pct) | round(1) }}%</strong></span>
+                            <span>Total: <strong>{{ (uploads_disk_total / 1073741824) | round(1) }} GB</strong></span>
                         </div>
                     </div>
 
@@ -183,14 +177,7 @@
                     {% endif %}
                     {% set instance_other_cls = 'bg-danger' if instance_disk_pct > 80 else ('bg-warning' if instance_disk_pct > 70 else 'bg-success') %}
                     <div class="mb-2">
-                        <div class="d-flex justify-content-between small mb-1">
-                            <span><i class="bi bi-database text-secondary"></i> <strong>instance/</strong></span>
-                            <span class="text-muted">
-                                App: <strong>{{ (instance_size / 1048576) | round(2) }} MB</strong>
-                                &nbsp;·&nbsp;
-                                Disk: <strong>{{ instance_disk_pct }}%</strong> of {{ (instance_disk_total / 1073741824) | round(1) }} GB total
-                            </span>
-                        </div>
+                        <div class="small mb-1"><i class="bi bi-database text-secondary"></i> <strong>instance/</strong></div>
                         <div class="progress" style="height:16px;">
                             <div class="progress-bar bg-primary"
                                  role="progressbar"
@@ -202,9 +189,10 @@
                                  title="Other system usage"></div>
                         </div>
                         <div class="d-flex gap-3 small mt-1 text-muted">
-                            <span><span class="badge bg-primary">&nbsp;</span> This app: {{ (instance_size / 1048576) | round(2) }} MB</span>
-                            <span><span class="badge {{ instance_other_cls }}">&nbsp;</span> Other: {{ ((instance_disk_pct - instance_app_pct) | round(1)) if instance_disk_total > 0 else 0 }}% of disk</span>
-                            <span>Free: {{ (100 - instance_disk_pct) | round(1) }}%</span>
+                            <span><span class="badge bg-primary">&nbsp;</span> This app: <strong>{{ (instance_size / 1048576) | round(2) }} MB</strong></span>
+                            <span><span class="badge {{ instance_other_cls }}">&nbsp;</span> Other: <strong>{{ ((instance_disk_pct - instance_app_pct) | round(1)) if instance_disk_total > 0 else 0 }}%</strong></span>
+                            <span>Free: <strong>{{ (100 - instance_disk_pct) | round(1) }}%</strong></span>
+                            <span>Total: <strong>{{ (instance_disk_total / 1073741824) | round(1) }} GB</strong></span>
                         </div>
                     </div>
 
@@ -391,28 +379,35 @@
                         <i class="bi bi-lock"></i> <strong>Demo Mode:</strong> File type and size settings are fixed for security. Disable Demo Mode to change them.
                     </div>
                     {% endif %}
+                    <div class="alert alert-info py-2 mb-4">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Max Files:</strong> Set to <code>-1</code> for unlimited uploads, or <code>0</code> to disable new uploads entirely (existing files are never affected).
+                    </div>
 
                     <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-box"></i> Item Uploads</h6>
+                    <div class="row mb-1">
+                        <div class="col-md-3"></div>
+                        <div class="col-md-4"><small class="text-muted fw-bold">Allowed Types</small></div>
+                        <div class="col-md-3"><small class="text-muted fw-bold">Max Size (MB)</small></div>
+                        <div class="col-md-2"><small class="text-muted fw-bold">Max Files</small></div>
+                    </div>
                     <div class="row mb-4">
+                        <div class="col-md-3"><label class="form-label small fw-bold">Items</label></div>
                         <div class="col-md-4">
-                            <label for="allowed_extensions" class="form-label">Allowed File Types {% if not demo_mode %}<span class="text-danger">*</span>{% endif %}</label>
-                            <input type="text" class="form-control" id="allowed_extensions" name="allowed_extensions"
+                            <input type="text" class="form-control form-control-sm" id="allowed_extensions" name="allowed_extensions"
                                    value="{% if demo_mode %}jpg,jpeg,png,txt{% else %}{{ allowed_extensions }}{% endif %}"
                                    {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}
                                    placeholder="pdf,png,jpg,jpeg,gif,txt,doc,docx">
                         </div>
-                        <div class="col-md-4">
-                            <label for="max_file_size" class="form-label">Max File Size (MB) {% if not demo_mode %}<span class="text-danger">*</span>{% endif %}</label>
-                            <input type="number" class="form-control" id="max_file_size" name="max_file_size"
+                        <div class="col-md-3">
+                            <input type="number" class="form-control form-control-sm" id="max_file_size" name="max_file_size"
                                    value="{% if demo_mode %}1{% else %}{{ max_file_size }}{% endif %}"
                                    min="1" max="100" {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}>
                         </div>
-                        <div class="col-md-4">
-                            <label for="max_file_upload_count" class="form-label">Max Number of Files {% if not demo_mode %}<span class="text-danger">*</span>{% endif %}</label>
-                            <input type="number" class="form-control" id="max_file_upload_count" name="max_file_upload_count"
+                        <div class="col-md-2">
+                            <input type="number" class="form-control form-control-sm" id="max_file_upload_count" name="max_file_upload_count"
                                    value="{% if demo_mode %}5{% else %}{{ max_file_upload_count }}{% endif %}"
                                    min="-1" max="50" {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}>
-                            <small class="text-muted">-1 = unlimited &nbsp;|&nbsp; 0 = uploads disabled</small>
                         </div>
                     </div>
 
@@ -451,7 +446,20 @@
                         </div>
                     </div>
                     {% endfor %}
-                    <small class="text-muted">Max Files: -1 = unlimited &nbsp;|&nbsp; 0 = uploads disabled</small>
+
+                    <h6 class="border-bottom pb-2 mb-3 mt-4"><i class="bi bi-columns-gap"></i> Kanban <span class="badge bg-secondary ms-1" style="font-size:0.7rem;">Coming Soon</span></h6>
+                    <div class="row mb-1">
+                        <div class="col-md-3"></div>
+                        <div class="col-md-4"><small class="text-muted fw-bold">Allowed Types</small></div>
+                        <div class="col-md-3"><small class="text-muted fw-bold">Max Size (MB)</small></div>
+                        <div class="col-md-2"><small class="text-muted fw-bold">Max Files</small></div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-md-3"><label class="form-label small fw-bold text-muted">Upload Files</label></div>
+                        <div class="col-md-4"><input type="text" class="form-control form-control-sm" placeholder="e.g. png,jpg,pdf" disabled></div>
+                        <div class="col-md-3"><input type="number" class="form-control form-control-sm" placeholder="10" disabled></div>
+                        <div class="col-md-2"><input type="number" class="form-control form-control-sm" placeholder="5" disabled></div>
+                    </div>
 
                     <h6 class="border-bottom pb-2 mb-3 mt-4"><i class="bi bi-folder-fill"></i> Share Files Uploads</h6>
                     {% set share_types = [
@@ -494,7 +502,7 @@
                         <div class="col-md-3"><input type="number" class="form-control form-control-sm" value="1" disabled></div>
                         <div class="col-md-2"><input type="number" class="form-control form-control-sm" value="1" disabled></div>
                     </div>
-                    <small class="text-muted"><i class="bi bi-lock"></i> Profile uploads are fixed to JPEG/PNG, max 1 MB, 1 file. &nbsp;|&nbsp; Max Files: -1 = unlimited, 0 = uploads disabled.</small>
+                    <small class="text-muted"><i class="bi bi-lock"></i> Profile uploads are fixed to JPEG/PNG, max 1 MB, 1 file.</small>
                 </div>
             </div>
 
@@ -696,7 +704,7 @@
                     <li><strong>User Signup</strong> — Allow self-registration at <code>/register</code>. Disable to require admin-created accounts only.</li>
                     <li><strong>Default Theme</strong> — Fallback theme for anonymous users and new accounts.</li>
                     <li><strong>Download All (ZIP)</strong> — Control which sections expose a bulk download button.</li>
-                    <li><strong>Storage Usage</strong> — Stacked bars showing this app's data (blue) separately from other system usage (green/yellow/red). Other usage turns yellow above 70% and red above 80% of the disk. Supports separate volumes (e.g. uploads on HDD, instance on SSD).</li>
+                    <li><strong>Storage Usage</strong> — Stacked bars per folder. Blue = this app's data; green/yellow/red = other system usage (yellow &gt;70%, red &gt;80% full). Legend shows app size, other %, free %, and total disk size. Supports separate volumes (e.g. uploads on HDD, instance on SSD).</li>
                 </ul>
 
                 <h6 class="mt-3"><i class="bi bi-building"></i> Company Details</h6>
@@ -709,10 +717,12 @@
                 <p class="small mb-2">Sets the maximum rows and columns allowed when creating or editing racks. Prevents excessively large grids (max 32×32).</p>
 
                 <h6 class="mt-3"><i class="bi bi-cloud-upload"></i> File Upload Settings</h6>
+                <p class="small mb-1">Each section has three columns: <strong>Allowed Types</strong> (comma-separated extensions), <strong>Max Size (MB)</strong> per file, and <strong>Max Files</strong> per upload batch. For Max Files: <code>-1</code> = unlimited, <code>0</code> = new uploads disabled (existing files are never removed).</p>
                 <ul class="small ps-3 mb-2">
-                    <li><strong>Item Uploads</strong> — Controls attachments on item pages.</li>
-                    <li><strong>Project Uploads</strong> — Per-type limits for pictures, documents, schematics, designs, and programs.</li>
-                    <li><strong>Share Files</strong> — Files accessible via shared links and sticker/icon libraries.</li>
+                    <li><strong>Item Uploads</strong> — Controls file attachments on item pages.</li>
+                    <li><strong>Project Uploads</strong> — Per-type limits: Pictures, Documents, Schematics, 2D Design, 3D Design, Programs.</li>
+                    <li><strong>Kanban</strong> — Placeholder for future Kanban board file attachments (not yet active).</li>
+                    <li><strong>Share Files</strong> — Shared file library (item, project, sticker, icon). Profile uploads are always fixed to JPEG/PNG, 1 MB, 1 file.</li>
                 </ul>
 
                 <div class="alert alert-info small mb-0 mt-3">
