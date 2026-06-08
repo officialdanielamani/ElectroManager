@@ -471,8 +471,9 @@ def role_new():
                 "contacts":           {"view_users": False, "view_other": False, "edit": False, "delete": False},
                 "share_files":        {"view": False, "add": False, "edit": False, "delete": False},
             },
+            "kanban": {"view_manage": False, "share_board": False},
         }
-        
+
         role = Role(
             name=form.name.data,
             description=form.description.data,
@@ -609,6 +610,12 @@ def role_edit(id):
                 'users_delete': 'settings_sections_users_roles_users_delete' in request.form
             }
             
+            # Kanban
+            perms['kanban'] = {
+                'view_manage': 'kanban_view_manage' in request.form,
+                'share_board': 'kanban_share_board' in request.form,
+            }
+
             # Backup & Restore
             perms['settings_sections']['backup_restore'] = {
                 'view': 'settings_sections_backup_restore_view' in request.form,

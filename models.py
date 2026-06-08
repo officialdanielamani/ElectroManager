@@ -1606,3 +1606,169 @@ class SharedFile(db.Model):
     @property
     def is_image(self):
         return self.ext in {'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'}
+
+
+# ── Kanban ────────────────────────────────────────────────────────────────────
+
+DEFAULT_KANBAN_COLUMNS = [
+    {'name': 'Backlog',      'color': '#6b7280', 'icon': 'bi-inbox'},
+    {'name': 'Not Started',  'color': '#64748b', 'icon': 'bi-circle'},
+    {'name': 'In Progress',  'color': '#3b82f6', 'icon': 'bi-hourglass-split'},
+    {'name': 'Testing',      'color': '#f59e0b', 'icon': 'bi-flask'},
+    {'name': 'Done',         'color': '#10b981', 'icon': 'bi-check-circle'},
+]
+
+
+class KanbanCategory(db.Model):
+    __tablename__ = 'kanban_categories'
+    id         = db.Column(db.Integer, primary_key=True)
+    board_id   = db.Column(db.Integer, db.ForeignKey('kanban_boards.id'), nullable=False)
+    name       = db.Column(db.String(64), nullable=False)
+    position   = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class KanbanBoard(db.Model):
+    __tablename__ = 'kanban_boards'
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    name       = db.Column(db.String(128), nullable=False)
+    board_uuid = db.Column(db.String(12), unique=True)
+    position   = db.Column(db.Integer, default=0)
+    board_icon   = db.Column(db.String(48),  default='bi-kanban')
+    board_color  = db.Column(db.String(7),   default='#6b7280')
+    board_status = db.Column(db.String(10),  default='shown')   # pinned / shown / hidden
+    is_public       = db.Column(db.Boolean, default=False)
+    share_view_users = db.Column(db.Text)   # JSON [{id, name}] – view-only access
+    share_edit_users = db.Column(db.Text)   # JSON [{id, name}] – view+edit access
+    notify_start_enabled = db.Column(db.Boolean, default=False)
+    notify_start_days    = db.Column(db.Integer, default=1)
+    notify_due_enabled   = db.Column(db.Boolean, default=False)
+    notify_due_days      = db.Column(db.Integer, default=1)
+    last_transfer_from_id   = db.Column(db.Integer, nullable=True)
+    last_transfer_from_name = db.Column(db.String(128), nullable=True)
+    last_transfer_at        = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    user       = db.relationship('User', backref='kanban_boards')
+    columns    = db.relationship('KanbanColumn', backref='board', lazy=True,
+                                 cascade='all, delete-orphan',
+                                 order_by='KanbanColumn.position')
+    cards      = db.relationship('KanbanCard', backref='board', lazy=True,
+                                 cascade='all, delete-orphan')
+    categories = db.relationship('KanbanCategory', backref='board', lazy=True,
+                                 cascade='all, delete-orphan',
+                                 order_by='KanbanCategory.position')
+
+    def __init__(self, **kwargs):
+        super(KanbanBoard, self).__init__(**kwargs)
+        if not self.board_uuid:
+            chars = string.ascii_uppercase + string.digits
+            self.board_uuid = ''.join(secrets.choice(chars) for _ in range(11)) + 'K'
+
+
+class KanbanBoardUserState(db.Model):
+    """Per-user view state (pin/show/hide + position) and notification prefs for shared boards."""
+    __tablename__ = 'kanban_board_user_states'
+    id       = db.Column(db.Integer, primary_key=True)
+    board_id = db.Column(db.Integer, db.ForeignKey('kanban_boards.id', ondelete='CASCADE'), nullable=False)
+    user_id  = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    status   = db.Column(db.String(10), default='shown')  # pinned / shown / hidden
+    position = db.Column(db.Integer, default=999)
+    # Per-user notification preferences (independent of board owner's settings)
+    notify_start_enabled = db.Column(db.Boolean, default=False)
+    notify_start_days    = db.Column(db.Integer, default=1)
+    notify_due_enabled   = db.Column(db.Boolean, default=False)
+    notify_due_days      = db.Column(db.Integer, default=1)
+    __table_args__ = (db.UniqueConstraint('board_id', 'user_id', name='uq_kanban_board_user'),)
+
+    board = db.relationship('KanbanBoard', backref=db.backref('user_states', cascade='all, delete-orphan', passive_deletes=True))
+
+
+class KanbanColumn(db.Model):
+    __tablename__ = 'kanban_columns'
+    id       = db.Column(db.Integer, primary_key=True)
+    board_id = db.Column(db.Integer, db.ForeignKey('kanban_boards.id'), nullable=False)
+    name     = db.Column(db.String(64), nullable=False)
+    color    = db.Column(db.String(7), default='#6b7280')
+    icon     = db.Column(db.String(32), default='bi-circle')
+    position = db.Column(db.Integer, default=0)
+
+    cards = db.relationship('KanbanCard', backref='column', lazy=True,
+                            order_by='KanbanCard.position')
+
+
+class KanbanCard(db.Model):
+    __tablename__ = 'kanban_cards'
+    id          = db.Column(db.Integer, primary_key=True)
+    board_id    = db.Column(db.Integer, db.ForeignKey('kanban_boards.id'), nullable=False)
+    column_id   = db.Column(db.Integer, db.ForeignKey('kanban_columns.id'), nullable=False)
+    title       = db.Column(db.String(256), nullable=False)
+    description = db.Column(db.Text)
+    priority    = db.Column(db.Integer, default=1)   # 1=Low 2=Medium 3=High 4=Urgent
+    label_color = db.Column(db.String(7))
+    label_name  = db.Column(db.String(64))           # kept for backward-compat; UI uses category_id
+    category_id = db.Column(db.Integer, db.ForeignKey('kanban_categories.id'), nullable=True)
+    key_persons = db.Column(db.Text)                 # JSON list of {id, name} dicts
+    start_date  = db.Column(db.Date)
+    due_date    = db.Column(db.Date)
+    completed_at  = db.Column(db.DateTime)
+    position      = db.Column(db.Integer, default=0)
+    created_at    = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at    = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                              onupdate=lambda: datetime.now(timezone.utc))
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    updated_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    tasks      = db.relationship('KanbanTask', backref='card', lazy=True,
+                                 cascade='all, delete-orphan',
+                                 order_by='KanbanTask.position')
+    category   = db.relationship('KanbanCategory', foreign_keys=[category_id], lazy='joined')
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    updated_by = db.relationship('User', foreign_keys=[updated_by_id])
+
+    def get_key_persons(self):
+        """Return list of {id, name, type} dicts; handles legacy plain-string lists."""
+        try:
+            data = json.loads(self.key_persons) if self.key_persons else []
+            normalized = []
+            for item in data:
+                if isinstance(item, dict):
+                    normalized.append({
+                        'id': item.get('id'),
+                        'name': item.get('name', ''),
+                        'type': item.get('type', 'person'),
+                    })
+                else:
+                    normalized.append({'id': None, 'name': str(item), 'type': 'person'})
+            return normalized
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    @property
+    def is_overdue(self):
+        if not self.due_date or self.completed_at:
+            return False
+        from datetime import date
+        return self.due_date < date.today()
+
+    @property
+    def task_count(self):
+        return len(self.tasks)
+
+    @property
+    def completed_task_count(self):
+        return sum(1 for t in self.tasks if t.completed)
+
+
+class KanbanTask(db.Model):
+    __tablename__ = 'kanban_tasks'
+    id         = db.Column(db.Integer, primary_key=True)
+    card_id    = db.Column(db.Integer, db.ForeignKey('kanban_cards.id'), nullable=False)
+    title      = db.Column(db.String(256), nullable=False)
+    completed  = db.Column(db.Boolean, default=False)
+    start_date = db.Column(db.Date)
+    due_date   = db.Column(db.Date)
+    position   = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))

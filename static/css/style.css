@@ -564,3 +564,17 @@ textarea.disabled {
     background-color: #f5f5f5 !important;
     color: #999 !important;
 }
+
+/* Lending history button — distinct from btn-info (Print) */
+.btn-lend-history {
+    --bs-btn-color: #fff;
+    --bs-btn-bg: #6f42c1;
+    --bs-btn-border-color: #6f42c1;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #5a329e;
+    --bs-btn-hover-border-color: #5a329e;
+    --bs-btn-active-bg: #4e2a8e;
+    --bs-btn-active-border-color: #4e2a8e;
+    --bs-btn-disabled-bg: #6f42c1;
+    --bs-btn-disabled-border-color: #6f42c1;
+}

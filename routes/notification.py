@@ -190,6 +190,165 @@ def notifications():
         except Exception:
             pass
 
+    # --- Kanban card & task notifications ---
+    from models import KanbanBoard, KanbanBoardUserState, KanbanCard, KanbanTask
+
+    # Collect all boards this user can see (own + shared)
+    own_boards = KanbanBoard.query.filter_by(user_id=current_user.id).all()
+    own_board_ids = {b.id for b in own_boards}
+
+    shared_states = KanbanBoardUserState.query.filter_by(user_id=current_user.id).all()
+    shared_boards = []
+    for state in shared_states:
+        b = state.board
+        if b:
+            shared_boards.append((b, state))
+
+    def _kanban_notify_prefs(board, state=None):
+        """Return (notify_start_enabled, notify_start_days, notify_due_enabled, notify_due_days)."""
+        if state is None:
+            return (board.notify_start_enabled or False, board.notify_start_days or 1,
+                    board.notify_due_enabled or False, board.notify_due_days or 1)
+        return (state.notify_start_enabled or False, state.notify_start_days or 1,
+                state.notify_due_enabled or False, state.notify_due_days or 1)
+
+    def _process_kanban_board(board, ns_en, ns_days, nd_en, nd_days):
+        for card in board.cards:
+            if card.completed_at:
+                continue
+            try:
+                if ns_en and card.start_date:
+                    remind_date = card.start_date - timedelta(days=ns_days)
+                    if card.start_date < today:
+                        notifications.append({
+                            'kanban_board': board, 'kanban_card': card,
+                            'message': f'Card "{card.title}" start date has passed ({card.start_date.strftime("%d/%m/%Y")})',
+                            'type': 'kanban_card_overdue',
+                        })
+                    elif card.start_date == today:
+                        notifications.append({
+                            'kanban_board': board, 'kanban_card': card,
+                            'message': f'Card "{card.title}" starts today ({card.start_date.strftime("%d/%m/%Y")})',
+                            'type': 'kanban_card_due',
+                        })
+                    elif remind_date <= today:
+                        days_left = (card.start_date - today).days
+                        notifications.append({
+                            'kanban_board': board, 'kanban_card': card,
+                            'message': f'Card "{card.title}" starts in {days_left} day(s) ({card.start_date.strftime("%d/%m/%Y")})',
+                            'type': 'kanban_card_soon',
+                        })
+                if nd_en and card.due_date:
+                    remind_date = card.due_date - timedelta(days=nd_days)
+                    if card.due_date < today:
+                        notifications.append({
+                            'kanban_board': board, 'kanban_card': card,
+                            'message': f'Card "{card.title}" due date has passed ({card.due_date.strftime("%d/%m/%Y")})',
+                            'type': 'kanban_card_overdue',
+                        })
+                    elif card.due_date == today:
+                        notifications.append({
+                            'kanban_board': board, 'kanban_card': card,
+                            'message': f'Card "{card.title}" is due today ({card.due_date.strftime("%d/%m/%Y")})',
+                            'type': 'kanban_card_due',
+                        })
+                    elif remind_date <= today:
+                        days_left = (card.due_date - today).days
+                        notifications.append({
+                            'kanban_board': board, 'kanban_card': card,
+                            'message': f'Card "{card.title}" is due in {days_left} day(s) ({card.due_date.strftime("%d/%m/%Y")})',
+                            'type': 'kanban_card_soon',
+                        })
+            except Exception:
+                pass
+
+            # Task-level notifications (same board prefs apply)
+            for task in card.tasks:
+                if task.completed:
+                    continue
+                try:
+                    if ns_en and task.start_date:
+                        remind_date = task.start_date - timedelta(days=ns_days)
+                        if task.start_date < today:
+                            notifications.append({
+                                'kanban_board': board, 'kanban_card': card, 'kanban_task': task,
+                                'message': f'Task "{task.title}" (in "{card.title}") start date has passed ({task.start_date.strftime("%d/%m/%Y")})',
+                                'type': 'kanban_task_overdue',
+                            })
+                        elif task.start_date == today:
+                            notifications.append({
+                                'kanban_board': board, 'kanban_card': card, 'kanban_task': task,
+                                'message': f'Task "{task.title}" (in "{card.title}") starts today ({task.start_date.strftime("%d/%m/%Y")})',
+                                'type': 'kanban_task_due',
+                            })
+                        elif remind_date <= today:
+                            days_left = (task.start_date - today).days
+                            notifications.append({
+                                'kanban_board': board, 'kanban_card': card, 'kanban_task': task,
+                                'message': f'Task "{task.title}" (in "{card.title}") starts in {days_left} day(s) ({task.start_date.strftime("%d/%m/%Y")})',
+                                'type': 'kanban_task_soon',
+                            })
+                    if nd_en and task.due_date:
+                        remind_date = task.due_date - timedelta(days=nd_days)
+                        if task.due_date < today:
+                            notifications.append({
+                                'kanban_board': board, 'kanban_card': card, 'kanban_task': task,
+                                'message': f'Task "{task.title}" (in "{card.title}") due date has passed ({task.due_date.strftime("%d/%m/%Y")})',
+                                'type': 'kanban_task_overdue',
+                            })
+                        elif task.due_date == today:
+                            notifications.append({
+                                'kanban_board': board, 'kanban_card': card, 'kanban_task': task,
+                                'message': f'Task "{task.title}" (in "{card.title}") is due today ({task.due_date.strftime("%d/%m/%Y")})',
+                                'type': 'kanban_task_due',
+                            })
+                        elif remind_date <= today:
+                            days_left = (task.due_date - today).days
+                            notifications.append({
+                                'kanban_board': board, 'kanban_card': card, 'kanban_task': task,
+                                'message': f'Task "{task.title}" (in "{card.title}") is due in {days_left} day(s) ({task.due_date.strftime("%d/%m/%Y")})',
+                                'type': 'kanban_task_soon',
+                            })
+                except Exception:
+                    pass
+
+    for board in own_boards:
+        try:
+            ns_en, ns_days, nd_en, nd_days = _kanban_notify_prefs(board)
+            if ns_en or nd_en:
+                _process_kanban_board(board, ns_en, ns_days, nd_en, nd_days)
+        except Exception:
+            pass
+
+    for board, state in shared_boards:
+        if board.id in own_board_ids:
+            continue  # already processed above
+        try:
+            ns_en, ns_days, nd_en, nd_days = _kanban_notify_prefs(board, state)
+            if ns_en or nd_en:
+                _process_kanban_board(board, ns_en, ns_days, nd_en, nd_days)
+        except Exception:
+            pass
+
+    # --- Kanban board transfer notifications ---
+    from datetime import timedelta
+    transfer_threshold = today - timedelta(days=30)
+    transferred_boards = KanbanBoard.query.filter(
+        KanbanBoard.user_id == current_user.id,
+        KanbanBoard.last_transfer_at.isnot(None),
+    ).all()
+    for board in transferred_boards:
+        try:
+            if board.last_transfer_at and board.last_transfer_at.date() >= transfer_threshold:
+                from_name = board.last_transfer_from_name or 'Someone'
+                notifications.append({
+                    'kanban_board': board,
+                    'message': f'Board "{board.name}" was transferred to you by {from_name}',
+                    'type': 'kanban_board_transfer',
+                })
+        except Exception:
+            pass
+
     return render_template('notifications.html', notifications=notifications, can_edit_notifications=can_edit)
 
 

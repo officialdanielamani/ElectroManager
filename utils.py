@@ -316,13 +316,17 @@ def markdown_to_html(text):
         allowed_tags = [
             'p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
             'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'hr', 'table',
-            'thead', 'tbody', 'tr', 'th', 'td', 'a',
+            'thead', 'tbody', 'tr', 'th', 'td', 'a', 'span', 'div',
             # img intentionally excluded — external src allows IP tracking / script injection
         ]
         allowed_attributes = {
             'a': ['href', 'title'],
             'code': ['class'],
-            'pre': ['class']
+            'pre': ['class'],
+            'span': ['class'],
+            'div': ['class'],
+            'td': ['class'],
+            'th': ['class'],
         }
         
         safe_html = bleach.clean(html, tags=allowed_tags, attributes=allowed_attributes)

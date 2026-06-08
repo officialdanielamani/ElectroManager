@@ -462,7 +462,6 @@
                                                     <th>Internal Serial Number (ISN)</th>
                                                     <th>Info</th>
                                                     <th>Project</th>
-                                                    <th>Lend to</th>
                                                     <th>Status</th>
                                                 </tr>
                                             </thead>
@@ -2995,7 +2994,7 @@ function abCalcFromTotal() {
     var qty = parseFloat(document.getElementById('ab_qty').value) || 0;
     var total = parseFloat(document.getElementById('ab_total').value) || 0;
     var displayQty = Math.max(1, qty);
-    document.getElementById('ab_price').value = (total / displayQty).toFixed(4);
+    document.getElementById('ab_price').value = (Math.round(total / displayQty * 10000) / 10000).toFixed(4);
 }
 function toggleAddBatchTracking() {
     var on = document.getElementById('addBatchSnTracking').checked;
@@ -3352,7 +3351,6 @@ function _snRender(batchId) {
             '<td><code style="font-size:0.78rem">'+_esc(isnDisplay)+'</code></td>' +
             '<td>' + infoCell + '</td>' +
             '<td>-</td>' +
-            '<td>' + lendCell + '</td>' +
             '<td>' + statusBadge + '</td>' +
             '</tr>';
     });
@@ -3676,7 +3674,7 @@ document.addEventListener('DOMContentLoaded', function() {
         togglePbTracking();
         document.getElementById('pbQty').value = b.quantity;
         document.getElementById('pbQty').max = b.sn_tracking ? '100' : '99999';
-        document.getElementById('pbQtyNote').textContent = b.sn_tracking ? 'Max 100 for tracking batches.' : '';
+        document.getElementById('pbQtyNote').textContent = '';
         document.getElementById('pbPrice').value = parseFloat(b.price || 0).toFixed(4);
         document.getElementById('pbTotal').value = parseFloat(b.total || 0).toFixed(2);
         document.getElementById('pbDate').value = b.date || '';
@@ -3710,7 +3708,7 @@ document.addEventListener('DOMContentLoaded', function() {
     window.pbCalcFromTotal = function() {
         var qty = parseFloat(document.getElementById('pbQty').value) || 0;
         var total = parseFloat(document.getElementById('pbTotal').value) || 0;
-        document.getElementById('pbPrice').value = (total / Math.max(1, qty)).toFixed(4);
+        document.getElementById('pbPrice').value = (Math.round(total / Math.max(1, qty) * 10000) / 10000).toFixed(4);
     };
 
     window.pendingBatchSave = function() {
@@ -3759,7 +3757,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (infoEl) infoEl.innerHTML = tracking ? '<strong>ON:</strong> Serial number tracking — max 100 per batch, individual item management, all things is recorded.' : '<strong>OFF:</strong> Simple batch — unlimited quantity, quantity based lending.';
         if (tracking) {
             qtyInput.max = '100';
-            note.textContent = 'Max 100 for tracking batches.';
             if (parseInt(qtyInput.value, 10) > 100) qtyInput.value = '100';
         } else {
             qtyInput.max = '99999';
@@ -4268,6 +4265,7 @@ function setSfView(view) {
 {% endif %}
 
 <script src="{{ url_for('static', filename='js/marked.min.js') }}"></script>
+<script src="{{ url_for('static', filename='lib/highlight.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/md-editor.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {

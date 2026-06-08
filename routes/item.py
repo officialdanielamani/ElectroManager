@@ -24,6 +24,15 @@ logger = logging.getLogger(__name__)
 item_bp = Blueprint('item', __name__)
 
 
+@item_bp.route('/items/advanced-search', endpoint='item_advanced_search')
+@login_required
+def item_advanced_search():
+    if not current_user.has_permission('items', 'view'):
+        flash('You do not have permission to view items.', 'danger')
+        return redirect(url_for('index'))
+    return render_template('item_advanced_search.html')
+
+
 @item_bp.route('/items', endpoint='items')
 @login_required
 def items():
@@ -48,13 +57,16 @@ def items():
     query = Item.query
     
     if search_query:
-        query = query.filter(
-            db.or_(
-                Item.name.ilike(f'%{search_query}%'),
-                Item.description.ilike(f'%{search_query}%'),
-                Item.sku.ilike(f'%{search_query}%')
+        if search_query.lower().startswith('uuid:'):
+            uuid_val = search_query[5:].strip()
+            query = query.filter(Item.uuid == uuid_val)
+        else:
+            query = query.filter(
+                db.or_(
+                    Item.name.ilike(f'%{search_query}%'),
+                    Item.short_info.ilike(f'%{search_query}%')
+                )
             )
-        )
     
     if category_id > 0:
         query = query.filter_by(category_id=category_id)

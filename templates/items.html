@@ -51,10 +51,14 @@
                 <form method="GET" action="{{ url_for('item.items') }}" class="row g-3" id="itemSearchForm">
                     <div class="col-md-6">
                         <div class="input-group">
-                            <input type="text" name="search" class="form-control" placeholder="Search items..." value="{{ search_query }}" id="itemSearchInput">
+                            <input type="text" name="search" class="form-control" placeholder="Name or uuid:&lt;UUID&gt;" value="{{ search_query }}" id="itemSearchInput">
+                            <button type="submit" class="btn btn-primary" title="Search"><i class="bi bi-search"></i> Search</button>
                             <button type="button" class="btn btn-outline-secondary" onclick="clearItemSearch()" title="Clear search">
                                 <i class="bi bi-x-lg"></i>
                             </button>
+                            <a href="{{ url_for('item.item_advanced_search') }}" class="btn btn-outline-secondary" title="Advanced Search">
+                                <i class="bi bi-gear"></i>
+                            </a>
                         </div>
                     </div>
                     <div class="col-md-3">
@@ -64,12 +68,6 @@
                             <option value="{{ cat[0] }}" {% if cat[0] == category_id %}selected{% endif %}>{{ cat[1] }}</option>
                             {% endfor %}
                         </select>
-                    </div>
-                    <div class="col-md-3">
-                        <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Search</button>
-                        <button type="button" class="btn btn-outline-secondary" title="Advanced Search (coming soon)" disabled>
-                            <i class="bi bi-gear"></i>
-                        </button>
                     </div>
                 </form>
             </div>
