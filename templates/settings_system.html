@@ -131,33 +131,80 @@
                     <hr>
                     <!-- Storage Usage -->
                     <label class="form-label fw-semibold"><i class="bi bi-hdd"></i> Storage Usage</label>
-                    <div class="form-text mb-2">Folder sizes and underlying filesystem usage. Each bar shows how full the filesystem that folder lives on is — useful when <code>uploads/</code> and <code>instance/</code> are on separate volumes.</div>
+                    <div class="form-text mb-2">
+                        Folder sizes and underlying filesystem usage.
+                        <span class="badge bg-primary">&nbsp;</span> Blue = this app's data &nbsp;
+                        <span class="badge bg-success">&nbsp;</span><span class="badge bg-warning text-dark">&nbsp;</span><span class="badge bg-danger">&nbsp;</span> Other system usage (green &lt;70% · yellow 70–80% · red &gt;80%) &nbsp;
+                        <span class="text-muted">□ Free space (unlabelled)</span>
+                    </div>
+
+                    {# uploads/ row #}
+                    {% if uploads_disk_total > 0 %}
+                        {% set uploads_app_pct  = [uploads_size / uploads_disk_total * 100, 100] | min %}
+                        {% set uploads_other_pct = [uploads_disk_pct - uploads_app_pct, 0] | max %}
+                    {% else %}
+                        {% set uploads_app_pct  = 0 %}
+                        {% set uploads_other_pct = 0 %}
+                    {% endif %}
+                    {% set uploads_other_cls = 'bg-danger' if uploads_disk_pct > 80 else ('bg-warning' if uploads_disk_pct > 70 else 'bg-success') %}
                     <div class="mb-3">
                         <div class="d-flex justify-content-between small mb-1">
                             <span><i class="bi bi-folder2-open text-primary"></i> <strong>uploads/</strong></span>
-                            <span class="text-muted">{{ (uploads_size / 1048576) | round(2) }} MB used &nbsp;·&nbsp; {{ uploads_disk_pct }}% of {{ (uploads_disk_total / 1073741824) | round(1) }} GB filesystem</span>
+                            <span class="text-muted">
+                                App: <strong>{{ (uploads_size / 1048576) | round(2) }} MB</strong>
+                                &nbsp;·&nbsp;
+                                Disk: <strong>{{ uploads_disk_pct }}%</strong> of {{ (uploads_disk_total / 1073741824) | round(1) }} GB total
+                            </span>
                         </div>
-                        <div class="progress" style="height:14px;">
-                            <div class="progress-bar {% if uploads_disk_pct > 80 %}bg-danger{% elif uploads_disk_pct > 70 %}bg-warning{% else %}bg-success{% endif %}"
+                        <div class="progress" style="height:16px;">
+                            <div class="progress-bar bg-primary"
                                  role="progressbar"
-                                 style="width:{{ [uploads_disk_pct, 100]|min }}%;"
-                                 aria-valuenow="{{ uploads_disk_pct }}" aria-valuemin="0" aria-valuemax="100">
-                                {{ uploads_disk_pct }}%
-                            </div>
+                                 style="width:{{ uploads_app_pct | round(2) }}%;"
+                                 title="This app: {{ (uploads_size / 1048576) | round(2) }} MB"></div>
+                            <div class="progress-bar {{ uploads_other_cls }}"
+                                 role="progressbar"
+                                 style="width:{{ uploads_other_pct | round(2) }}%;"
+                                 title="Other system usage"></div>
+                        </div>
+                        <div class="d-flex gap-3 small mt-1 text-muted">
+                            <span><span class="badge bg-primary">&nbsp;</span> This app: {{ (uploads_size / 1048576) | round(2) }} MB</span>
+                            <span><span class="badge {{ uploads_other_cls }}">&nbsp;</span> Other: {{ ((uploads_disk_pct - uploads_app_pct) | round(1)) if uploads_disk_total > 0 else 0 }}% of disk</span>
+                            <span>Free: {{ (100 - uploads_disk_pct) | round(1) }}%</span>
                         </div>
                     </div>
+
+                    {# instance/ row #}
+                    {% if instance_disk_total > 0 %}
+                        {% set instance_app_pct  = [instance_size / instance_disk_total * 100, 100] | min %}
+                        {% set instance_other_pct = [instance_disk_pct - instance_app_pct, 0] | max %}
+                    {% else %}
+                        {% set instance_app_pct  = 0 %}
+                        {% set instance_other_pct = 0 %}
+                    {% endif %}
+                    {% set instance_other_cls = 'bg-danger' if instance_disk_pct > 80 else ('bg-warning' if instance_disk_pct > 70 else 'bg-success') %}
                     <div class="mb-2">
                         <div class="d-flex justify-content-between small mb-1">
                             <span><i class="bi bi-database text-secondary"></i> <strong>instance/</strong></span>
-                            <span class="text-muted">{{ (instance_size / 1048576) | round(2) }} MB used &nbsp;·&nbsp; {{ instance_disk_pct }}% of {{ (instance_disk_total / 1073741824) | round(1) }} GB filesystem</span>
+                            <span class="text-muted">
+                                App: <strong>{{ (instance_size / 1048576) | round(2) }} MB</strong>
+                                &nbsp;·&nbsp;
+                                Disk: <strong>{{ instance_disk_pct }}%</strong> of {{ (instance_disk_total / 1073741824) | round(1) }} GB total
+                            </span>
                         </div>
-                        <div class="progress" style="height:14px;">
-                            <div class="progress-bar {% if instance_disk_pct > 80 %}bg-danger{% elif instance_disk_pct > 70 %}bg-warning{% else %}bg-success{% endif %}"
+                        <div class="progress" style="height:16px;">
+                            <div class="progress-bar bg-primary"
                                  role="progressbar"
-                                 style="width:{{ [instance_disk_pct, 100]|min }}%;"
-                                 aria-valuenow="{{ instance_disk_pct }}" aria-valuemin="0" aria-valuemax="100">
-                                {{ instance_disk_pct }}%
-                            </div>
+                                 style="width:{{ instance_app_pct | round(2) }}%;"
+                                 title="This app: {{ (instance_size / 1048576) | round(2) }} MB"></div>
+                            <div class="progress-bar {{ instance_other_cls }}"
+                                 role="progressbar"
+                                 style="width:{{ instance_other_pct | round(2) }}%;"
+                                 title="Other system usage"></div>
+                        </div>
+                        <div class="d-flex gap-3 small mt-1 text-muted">
+                            <span><span class="badge bg-primary">&nbsp;</span> This app: {{ (instance_size / 1048576) | round(2) }} MB</span>
+                            <span><span class="badge {{ instance_other_cls }}">&nbsp;</span> Other: {{ ((instance_disk_pct - instance_app_pct) | round(1)) if instance_disk_total > 0 else 0 }}% of disk</span>
+                            <span>Free: {{ (100 - instance_disk_pct) | round(1) }}%</span>
                         </div>
                     </div>
 
@@ -642,7 +689,7 @@
                     <li><strong>User Signup</strong> — Allow self-registration at <code>/register</code>. Disable to require admin-created accounts only.</li>
                     <li><strong>Default Theme</strong> — Fallback theme for anonymous users and new accounts.</li>
                     <li><strong>Download All (ZIP)</strong> — Control which sections expose a bulk download button.</li>
-                    <li><strong>Storage Usage</strong> — Two bars showing folder sizes and the fill level of each folder's underlying filesystem. Supports separate volumes (e.g. uploads on HDD, instance on SSD). Bar turns yellow above 70% and red above 80%.</li>
+                    <li><strong>Storage Usage</strong> — Stacked bars showing this app's data (blue) separately from other system usage (green/yellow/red). Other usage turns yellow above 70% and red above 80% of the disk. Supports separate volumes (e.g. uploads on HDD, instance on SSD).</li>
                 </ul>
 
                 <h6 class="mt-3"><i class="bi bi-building"></i> Company Details</h6>
