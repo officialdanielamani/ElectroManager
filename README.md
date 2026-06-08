@@ -80,9 +80,20 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 - Magic Parameters on projects (same parameter definitions as items)
 - Manage project categories, statuses, persons, and groups via settings
 
+### Kanban
+- **Boards** — create personal or shared Kanban boards with custom columns (name, color, icon), per-board color/icon, and a pin/hide/show status list
+- **Cards** — title, description (free text), priority (Low/Medium/High/Urgent), label color, category, due and start dates, key persons, and a Mark Done toggle
+- **Tasks (checklist)** — per-card task lists with individual completion checkboxes, start/due dates, and inline edit/delete; task progress badge on board view
+- **Card file uploads** — attach images and documents directly to cards; images open in a lightbox modal; enforces the Kanban upload settings (allowed types, max size, max files per batch); upload permission extends to view-shared users
+- **Share Files on cards** — link files from the shared library (Item, Project, or Icon categories) to a card using the same browse-picker UI as items and projects; chips display with thumbnail preview
+- **Board sharing** — share boards in edit mode (collaborators can create, edit, and delete cards/tasks) or view-only mode; public boards visible to all logged-in users
+- **Real-time collaboration** — presence indicators show who else is viewing or editing the same board; card changes by other users sync automatically without a page reload
+- **Categories** — per-board label categories with configurable names; used to color-tag cards
+- **Keyboard-friendly** — drag-and-drop column/card reordering via SortableJS; collapse/expand task lists per card with state persisted in localStorage
+
 ### Shared File Library
-- Central file library (`Settings → Share Files`) for uploading files once and linking them to multiple items or projects
-- Categories: `item`, `profile`, `project`, `sticker`
+- Central file library (`Settings → Share Files`) for uploading files once and linking them to multiple items, projects, or Kanban cards
+- Categories: `item`, `project`, `icon`, `profile`, `sticker`
 - Bulk delete and bulk download
 - Files are stored in a dedicated share folder separate from item/project attachments
 - Scan-and-register tool to import files dropped directly into the share folder on disk
@@ -113,6 +124,7 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
   - Items: view, create, delete, and individual edit permissions per field (name, SKU/type, description, datasheet, uploads, price, quantity, location, category, footprint, tags, parameters, batches, serial numbers, lending)
   - Projects: view, create, edit, delete
   - Lending & Returns: view page, lend, return
+  - Kanban: view & manage boards
   - Settings sections: backup/restore, location management, reports, project settings, magic parameters, contacts
   - Pages: notifications, visual storage
 - Admin users bypass all permission checks
@@ -132,6 +144,18 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 ### Audit Log
 - Every create / read / update / delete action is logged with user, entity type, entity ID, and timestamp
 - In/Out module has a dedicated lending activity log view
+
+### Settings — File Uploads
+- Per-section upload limits configurable at `Settings → System → File Upload Settings`
+- **Sections:** Item Uploads, Project Uploads (per attachment type), Kanban Card Uploads, Share Files Uploads
+- **Controls per section:** Allowed file types (extension list), Max file size (MB), Max files per upload batch
+- **Max files semantics:** `-1` = unlimited, `0` = new uploads disabled (existing files are never affected), `>0` = batch limit enforced on every upload request
+- Share Files section defaults to a higher max-files limit (acts as a drive); all others default to 5
+
+### In/Out — Sound Effects
+- The In/Out scanning workflow plays audio feedback when a barcode/QR is scanned
+- Toggle in the scan interface settings panel
+- Sound files must be present at `static/mp3/scanner.mp3`, `static/mp3/success.mp3`, and `static/mp3/error.mp3`
 
 ---
 
@@ -275,6 +299,7 @@ ElectroManager/
 │   ├── batch.py                  # Batch management and serial numbers
 │   ├── in_out.py                 # Lending & return sessions (In/Out)
 │   ├── project.py                # Projects, BOM, cost items, project attachments
+│   ├── kanban.py                 # Kanban boards, columns, cards, tasks, attachments
 │   ├── location_rack.py          # Locations and racks management
 │   ├── visual_storage.py         # Visual rack/drawer interface
 │   ├── category.py               # Categories
@@ -299,6 +324,7 @@ ElectroManager/
 │   ├── items.html                # Item list
 │   ├── item_detail.html          # Item detail view
 │   ├── item_form.html            # Item create / edit form
+│   ├── kanban.html               # Kanban board view (boards, cards, tasks, uploads)
 │   ├── in_out*.html              # Lending / return pages
 │   ├── project*.html             # Project pages
 │   ├── visual_storage.html       # Visual rack map
@@ -319,7 +345,10 @@ ElectroManager/
 │   │   ├── table-sorter.js       # Client-side table sorting
 │   │   ├── md-editor.js          # Markdown editor helper
 │   │   └── marked.min.js         # Markdown renderer
-│   ├── mp3/                      # UI sound effects (scanner beep, success, error)
+│   ├── mp3/                      # UI sound effects — scanner beep, success chime, error pop
+│   │   ├── scanner.mp3           # Plays on QR/barcode scan (In/Out)
+│   │   ├── success.mp3           # Plays on successful lend/return
+│   │   └── error.mp3             # Plays on scan error
 │   ├── icons/                    # Bootstrap Icons — core, downloaded at build/startup
 │   ├── lib/                      # Bootstrap CSS/JS + SortableJS — core, downloaded at build/startup
 │   └── custom/                   # ← User-provided: custom fonts + themes (bind-mounted in Docker)
@@ -371,6 +400,18 @@ ElectroManager/
 ## 📝 License
 
 MIT License
+
+---
+
+## 🎵 Sound Effect Credits
+
+Sound effects used in the In/Out scanning workflow are sourced from [Pixabay](https://pixabay.com/) under the Pixabay Content License (royalty-free):
+
+| File | Title | Author |
+|------|-------|--------|
+| `scanner.mp3` | Store Scanner Beep | freesound_community |
+| `error.mp3` | UI Error Pop | SoundShelfStudio |
+| `success.mp3` | UI Success Chime | SoundShelfStudio |
 
 ---
 
