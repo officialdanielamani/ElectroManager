@@ -724,6 +724,7 @@ def item_edit(uuid):
     # Get file upload settings
     max_size_mb = int(Setting.get('max_file_size_mb', '10'))
     extensions_str = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
+    max_file_upload_count = int(Setting.get('max_file_upload_count', '5'))
     
     batch_lend_data = {b.id: b.get_lend_records_data() for b in item.batches}
     sn_all_data = {}
@@ -732,7 +733,7 @@ def item_edit(uuid):
             sn_all_data[batch.id] = batch.get_serial_numbers_data()
     share_files_item = SharedFile.query.filter_by(category='item').order_by(SharedFile.name).all()
     share_files_icon = SharedFile.query.filter_by(category='icon').order_by(SharedFile.name).all()
-    return render_template('item_form.html', form=form, item=item, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='Edit Item', currency=Setting.get('currency', '$'), max_file_size_mb=max_size_mb, allowed_file_types=extensions_str, item_perms=perms, batch_lend_data=batch_lend_data, sn_all_data=sn_all_data, share_files_item=share_files_item, share_files_icon=share_files_icon)
+    return render_template('item_form.html', form=form, item=item, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='Edit Item', currency=Setting.get('currency', '$'), max_file_size_mb=max_size_mb, allowed_file_types=extensions_str, max_file_upload_count=max_file_upload_count, item_perms=perms, batch_lend_data=batch_lend_data, sn_all_data=sn_all_data, share_files_item=share_files_item, share_files_icon=share_files_icon)
 
 
 
@@ -1007,13 +1008,21 @@ def upload_attachment(item_id):
     max_size_mb = int(Setting.get('max_file_size_mb', '10'))
     max_size_bytes = max_size_mb * 1024 * 1024
     extensions_str = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
+    max_file_upload_count = int(Setting.get('max_file_upload_count', '5'))
+
+    # Count non-empty files
+    valid_files = [f for f in files if f and f.filename]
+    if len(valid_files) > max_file_upload_count:
+        return jsonify({
+            'success': False,
+            'uploaded': 0,
+            'errors': [f'Too many files selected ({len(valid_files)}). Maximum allowed per upload is {max_file_upload_count}.'],
+        }), 400
 
     uploaded_count = 0
     errors = []
 
-    for file in files:
-        if not file or not file.filename:
-            continue
+    for file in valid_files:
 
         fname = file.filename
 

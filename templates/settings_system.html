@@ -347,18 +347,24 @@
 
                     <h6 class="border-bottom pb-2 mb-3"><i class="bi bi-box"></i> Item Uploads</h6>
                     <div class="row mb-4">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label for="allowed_extensions" class="form-label">Allowed File Types {% if not demo_mode %}<span class="text-danger">*</span>{% endif %}</label>
                             <input type="text" class="form-control" id="allowed_extensions" name="allowed_extensions"
                                    value="{% if demo_mode %}jpg,jpeg,png,txt{% else %}{{ allowed_extensions }}{% endif %}"
                                    {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}
                                    placeholder="pdf,png,jpg,jpeg,gif,txt,doc,docx">
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label for="max_file_size" class="form-label">Max File Size (MB) {% if not demo_mode %}<span class="text-danger">*</span>{% endif %}</label>
                             <input type="number" class="form-control" id="max_file_size" name="max_file_size"
                                    value="{% if demo_mode %}1{% else %}{{ max_file_size }}{% endif %}"
                                    min="1" max="100" {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="max_file_upload_count" class="form-label">Max Number of Files {% if not demo_mode %}<span class="text-danger">*</span>{% endif %}</label>
+                            <input type="number" class="form-control" id="max_file_upload_count" name="max_file_upload_count"
+                                   value="{% if demo_mode %}5{% else %}{{ max_file_upload_count }}{% endif %}"
+                                   min="1" max="50" {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}>
                         </div>
                     </div>
 

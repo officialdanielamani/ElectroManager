@@ -618,8 +618,7 @@
                                         <label class="form-label form-label-sm">Select Files to Upload:</label>
                                         <input type="file" id="fileUploadInput" class="form-control form-control-sm"
                                             multiple {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
-                                        <small class="text-muted">Allowed: {{ allowed_file_types }} | Max: {{
-                                            max_file_size_mb }}MB per file</small>
+                                        <small class="text-muted">Allowed: {{ allowed_file_types }} | Max: {{ max_file_size_mb }}MB per file | Max files: {{ max_file_upload_count }}</small>
                                     </div>
                                     <button type="button" class="btn btn-primary btn-sm" onclick="uploadFiles()" {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
                                         <i class="bi bi-upload"></i> Upload Files
@@ -1145,6 +1144,12 @@
 
         if (files.length === 0) {
             alert('Please select files to upload');
+            return;
+        }
+
+        const maxFiles = {{ max_file_upload_count }};
+        if (files.length > maxFiles) {
+            alert(`Too many files selected (${files.length}). Maximum allowed per upload is ${maxFiles}.\n\nPlease remove some files and try again.`);
             return;
         }
 

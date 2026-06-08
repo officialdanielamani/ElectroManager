@@ -468,6 +468,7 @@ def settings_system():
                 # Demo mode: use fixed values, ignore form input for file settings
                 allowed_extensions = 'jpg,jpeg,png,txt,md'
                 max_file_size = 1
+                max_file_upload_count = 5
             else:
                 # Production mode: validate file settings from form
                 allowed_extensions = request.form.get('allowed_extensions', '').strip()
@@ -500,6 +501,17 @@ def settings_system():
                         return redirect(url_for('settings.settings_system'))
                 except ValueError:
                     flash('Invalid max file size value!', 'danger')
+                    return redirect(url_for('settings.settings_system'))
+
+                # Max number of files validation (production mode only)
+                max_file_upload_count = request.form.get('max_file_upload_count', '5')
+                try:
+                    max_file_upload_count = int(max_file_upload_count)
+                    if max_file_upload_count < 1 or max_file_upload_count > 50:
+                        flash('Max number of files must be between 1 and 50!', 'danger')
+                        return redirect(url_for('settings.settings_system'))
+                except ValueError:
+                    flash('Invalid max number of files value!', 'danger')
                     return redirect(url_for('settings.settings_system'))
             
             # Max drawer rows
@@ -624,6 +636,7 @@ def settings_system():
             Setting.set('currency_decimal_places', currency_decimal_places, 'Currency decimal places (0-5)')
             Setting.set('max_file_size_mb', max_file_size, 'Maximum file upload size in MB')
             Setting.set('allowed_extensions', allowed_extensions, 'Allowed file extensions (comma-separated)')
+            Setting.set('max_file_upload_count', max_file_upload_count, 'Maximum number of files per upload batch')
             Setting.set('max_drawer_rows', max_drawer_rows, 'Maximum drawer rows (1-32)')
             Setting.set('max_drawer_cols', max_drawer_cols, 'Maximum drawer columns (1-32)')
             Setting.set('banner_timeout', banner_timeout, 'Banner auto-dismiss timeout in seconds (0=permanent)')
@@ -698,6 +711,7 @@ def settings_system():
     currency_decimal_places = Setting.get('currency_decimal_places', '2')
     max_file_size = Setting.get('max_file_size_mb', '10')
     allowed_extensions = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
+    max_file_upload_count = Setting.get('max_file_upload_count', '5')
     max_drawer_rows = Setting.get('max_drawer_rows', '10')
     max_drawer_cols = Setting.get('max_drawer_cols', '10')
     banner_timeout = Setting.get('banner_timeout', '5')
@@ -774,6 +788,7 @@ def settings_system():
                           currency_decimal_places=currency_decimal_places,
                           max_file_size=max_file_size,
                           allowed_extensions=allowed_extensions,
+                          max_file_upload_count=max_file_upload_count,
                           max_drawer_rows=max_drawer_rows,
                           max_drawer_cols=max_drawer_cols,
                           banner_timeout=banner_timeout,
