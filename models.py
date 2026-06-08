@@ -1724,6 +1724,9 @@ class KanbanCard(db.Model):
     tasks      = db.relationship('KanbanTask', backref='card', lazy=True,
                                  cascade='all, delete-orphan',
                                  order_by='KanbanTask.position')
+    attachments = db.relationship('KanbanAttachment', backref='card', lazy=True,
+                                  cascade='all, delete-orphan',
+                                  order_by='KanbanAttachment.uploaded_at')
     category   = db.relationship('KanbanCategory', foreign_keys=[category_id], lazy='joined')
     created_by = db.relationship('User', foreign_keys=[created_by_id])
     updated_by = db.relationship('User', foreign_keys=[updated_by_id])
@@ -1760,6 +1763,21 @@ class KanbanCard(db.Model):
     @property
     def completed_task_count(self):
         return sum(1 for t in self.tasks if t.completed)
+
+
+class KanbanAttachment(db.Model):
+    __tablename__ = 'kanban_attachments'
+    id                = db.Column(db.Integer, primary_key=True)
+    card_id           = db.Column(db.Integer, db.ForeignKey('kanban_cards.id'), nullable=False)
+    filename          = db.Column(db.String(255), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    file_path         = db.Column(db.String(500), nullable=False)
+    file_type         = db.Column(db.String(50))
+    file_size         = db.Column(db.Integer)
+    uploaded_at       = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    uploaded_by       = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    uploader = db.relationship('User', foreign_keys=[uploaded_by])
 
 
 class KanbanTask(db.Model):

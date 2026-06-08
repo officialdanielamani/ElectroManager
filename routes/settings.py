@@ -469,6 +469,9 @@ def settings_system():
                 allowed_extensions = 'jpg,jpeg,png,txt,md'
                 max_file_size = 1
                 max_file_upload_count = 5
+                kanban_upload_extensions = 'png,jpg,jpeg'
+                kanban_upload_max_size = 1
+                kanban_upload_max_files = 5
             else:
                 # Production mode: validate file settings from form
                 allowed_extensions = request.form.get('allowed_extensions', '').strip()
@@ -685,6 +688,32 @@ def settings_system():
                         flash(f'Invalid max files value for share {stype}!', 'danger')
                         return redirect(url_for('settings.settings_system'))
 
+            # Kanban upload settings
+            if not current_app.config.get('DEMO_MODE', False):
+                kanban_ext = request.form.get('kanban_upload_extensions', '').strip()
+                kanban_size = request.form.get('kanban_upload_max_size', '10')
+                kanban_files = request.form.get('kanban_upload_max_files', '5')
+                if kanban_ext:
+                    Setting.set('kanban_upload_extensions', kanban_ext, 'Kanban card upload allowed extensions')
+                try:
+                    kanban_size_int = int(kanban_size)
+                    if kanban_size_int < 1 or kanban_size_int > 100:
+                        flash('Kanban max file size must be between 1 and 100 MB!', 'danger')
+                        return redirect(url_for('settings.settings_system'))
+                    Setting.set('kanban_upload_max_size', kanban_size_int, 'Kanban card upload max file size MB')
+                except ValueError:
+                    flash('Invalid Kanban max file size!', 'danger')
+                    return redirect(url_for('settings.settings_system'))
+                try:
+                    kanban_files_int = int(kanban_files)
+                    if kanban_files_int < -1 or kanban_files_int > 50:
+                        flash('Kanban max files must be between -1 and 50!', 'danger')
+                        return redirect(url_for('settings.settings_system'))
+                    Setting.set('kanban_upload_max_files', kanban_files_int, 'Kanban card max files per upload (-1=unlimited, 0=disabled)')
+                except ValueError:
+                    flash('Invalid Kanban max files value!', 'danger')
+                    return redirect(url_for('settings.settings_system'))
+
             # Lending & Return settings
             lr_keys = ['lr_lend_start_date_required', 'lr_lend_start_time_required',
                        'lr_lend_end_date_required', 'lr_lend_end_time_required', 'lr_lend_self_use_now',
@@ -733,6 +762,9 @@ def settings_system():
     max_file_size = Setting.get('max_file_size_mb', '10')
     allowed_extensions = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
     max_file_upload_count = Setting.get('max_file_upload_count', '5')
+    kanban_upload_extensions = Setting.get('kanban_upload_extensions', 'png,jpg,jpeg,txt,pdf')
+    kanban_upload_max_size   = Setting.get('kanban_upload_max_size', '10')
+    kanban_upload_max_files  = Setting.get('kanban_upload_max_files', '5')
     max_drawer_rows = Setting.get('max_drawer_rows', '10')
     max_drawer_cols = Setting.get('max_drawer_cols', '10')
     banner_timeout = Setting.get('banner_timeout', '5')
@@ -810,6 +842,9 @@ def settings_system():
                           max_file_size=max_file_size,
                           allowed_extensions=allowed_extensions,
                           max_file_upload_count=max_file_upload_count,
+                          kanban_upload_extensions=kanban_upload_extensions,
+                          kanban_upload_max_size=kanban_upload_max_size,
+                          kanban_upload_max_files=kanban_upload_max_files,
                           max_drawer_rows=max_drawer_rows,
                           max_drawer_cols=max_drawer_cols,
                           banner_timeout=banner_timeout,

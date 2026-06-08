@@ -447,7 +447,7 @@
                     </div>
                     {% endfor %}
 
-                    <h6 class="border-bottom pb-2 mb-3 mt-4"><i class="bi bi-columns-gap"></i> Kanban <span class="badge bg-secondary ms-1" style="font-size:0.7rem;">Coming Soon</span></h6>
+                    <h6 class="border-bottom pb-2 mb-3 mt-4"><i class="bi bi-columns-gap"></i> Kanban</h6>
                     <div class="row mb-1">
                         <div class="col-md-3"></div>
                         <div class="col-md-4"><small class="text-muted fw-bold">Allowed Types</small></div>
@@ -455,10 +455,23 @@
                         <div class="col-md-2"><small class="text-muted fw-bold">Max Files</small></div>
                     </div>
                     <div class="row mb-2">
-                        <div class="col-md-3"><label class="form-label small fw-bold text-muted">Upload Files</label></div>
-                        <div class="col-md-4"><input type="text" class="form-control form-control-sm" placeholder="e.g. png,jpg,pdf" disabled></div>
-                        <div class="col-md-3"><input type="number" class="form-control form-control-sm" placeholder="10" disabled></div>
-                        <div class="col-md-2"><input type="number" class="form-control form-control-sm" placeholder="5" disabled></div>
+                        <div class="col-md-3"><label class="form-label small fw-bold">Card Uploads</label></div>
+                        <div class="col-md-4">
+                            <input type="text" class="form-control form-control-sm" name="kanban_upload_extensions"
+                                   value="{% if demo_mode %}png,jpg,jpeg{% else %}{{ kanban_upload_extensions }}{% endif %}"
+                                   {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}
+                                   placeholder="png,jpg,jpeg,txt,pdf">
+                        </div>
+                        <div class="col-md-3">
+                            <input type="number" class="form-control form-control-sm" name="kanban_upload_max_size"
+                                   value="{% if demo_mode %}1{% else %}{{ kanban_upload_max_size }}{% endif %}"
+                                   min="1" max="100" {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-2">
+                            <input type="number" class="form-control form-control-sm" name="kanban_upload_max_files"
+                                   value="{% if demo_mode %}5{% else %}{{ kanban_upload_max_files }}{% endif %}"
+                                   min="-1" max="50" {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}>
+                        </div>
                     </div>
 
                     <h6 class="border-bottom pb-2 mb-3 mt-4"><i class="bi bi-folder-fill"></i> Share Files Uploads</h6>
@@ -721,7 +734,7 @@
                 <ul class="small ps-3 mb-2">
                     <li><strong>Item Uploads</strong> — Controls file attachments on item pages.</li>
                     <li><strong>Project Uploads</strong> — Per-type limits: Pictures, Documents, Schematics, 2D Design, 3D Design, Programs.</li>
-                    <li><strong>Kanban</strong> — Placeholder for future Kanban board file attachments (not yet active).</li>
+                    <li><strong>Kanban</strong> — Card attachments (images and documents attached to individual Kanban cards). Board owner and all shared users (View & Edit or View Only) can upload and delete.</li>
                     <li><strong>Share Files</strong> — Shared file library (item, project, sticker, icon). Profile uploads are always fixed to JPEG/PNG, 1 MB, 1 file.</li>
                 </ul>
 

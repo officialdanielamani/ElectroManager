@@ -907,6 +907,25 @@
 
             <hr>
 
+            {# Uploads section #}
+            <div class="mb-3">
+                <label class="form-label fw-semibold"><i class="bi bi-paperclip"></i> Uploads</label>
+                <div id="card-attachments" class="mb-2">
+                    <small class="text-muted">No files attached.</small>
+                </div>
+                <div id="card-upload-section" style="display:none;">
+                    <div class="d-flex align-items-center gap-2 mt-1">
+                        <input type="file" id="card-file-input" class="form-control form-control-sm flex-grow-1" multiple>
+                        <button type="button" class="btn btn-sm btn-primary flex-shrink-0" onclick="uploadCardFiles()">
+                            <i class="bi bi-upload"></i> Upload
+                        </button>
+                    </div>
+                    <small class="text-muted d-block mt-1" id="card-upload-hint"></small>
+                </div>
+            </div>
+
+            <hr>
+
             {# Tasks section #}
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <label class="form-label mb-0 fw-semibold">
@@ -997,7 +1016,11 @@ const LOGOUT_URL    = '{{ url_for("auth.logout") }}';
 const CAN_SHARE_BOARD = {{ can_share_board | tojson }};
 const IS_OWNER        = {{ is_owner | tojson }};
 const ACTIVE_SHARE_TYPE = {{ active_share_type | tojson }};
-const CAN_EDIT = IS_OWNER || ACTIVE_SHARE_TYPE === 'edit';
+const CAN_EDIT   = IS_OWNER || ACTIVE_SHARE_TYPE === 'edit';
+const CAN_UPLOAD = IS_OWNER || ACTIVE_SHARE_TYPE === 'edit' || ACTIVE_SHARE_TYPE === 'view';
+const KANBAN_UPLOAD_EXTS     = {{ kanban_upload_exts | tojson }};
+const KANBAN_UPLOAD_MAX_SIZE = {{ kanban_upload_max_size | tojson }};
+const KANBAN_UPLOAD_MAX_FILES = {{ kanban_upload_max_files | tojson }};
 const CURRENT_USER_ID   = {{ current_user.id | tojson }};
 const CURRENT_USER_NAME = {{ (current_user.name or current_user.username) | tojson }};
 
@@ -2232,6 +2255,7 @@ function populateCardModal(card) {
     updateMarkDoneState(card.task_count, card.completed_task_count);
     _applyCardModalReadOnly(!CAN_EDIT);
     _updateCardModalTimestamps(card);
+    renderCardAttachments(card.attachments || []);
 }
 
 function renderModalTaskList(tasks, total, done) {
@@ -2325,6 +2349,119 @@ async function refreshModalTasks() {
     const card = await api('GET', '/kanban/cards/' + _currentCardId);
     renderModalTaskList(card.tasks, card.task_count, card.completed_task_count);
     _updateCardModalTimestamps(card);
+}
+
+// ── Card attachments ─────────────────────────────────────────────
+
+function renderCardAttachments(attachments) {
+    const container = document.getElementById('card-attachments');
+    const section   = document.getElementById('card-upload-section');
+    const hint      = document.getElementById('card-upload-hint');
+
+    if (section) section.style.display = CAN_UPLOAD ? '' : 'none';
+    if (hint) {
+        const maxF = KANBAN_UPLOAD_MAX_FILES === -1 ? 'unlimited'
+                   : KANBAN_UPLOAD_MAX_FILES === 0  ? 'disabled'
+                   : KANBAN_UPLOAD_MAX_FILES;
+        hint.textContent = `Allowed: ${KANBAN_UPLOAD_EXTS} | Max: ${KANBAN_UPLOAD_MAX_SIZE} MB per file | Max files: ${maxF}`;
+    }
+
+    if (!container) return;
+    if (!attachments || attachments.length === 0) {
+        container.innerHTML = '<small class="text-muted">No files attached.</small>';
+        return;
+    }
+
+    const imgExts = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']);
+    const images  = attachments.filter(a => imgExts.has(a.file_type));
+    const others  = attachments.filter(a => !imgExts.has(a.file_type));
+
+    let html = '';
+
+    if (images.length) {
+        html += '<div class="d-flex flex-wrap gap-2 mb-2">';
+        images.forEach(a => {
+            const delBtn = CAN_UPLOAD
+                ? `<button type="button" class="position-absolute top-0 end-0 btn btn-danger p-0 js-del-attachment"
+                       data-id="${a.id}" style="width:18px;height:18px;font-size:.6rem;line-height:1;">×</button>`
+                : '';
+            html += `<div class="position-relative" style="width:72px;height:72px;flex-shrink:0;">
+                <a href="/uploads/${escHtml(a.filename)}" target="_blank" title="${escHtml(a.original_filename)}">
+                    <img src="/uploads/${escHtml(a.filename)}" alt="${escHtml(a.original_filename)}"
+                         class="rounded border"
+                         style="width:72px;height:72px;object-fit:cover;">
+                </a>
+                ${delBtn}
+            </div>`;
+        });
+        html += '</div>';
+    }
+
+    if (others.length) {
+        others.forEach(a => {
+            const sizeMb  = (a.file_size / 1048576).toFixed(2);
+            const icon    = a.file_type === 'pdf'  ? 'bi-file-earmark-pdf text-danger'
+                          : a.file_type === 'txt'  ? 'bi-file-earmark-text text-secondary'
+                          : 'bi-file-earmark text-muted';
+            const delBtn  = CAN_UPLOAD
+                ? `<button type="button" class="btn btn-link btn-sm p-0 text-danger ms-2 js-del-attachment"
+                       data-id="${a.id}" title="Delete"><i class="bi bi-trash"></i></button>`
+                : '';
+            html += `<div class="d-flex align-items-center py-1 border-bottom small">
+                <i class="bi ${icon} me-2"></i>
+                <a href="/uploads/${escHtml(a.filename)}" target="_blank"
+                   class="flex-grow-1 text-truncate">${escHtml(a.original_filename)}</a>
+                <span class="text-muted ms-2 text-nowrap">${sizeMb} MB</span>
+                ${delBtn}
+            </div>`;
+        });
+    }
+
+    container.innerHTML = html;
+    container.querySelectorAll('.js-del-attachment').forEach(btn => {
+        btn.addEventListener('click', () => deleteCardAttachment(parseInt(btn.dataset.id)));
+    });
+}
+
+async function uploadCardFiles() {
+    if (!_currentCardId) return;
+    const input = document.getElementById('card-file-input');
+    const files = input?.files;
+    if (!files || files.length === 0) { alert('Please select files to upload.'); return; }
+
+    if (KANBAN_UPLOAD_MAX_FILES === 0) {
+        alert('File uploads are currently disabled by the administrator.');
+        return;
+    }
+    if (KANBAN_UPLOAD_MAX_FILES > 0 && files.length > KANBAN_UPLOAD_MAX_FILES) {
+        alert(`Too many files selected (${files.length}). Maximum allowed per upload is ${KANBAN_UPLOAD_MAX_FILES}.`);
+        return;
+    }
+
+    const fd = new FormData();
+    for (const f of files) fd.append('files', f);
+
+    try {
+        const r    = await fetch(`/kanban/cards/${_currentCardId}/upload`,
+                                 { method: 'POST', headers: { 'X-CSRFToken': CSRF }, body: fd });
+        const data = await r.json();
+        if (data.errors?.length) {
+            const prefix = data.uploaded > 0 ? `${data.uploaded} file(s) uploaded.\n\nRejected:\n` : '';
+            alert(prefix + '• ' + data.errors.join('\n• '));
+        }
+        const card = await api('GET', '/kanban/cards/' + _currentCardId);
+        renderCardAttachments(card.attachments);
+        if (input) input.value = '';
+    } catch(e) { showErr(e.message); }
+}
+
+async function deleteCardAttachment(id) {
+    if (!confirm('Delete this file?')) return;
+    try {
+        await api('DELETE', '/kanban/cards/attachments/' + id);
+        const card = await api('GET', '/kanban/cards/' + _currentCardId);
+        renderCardAttachments(card.attachments);
+    } catch(e) { showErr(e.message); }
 }
 
 document.getElementById('btn-save-card')?.addEventListener('click', async () => {
