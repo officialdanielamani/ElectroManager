@@ -973,6 +973,21 @@
     </div></div>
 </div>
 
+{# ── Kanban Image Lightbox Modal ──────────────── #}
+<div class="modal fade" id="kanbanImageModal" tabindex="-1" style="z-index:1090;">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title mb-0" id="kanbanImageModalLabel"></h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center p-2">
+                <img id="kanbanModalImage" src="" class="img-fluid rounded" alt="" style="max-height:80vh;">
+            </div>
+        </div>
+    </div>
+</div>
+
 {# ── Task Edit Modal ───────────────────────────── #}
 <div class="modal fade" id="taskEditModal" tabindex="-1">
     <div class="modal-dialog modal-sm"><div class="modal-content">
@@ -2385,12 +2400,13 @@ function renderCardAttachments(attachments) {
                 ? `<button type="button" class="position-absolute top-0 end-0 btn btn-danger p-0 js-del-attachment"
                        data-id="${a.id}" style="width:18px;height:18px;font-size:.6rem;line-height:1;">×</button>`
                 : '';
-            html += `<div class="position-relative" style="width:72px;height:72px;flex-shrink:0;">
-                <a href="/uploads/${escHtml(a.filename)}" target="_blank" title="${escHtml(a.original_filename)}">
-                    <img src="/uploads/${escHtml(a.filename)}" alt="${escHtml(a.original_filename)}"
-                         class="rounded border"
-                         style="width:72px;height:72px;object-fit:cover;">
-                </a>
+            html += `<div class="position-relative" style="width:72px;height:72px;flex-shrink:0;cursor:pointer;">
+                <img src="/uploads/${escHtml(a.filename)}" alt="${escHtml(a.original_filename)}"
+                     class="rounded border js-preview-img"
+                     data-src="/uploads/${escHtml(a.filename)}"
+                     data-title="${escHtml(a.original_filename)}"
+                     style="width:72px;height:72px;object-fit:cover;"
+                     title="${escHtml(a.original_filename)}">
                 ${delBtn}
             </div>`;
         });
@@ -2421,6 +2437,15 @@ function renderCardAttachments(attachments) {
     container.querySelectorAll('.js-del-attachment').forEach(btn => {
         btn.addEventListener('click', () => deleteCardAttachment(parseInt(btn.dataset.id)));
     });
+    container.querySelectorAll('.js-preview-img').forEach(img => {
+        img.addEventListener('click', () => openKanbanImageModal(img.dataset.src, img.dataset.title));
+    });
+}
+
+function openKanbanImageModal(src, title) {
+    document.getElementById('kanbanModalImage').src = src;
+    document.getElementById('kanbanImageModalLabel').textContent = title;
+    new bootstrap.Modal(document.getElementById('kanbanImageModal')).show();
 }
 
 async function uploadCardFiles() {
