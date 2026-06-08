@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, request, jsonify, abort, redirect,
 from flask_login import login_required, current_user
 from models import (db, KanbanBoard, KanbanBoardUserState, KanbanColumn, KanbanCard,
                     KanbanTask, KanbanAttachment, KanbanCategory, DEFAULT_KANBAN_COLUMNS,
-                    ContactPerson, ContactOrganization, ContactGroup, User, Setting)
+                    ContactPerson, ContactOrganization, ContactGroup, User, Setting, SharedFile)
 from datetime import datetime, timezone, date
 from utils import log_audit, validate_mime_type, format_file_size
 import json
@@ -295,6 +295,9 @@ def _card_to_dict(card):
         'created_by_name': (card.created_by.name or card.created_by.username) if card.created_by else '',
         'updated_by_name': (card.updated_by.name or card.updated_by.username) if card.updated_by else '',
         'attachments': [_attachment_to_dict(a) for a in card.attachments],
+        'share_files': [{'id': sf.id, 'name': sf.name, 'filename': sf.filename,
+                         'category': sf.category, 'is_image': sf.is_image,
+                         'ext': sf.ext} for sf in card.linked_share_files],
     }
 
 
@@ -435,6 +438,10 @@ def kanban():
     kanban_upload_max_size = 1 if demo else int(Setting.get('kanban_upload_max_size', '10'))
     kanban_upload_max_files = 5 if demo else int(Setting.get('kanban_upload_max_files', '5'))
 
+    share_files_item    = SharedFile.query.filter_by(category='item').order_by(SharedFile.name).all()
+    share_files_project = SharedFile.query.filter_by(category='project').order_by(SharedFile.name).all()
+    share_files_icon    = SharedFile.query.filter_by(category='icon').order_by(SharedFile.name).all()
+
     return render_template('kanban.html',
         boards=boards,
         all_boards=own_boards,
@@ -448,6 +455,9 @@ def kanban():
         kanban_upload_exts=kanban_upload_exts,
         kanban_upload_max_size=kanban_upload_max_size,
         kanban_upload_max_files=kanban_upload_max_files,
+        share_files_item=share_files_item,
+        share_files_project=share_files_project,
+        share_files_icon=share_files_icon,
     )
 
 
@@ -1021,6 +1031,18 @@ def update_card(card_id):
         return jsonify({'error': 'Start date must be on or before the due date'}), 400
     if 'completed_at' in data:
         card.completed_at = datetime.now(timezone.utc) if data['completed_at'] else None
+    if 'share_file_ids' in data:
+        ids = data['share_file_ids']
+        if isinstance(ids, list):
+            valid_ids = [int(i) for i in ids if str(i).lstrip('-').isdigit()]
+            if valid_ids:
+                sf_list = SharedFile.query.filter(
+                    SharedFile.id.in_(valid_ids),
+                    SharedFile.category.in_(['item', 'project', 'icon'])
+                ).all()
+            else:
+                sf_list = []
+            card.linked_share_files = sf_list
     card.updated_at = datetime.now(timezone.utc)
     card.updated_by_id = current_user.id
     db.session.commit()

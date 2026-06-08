@@ -391,6 +391,12 @@ project_share_files = db.Table(
     db.Column('shared_file_id', db.Integer, db.ForeignKey('shared_files.id'), primary_key=True),
 )
 
+kanban_card_share_files = db.Table(
+    'kanban_card_share_files',
+    db.Column('card_id', db.Integer, db.ForeignKey('kanban_cards.id'), primary_key=True),
+    db.Column('shared_file_id', db.Integer, db.ForeignKey('shared_files.id'), primary_key=True),
+)
+
 
 class Item(db.Model):
     __tablename__ = 'items'
@@ -1727,6 +1733,9 @@ class KanbanCard(db.Model):
     attachments = db.relationship('KanbanAttachment', backref='card', lazy=True,
                                   cascade='all, delete-orphan',
                                   order_by='KanbanAttachment.uploaded_at')
+    linked_share_files = db.relationship('SharedFile', secondary='kanban_card_share_files',
+                                         lazy='subquery',
+                                         backref=db.backref('linked_kanban_cards', lazy=True))
     category   = db.relationship('KanbanCategory', foreign_keys=[category_id], lazy='joined')
     created_by = db.relationship('User', foreign_keys=[created_by_id])
     updated_by = db.relationship('User', foreign_keys=[updated_by_id])

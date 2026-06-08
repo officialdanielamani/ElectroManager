@@ -907,25 +907,6 @@
 
             <hr>
 
-            {# Uploads section #}
-            <div class="mb-3">
-                <label class="form-label fw-semibold"><i class="bi bi-paperclip"></i> Uploads</label>
-                <div id="card-attachments" class="mb-2">
-                    <small class="text-muted">No files attached.</small>
-                </div>
-                <div id="card-upload-section" style="display:none;">
-                    <div class="d-flex align-items-center gap-2 mt-1">
-                        <input type="file" id="card-file-input" class="form-control form-control-sm flex-grow-1" multiple>
-                        <button type="button" class="btn btn-sm btn-primary flex-shrink-0" onclick="uploadCardFiles()">
-                            <i class="bi bi-upload"></i> Upload
-                        </button>
-                    </div>
-                    <small class="text-muted d-block mt-1" id="card-upload-hint"></small>
-                </div>
-            </div>
-
-            <hr>
-
             {# Tasks section #}
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <label class="form-label mb-0 fw-semibold">
@@ -951,6 +932,41 @@
                 <div class="col-6">
                     <input type="date" class="form-control form-control-sm"
                            id="new-task-due" title="Task due date">
+                </div>
+            </div>
+
+            <hr>
+
+            {# Uploads section #}
+            <div class="mb-3">
+                <label class="form-label fw-semibold"><i class="bi bi-paperclip"></i> Uploads</label>
+                <div id="card-attachments" class="mb-2">
+                    <small class="text-muted">No files attached.</small>
+                </div>
+                <div id="card-upload-section" style="display:none;">
+                    <div class="d-flex align-items-center gap-2 mt-1">
+                        <input type="file" id="card-file-input" class="form-control form-control-sm flex-grow-1" multiple>
+                        <button type="button" class="btn btn-sm btn-primary flex-shrink-0" onclick="uploadCardFiles()">
+                            <i class="bi bi-upload"></i> Upload
+                        </button>
+                    </div>
+                    <small class="text-muted d-block mt-1" id="card-upload-hint"></small>
+                </div>
+            </div>
+
+            <hr>
+
+            {# Share Files section #}
+            <div class="mb-3">
+                <label class="form-label fw-semibold"><i class="bi bi-folder-fill text-warning"></i> Share Files</label>
+                <div id="card-linked-share-files" class="d-flex flex-wrap gap-2 mb-2">
+                    <small class="text-muted" id="card-sf-empty">No share files linked.</small>
+                </div>
+                <div id="card-sf-browse-wrap" style="display:none;">
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            onclick="openKanbanSfPicker()">
+                        <i class="bi bi-folder2-open"></i> Browse Share Files
+                    </button>
                 </div>
             </div>
 
@@ -983,6 +999,326 @@
             </div>
             <div class="modal-body text-center p-2">
                 <img id="kanbanModalImage" src="" class="img-fluid rounded" alt="" style="max-height:80vh;">
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── Kanban Share File Picker Modal ───────────── #}
+<div class="modal fade" id="kanbanSfPickerModal" tabindex="-1" style="z-index:1092;">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-folder-fill text-warning"></i> Select Share Files</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                {# Toolbar #}
+                <div class="d-flex gap-2 align-items-center mb-2 flex-wrap">
+                    <div class="input-group input-group-sm" style="max-width:260px;">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="knsfSearch"
+                               placeholder="Search files…" oninput="knsfFilter(this.value)">
+                        <button class="btn btn-outline-secondary" type="button"
+                                onclick="document.getElementById('knsfSearch').value=''; knsfFilter('');">×</button>
+                    </div>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary active" id="knsfViewCard"
+                                onclick="knsfSetView('card')" title="Card view">
+                            <i class="bi bi-grid-3x3-gap"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="knsfViewList"
+                                onclick="knsfSetView('list')" title="List view">
+                            <i class="bi bi-list-ul"></i>
+                        </button>
+                    </div>
+                    <span class="text-muted small ms-auto" id="knsfSelectedCount">0 selected</span>
+                </div>
+                {# Category tabs #}
+                <ul class="nav nav-tabs mb-3" id="knsfCatTabs">
+                    <li class="nav-item">
+                        <button class="nav-link active" data-cat="item" onclick="knsfSetCat('item')">
+                            <i class="bi bi-box-seam"></i> Item
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-cat="project" onclick="knsfSetCat('project')">
+                            <i class="bi bi-diagram-3"></i> Project
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-cat="icon" onclick="knsfSetCat('icon')">
+                            <i class="bi bi-image"></i> Icon
+                        </button>
+                    </li>
+                </ul>
+                {# Item panel #}
+                <div id="knsfPanel-item" class="knsf-panel">
+                    {% if share_files_item %}
+                    <div id="knsfCardView-item" class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3">
+                        {% for sf in share_files_item %}
+                        <div class="col knsf-picker-item" data-name="{{ sf.name|lower }}.{{ sf.ext }}">
+                            <div class="card h-100 shadow-sm position-relative knsf-picker-card"
+                                 id="knsfpcard_{{ sf.id }}"
+                                 data-sf-id="{{ sf.id }}"
+                                 data-sf-name="{{ sf.name }}"
+                                 data-sf-image="{{ 'true' if sf.is_image else 'false' }}"
+                                 data-sf-category="item"
+                                 data-sf-filename="{{ sf.filename }}"
+                                 style="cursor:pointer;"
+                                 onclick="knsfTogglePick(this)">
+                                <div class="position-absolute top-0 start-0 p-1" style="z-index:2;pointer-events:none;">
+                                    <span class="knsf-check-icon d-none">
+                                        <i class="bi bi-check-circle-fill text-success" style="font-size:1.1rem;filter:drop-shadow(0 0 2px #fff);"></i>
+                                    </span>
+                                </div>
+                                <div class="card-img-top d-flex align-items-center justify-content-center bg-light"
+                                     style="width:100%;aspect-ratio:1/1;overflow:hidden;pointer-events:none;">
+                                    {% if sf.is_image %}
+                                    <img src="{{ url_for('share.share_serve', category='item', filename=sf.filename) }}"
+                                         alt="{{ sf.name }}" style="width:100%;height:100%;object-fit:cover;">
+                                    {% else %}
+                                    {% set ext = sf.ext %}
+                                    {% if ext == 'pdf' %}<i class="bi bi-file-earmark-pdf text-danger" style="font-size:2.5rem;"></i>
+                                    {% elif ext in ['doc','docx'] %}<i class="bi bi-file-earmark-word text-primary" style="font-size:2.5rem;"></i>
+                                    {% elif ext in ['txt','md'] %}<i class="bi bi-file-earmark-text text-secondary" style="font-size:2.5rem;"></i>
+                                    {% else %}<i class="bi bi-file-earmark text-muted" style="font-size:2.5rem;"></i>
+                                    {% endif %}
+                                    {% endif %}
+                                </div>
+                                <div class="card-body p-1" style="pointer-events:none;">
+                                    <p class="card-text small fw-semibold text-truncate mb-0" title="{{ sf.name }}.{{ sf.ext }}">{{ sf.name }}</p>
+                                    <small class="text-muted">{{ sf.ext|upper }} · {{ sf.size_display() }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div id="knsfListView-item" class="d-none">
+                        <table class="table table-hover align-middle table-sm">
+                            <thead class="table-light"><tr>
+                                <th width="36"></th><th width="44">Preview</th>
+                                <th>Name</th><th>Type</th><th>Size</th>
+                            </tr></thead>
+                            <tbody>
+                                {% for sf in share_files_item %}
+                                <tr class="knsf-picker-item knsf-picker-row"
+                                    data-name="{{ sf.name|lower }}.{{ sf.ext }}"
+                                    data-sf-id="{{ sf.id }}"
+                                    data-sf-name="{{ sf.name }}"
+                                    data-sf-image="{{ 'true' if sf.is_image else 'false' }}"
+                                    data-sf-category="item"
+                                    data-sf-filename="{{ sf.filename }}"
+                                    style="cursor:pointer;"
+                                    onclick="knsfTogglePickRow(this)">
+                                    <td>
+                                        <span class="knsf-check-icon d-none"><i class="bi bi-check-circle-fill text-success"></i></span>
+                                        <span class="knsf-uncheck-icon"><i class="bi bi-circle text-muted"></i></span>
+                                    </td>
+                                    <td>
+                                        {% if sf.is_image %}
+                                        <img src="{{ url_for('share.share_serve', category='item', filename=sf.filename) }}"
+                                             alt="{{ sf.name }}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;">
+                                        {% else %}
+                                        {% set ext = sf.ext %}
+                                        {% if ext == 'pdf' %}<i class="bi bi-file-earmark-pdf text-danger fs-4"></i>
+                                        {% elif ext in ['doc','docx'] %}<i class="bi bi-file-earmark-word text-primary fs-4"></i>
+                                        {% elif ext in ['txt','md'] %}<i class="bi bi-file-earmark-text text-secondary fs-4"></i>
+                                        {% else %}<i class="bi bi-file-earmark text-muted fs-4"></i>
+                                        {% endif %}
+                                        {% endif %}
+                                    </td>
+                                    <td><span class="fw-semibold">{{ sf.name }}</span></td>
+                                    <td><span class="badge bg-secondary">{{ sf.ext|upper }}</span></td>
+                                    <td><small class="text-muted">{{ sf.size_display() }}</small></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4">No share files in the Item category yet.</p>
+                    {% endif %}
+                </div>
+                {# Project panel #}
+                <div id="knsfPanel-project" class="knsf-panel d-none">
+                    {% if share_files_project %}
+                    <div id="knsfCardView-project" class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3">
+                        {% for sf in share_files_project %}
+                        <div class="col knsf-picker-item" data-name="{{ sf.name|lower }}.{{ sf.ext }}">
+                            <div class="card h-100 shadow-sm position-relative knsf-picker-card"
+                                 id="knsfpcard_{{ sf.id }}"
+                                 data-sf-id="{{ sf.id }}"
+                                 data-sf-name="{{ sf.name }}"
+                                 data-sf-image="{{ 'true' if sf.is_image else 'false' }}"
+                                 data-sf-category="project"
+                                 data-sf-filename="{{ sf.filename }}"
+                                 style="cursor:pointer;"
+                                 onclick="knsfTogglePick(this)">
+                                <div class="position-absolute top-0 start-0 p-1" style="z-index:2;pointer-events:none;">
+                                    <span class="knsf-check-icon d-none">
+                                        <i class="bi bi-check-circle-fill text-success" style="font-size:1.1rem;filter:drop-shadow(0 0 2px #fff);"></i>
+                                    </span>
+                                </div>
+                                <div class="card-img-top d-flex align-items-center justify-content-center bg-light"
+                                     style="width:100%;aspect-ratio:1/1;overflow:hidden;pointer-events:none;">
+                                    {% if sf.is_image %}
+                                    <img src="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}"
+                                         alt="{{ sf.name }}" style="width:100%;height:100%;object-fit:cover;">
+                                    {% else %}
+                                    {% set ext = sf.ext %}
+                                    {% if ext == 'pdf' %}<i class="bi bi-file-earmark-pdf text-danger" style="font-size:2.5rem;"></i>
+                                    {% elif ext in ['doc','docx'] %}<i class="bi bi-file-earmark-word text-primary" style="font-size:2.5rem;"></i>
+                                    {% elif ext in ['txt','md'] %}<i class="bi bi-file-earmark-text text-secondary" style="font-size:2.5rem;"></i>
+                                    {% else %}<i class="bi bi-file-earmark text-muted" style="font-size:2.5rem;"></i>
+                                    {% endif %}
+                                    {% endif %}
+                                </div>
+                                <div class="card-body p-1" style="pointer-events:none;">
+                                    <p class="card-text small fw-semibold text-truncate mb-0" title="{{ sf.name }}.{{ sf.ext }}">{{ sf.name }}</p>
+                                    <small class="text-muted">{{ sf.ext|upper }} · {{ sf.size_display() }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div id="knsfListView-project" class="d-none">
+                        <table class="table table-hover align-middle table-sm">
+                            <thead class="table-light"><tr>
+                                <th width="36"></th><th width="44">Preview</th>
+                                <th>Name</th><th>Type</th><th>Size</th>
+                            </tr></thead>
+                            <tbody>
+                                {% for sf in share_files_project %}
+                                <tr class="knsf-picker-item knsf-picker-row"
+                                    data-name="{{ sf.name|lower }}.{{ sf.ext }}"
+                                    data-sf-id="{{ sf.id }}"
+                                    data-sf-name="{{ sf.name }}"
+                                    data-sf-image="{{ 'true' if sf.is_image else 'false' }}"
+                                    data-sf-category="project"
+                                    data-sf-filename="{{ sf.filename }}"
+                                    style="cursor:pointer;"
+                                    onclick="knsfTogglePickRow(this)">
+                                    <td>
+                                        <span class="knsf-check-icon d-none"><i class="bi bi-check-circle-fill text-success"></i></span>
+                                        <span class="knsf-uncheck-icon"><i class="bi bi-circle text-muted"></i></span>
+                                    </td>
+                                    <td>
+                                        {% if sf.is_image %}
+                                        <img src="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}"
+                                             alt="{{ sf.name }}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;">
+                                        {% else %}
+                                        {% set ext = sf.ext %}
+                                        {% if ext == 'pdf' %}<i class="bi bi-file-earmark-pdf text-danger fs-4"></i>
+                                        {% elif ext in ['doc','docx'] %}<i class="bi bi-file-earmark-word text-primary fs-4"></i>
+                                        {% elif ext in ['txt','md'] %}<i class="bi bi-file-earmark-text text-secondary fs-4"></i>
+                                        {% else %}<i class="bi bi-file-earmark text-muted fs-4"></i>
+                                        {% endif %}
+                                        {% endif %}
+                                    </td>
+                                    <td><span class="fw-semibold">{{ sf.name }}</span></td>
+                                    <td><span class="badge bg-secondary">{{ sf.ext|upper }}</span></td>
+                                    <td><small class="text-muted">{{ sf.size_display() }}</small></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4">No share files in the Project category yet.</p>
+                    {% endif %}
+                </div>
+                {# Icon panel #}
+                <div id="knsfPanel-icon" class="knsf-panel d-none">
+                    {% if share_files_icon %}
+                    <div id="knsfCardView-icon" class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3">
+                        {% for sf in share_files_icon %}
+                        <div class="col knsf-picker-item" data-name="{{ sf.name|lower }}.{{ sf.ext }}">
+                            <div class="card h-100 shadow-sm position-relative knsf-picker-card"
+                                 id="knsfpcard_{{ sf.id }}"
+                                 data-sf-id="{{ sf.id }}"
+                                 data-sf-name="{{ sf.name }}"
+                                 data-sf-image="{{ 'true' if sf.is_image else 'false' }}"
+                                 data-sf-category="icon"
+                                 data-sf-filename="{{ sf.filename }}"
+                                 style="cursor:pointer;"
+                                 onclick="knsfTogglePick(this)">
+                                <div class="position-absolute top-0 start-0 p-1" style="z-index:2;pointer-events:none;">
+                                    <span class="knsf-check-icon d-none">
+                                        <i class="bi bi-check-circle-fill text-success" style="font-size:1.1rem;filter:drop-shadow(0 0 2px #fff);"></i>
+                                    </span>
+                                </div>
+                                <div class="card-img-top d-flex align-items-center justify-content-center bg-light"
+                                     style="width:100%;aspect-ratio:1/1;overflow:hidden;pointer-events:none;">
+                                    {% if sf.is_image %}
+                                    <img src="{{ url_for('share.share_serve', category='icon', filename=sf.filename) }}"
+                                         alt="{{ sf.name }}" style="width:100%;height:100%;object-fit:cover;">
+                                    {% else %}
+                                    {% set ext = sf.ext %}
+                                    {% if ext == 'pdf' %}<i class="bi bi-file-earmark-pdf text-danger" style="font-size:2.5rem;"></i>
+                                    {% elif ext in ['doc','docx'] %}<i class="bi bi-file-earmark-word text-primary" style="font-size:2.5rem;"></i>
+                                    {% elif ext in ['txt','md'] %}<i class="bi bi-file-earmark-text text-secondary" style="font-size:2.5rem;"></i>
+                                    {% else %}<i class="bi bi-file-earmark text-muted" style="font-size:2.5rem;"></i>
+                                    {% endif %}
+                                    {% endif %}
+                                </div>
+                                <div class="card-body p-1" style="pointer-events:none;">
+                                    <p class="card-text small fw-semibold text-truncate mb-0" title="{{ sf.name }}.{{ sf.ext }}">{{ sf.name }}</p>
+                                    <small class="text-muted">{{ sf.ext|upper }} · {{ sf.size_display() }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div id="knsfListView-icon" class="d-none">
+                        <table class="table table-hover align-middle table-sm">
+                            <thead class="table-light"><tr>
+                                <th width="36"></th><th width="44">Preview</th>
+                                <th>Name</th><th>Type</th><th>Size</th>
+                            </tr></thead>
+                            <tbody>
+                                {% for sf in share_files_icon %}
+                                <tr class="knsf-picker-item knsf-picker-row"
+                                    data-name="{{ sf.name|lower }}.{{ sf.ext }}"
+                                    data-sf-id="{{ sf.id }}"
+                                    data-sf-name="{{ sf.name }}"
+                                    data-sf-image="{{ 'true' if sf.is_image else 'false' }}"
+                                    data-sf-category="icon"
+                                    data-sf-filename="{{ sf.filename }}"
+                                    style="cursor:pointer;"
+                                    onclick="knsfTogglePickRow(this)">
+                                    <td>
+                                        <span class="knsf-check-icon d-none"><i class="bi bi-check-circle-fill text-success"></i></span>
+                                        <span class="knsf-uncheck-icon"><i class="bi bi-circle text-muted"></i></span>
+                                    </td>
+                                    <td>
+                                        {% if sf.is_image %}
+                                        <img src="{{ url_for('share.share_serve', category='icon', filename=sf.filename) }}"
+                                             alt="{{ sf.name }}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;">
+                                        {% else %}
+                                        {% set ext = sf.ext %}
+                                        {% if ext == 'pdf' %}<i class="bi bi-file-earmark-pdf text-danger fs-4"></i>
+                                        {% elif ext in ['doc','docx'] %}<i class="bi bi-file-earmark-word text-primary fs-4"></i>
+                                        {% elif ext in ['txt','md'] %}<i class="bi bi-file-earmark-text text-secondary fs-4"></i>
+                                        {% else %}<i class="bi bi-file-earmark text-muted fs-4"></i>
+                                        {% endif %}
+                                        {% endif %}
+                                    </td>
+                                    <td><span class="fw-semibold">{{ sf.name }}</span></td>
+                                    <td><span class="badge bg-secondary">{{ sf.ext|upper }}</span></td>
+                                    <td><small class="text-muted">{{ sf.size_display() }}</small></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4">No share files in the Icon category yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
             </div>
         </div>
     </div>
@@ -2204,6 +2540,7 @@ function _updateCardModalTimestamps(card) {
 let _currentCardId = null;
 let _currentBoardCategories = [];
 let _editingCardId = null;
+let _cardShareFileIds = new Set();
 
 async function openCard(cardId) {
     try {
@@ -2271,6 +2608,9 @@ function populateCardModal(card) {
     _applyCardModalReadOnly(!CAN_EDIT);
     _updateCardModalTimestamps(card);
     renderCardAttachments(card.attachments || []);
+    renderCardSfChips(card.share_files || []);
+    const browseWrap = document.getElementById('card-sf-browse-wrap');
+    if (browseWrap) browseWrap.style.display = CAN_EDIT ? '' : 'none';
 }
 
 function renderModalTaskList(tasks, total, done) {
@@ -2489,6 +2829,160 @@ async function deleteCardAttachment(id) {
     } catch(e) { showErr(e.message); }
 }
 
+// ── Card share files ─────────────────────────────────────────────
+
+function renderCardSfChips(shareFiles) {
+    _cardShareFileIds = new Set((shareFiles || []).map(sf => sf.id));
+    const container = document.getElementById('card-linked-share-files');
+    const empty = document.getElementById('card-sf-empty');
+    if (!container) return;
+    container.querySelectorAll('.knsf-chip').forEach(el => el.remove());
+    if (!shareFiles || shareFiles.length === 0) {
+        if (empty) empty.style.display = '';
+        return;
+    }
+    if (empty) empty.style.display = 'none';
+    shareFiles.forEach(sf => _addKanbanSfChip(sf.id, sf.name, sf.is_image, sf.category, sf.filename));
+}
+
+function _addKanbanSfChip(id, name, isImage, category, filename) {
+    if (document.getElementById('knsf_chip_' + id)) return;
+    const container = document.getElementById('card-linked-share-files');
+    const empty = document.getElementById('card-sf-empty');
+    if (empty) empty.style.display = 'none';
+    const imgUrl = `/uploads/share/${category}/${filename}`;
+    const div = document.createElement('div');
+    div.className = 'position-relative border rounded p-1 bg-light d-flex align-items-center justify-content-center knsf-chip';
+    div.id = 'knsf_chip_' + id;
+    div.style.cssText = 'width:80px;height:80px;overflow:hidden;flex-shrink:0;';
+    const inner = isImage
+        ? `<img src="${imgUrl}" alt="${escHtml(name)}" style="width:100%;height:100%;object-fit:cover;border-radius:4px;">`
+        : `<div class="text-center"><i class="bi bi-file-earmark text-muted" style="font-size:1.5rem;"></i><div class="text-truncate" style="font-size:0.65rem;max-width:72px;">${escHtml(name)}</div></div>`;
+    div.innerHTML = inner + (CAN_EDIT
+        ? `<button type="button" class="position-absolute top-0 end-0 btn btn-danger btn-sm p-0"
+               style="width:18px;height:18px;font-size:0.6rem;line-height:1;"
+               onclick="removeKanbanSfChip(${id})">×</button>`
+        : '');
+    container.appendChild(div);
+    _cardShareFileIds.add(id);
+    _knsfUpdateCount();
+}
+
+function removeKanbanSfChip(id) {
+    const chip = document.getElementById('knsf_chip_' + id);
+    if (chip) chip.remove();
+    _cardShareFileIds.delete(id);
+    const empty = document.getElementById('card-sf-empty');
+    if (empty && _cardShareFileIds.size === 0) empty.style.display = '';
+    const card = document.getElementById('knsfpcard_' + id);
+    if (card) _knsfSetCardSel(card, false);
+    const row = document.querySelector('.knsf-picker-row[data-sf-id="' + id + '"]');
+    if (row) _knsfSetRowSel(row, false);
+    _knsfUpdateCount();
+}
+
+function openKanbanSfPicker() {
+    _knsfSyncState();
+    new bootstrap.Modal(document.getElementById('kanbanSfPickerModal')).show();
+}
+
+function _knsfSyncState() {
+    document.querySelectorAll('.knsf-picker-card').forEach(card => {
+        _knsfSetCardSel(card, _cardShareFileIds.has(parseInt(card.dataset.sfId)));
+    });
+    document.querySelectorAll('.knsf-picker-row').forEach(row => {
+        _knsfSetRowSel(row, _cardShareFileIds.has(parseInt(row.dataset.sfId)));
+    });
+    _knsfUpdateCount();
+}
+
+function _knsfSetCardSel(card, sel) {
+    const icon = card.querySelector('.knsf-check-icon');
+    card.classList.toggle('border-success', sel);
+    card.classList.toggle('border-2', sel);
+    if (icon) icon.classList.toggle('d-none', !sel);
+}
+
+function _knsfSetRowSel(row, sel) {
+    const checkIcon = row.querySelector('.knsf-check-icon');
+    const uncheckIcon = row.querySelector('.knsf-uncheck-icon');
+    row.classList.toggle('table-success', sel);
+    if (checkIcon) checkIcon.classList.toggle('d-none', !sel);
+    if (uncheckIcon) uncheckIcon.classList.toggle('d-none', sel);
+}
+
+function _knsfUpdateCount() {
+    const el = document.getElementById('knsfSelectedCount');
+    if (el) el.textContent = _cardShareFileIds.size + ' selected';
+}
+
+function knsfTogglePick(card) {
+    const id = parseInt(card.dataset.sfId);
+    if (_cardShareFileIds.has(id)) {
+        _knsfSetCardSel(card, false);
+        const row = document.querySelector('.knsf-picker-row[data-sf-id="' + id + '"]');
+        if (row) _knsfSetRowSel(row, false);
+        removeKanbanSfChip(id);
+    } else {
+        _knsfSetCardSel(card, true);
+        const row = document.querySelector('.knsf-picker-row[data-sf-id="' + id + '"]');
+        if (row) _knsfSetRowSel(row, true);
+        _addKanbanSfChip(id, card.dataset.sfName, card.dataset.sfImage === 'true',
+                         card.dataset.sfCategory, card.dataset.sfFilename);
+    }
+}
+
+function knsfTogglePickRow(row) {
+    const id = parseInt(row.dataset.sfId);
+    if (_cardShareFileIds.has(id)) {
+        _knsfSetRowSel(row, false);
+        const card = document.getElementById('knsfpcard_' + id);
+        if (card) _knsfSetCardSel(card, false);
+        removeKanbanSfChip(id);
+    } else {
+        _knsfSetRowSel(row, true);
+        const card = document.getElementById('knsfpcard_' + id);
+        if (card) _knsfSetCardSel(card, true);
+        _addKanbanSfChip(id, row.dataset.sfName, row.dataset.sfImage === 'true',
+                         row.dataset.sfCategory, row.dataset.sfFilename);
+    }
+}
+
+function knsfFilter(query) {
+    const q = query.toLowerCase();
+    const activePanel = document.querySelector('.knsf-panel:not(.d-none)');
+    if (!activePanel) return;
+    activePanel.querySelectorAll('.knsf-picker-item').forEach(el => {
+        el.style.display = el.dataset.name.includes(q) ? '' : 'none';
+    });
+}
+
+function knsfSetView(view) {
+    ['item','project','icon'].forEach(cat => {
+        const cv = document.getElementById('knsfCardView-' + cat);
+        const lv = document.getElementById('knsfListView-' + cat);
+        if (cv) cv.classList.toggle('d-none', view !== 'card');
+        if (lv) lv.classList.toggle('d-none', view !== 'list');
+    });
+    document.getElementById('knsfViewCard')?.classList.toggle('active', view === 'card');
+    document.getElementById('knsfViewList')?.classList.toggle('active', view === 'list');
+}
+
+function knsfSetCat(cat) {
+    document.querySelectorAll('.knsf-panel').forEach(p => p.classList.add('d-none'));
+    const panel = document.getElementById('knsfPanel-' + cat);
+    if (panel) panel.classList.remove('d-none');
+    document.querySelectorAll('#knsfCatTabs .nav-link').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.cat === cat);
+    });
+    const search = document.getElementById('knsfSearch');
+    if (search) { search.value = ''; knsfFilter(''); }
+}
+
+document.getElementById('kanbanSfPickerModal')?.addEventListener('show.bs.modal', () => {
+    _knsfSyncState();
+});
+
 document.getElementById('btn-save-card')?.addEventListener('click', async () => {
     const id = _currentCardId;
     if (!id) return;
@@ -2513,6 +3007,7 @@ document.getElementById('btn-save-card')?.addEventListener('click', async () => 
             completed_at: completed ? 'now' : '',
             key_persons: persons,
             description: document.getElementById('card-modal-desc').value,
+            share_file_ids: [..._cardShareFileIds],
         });
         hideModal('cardModal');
         location.reload();
