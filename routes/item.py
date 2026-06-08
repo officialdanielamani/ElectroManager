@@ -1010,9 +1010,16 @@ def upload_attachment(item_id):
     extensions_str = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
     max_file_upload_count = int(Setting.get('max_file_upload_count', '5'))
 
-    # Count non-empty files
+    # Count non-empty files and enforce max_file_upload_count
+    # -1 = unlimited, 0 = uploads disabled, >0 = batch limit
     valid_files = [f for f in files if f and f.filename]
-    if len(valid_files) > max_file_upload_count:
+    if max_file_upload_count == 0:
+        return jsonify({
+            'success': False,
+            'uploaded': 0,
+            'errors': ['File uploads are currently disabled by the administrator.'],
+        }), 400
+    if max_file_upload_count > 0 and len(valid_files) > max_file_upload_count:
         return jsonify({
             'success': False,
             'uploaded': 0,

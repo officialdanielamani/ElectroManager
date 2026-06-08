@@ -504,11 +504,12 @@ def settings_system():
                     return redirect(url_for('settings.settings_system'))
 
                 # Max number of files validation (production mode only)
+                # -1 = unlimited, 0 = uploads disabled, >0 = batch limit
                 max_file_upload_count = request.form.get('max_file_upload_count', '5')
                 try:
                     max_file_upload_count = int(max_file_upload_count)
-                    if max_file_upload_count < 1 or max_file_upload_count > 50:
-                        flash('Max number of files must be between 1 and 50!', 'danger')
+                    if max_file_upload_count < -1 or max_file_upload_count > 50:
+                        flash('Max number of files must be between -1 and 50 (-1 = unlimited, 0 = disabled)!', 'danger')
                         return redirect(url_for('settings.settings_system'))
                 except ValueError:
                     flash('Invalid max number of files value!', 'danger')
@@ -661,8 +662,18 @@ def settings_system():
                 for stype in ['item', 'project', 'sticker', 'icon']:
                     sext = request.form.get(f'share_{stype}_extensions', '').strip()
                     ssize = request.form.get(f'share_{stype}_max_size', '10')
+                    sfiles = request.form.get(f'share_{stype}_max_files', '100')
                     if sext: Setting.set(f'share_{stype}_extensions', sext, f'Share {stype} allowed extensions')
                     if ssize: Setting.set(f'share_{stype}_max_size', ssize, f'Share {stype} max size MB')
+                    try:
+                        sfiles_int = int(sfiles)
+                        if sfiles_int < -1 or sfiles_int > 9999:
+                            flash(f'Share {stype} max files must be between -1 and 9999!', 'danger')
+                            return redirect(url_for('settings.settings_system'))
+                        Setting.set(f'share_{stype}_max_files', sfiles_int, f'Share {stype} max number of files per upload (-1=unlimited, 0=disabled)')
+                    except ValueError:
+                        flash(f'Invalid max files value for share {stype}!', 'danger')
+                        return redirect(url_for('settings.settings_system'))
 
             # Lending & Return settings
             lr_keys = ['lr_lend_start_date_required', 'lr_lend_start_time_required',
@@ -836,10 +847,10 @@ def settings_system():
                               'program': {'extensions': Setting.get('project_upload_program_extensions', 'zip,txt,cpp,py'), 'max_size': Setting.get('project_upload_program_max_size', '10')},
                           },
                           share_upload_settings={
-                              'item':    {'extensions': Setting.get('share_item_extensions',    'pdf,png,jpg,jpeg,gif,txt,doc,docx'), 'max_size': Setting.get('share_item_max_size',    '10')},
-                              'project': {'extensions': Setting.get('share_project_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx'), 'max_size': Setting.get('share_project_max_size', '10')},
-                              'sticker': {'extensions': Setting.get('share_sticker_extensions', 'png,jpg,jpeg'),                      'max_size': Setting.get('share_sticker_max_size', '1')},
-                              'icon':    {'extensions': Setting.get('share_icon_extensions',    'png,jpg,jpeg'),                      'max_size': Setting.get('share_icon_max_size',    '5')},
+                              'item':    {'extensions': Setting.get('share_item_extensions',    'pdf,png,jpg,jpeg,gif,txt,doc,docx'), 'max_size': Setting.get('share_item_max_size',    '10'), 'max_files': Setting.get('share_item_max_files',    '100')},
+                              'project': {'extensions': Setting.get('share_project_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx'), 'max_size': Setting.get('share_project_max_size', '10'), 'max_files': Setting.get('share_project_max_files', '100')},
+                              'sticker': {'extensions': Setting.get('share_sticker_extensions', 'png,jpg,jpeg'),                      'max_size': Setting.get('share_sticker_max_size', '1'),  'max_files': Setting.get('share_sticker_max_files', '100')},
+                              'icon':    {'extensions': Setting.get('share_icon_extensions',    'png,jpg,jpeg'),                      'max_size': Setting.get('share_icon_max_size',    '5'),  'max_files': Setting.get('share_icon_max_files',    '100')},
                           })
 
 

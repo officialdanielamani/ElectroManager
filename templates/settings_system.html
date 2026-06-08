@@ -364,7 +364,8 @@
                             <label for="max_file_upload_count" class="form-label">Max Number of Files {% if not demo_mode %}<span class="text-danger">*</span>{% endif %}</label>
                             <input type="number" class="form-control" id="max_file_upload_count" name="max_file_upload_count"
                                    value="{% if demo_mode %}5{% else %}{{ max_file_upload_count }}{% endif %}"
-                                   min="1" max="50" {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}>
+                                   min="-1" max="50" {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}>
+                            <small class="text-muted">-1 = unlimited &nbsp;|&nbsp; 0 = uploads disabled</small>
                         </div>
                     </div>
 
@@ -408,31 +409,38 @@
                     {% set demo_share = {'item': ('jpg,jpeg,png,txt','1'), 'project': ('jpg,jpeg,png,txt','1'), 'sticker': ('jpg,jpeg,png','1'), 'icon': ('jpg,jpeg,png','1')} %}
                     <div class="row mb-1">
                         <div class="col-md-3"></div>
-                        <div class="col-md-5"><small class="text-muted fw-bold">Allowed Types</small></div>
-                        <div class="col-md-4"><small class="text-muted fw-bold">Max Size (MB)</small></div>
+                        <div class="col-md-4"><small class="text-muted fw-bold">Allowed Types</small></div>
+                        <div class="col-md-3"><small class="text-muted fw-bold">Max Size (MB)</small></div>
+                        <div class="col-md-2"><small class="text-muted fw-bold">Max Files</small></div>
                     </div>
                     {% for stype, slabel, sdefault_ext, sdefault_size in share_types %}
                     <div class="row mb-2">
                         <div class="col-md-3"><label class="form-label small fw-bold">{{ slabel }}</label></div>
-                        <div class="col-md-5">
+                        <div class="col-md-4">
                             <input type="text" class="form-control form-control-sm" name="share_{{ stype }}_extensions"
                                    value="{% if demo_mode %}{{ demo_share[stype][0] }}{% else %}{{ share_upload_settings.get(stype, {}).get('extensions', sdefault_ext) }}{% endif %}"
                                    {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}
                                    placeholder="{{ sdefault_ext }}">
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <input type="number" class="form-control form-control-sm" name="share_{{ stype }}_max_size"
                                    value="{% if demo_mode %}{{ demo_share[stype][1] }}{% else %}{{ share_upload_settings.get(stype, {}).get('max_size', sdefault_size) }}{% endif %}"
                                    min="1" max="100" {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-2">
+                            <input type="number" class="form-control form-control-sm" name="share_{{ stype }}_max_files"
+                                   value="{% if demo_mode %}5{% else %}{{ share_upload_settings.get(stype, {}).get('max_files', '100') }}{% endif %}"
+                                   min="-1" max="9999" {% if not demo_mode %}required{% endif %} {% if demo_mode %}disabled{% endif %}>
                         </div>
                     </div>
                     {% endfor %}
                     <div class="row mb-2">
                         <div class="col-md-3"><label class="form-label small fw-bold text-muted">Profile Files</label></div>
-                        <div class="col-md-5"><input type="text" class="form-control form-control-sm" value="jpg, jpeg, png" disabled></div>
-                        <div class="col-md-4"><input type="number" class="form-control form-control-sm" value="1" disabled></div>
+                        <div class="col-md-4"><input type="text" class="form-control form-control-sm" value="jpg, jpeg, png" disabled></div>
+                        <div class="col-md-3"><input type="number" class="form-control form-control-sm" value="1" disabled></div>
+                        <div class="col-md-2"><input type="number" class="form-control form-control-sm" value="1" disabled></div>
                     </div>
-                    <small class="text-muted"><i class="bi bi-lock"></i> Profile uploads are fixed to JPEG/PNG, max 1 MB.</small>
+                    <small class="text-muted"><i class="bi bi-lock"></i> Profile uploads are fixed to JPEG/PNG, max 1 MB, 1 file. &nbsp;|&nbsp; Max Files: -1 = unlimited, 0 = uploads disabled.</small>
                 </div>
             </div>
 

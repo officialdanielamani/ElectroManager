@@ -136,10 +136,17 @@ def share_files():
     # Build display strings for upload hints
     share_ext = {}
     share_size = {}
+    share_max_files = {}
     for cat in SHARE_CATEGORIES:
         exts, max_b = get_share_config(cat)
         share_ext[cat] = ', '.join(sorted(exts))
         share_size[cat] = str(max_b // (1024 * 1024))
+        if cat == 'profile':
+            share_max_files[cat] = 1
+        elif current_app.config.get('DEMO_MODE', False):
+            share_max_files[cat] = 5
+        else:
+            share_max_files[cat] = int(Setting.get(f'share_{cat}_max_files', '100'))
 
     return render_template('share_files.html',
                            files=files,
@@ -150,6 +157,7 @@ def share_files():
                            counts=counts,
                            share_ext=share_ext,
                            share_size=share_size,
+                           share_max_files=share_max_files,
                            download_all_share_files_page=Setting.get('download_all_share_files_page', True))
 
 
@@ -178,6 +186,17 @@ def share_upload():
         flash('Invalid category.', 'danger')
         return redirect(url_for('share.share_files'))
     os.makedirs(share_folder, exist_ok=True)
+
+    # Enforce max number of files per upload (-1=unlimited, 0=disabled, >0=batch limit)
+    if category != 'profile' and not current_app.config.get('DEMO_MODE', False):
+        max_files = int(Setting.get(f'share_{category}_max_files', '100'))
+        valid_files = [f for f in files if f and f.filename]
+        if max_files == 0:
+            flash('File uploads are currently disabled by the administrator.', 'danger')
+            return redirect(url_for('share.share_files', category=category))
+        if max_files > 0 and len(valid_files) > max_files:
+            flash(f'Too many files selected ({len(valid_files)}). Maximum allowed per upload is {max_files}.', 'danger')
+            return redirect(url_for('share.share_files', category=category))
 
     uploaded = 0
     errors = []
