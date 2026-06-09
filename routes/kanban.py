@@ -494,8 +494,23 @@ def create_board():
 @login_required
 def delete_board(board_id):
     board = _board_or_404(board_id)
+    file_paths = [att.file_path for card in board.cards for att in card.attachments]
     db.session.delete(board)
     db.session.commit()
+    deleted_dirs = set()
+    for fp in file_paths:
+        try:
+            if os.path.exists(fp):
+                os.remove(fp)
+                deleted_dirs.add(os.path.dirname(fp))
+        except OSError:
+            pass
+    for d in deleted_dirs:
+        try:
+            if os.path.isdir(d):
+                os.rmdir(d)
+        except OSError:
+            pass
     return jsonify({'ok': True})
 
 
@@ -1055,8 +1070,23 @@ def update_card(card_id):
 @login_required
 def delete_card(card_id):
     card = _card_or_404(card_id)
+    file_paths = [att.file_path for att in card.attachments]
     db.session.delete(card)
     db.session.commit()
+    deleted_dirs = set()
+    for fp in file_paths:
+        try:
+            if os.path.exists(fp):
+                os.remove(fp)
+                deleted_dirs.add(os.path.dirname(fp))
+        except OSError:
+            pass
+    for d in deleted_dirs:
+        try:
+            if os.path.isdir(d):
+                os.rmdir(d)
+        except OSError:
+            pass
     return jsonify({'ok': True})
 
 
