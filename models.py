@@ -1708,7 +1708,7 @@ class KanbanColumn(db.Model):
 class KanbanCard(db.Model):
     __tablename__ = 'kanban_cards'
     id          = db.Column(db.Integer, primary_key=True)
-    uuid        = db.Column(db.String(12), unique=True, nullable=True)
+    uuid        = db.Column(db.String(12), unique=True, nullable=False)
     board_id    = db.Column(db.Integer, db.ForeignKey('kanban_boards.id'), nullable=False)
     column_id   = db.Column(db.Integer, db.ForeignKey('kanban_columns.id'), nullable=False)
     title       = db.Column(db.String(256), nullable=False)

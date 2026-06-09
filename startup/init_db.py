@@ -6,77 +6,14 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import app, db
-from models import User, Role, Setting, KanbanCard
+from models import User, Role, Setting
 import json
-import secrets
-import string
-
-
-
-def _generate_user_uid():
-    """Generate a unique UXXXXX identifier (U + 5 uppercase alphanumeric chars)."""
-    chars = string.ascii_uppercase + string.digits
-    return 'U' + ''.join(secrets.choice(chars) for _ in range(5))
-
-
-def _add_missing_columns():
-    """Add new columns to existing tables without a migration script."""
-    with db.engine.connect() as conn:
-        additions = [
-            ("batch_lend_records",   "lend_note",           "VARCHAR(128)"),
-            ("batch_serial_numbers", "lend_note",           "VARCHAR(128)"),
-            ("batch_serial_numbers", "lending_session_id",  "INTEGER"),
-            ("batch_lend_records",   "lending_session_id",  "INTEGER"),
-            ("users",                "user_uid",             "VARCHAR(6)"),
-            ("users",                "api_enabled",          "BOOLEAN DEFAULT 0"),
-            ("users",                "api_key",              "VARCHAR(64)"),
-            ("users",                "api_item_search",      "BOOLEAN DEFAULT 0"),
-            ("users",                "api_rack_drawer",      "BOOLEAN DEFAULT 0"),
-            ("users",                "api_lending_return",   "BOOLEAN DEFAULT 0"),
-            ("kanban_cards",         "uuid",                "VARCHAR(12)"),
-        ]
-        for table, col, col_type in additions:
-            try:
-                conn.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
-                conn.commit()
-                print(f"[OK] Added column {table}.{col}")
-            except Exception:
-                pass  # column already exists
-
-    # Backfill user_uid for existing users that don't have one
-    users_without_uid = User.query.filter(User.user_uid == None).all()
-    if users_without_uid:
-        existing_uids = set(u.user_uid for u in User.query.filter(User.user_uid != None).all())
-        for user in users_without_uid:
-            uid = _generate_user_uid()
-            while uid in existing_uids:
-                uid = _generate_user_uid()
-            user.user_uid = uid
-            existing_uids.add(uid)
-        db.session.commit()
-        print(f"[OK] Backfilled user_uid for {len(users_without_uid)} existing user(s)")
-
-    # Backfill uuid for existing kanban cards that don't have one
-    cards_without_uuid = KanbanCard.query.filter(KanbanCard.uuid == None).all()
-    if cards_without_uuid:
-        chars = string.ascii_uppercase + string.digits
-        existing_card_uuids = set(c.uuid for c in KanbanCard.query.filter(KanbanCard.uuid != None).all())
-        for card in cards_without_uuid:
-            while True:
-                candidate = ''.join(secrets.choice(chars) for _ in range(11)) + 'C'
-                if candidate not in existing_card_uuids:
-                    card.uuid = candidate
-                    existing_card_uuids.add(candidate)
-                    break
-        db.session.commit()
-        print(f"[OK] Backfilled uuid for {len(cards_without_uuid)} existing kanban card(s)")
 
 
 def init_db():
     with app.app_context():
         print("Creating database tables...")
         db.create_all()
-        _add_missing_columns()
         print("Database tables created!")
 
         create_default_roles()
