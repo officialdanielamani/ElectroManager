@@ -1708,6 +1708,7 @@ class KanbanColumn(db.Model):
 class KanbanCard(db.Model):
     __tablename__ = 'kanban_cards'
     id          = db.Column(db.Integer, primary_key=True)
+    uuid        = db.Column(db.String(12), unique=True, nullable=True)
     board_id    = db.Column(db.Integer, db.ForeignKey('kanban_boards.id'), nullable=False)
     column_id   = db.Column(db.Integer, db.ForeignKey('kanban_columns.id'), nullable=False)
     title       = db.Column(db.String(256), nullable=False)
@@ -1739,6 +1740,12 @@ class KanbanCard(db.Model):
     category   = db.relationship('KanbanCategory', foreign_keys=[category_id], lazy='joined')
     created_by = db.relationship('User', foreign_keys=[created_by_id])
     updated_by = db.relationship('User', foreign_keys=[updated_by_id])
+
+    def __init__(self, **kwargs):
+        super(KanbanCard, self).__init__(**kwargs)
+        if not self.uuid:
+            chars = string.ascii_uppercase + string.digits
+            self.uuid = ''.join(secrets.choice(chars) for _ in range(11)) + 'C'
 
     def get_key_persons(self):
         """Return list of {id, name, type} dicts; handles legacy plain-string lists."""

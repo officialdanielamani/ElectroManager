@@ -6,7 +6,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import app, db
-from models import User, Role, Setting
+from models import User, Role, Setting, KanbanCard
 import json
 import secrets
 import string
@@ -33,6 +33,7 @@ def _add_missing_columns():
             ("users",                "api_item_search",      "BOOLEAN DEFAULT 0"),
             ("users",                "api_rack_drawer",      "BOOLEAN DEFAULT 0"),
             ("users",                "api_lending_return",   "BOOLEAN DEFAULT 0"),
+            ("kanban_cards",         "uuid",                "VARCHAR(12)"),
         ]
         for table, col, col_type in additions:
             try:
@@ -54,6 +55,21 @@ def _add_missing_columns():
             existing_uids.add(uid)
         db.session.commit()
         print(f"[OK] Backfilled user_uid for {len(users_without_uid)} existing user(s)")
+
+    # Backfill uuid for existing kanban cards that don't have one
+    cards_without_uuid = KanbanCard.query.filter(KanbanCard.uuid == None).all()
+    if cards_without_uuid:
+        chars = string.ascii_uppercase + string.digits
+        existing_card_uuids = set(c.uuid for c in KanbanCard.query.filter(KanbanCard.uuid != None).all())
+        for card in cards_without_uuid:
+            while True:
+                candidate = ''.join(secrets.choice(chars) for _ in range(11)) + 'C'
+                if candidate not in existing_card_uuids:
+                    card.uuid = candidate
+                    existing_card_uuids.add(candidate)
+                    break
+        db.session.commit()
+        print(f"[OK] Backfilled uuid for {len(cards_without_uuid)} existing kanban card(s)")
 
 
 def init_db():

@@ -274,6 +274,7 @@ def _card_uploadable_or_403(card_id):
 def _card_to_dict(card):
     return {
         'id': card.id,
+        'uuid': card.uuid or '',
         'title': card.title,
         'description': card.description or '',
         'priority': card.priority,
@@ -1089,7 +1090,7 @@ def upload_card_attachment(card_id):
                             'errors': [f'Too many files. Selecting {len(valid_files)} would exceed the limit (max {max_files}, already {existing_count}, room for {remaining} more).']}), 400
 
     upload_folder = current_app.config['UPLOAD_FOLDER']
-    card_folder   = os.path.join(upload_folder, 'kanban', str(card.id))
+    card_folder   = os.path.join(upload_folder, 'kanban', card.uuid)
     os.makedirs(card_folder, exist_ok=True)
 
     uploaded = 0
@@ -1131,7 +1132,7 @@ def upload_card_attachment(card_id):
 
         att = KanbanAttachment(
             card_id=card.id,
-            filename=f'kanban/{card.id}/{safe_name}',
+            filename=f'kanban/{card.uuid}/{safe_name}',
             original_filename=secure_filename(fname) or safe_name,
             file_path=file_path,
             file_type=ext,
