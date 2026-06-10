@@ -48,9 +48,15 @@
     <div class="col-md-12">
         <div class="card">
             <div class="card-body">
-                <form method="GET" action="{{ url_for('project.projects') }}" class="row g-3">
-                    <div class="col-md-4">
-                        <input type="text" name="search" class="form-control" placeholder="Search projects..." value="{{ search_query }}">
+                <form method="GET" action="{{ url_for('project.projects') }}" class="row g-3" id="projectSearchForm">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <input type="text" name="search" class="form-control" placeholder="Name or id:&lt;PROJECT_ID&gt;" value="{{ search_query }}" id="projectSearchInput">
+                            <button type="submit" class="btn btn-primary" title="Search"><i class="bi bi-search"></i> Search</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="clearProjectSearch()" title="Clear search">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="col-md-3">
                         <select name="category" class="form-select">
@@ -63,10 +69,6 @@
                             <option value="0">All Statuses</option>
                             {% for st in statuses %}<option value="{{ st.id }}" {% if st.id == status_id %}selected{% endif %}>{{ st.name }}</option>{% endfor %}
                         </select>
-                    </div>
-                    <div class="col-md-2">
-                        <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Search</button>
-                        <a href="{{ url_for('project.projects') }}" class="btn btn-secondary"><i class="bi bi-x-circle"></i> Clear</a>
                     </div>
                 </form>
             </div>
@@ -87,8 +89,9 @@
                     </div>
                     <div class="d-flex align-items-center gap-2 flex-wrap">
                         <div class="d-flex align-items-center gap-2">
-                            <label class="mb-0 small">Per Page:</label>
-                            <select class="form-select form-select-sm" id="itemsPerPage" style="width: auto;" onchange="changePerPage()">
+                            <label class="mb-0 small">Projects Per Page:</label>
+                            <select class="form-select form-select-sm" id="projectsPerPage" style="width: auto;" onchange="changePerPage()">
+                                <option value="5" {% if per_page == 5 %}selected{% endif %}>5</option>
                                 <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
                                 <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
                                 <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
@@ -161,11 +164,30 @@
                     </table>
                 </div>
                 {% if pagination.pages > 1 %}
-                <nav><ul class="pagination justify-content-center">
-                    {% if pagination.has_prev %}<li class="page-item"><a class="page-link" href="{{ url_for('project.projects', page=pagination.page-1, per_page=per_page, search=search_query, category=category_id, status=status_id) }}">Previous</a></li>{% endif %}
-                    {% for p in range(1, pagination.pages + 1) %}<li class="page-item {% if p == pagination.page %}active{% endif %}"><a class="page-link" href="{{ url_for('project.projects', page=p, per_page=per_page, search=search_query, category=category_id, status=status_id) }}">{{ p }}</a></li>{% endfor %}
-                    {% if pagination.has_next %}<li class="page-item"><a class="page-link" href="{{ url_for('project.projects', page=pagination.page+1, per_page=per_page, search=search_query, category=category_id, status=status_id) }}">Next</a></li>{% endif %}
-                </ul></nav>
+                <nav>
+                    <ul class="pagination pagination-sm justify-content-center mb-0">
+                        <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                            <a class="page-link" href="{{ url_for('project.projects', page=1, per_page=per_page, search=search_query, category=category_id, status=status_id) }}">&laquo;&laquo;</a>
+                        </li>
+                        <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                            <a class="page-link" href="{{ url_for('project.projects', page=pagination.page-1, per_page=per_page, search=search_query, category=category_id, status=status_id) }}">&lt;</a>
+                        </li>
+                        {% for p in range([1, pagination.page-2]|max, [pagination.pages+1, pagination.page+3]|min) %}
+                        <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                            <a class="page-link" href="{{ url_for('project.projects', page=p, per_page=per_page, search=search_query, category=category_id, status=status_id) }}">{{ p }}</a>
+                        </li>
+                        {% endfor %}
+                        <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                            <a class="page-link" href="{{ url_for('project.projects', page=pagination.page+1, per_page=per_page, search=search_query, category=category_id, status=status_id) }}">&gt;</a>
+                        </li>
+                        <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                            <a class="page-link" href="{{ url_for('project.projects', page=pagination.pages, per_page=per_page, search=search_query, category=category_id, status=status_id) }}">&raquo;&raquo;</a>
+                        </li>
+                    </ul>
+                    <div class="text-center text-muted small mt-1">
+                        Page {{ pagination.page }} of {{ pagination.pages }}
+                    </div>
+                </nav>
                 {% endif %}
                 {% else %}
                 <div class="text-muted">
@@ -181,8 +203,39 @@
 </div>
 
 <script>
-function changePerPage() { const url = new URL(window.location); url.searchParams.set('per_page', document.getElementById('itemsPerPage').value); url.searchParams.set('page', '1'); window.location = url; }
-function printProjectsList() { const url = new URL("{{ url_for('project.projects_print') }}", window.location.origin); url.searchParams.set('search', '{{ search_query }}'); url.searchParams.set('category', '{{ category_id }}'); url.searchParams.set('status', '{{ status_id }}'); window.open(url, '_blank'); }
+function changePerPage() {
+    const url = new URL(window.location);
+    url.searchParams.set('per_page', document.getElementById('projectsPerPage').value);
+    url.searchParams.set('page', '1');
+    window.location = url;
+}
+function clearProjectSearch() {
+    document.getElementById('projectSearchInput').value = '';
+    document.getElementById('projectSearchForm').submit();
+}
+function printProjectsList() {
+    const url = new URL("{{ url_for('project.projects_print') }}", window.location.origin);
+    url.searchParams.set('search', '{{ search_query }}');
+    url.searchParams.set('category', '{{ category_id }}');
+    url.searchParams.set('status', '{{ status_id }}');
+    window.open(url, '_blank');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Auto-submit form when category or status filter changes
+    document.querySelectorAll('#projectSearchForm select').forEach(sel => {
+        sel.addEventListener('change', () => document.getElementById('projectSearchForm').submit());
+    });
+    // Also preserve per_page when submitting search form
+    document.getElementById('projectSearchForm')?.addEventListener('submit', function() {
+        const pp = document.getElementById('projectsPerPage')?.value;
+        if (pp) {
+            let inp = this.querySelector('input[name="per_page"]');
+            if (!inp) { inp = document.createElement('input'); inp.type = 'hidden'; inp.name = 'per_page'; this.appendChild(inp); }
+            inp.value = pp;
+        }
+    });
+});
 </script>
 <script src="{{ url_for('static', filename='js/table-sorter.js') }}"></script>
 <script>

@@ -49,10 +49,8 @@ def items():
     status_filter = request.args.get('status', '')
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 25, type=int)
-    
-    # Cap per_page at a reasonable maximum
-    if per_page > 999999:
-        per_page = 999999
+    if per_page < 1 or per_page > 100:
+        per_page = 25
     
     query = Item.query
     

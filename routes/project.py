@@ -125,8 +125,8 @@ def projects():
     status_id = request.args.get('status', 0, type=int)
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 25, type=int)
-    if per_page > 999999:
-        per_page = 999999
+    if per_page < 1 or per_page > 100:
+        per_page = 25
 
     query = Project.query
 
