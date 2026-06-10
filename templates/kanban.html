@@ -356,7 +356,7 @@
                     {# Updated timestamp — hidden when tasks are collapsed #}
                     {% if card.updated_at %}
                     <div class="card-dates-row card-updated-row" style="border-top:1px solid var(--bs-border-color,#dee2e6)">
-                        <span><i class="bi bi-pencil" style="font-size:.65rem"></i> <time class="js-utc-ts" data-utc="{{ card.updated_at.strftime('%Y-%m-%dT%H:%M:%SZ') }}">{{ card.updated_at.strftime('%d %b %Y | %H:%M') }}</time>{% if card.updated_by %} · {{ (card.updated_by.name or '') }}{% endif %}</span>
+                        <span><time class="js-utc-ts" data-utc="{{ card.updated_at.strftime('%Y-%m-%dT%H:%M:%SZ') }}">{{ card.updated_at.strftime('%d %b %Y | %H:%M') }}</time>{% if card.updated_by %} · {{ (card.updated_by.name or '') }}{% endif %}</span>
                     </div>
                     {% endif %}
                     {# Key persons #}
@@ -1330,7 +1330,7 @@
 </div>
 
 {# ── Task Edit Modal ───────────────────────────── #}
-<div class="modal fade" id="taskEditModal" tabindex="-1">
+<div class="modal fade" id="taskEditModal" tabindex="-1" data-bs-backdrop="false">
     <div class="modal-dialog modal-sm"><div class="modal-content">
         <div class="modal-header">
             <h5 class="modal-title" style="font-size:.95rem">
@@ -2998,17 +2998,20 @@ document.getElementById('kanbanSfPickerModal')?.addEventListener('show.bs.modal'
 });
 
 document.getElementById('btn-save-card')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-save-card');
+    if (btn.disabled) return;
+    btn.disabled = true;
     const id = _currentCardId;
-    if (!id) return;
+    if (!id) { btn.disabled = false; return; }
     const persons = JSON.parse(document.getElementById('card-modal-persons-json').value || '[]');
     const completed = document.getElementById('card-modal-completed').checked;
     const title = document.getElementById('card-modal-title').value.trim();
-    if (!title) { showErr('Title is required'); return; }
+    if (!title) { btn.disabled = false; showErr('Title is required'); return; }
     if (!validateDates(
         document.getElementById('card-modal-start-date').value,
         document.getElementById('card-modal-due-date').value,
         'Card start date'
-    )) return;
+    )) { btn.disabled = false; return; }
     const catVal = document.getElementById('card-modal-category').value;
     try {
         await api('PUT', '/kanban/cards/' + id, {
@@ -3025,7 +3028,7 @@ document.getElementById('btn-save-card')?.addEventListener('click', async () => 
         });
         hideModal('cardModal');
         location.reload();
-    } catch(e) { showErr(e.message); }
+    } catch(e) { btn.disabled = false; showErr(e.message); }
 });
 
 document.getElementById('btn-delete-card-modal')?.addEventListener('click', async () => {
@@ -3057,16 +3060,26 @@ document.getElementById('taskEditModal')?.addEventListener('hide.bs.modal', () =
         _editingCardId = null;
     }
 });
+document.getElementById('taskEditModal')?.addEventListener('hidden.bs.modal', () => {
+    // Bootstrap 5 removes modal-open from body when any modal closes, even stacked ones.
+    // Restore it so the parent cardModal remains usable without a page reload.
+    if (document.getElementById('cardModal')?.classList.contains('show')) {
+        document.body.classList.add('modal-open');
+    }
+});
 
 document.getElementById('btn-save-task-edit')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-save-task-edit');
+    if (btn.disabled) return;
+    btn.disabled = true;
     const taskId = document.getElementById('task-edit-id').value;
     const title  = document.getElementById('task-edit-title').value.trim();
-    if (!title) return;
+    if (!title) { btn.disabled = false; return; }
     if (!validateDates(
         document.getElementById('task-edit-start').value,
         document.getElementById('task-edit-due').value,
         'Task start date'
-    )) return;
+    )) { btn.disabled = false; return; }
     try {
         await api('PUT', '/kanban/tasks/' + taskId, {
             title,
@@ -3076,6 +3089,7 @@ document.getElementById('btn-save-task-edit')?.addEventListener('click', async (
         hideModal('taskEditModal');
         await refreshModalTasks();
     } catch(e) { showErr(e.message); }
+    btn.disabled = false;
 });
 
 // ── Board task interactions (checkbox + edit + delete on board view) ──
