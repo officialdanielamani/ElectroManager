@@ -1401,7 +1401,7 @@ def save_project_table_columns():
     try:
         columns = json.loads(columns_json)
         valid_columns = ['project_name', 'info', 'categories', 'tags', 'date_start', 'dateline',
-                         'total_cost', 'status', 'users', 'group', 'project_id']
+                         'total_cost', 'est_total_cost', 'status', 'users', 'group', 'project_id']
         columns = [col for col in columns if col in valid_columns]
         current_user.set_project_table_columns(columns)
         db.session.commit()

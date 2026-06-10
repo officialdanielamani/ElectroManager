@@ -484,11 +484,12 @@
         {% set _cpq    = project.get_cost_per_qty_total() %}
         {% set _ov     = project.get_overall_cost_total() %}
         {% set _qty    = project.quantity or 1 %}
-        {% set _total  = (_bom_act + _cpq) * _qty + _ov %}
+        {% set _total     = (_bom_act + _cpq) * _qty + _ov %}
+        {% set _est_total = (_bom_est + _cpq) * _qty + _ov %}
         <table class="table table-bordered mb-2" style="table-layout:fixed;">
             <tbody>
                 <tr>
-                    <td rowspan="2" class="text-center align-middle table-secondary" style="width:22%;">
+                    <td class="text-center p-2 table-secondary" style="width:22%;">
                         <small class="text-muted d-block">Quantity</small>
                         <strong class="fs-5">{{ _qty }}</strong>
                     </td>
@@ -503,9 +504,13 @@
                     <td rowspan="2" class="text-center align-middle bg-primary text-white" style="width:34%;">
                         <small class="d-block opacity-75">Project Total Cost</small>
                         <strong class="fs-5">{{ currency }} {{ '{:,.{}f}'.format(_total, currency_decimal) }}</strong>
+                        <hr class="border-light my-2 opacity-50">
+                        <small class="d-block opacity-75">Est. Project Total Cost</small>
+                        <strong class="fs-5">{{ currency }} {{ '{:,.{}f}'.format(_est_total, currency_decimal) }}</strong>
                     </td>
                 </tr>
                 <tr>
+                    <td class="table-secondary"></td>
                     <td class="text-center p-2 table-secondary">
                         <small class="text-muted d-block">Actual BOM</small>
                         <strong>{{ currency }} {{ '{:,.{}f}'.format(_bom_act, currency_decimal) }}</strong>
@@ -517,7 +522,10 @@
                 </tr>
             </tbody>
         </table>
-        <p class="text-muted small mb-3"><i class="bi bi-info-circle"></i> Formula: <code>((Actual BOM + Cost per Qty) × Quantity) + Overall Cost = Project Total Cost</code></p>
+        <p class="text-muted small mb-3"><i class="bi bi-info-circle"></i>
+            Project Total Cost: <code>((Actual BOM + Cost per Qty) × Quantity) + Overall Cost</code> &nbsp;|&nbsp;
+            Est. Project Total Cost: <code>((Estimate BOM + Cost per Qty) × Quantity) + Overall Cost</code>
+        </p>
 
         <!-- BOM -->
         <div class="card mt-2 border-0 shadow-sm">

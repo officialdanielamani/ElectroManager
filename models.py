@@ -123,7 +123,7 @@ class User(UserMixin, db.Model):
     theme = db.Column(db.String(20), default='light')
     user_font = db.Column(db.String(50), default='system')
     table_columns_view = db.Column(db.Text, default='["name", "category", "tags", "type_model", "sku", "footprint", "quantity", "total_price", "price_per_unit", "location", "uuid", "status"]')
-    project_table_columns_view = db.Column(db.Text, default='["project_name", "info", "categories", "tags", "date_start", "dateline", "total_cost", "status", "users", "group", "project_id"]')
+    project_table_columns_view = db.Column(db.Text, default='["project_name", "info", "categories", "tags", "date_start", "dateline", "total_cost", "est_total_cost", "status", "users", "group", "project_id"]')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     is_active = db.Column(db.Boolean, default=True)
     is_demo_user = db.Column(db.Boolean, default=False)
@@ -173,11 +173,10 @@ class User(UserMixin, db.Model):
         try:
             return json.loads(self.project_table_columns_view)
         except (json.JSONDecodeError, TypeError):
-            return ["project_name", "info", "categories", "tags", "date_start", "dateline", "total_cost", "status", "users", "group", "project_id"]
+            return ["project_name", "info", "categories", "tags", "date_start", "dateline", "total_cost", "est_total_cost", "status", "users", "group", "project_id"]
 
     def set_project_table_columns(self, columns):
         self.project_table_columns_view = json.dumps(columns)
-        self.table_columns_view = json.dumps(columns)
     
     def __repr__(self):
         return f'<User {self.username}>'
@@ -1505,6 +1504,9 @@ class Project(db.Model):
     def get_project_total_cost(self):
         qty = self.quantity or 1
         return (self.get_bom_actual_cost() + self.get_cost_per_qty_total()) * qty + self.get_overall_cost_total()
+    def get_estimated_project_total_cost(self):
+        qty = self.quantity or 1
+        return (self.get_bom_total_cost() + self.get_cost_per_qty_total()) * qty + self.get_overall_cost_total()
     def get_cost_per_qty_total(self):
         return sum(i.total for i in self.cost_items if i.cost_type == 'per_qty')
     def get_overall_cost_total(self):

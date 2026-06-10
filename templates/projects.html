@@ -117,6 +117,7 @@
                                     {% if col == 'date_start' %}<th><a href="#" class="text-decoration-none" title="Sort by Date Start">Date Start <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>{% endif %}
                                     {% if col == 'dateline' %}<th><a href="#" class="text-decoration-none" title="Sort by Dateline">Dateline <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>{% endif %}
                                     {% if col == 'total_cost' and can_view_costing %}<th><a href="#" class="text-decoration-none" title="Sort by Total Cost">Total Cost <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>{% endif %}
+                                    {% if col == 'est_total_cost' and can_view_costing %}<th><a href="#" class="text-decoration-none" title="Est. Total Cost">Est. Total Cost <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>{% endif %}
                                     {% if col == 'status' %}<th>Status</th>{% endif %}
                                     {% if col == 'users' %}<th>Users</th>{% endif %}
                                     {% if col == 'group' %}<th><a href="#" class="text-decoration-none" title="Sort by Group">Group <i class="bi bi-arrow-down-up text-muted sort-default"></i></a></th>{% endif %}
@@ -137,6 +138,7 @@
                                     {% if col == 'date_start' %}<td>{{ project.date_start.strftime('%Y-%m-%d') if project.date_start else '' }}</td>{% endif %}
                                     {% if col == 'dateline' %}<td>{{ project.date_end.strftime('%Y-%m-%d') if project.date_end else '' }}</td>{% endif %}
                                     {% if col == 'total_cost' and can_view_costing %}<td>{{ currency }} {{ '{:,.{}f}'.format(project.get_project_total_cost(), currency_decimal) }}</td>{% endif %}
+                                    {% if col == 'est_total_cost' and can_view_costing %}<td>{{ currency }} {{ '{:,.{}f}'.format(project.get_estimated_project_total_cost(), currency_decimal) }}</td>{% endif %}
                                     {% if col == 'status' %}<td>{% if project.status %}<span class="badge" style="background-color: {{ project.status.color }}">{{ project.status.name }}</span>{% endif %}</td>{% endif %}
                                     {% if col == 'users' %}<td>{% for u in project.get_users_list() %}<span class="badge bg-secondary">{{ u.username }}</span> {% endfor %}</td>{% endif %}
                                     {% if col == 'group' %}<td>{{ project.group.name if project.group else '' }}</td>{% endif %}
