@@ -92,19 +92,6 @@
     color: var(--brd-color, inherit);
 }
 
-/* ── Icon picker ─────────────────────────────────────────── */
-.icon-picker-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
-    gap: 3px; max-height: 340px; overflow-y: auto;
-}
-.icon-opt {
-    text-align: center; padding: .35rem .2rem; border-radius: .3rem; cursor: pointer;
-    font-size: 1.1rem; border: 2px solid transparent;
-}
-.icon-opt:hover { background: var(--bs-secondary-bg); }
-.icon-opt.selected { border-color: var(--bs-primary); background: var(--bs-primary-bg-subtle); }
-.icon-opt small { display: block; font-size: .6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
 /* ── Board listing (drag-reorder) ────────────────────────── */
 .board-listing-item {
     display: flex; align-items: center; gap: .5rem;
@@ -745,20 +732,7 @@
     </div></div>
 </div>
 
-{# ── Icon Picker ───────────────────────────────── #}
-<div class="modal fade" id="colIconPickerModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
-        <div class="modal-header">
-            <h5 class="modal-title"><i class="bi bi-grid-3x3-gap"></i> Pick Icon</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-            <input type="text" class="form-control form-control-sm mb-3" id="colIconSearch"
-                   placeholder="Search icons…">
-            <div id="colIconGrid"><p class="text-muted text-center py-4">Loading…</p></div>
-        </div>
-    </div></div>
-</div>
+
 
 {# ── Delete Column Confirm ─────────────────────── #}
 <div class="modal fade" id="deleteColModal" tabindex="-1">
@@ -774,23 +748,6 @@
         <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
             <button type="button" class="btn btn-danger" id="btn-delete-col">Delete</button>
-        </div>
-    </div></div>
-</div>
-
-{# ── Shared Icon Picker ───────────────────────── #}
-<div class="modal fade" id="iconPickerModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
-        <div class="modal-header">
-            <h5 class="modal-title"><i class="bi bi-grid-3x3-gap"></i> Pick Icon</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-            <input type="text" class="form-control form-control-sm mb-3" id="iconPickerSearch"
-                   placeholder="Search icons…">
-            <div class="icon-picker-grid" id="iconPickerGrid">
-                <p class="text-muted text-center py-4">Loading…</p>
-            </div>
         </div>
     </div></div>
 </div>
@@ -1549,13 +1506,6 @@ document.addEventListener('click', function(e) {
         return;
     }
 
-    // Shared icon picker pick
-    const iconOpt = e.target.closest('.js-pick-icon');
-    if (iconOpt) {
-        _onPickIcon(iconOpt.dataset.icon);
-        return;
-    }
-
     // Category: inline edit save
     const catSaveBtn = e.target.closest('.js-cat-save');
     if (catSaveBtn) {
@@ -1834,7 +1784,7 @@ document.addEventListener('click', function(e) {
 
 // Board icon picker button
 document.getElementById('btn-open-board-icon-picker')?.addEventListener('click', () => {
-    openIconPicker(icon => {
+    IconPicker.open(icon => {
         _selectedBoardIcon = icon;
         document.getElementById('settings-board-icon').value = icon;
         document.getElementById('settings-board-icon-preview').className = 'bi ' + icon;
@@ -2285,63 +2235,9 @@ function editCol(id, name, color, icon) {
     setTimeout(() => getModal('colModal').show(), 200);
 }
 
-// ── Shared icon picker (callback-based) ─────────────────────────
-let _allIconsCache = null;
-let _iconPickerCallback = null;   // set before opening; called with chosen iconClass
-let _iconPickerSelected = '';
-
-function openIconPicker(callback, currentIcon) {
-    _iconPickerCallback = callback;
-    _iconPickerSelected = (currentIcon || '').replace(/^bi-/, '');
-    getModal('iconPickerModal').show();
-    if (!_allIconsCache) loadAllIcons(); else renderIconGrid();
-}
-
-async function loadAllIcons() {
-    document.getElementById('iconPickerGrid').innerHTML =
-        '<p class="text-muted text-center py-4">Loading…</p>';
-    try {
-        const r = await fetch('/api/icons');
-        _allIconsCache = await r.json();
-        renderIconGrid();
-    } catch(e) {
-        document.getElementById('iconPickerGrid').innerHTML =
-            '<p class="text-danger text-center py-4">Error loading icons.</p>';
-    }
-}
-
-function renderIconGrid() {
-    const grid = document.getElementById('iconPickerGrid');
-    if (!grid || !_allIconsCache) return;
-    const q = (document.getElementById('iconPickerSearch')?.value || '').toLowerCase();
-    const filtered = q ? _allIconsCache.filter(ic => ic.name.includes(q)) : _allIconsCache;
-    // Show first 240 unfiltered; show all when searching
-    const visible = q ? filtered : filtered.slice(0, 240);
-    grid.innerHTML = visible.map(ic =>
-        `<div class="icon-opt js-pick-icon${ic.name === _iconPickerSelected ? ' selected' : ''}"
-              data-icon="bi-${escHtml(ic.name)}" title="${escHtml(ic.name)}">
-            <i class="bi bi-${escHtml(ic.name)}"></i>
-            <small>${escHtml(ic.name)}</small>
-        </div>`
-    ).join('') +
-    (!q && filtered.length > 240
-        ? `<p class="text-muted text-center py-2 small" style="grid-column:1/-1">
-               Showing 240 of ${filtered.length} — search to filter</p>` : '') ||
-    '<p class="text-muted text-center py-4" style="grid-column:1/-1">No icons found.</p>';
-}
-
-document.getElementById('iconPickerSearch')?.addEventListener('input', renderIconGrid);
-
-// js-pick-icon handler is in the main delegation; route to callback
-function _onPickIcon(iconClass) {
-    _iconPickerSelected = iconClass.replace(/^bi-/, '');
-    if (_iconPickerCallback) { _iconPickerCallback(iconClass); _iconPickerCallback = null; }
-    hideModal('iconPickerModal');
-}
-
 // Wire column icon picker button to shared picker
 document.getElementById('btn-open-col-icon-picker')?.addEventListener('click', () => {
-    openIconPicker(icon => setColIcon(icon), _selectedColIcon);
+    IconPicker.open(icon => setColIcon(icon), _selectedColIcon);
 });
 
 document.getElementById('btn-save-col')?.addEventListener('click', async () => {

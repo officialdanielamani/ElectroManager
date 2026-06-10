@@ -275,23 +275,6 @@
     </div>
 </div>
 
-<!-- Drawer Icon — Bootstrap Icons Picker Modal -->
-<div class="modal fade" id="diIconPickerModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-star me-2"></i>Select Icon for Drawer</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <input type="text" class="form-control form-control-sm mb-3" id="diIpSearch" placeholder="Search icons…" oninput="_diRenderIcons(_diIconsCache||[])">
-                <div id="diIpGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:4px;max-height:400px;overflow-y:auto;">
-                    <p class="text-muted text-center py-4">Loading…</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Drawer Icon — Share File Picker Modal -->
 <div class="modal fade" id="diFilePickerModal" tabindex="-1">
@@ -1339,7 +1322,6 @@ function saveDrawerShortInfo() {
 // ===== Drawer Icon =====
 let _currentDrawerIconType = 'none';
 let _currentDrawerIconValue = '';
-let _diIconsCache = null;
 let _diFileCache = null;
 
 function _diUpdatePreview() {
@@ -1363,8 +1345,10 @@ function clearDrawerIcon() {
 }
 
 function openDrawerIconPicker() {
-    const modal = new bootstrap.Modal(document.getElementById('diIconPickerModal'));
-    modal.show();
+    const curIcon = (_currentDrawerIconType === 'icon' && _currentDrawerIconValue) ? 'bi-' + _currentDrawerIconValue : '';
+    IconPicker.open(function(iconClass) {
+        selectDrawerIcon(iconClass.replace(/^bi-/, ''));
+    }, curIcon);
 }
 
 function openDrawerFilePicker() {
@@ -1372,40 +1356,10 @@ function openDrawerFilePicker() {
     modal.show();
 }
 
-async function _diLoadIcons() {
-    if (_diIconsCache) { _diRenderIcons(_diIconsCache); return; }
-    const grid = document.getElementById('diIpGrid');
-    if (grid) grid.innerHTML = '<p class="text-muted text-center py-4">Loading…</p>';
-    try {
-        const resp = await fetch('/api/icons');
-        _diIconsCache = await resp.json();
-        _diRenderIcons(_diIconsCache);
-    } catch (e) {
-        if (grid) grid.innerHTML = '<p class="text-danger text-center py-4">Error loading icons.</p>';
-    }
-}
-
-function _diRenderIcons(icons) {
-    const query = (document.getElementById('diIpSearch')?.value || '').toLowerCase();
-    const filtered = query ? icons.filter(ic => ic.name.includes(query)) : icons;
-    const grid = document.getElementById('diIpGrid');
-    if (!grid) return;
-    if (!filtered.length) {
-        grid.innerHTML = '<p class="text-muted mb-0" style="grid-column:1/-1;text-align:center;padding:12px 0;">No icons found</p>';
-        return;
-    }
-    grid.innerHTML = filtered.map(ic => {
-        const sel = ic.name === _currentDrawerIconValue ? 'background:#0d6efd22;outline:2px solid #0d6efd;border-radius:4px;' : '';
-        return `<button type="button" style="border:1px solid #dee2e6;border-radius:4px;padding:4px 2px;background:white;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:52px;${sel}" title="${ic.name}" onclick="selectDrawerIcon('${ic.name}')"><i class="${ic.class}" style="font-size:18px;"></i><span style="font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${ic.name}</span></button>`;
-    }).join('');
-}
-
 function selectDrawerIcon(iconName) {
     _currentDrawerIconType = 'icon';
     _currentDrawerIconValue = iconName;
-    bootstrap.Modal.getInstance(document.getElementById('diIconPickerModal')).hide();
     _diUpdatePreview();
-    _diRenderIcons(_diIconsCache || []);
     saveDrawerIcon('icon', iconName);
 }
 
@@ -1916,7 +1870,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('diIconPickerModal')?.addEventListener('show.bs.modal', _diLoadIcons);
     document.getElementById('diFilePickerModal')?.addEventListener('show.bs.modal', _diLoadFiles);
 
     // Populate "From:" label when swap/move modals are about to show (safe: fires after DOM is ready)

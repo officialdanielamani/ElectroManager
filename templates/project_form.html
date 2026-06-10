@@ -853,23 +853,6 @@
     </div>
 </div>
 
-<!-- Project Thumbnail Icon Picker Modal -->
-<div class="modal fade" id="projThumbIconPickerModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-star me-2"></i>Select Icon for Thumbnail</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <input type="text" class="form-control form-control-sm mb-3" id="ptIpSearch" placeholder="Search icons…" oninput="_ptRenderIcons(_ptIconsCache||[])">
-                <div id="ptIpGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:4px;max-height:400px;overflow-y:auto;">
-                    <p class="text-muted text-center py-4">Loading…</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Project Thumbnail Picture Picker Modal -->
 <div class="modal fade" id="projThumbPicturePickerModal" tabindex="-1">
@@ -929,7 +912,6 @@
     const _pid = '{{ project.project_id }}';
 
     /* ---- Project thumbnail helpers ---- */
-    let _ptIconsCache = null;
     let _ptShareCache = null;
     const _ptClearBtnHtml = `<button type="button" onclick="clearProjThumb()" style="position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:none;background:var(--bs-danger);color:var(--bs-white);font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;z-index:1;" title="Remove thumbnail"><i class="bi bi-x"></i></button>`;
 
@@ -959,42 +941,13 @@
 
     /* Icon picker */
     window.openProjThumbIconPicker = function() {
-        const modal = new bootstrap.Modal(document.getElementById('projThumbIconPickerModal'));
-        modal.show();
-        _ptLoadIcons();
-    };
-
-    async function _ptLoadIcons() {
-        if (_ptIconsCache) { _ptRenderIcons(_ptIconsCache); return; }
-        const grid = document.getElementById('ptIpGrid');
-        if (grid) grid.innerHTML = '<p class="text-muted text-center py-4">Loading…</p>';
-        try {
-            const resp = await fetch('/api/icons');
-            _ptIconsCache = await resp.json();
-            _ptRenderIcons(_ptIconsCache);
-        } catch (e) {
-            if (grid) grid.innerHTML = '<p class="text-danger text-center py-4">Error loading icons.</p>';
-        }
-    }
-
-    window._ptRenderIcons = function(icons) {
-        const current = document.getElementById('projThumbnailValue').value;
-        const curIcon = current.startsWith('biicon:') ? current.slice(7) : '';
-        const query = (document.getElementById('ptIpSearch')?.value || '').toLowerCase();
-        const filtered = query ? icons.filter(ic => ic.name.includes(query)) : icons;
-        const grid = document.getElementById('ptIpGrid');
-        if (!grid) return;
-        grid.innerHTML = filtered.map(ic => {
-            const sel = ic.name === curIcon ? 'background:color-mix(in srgb, var(--bs-primary) 15%, transparent);outline:2px solid var(--bs-primary);border-radius:4px;' : '';
-            return `<button type="button" style="border:1px solid var(--bs-border-color);border-radius:4px;padding:4px 2px;background:var(--bs-body-bg);color:var(--bs-body-color);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:52px;${sel}" title="${ic.name}" onclick="ptSelectIcon('${ic.name}')"><i class="${ic.class}" style="font-size:18px;"></i><span style="font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${ic.name}</span></button>`;
-        }).join('') || '<p class="text-muted text-center py-4" style="grid-column:1/-1;">No icons found.</p>';
-    };
-
-    window.ptSelectIcon = function(iconName) {
-        document.getElementById('projThumbnailValue').value = 'biicon:' + iconName;
-        _ptUpdatePreview('icon', iconName, '');
-        _ptRenderIcons(_ptIconsCache || []);
-        bootstrap.Modal.getInstance(document.getElementById('projThumbIconPickerModal')).hide();
+        const cur = document.getElementById('projThumbnailValue').value;
+        const curIcon = cur.startsWith('biicon:') ? 'bi-' + cur.slice(7) : '';
+        IconPicker.open(function(iconClass) {
+            const name = iconClass.replace(/^bi-/, '');
+            document.getElementById('projThumbnailValue').value = 'biicon:' + name;
+            _ptUpdatePreview('icon', name, '');
+        }, curIcon);
     };
 
     /* Picture picker (project uploaded pictures) */

@@ -3795,23 +3795,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- ===== Thumbnail Picker Modals ===== -->
 
-<!-- Bootstrap Icon Picker -->
-<div class="modal fade" id="thumbIconPickerModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-star me-2"></i>Select Icon for Thumbnail</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <input type="text" class="form-control form-control-sm mb-3" id="tiIpSearch" placeholder="Search icons…" oninput="_tiRenderIcons(_tiIconsCache||[])">
-                <div id="tiIpGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:4px;max-height:400px;overflow-y:auto;">
-                    <p class="text-muted text-center py-4">Loading…</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
 {% if item %}
 <!-- Picture Picker (uploaded item images) -->
@@ -3869,7 +3852,6 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <script>
-let _tiIconsCache = null;
 let _tiShareCache = null;
 const _tiClearBtn = `<button type="button" onclick="clearThumb()" style="position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:none;background:#dc3545;color:white;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;z-index:1;" title="Remove thumbnail"><i class="bi bi-x"></i></button>`;
 
@@ -3899,40 +3881,13 @@ function clearThumb() {
 
 // ----- Icon picker -----
 function openThumbIconPicker() {
-    new bootstrap.Modal(document.getElementById('thumbIconPickerModal')).show();
-}
-
-async function _tiLoadIcons() {
-    if (_tiIconsCache) { _tiRenderIcons(_tiIconsCache); return; }
-    const grid = document.getElementById('tiIpGrid');
-    if (grid) grid.innerHTML = '<p class="text-muted text-center py-4">Loading…</p>';
-    try {
-        const resp = await fetch('/api/icons');
-        _tiIconsCache = await resp.json();
-        _tiRenderIcons(_tiIconsCache);
-    } catch (e) {
-        if (grid) grid.innerHTML = '<p class="text-danger text-center py-4">Error loading icons.</p>';
-    }
-}
-
-function _tiRenderIcons(icons) {
-    const current = document.getElementById('thumbnailValue').value;
-    const curIcon = current.startsWith('biicon:') ? current.slice(7) : '';
-    const query = (document.getElementById('tiIpSearch')?.value || '').toLowerCase();
-    const filtered = query ? icons.filter(ic => ic.name.includes(query)) : icons;
-    const grid = document.getElementById('tiIpGrid');
-    if (!grid) return;
-    grid.innerHTML = filtered.map(ic => {
-        const sel = ic.name === curIcon ? 'background:#0d6efd22;outline:2px solid #0d6efd;border-radius:4px;' : '';
-        return `<button type="button" style="border:1px solid #dee2e6;border-radius:4px;padding:4px 2px;background:white;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:52px;${sel}" title="${ic.name}" onclick="tiSelectIcon('${ic.name}')"><i class="${ic.class}" style="font-size:18px;"></i><span style="font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${ic.name}</span></button>`;
-    }).join('') || '<p class="text-muted text-center py-4" style="grid-column:1/-1;">No icons found.</p>';
-}
-
-function tiSelectIcon(iconName) {
-    document.getElementById('thumbnailValue').value = 'biicon:' + iconName;
-    _tiUpdatePreview('icon', iconName, '');
-    _tiRenderIcons(_tiIconsCache || []);
-    bootstrap.Modal.getInstance(document.getElementById('thumbIconPickerModal')).hide();
+    const cur = document.getElementById('thumbnailValue').value;
+    const curIcon = cur.startsWith('biicon:') ? 'bi-' + cur.slice(7) : '';
+    IconPicker.open(function(iconClass) {
+        const name = iconClass.replace(/^bi-/, '');
+        document.getElementById('thumbnailValue').value = 'biicon:' + name;
+        _tiUpdatePreview('icon', name, '');
+    }, curIcon);
 }
 
 // ----- Picture picker -----
@@ -3996,7 +3951,6 @@ function tiSelectShare(value, url, category) {
     bootstrap.Modal.getInstance(document.getElementById('thumbSharePickerModal')).hide();
 }
 
-document.getElementById('thumbIconPickerModal').addEventListener('show.bs.modal', _tiLoadIcons);
 document.getElementById('thumbSharePickerModal').addEventListener('show.bs.modal', _tiLoadShare);
 
 // legacy clearThumbnail alias kept for any old references
