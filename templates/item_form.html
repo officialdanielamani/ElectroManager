@@ -533,6 +533,7 @@
                     <div class="mb-3">
                         <label class="form-label form-label-sm">Description</label>
                         {{ form.description(class="form-control form-control-sm", placeholder="Support Markdown format", rows=6, disabled=(item_perms and not item_perms.can_edit_advance), id="itemDescription") }}
+                        <div class="text-end mt-1"><small id="itemDescCounter" class="text-muted">0 / 65,535</small></div>
                     </div>
 
                     <div class="mb-3">
@@ -4242,7 +4243,20 @@ function setSfView(view) {
 document.addEventListener('DOMContentLoaded', function () {
     var ta = document.getElementById('itemDescription');
     if (ta) initMdEditor(ta);
+    _initCharCounter('itemDescription', 'itemDescCounter', 65535);
 });
+function _initCharCounter(taId, counterId, max) {
+    var ta = document.getElementById(taId);
+    var ct = document.getElementById(counterId);
+    if (!ta || !ct) return;
+    function update() {
+        var len = ta.value.length;
+        ct.textContent = len.toLocaleString() + ' / ' + max.toLocaleString();
+        ct.className = len >= max ? 'text-danger' : len >= max * 0.9 ? 'text-warning' : 'text-muted';
+    }
+    ta.addEventListener('input', update);
+    update();
+}
 </script>
 
 {% endblock %}

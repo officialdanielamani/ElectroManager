@@ -290,6 +290,7 @@
                     <div class="mb-2">
                         <label class="form-label form-label-sm">Description <small class="text-muted">(Markdown)</small></label>
                         <textarea class="form-control form-control-sm" name="description" id="projectDescription" rows="6">{{ project.description or '' }}</textarea>
+                        <div class="text-end mt-1"><small id="projDescCounter" class="text-muted">0 / 65,535</small></div>
                     </div>
 
                     <!-- Dateline Notification (edit only) -->
@@ -1914,7 +1915,20 @@ function setSfView(view) {
 document.addEventListener('DOMContentLoaded', function () {
     var ta = document.getElementById('projectDescription');
     if (ta) initMdEditor(ta);
+    _initCharCounter('projectDescription', 'projDescCounter', 65535);
 });
+function _initCharCounter(taId, counterId, max) {
+    var ta = document.getElementById(taId);
+    var ct = document.getElementById(counterId);
+    if (!ta || !ct) return;
+    function update() {
+        var len = ta.value.length;
+        ct.textContent = len.toLocaleString() + ' / ' + max.toLocaleString();
+        ct.className = len >= max ? 'text-danger' : len >= max * 0.9 ? 'text-warning' : 'text-muted';
+    }
+    ta.addEventListener('input', update);
+    update();
+}
 </script>
 
 {% endblock %}
