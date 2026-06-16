@@ -63,7 +63,11 @@ class Location(db.Model):
         super(Location, self).__init__(**kwargs)
         if not self.uuid:
             chars = string.ascii_uppercase + string.digits
-            self.uuid = ''.join(secrets.choice(chars) for _ in range(11)) + 'L'
+            while True:
+                candidate = ''.join(secrets.choice(chars) for _ in range(11)) + 'L'
+                if not Location.query.filter_by(uuid=candidate).first():
+                    self.uuid = candidate
+                    break
     
     def __repr__(self):
         return f'<Location {self.name}>'
@@ -149,7 +153,11 @@ class User(UserMixin, db.Model):
         super(User, self).__init__(**kwargs)
         if not self.user_uid:
             chars = string.ascii_uppercase + string.digits
-            self.user_uid = 'U' + ''.join(secrets.choice(chars) for _ in range(5))
+            while True:
+                candidate = 'U' + ''.join(secrets.choice(chars) for _ in range(5))
+                if not User.query.filter_by(user_uid=candidate).first():
+                    self.user_uid = candidate
+                    break
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -245,7 +253,11 @@ class Rack(db.Model):
         super(Rack, self).__init__(**kwargs)
         if not self.uuid:
             chars = string.ascii_uppercase + string.digits
-            self.uuid = ''.join(secrets.choice(chars) for _ in range(11)) + 'R'
+            while True:
+                candidate = ''.join(secrets.choice(chars) for _ in range(11)) + 'R'
+                if not Rack.query.filter_by(uuid=candidate).first():
+                    self.uuid = candidate
+                    break
 
     def get_unavailable_drawers(self):
         if not self.unavailable_drawers:
@@ -447,7 +459,11 @@ class Item(db.Model):
         super(Item, self).__init__(**kwargs)
         if not self.uuid:
             chars = string.ascii_uppercase + string.digits
-            self.uuid = ''.join(secrets.choice(chars) for _ in range(11)) + 'I'
+            while True:
+                candidate = ''.join(secrets.choice(chars) for _ in range(11)) + 'I'
+                if not Item.query.filter_by(uuid=candidate).first():
+                    self.uuid = candidate
+                    break
     
     def get_full_location(self):
         if self.rack_id and self.drawer:
@@ -1470,7 +1486,11 @@ class Project(db.Model):
         super(Project, self).__init__(**kwargs)
         if not self.project_id:
             chars = string.ascii_uppercase + string.digits
-            self.project_id = ''.join(secrets.choice(chars) for _ in range(11)) + 'P'
+            while True:
+                candidate = ''.join(secrets.choice(chars) for _ in range(11)) + 'P'
+                if not Project.query.filter_by(project_id=candidate).first():
+                    self.project_id = candidate
+                    break
     def get_tags_list(self):
         if not self.tags: return []
         try:
@@ -1673,7 +1693,11 @@ class KanbanBoard(db.Model):
         super(KanbanBoard, self).__init__(**kwargs)
         if not self.board_uuid:
             chars = string.ascii_uppercase + string.digits
-            self.board_uuid = ''.join(secrets.choice(chars) for _ in range(11)) + 'K'
+            while True:
+                candidate = ''.join(secrets.choice(chars) for _ in range(11)) + 'K'
+                if not KanbanBoard.query.filter_by(board_uuid=candidate).first():
+                    self.board_uuid = candidate
+                    break
 
 
 class KanbanBoardUserState(db.Model):
@@ -1747,7 +1771,11 @@ class KanbanCard(db.Model):
         super(KanbanCard, self).__init__(**kwargs)
         if not self.uuid:
             chars = string.ascii_uppercase + string.digits
-            self.uuid = ''.join(secrets.choice(chars) for _ in range(11)) + 'C'
+            while True:
+                candidate = ''.join(secrets.choice(chars) for _ in range(11)) + 'C'
+                if not KanbanCard.query.filter_by(uuid=candidate).first():
+                    self.uuid = candidate
+                    break
 
     def get_key_persons(self):
         """Return list of {id, name, type} dicts; handles legacy plain-string lists."""

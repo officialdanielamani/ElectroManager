@@ -1306,7 +1306,7 @@ def item_add_parameter(id):
     value = request.form.get('value', '').strip()
     value2 = request.form.get('value2', '').strip()
     unit = request.form.get('unit', '').strip()
-    description = request.form.get('description', '').strip()
+    description = request.form.get('description', '').strip()[:512]
 
     # Validate parameter exists
     parameter = MagicParameter.query.get(parameter_id)

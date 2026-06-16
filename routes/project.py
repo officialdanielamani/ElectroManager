@@ -221,6 +221,7 @@ def project_new():
         project = Project(
             name=name,
             info=request.form.get('info', '').strip()[:128],
+            description=request.form.get('description', '').strip()[:65535] or None,
             category_id=cat_id,
             status_id=stat_id,
             quantity=request.form.get('quantity', 1, type=int),
@@ -367,7 +368,7 @@ def project_edit(project_id):
 
         project.name = name
         project.info = request.form.get('info', '').strip()[:128]
-        project.description = request.form.get('description', '').strip()
+        project.description = request.form.get('description', '').strip()[:65535]
         project.category_id = cat_id
         project.status_id = stat_id
         project.quantity = request.form.get('quantity', 1, type=int)
@@ -909,7 +910,7 @@ def cost_item_add(project_id):
         project_id=project.id,
         cost_type=cost_type,
         name=(data.get('name') or '').strip(),
-        description=(data.get('description') or '').strip(),
+        description=(data.get('description') or '').strip()[:512],
         price=price,
         unit_label=(data.get('unit_label') or '').strip(),
         quantity=qty,
@@ -944,7 +945,7 @@ def cost_item_edit(project_id, cost_id):
         return jsonify({'error': 'Invalid price or quantity'}), 400
 
     item.name = name
-    item.description = (data.get('description') or '').strip()
+    item.description = (data.get('description') or '').strip()[:512]
     item.price = price
     item.unit_label = (data.get('unit_label') or '').strip()
     item.quantity = qty
@@ -1166,7 +1167,7 @@ def project_url_add(project_id):
         project_id=project.id,
         url=url_val,
         title=request.form.get('title', '').strip() or None,
-        description=request.form.get('url_description', '').strip() or None
+        description=request.form.get('url_description', '').strip()[:512] or None
     )
     db.session.add(purl)
     db.session.commit()
