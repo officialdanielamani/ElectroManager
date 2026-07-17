@@ -181,10 +181,13 @@ def save_file(file, upload_folder, item_uuid):
         
         # Save file
         file.save(file_path)
-        
+
         # Get file size
         file_size = os.path.getsize(file_path)
-        
+
+        # Generate thumbnail for images
+        generate_thumbnail_for_file(file_path, upload_folder)
+
         return {
             'filename': f"items/{item_uuid}/{filename}",  # Store relative path
             'original_filename': secure_filename(file.filename),
@@ -195,18 +198,58 @@ def save_file(file, upload_folder, item_uuid):
     return None
 
 
-def create_thumbnail(image_path, thumbnail_path, size=(200, 200)):
-    """Create a thumbnail for images"""
+IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+
+def create_thumbnail(image_path, thumbnail_path, size=(400, 400)):
+    """Create a thumbnail for images, handling EXIF rotation and colour mode."""
     if not PILLOW_AVAILABLE:
         return False
     try:
         with Image.open(image_path) as img:
-            img.thumbnail(size)
-            img.save(thumbnail_path)
+            # Honour EXIF rotation so thumbnails aren't sideways
+            try:
+                from PIL import ImageOps
+                img = ImageOps.exif_transpose(img)
+            except Exception:
+                pass
+            # Convert palette/transparency modes so JPEG save works
+            if img.mode in ('RGBA', 'LA', 'P'):
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                alpha = img.split()[-1] if img.mode in ('RGBA', 'LA') else None
+                if alpha:
+                    background.paste(img, mask=alpha)
+                else:
+                    background.paste(img)
+                img = background
+            elif img.mode != 'RGB':
+                img = img.convert('RGB')
+            img.thumbnail(size, Image.LANCZOS)
+            # Preserve PNG for lossless; use JPEG for everything else
+            fmt = 'PNG' if image_path.lower().endswith('.png') else 'JPEG'
+            img.save(thumbnail_path, fmt, quality=85, optimize=True)
             return True
     except Exception as e:
         print(f"Error creating thumbnail: {e}")
         return False
+
+
+def generate_thumbnail_for_file(file_path_abs, upload_folder):
+    """Generate a thumbnail for an image file into the thumbs/ sub-tree. Silent no-op for non-images."""
+    ext = file_path_abs.rsplit('.', 1)[-1].lower() if '.' in file_path_abs else ''
+    if ext not in IMAGE_EXTENSIONS:
+        return
+    try:
+        rel = os.path.relpath(os.path.realpath(file_path_abs), os.path.realpath(upload_folder))
+        if rel.startswith('..'):
+            return  # outside upload folder — skip
+        thumb_path = os.path.join(upload_folder, 'thumbs', rel)
+        os.makedirs(os.path.dirname(thumb_path), exist_ok=True)
+        create_thumbnail(file_path_abs, thumb_path)
+    except Exception as e:
+        print(f"Thumbnail generation failed for {file_path_abs}: {e}")
 
 
 def log_audit(user_id, action, entity_type, entity_id, details=None):

@@ -11,7 +11,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from models import db, SharedFile, Setting, User
-from utils import log_audit
+from utils import log_audit, generate_thumbnail_for_file
 
 share_bp = Blueprint('share', __name__)
 
@@ -225,7 +225,11 @@ def share_upload():
 
         safe_base = secure_filename(file.filename)
         stored_name = _unique_filename(share_folder, safe_base)
-        file.save(os.path.join(share_folder, stored_name))
+        saved_path = os.path.join(share_folder, stored_name)
+        file.save(saved_path)
+        # Generate thumbnail for images (SVG excluded — it's already vector)
+        if ext != 'svg':
+            generate_thumbnail_for_file(saved_path, current_app.config['UPLOAD_FOLDER'])
         name_base = stored_name.rsplit('.', 1)[0] if '.' in stored_name else stored_name
 
         sf = SharedFile(
@@ -343,11 +347,16 @@ def share_delete(id):
     name = sf.name
     category = sf.category
 
+    upload_folder = current_app.config['UPLOAD_FOLDER']
     try:
-        file_path = _share_file_path(current_app.config['UPLOAD_FOLDER'], sf.category, sf.filename)
+        file_path = _share_file_path(upload_folder, sf.category, sf.filename)
         if os.path.exists(file_path):
             os.remove(file_path)
-    except ValueError:
+        # Remove thumbnail too
+        thumb_path = os.path.join(upload_folder, 'thumbs', 'share', sf.category, sf.filename)
+        if os.path.exists(thumb_path):
+            os.remove(thumb_path)
+    except (ValueError, OSError):
         pass  # File already gone or path invalid — proceed with DB deletion
 
     db.session.delete(sf)
@@ -369,13 +378,17 @@ def share_bulk_delete():
         return jsonify({'success': False, 'error': 'No files specified.'}), 400
 
     files = SharedFile.query.filter(SharedFile.id.in_(ids)).all()
+    upload_folder = current_app.config['UPLOAD_FOLDER']
     count = 0
     for sf in files:
         try:
-            file_path = _share_file_path(current_app.config['UPLOAD_FOLDER'], sf.category, sf.filename)
+            file_path = _share_file_path(upload_folder, sf.category, sf.filename)
             if os.path.exists(file_path):
                 os.remove(file_path)
-        except ValueError:
+            thumb_path = os.path.join(upload_folder, 'thumbs', 'share', sf.category, sf.filename)
+            if os.path.exists(thumb_path):
+                os.remove(thumb_path)
+        except (ValueError, OSError):
             pass  # Invalid path — skip file delete, still remove DB record
         log_audit(current_user.id, 'delete', 'shared_file', sf.id, f'Bulk deleted shared file: {sf.name}')
         db.session.delete(sf)
@@ -475,12 +488,41 @@ def share_download_all():
     return send_file(buf, as_attachment=True, download_name=zip_name, mimetype='application/zip')
 
 
+_SHARE_IMAGE_EXTS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+
 @share_bp.route('/uploads/share/<category>/<path:filename>', endpoint='share_serve')
 @login_required
 def share_serve(category, filename):
     try:
         folder = _share_folder(current_app.config['UPLOAD_FOLDER'], category)
     except ValueError:
-        from flask import abort
         abort(404)
-    return send_from_directory(folder, filename)
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+    max_age = 86400 if ext in _SHARE_IMAGE_EXTS else 0
+    return send_from_directory(folder, filename, max_age=max_age)
+
+
+@share_bp.route('/uploads/share-thumb/<category>/<path:filename>', endpoint='share_thumb_serve')
+@login_required
+def share_thumb_serve(category, filename):
+    """Serve share-file thumbnail if available, otherwise fall back to the original."""
+    if category not in SHARE_CATEGORIES:
+        abort(404)
+    upload_folder = current_app.config['UPLOAD_FOLDER']
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+    max_age = 86400 if ext in _SHARE_IMAGE_EXTS else 0
+
+    thumb_folder = os.path.join(upload_folder, 'thumbs', 'share', category)
+    thumb_path = os.path.join(thumb_folder, filename)
+    if os.path.exists(thumb_path):
+        return send_from_directory(thumb_folder, filename, max_age=max_age)
+
+    try:
+        orig_folder = _share_folder(upload_folder, category)
+    except ValueError:
+        abort(404)
+    orig_path = os.path.join(orig_folder, filename)
+    if not os.path.exists(orig_path):
+        abort(404)
+    return send_from_directory(orig_folder, filename, max_age=max_age)

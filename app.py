@@ -241,6 +241,22 @@ def inject_settings():
     }
 
 
+@app.context_processor
+def inject_thumb_helpers():
+    """Provide thumb_url() and share_thumb_url() for templates."""
+    from flask import url_for as _url_for
+
+    def thumb_url(filename):
+        """Return the thumbnail URL for a direct upload (falls back to original server-side)."""
+        return _url_for('thumb_file', filename=filename)
+
+    def share_thumb_url(category, filename):
+        """Return the thumbnail URL for a share-library file."""
+        return _url_for('share.share_thumb_serve', category=category, filename=filename)
+
+    return dict(thumb_url=thumb_url, share_thumb_url=share_thumb_url)
+
+
 # Main application routes
 @app.route('/')
 @login_required
@@ -250,19 +266,50 @@ def index():
 
 
 # Main application routes
+_IMAGE_EXTS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+
+def _image_max_age(filename):
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+    return 86400 if ext in _IMAGE_EXTS else 0
+
+
 @app.route('/uploads/<path:filename>')
 @login_required  # Protects general uploads (item photos, icons, etc.)
 def uploaded_file(filename):
-    """Serve uploaded files"""
+    """Serve uploaded files (full-size originals)."""
     from werkzeug.security import safe_join
     from flask import abort
-    
-    # Security: prevent directory traversal
+
     safe_path = safe_join(app.config['UPLOAD_FOLDER'], filename)
     if safe_path is None or not os.path.exists(safe_path):
         abort(404)
-    
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename,
+                               max_age=_image_max_age(filename))
+
+
+@app.route('/uploads/thumb/<path:filename>')
+@login_required
+def thumb_file(filename):
+    """Serve thumbnail if available, otherwise fall back to the original. Cached for images."""
+    from werkzeug.security import safe_join
+    from flask import abort
+
+    upload_folder = app.config['UPLOAD_FOLDER']
+    thumb_folder = os.path.join(upload_folder, 'thumbs')
+
+    thumb_path = safe_join(thumb_folder, filename)
+    if thumb_path and os.path.exists(thumb_path):
+        return send_from_directory(thumb_folder, filename,
+                                   max_age=_image_max_age(filename))
+
+    orig_path = safe_join(upload_folder, filename)
+    if orig_path is None or not os.path.exists(orig_path):
+        abort(404)
+
+    return send_from_directory(upload_folder, filename,
+                               max_age=_image_max_age(filename))
 
 
 @app.route('/uploads/userpicture/<filename>')
@@ -271,13 +318,14 @@ def user_picture(filename):
     """Serve user profile pictures"""
     from werkzeug.security import safe_join
     from flask import abort
-    
+
     user_pic_folder = os.path.join(app.config['UPLOAD_FOLDER'], 'userpicture')
     safe_path = safe_join(user_pic_folder, filename)
     if safe_path is None or not os.path.exists(safe_path):
         abort(404)
-    
-    return send_from_directory(user_pic_folder, filename)
+
+    return send_from_directory(user_pic_folder, filename,
+                               max_age=_image_max_age(filename))
 
 
 @app.route('/favicon.ico')

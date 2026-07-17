@@ -781,6 +781,24 @@ Find item location
 
 These endpoints are used exclusively by the browser UI. They require an active login session and are **not intended for external access** — no token auth, no versioning, no stability guarantees.
 
+### File Serving & Thumbnails
+
+All file-serving routes require an active login session (`@login_required`).
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/uploads/<path:filename>` | Serve full-size original file (item attachments, project files, kanban files) |
+| GET | `/uploads/thumb/<path:filename>` | Serve thumbnail for an uploaded file; falls back to the original if no thumbnail exists. Image responses are cached for 24 hours (`Cache-Control: public, max-age=86400`). |
+| GET | `/uploads/userpicture/<filename>` | Serve user profile pictures (direct uploads) |
+| GET | `/uploads/share/<category>/<path:filename>` | Serve a full-size shared-library file |
+| GET | `/uploads/share-thumb/<category>/<path:filename>` | Serve the thumbnail for a shared-library file; falls back to the original if no thumbnail exists. Cached for 24 hours for image files. |
+
+**Thumbnail details:**
+- Thumbnails are generated automatically on image upload (PNG, JPG, JPEG, GIF, WEBP). SVG files are excluded.
+- Maximum thumbnail size is 400 × 400 px (aspect ratio preserved via `Image.thumbnail`).
+- Thumbnails are stored at `uploads/thumbs/{original_relative_path}` (for direct uploads) or `uploads/thumbs/share/{category}/{filename}` (for share-library files).
+- If Pillow is unavailable, thumbnail generation is skipped silently; the `/uploads/thumb/` and `/uploads/share-thumb/` routes still work by falling back to the original.
+
 ### Search
 
 | Method | Endpoint | Description |

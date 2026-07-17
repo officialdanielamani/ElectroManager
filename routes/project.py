@@ -9,7 +9,7 @@ from models import (db, User, Item, ItemBatch, BatchSerialNumber, Setting,
                     ContactPerson, ContactOrganization,
                     ProjectBOMItem, ProjectCostItem, ProjectAttachment, ProjectURL, SharedFile,
                     MagicParameter, ProjectParameter, ProjectParameterStringValue)
-from utils import log_audit, permission_required, allowed_file
+from utils import log_audit, permission_required, allowed_file, generate_thumbnail_for_file
 from werkzeug.utils import secure_filename
 from datetime import datetime, timezone
 import os
@@ -1030,6 +1030,7 @@ def project_upload(project_id, attachment_type):
             return redirect(url_for('project.project_edit', project_id=project_id))
 
     uploaded = 0
+    upload_folder = current_app.config['UPLOAD_FOLDER']
     for file in valid_files:
         result, error = save_project_file(file, project.project_id, attachment_type)
         if error:
@@ -1046,6 +1047,10 @@ def project_upload(project_id, attachment_type):
             uploaded_by=current_user.id
         )
         db.session.add(att)
+        # Generate thumbnail for picture attachments
+        if attachment_type == 'picture':
+            full_path = os.path.join(upload_folder, result['file_path'])
+            generate_thumbnail_for_file(full_path, upload_folder)
         uploaded += 1
 
     if uploaded:
@@ -1087,10 +1092,17 @@ def project_attachment_delete(att_id):
     att = ProjectAttachment.query.get_or_404(att_id)
     project = att.project
 
-    # Delete file
-    full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], att.file_path)
+    upload_folder = current_app.config['UPLOAD_FOLDER']
+    full_path = os.path.join(upload_folder, att.file_path)
     if os.path.exists(full_path):
         os.remove(full_path)
+    # Remove thumbnail if it exists
+    thumb_path = os.path.join(upload_folder, 'thumbs', att.file_path)
+    try:
+        if os.path.exists(thumb_path):
+            os.remove(thumb_path)
+    except OSError:
+        pass
 
     db.session.delete(att)
     db.session.commit()

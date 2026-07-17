@@ -419,21 +419,21 @@
                                                 <i class="bi bi-{{ item.thumbnail[7:] }}" style="font-size:2rem;"></i>
                                             </div>
                                             {% elif item.thumbnail.startswith('share:') %}
-                                            <img src="{{ url_for('share.share_serve', category='item', filename=item.thumbnail[6:]) }}"
-                                                 alt="{{ item.name }}" style="width:64px;height:64px;object-fit:cover;border-radius:4px;">
+                                            <img src="{{ share_thumb_url('item', item.thumbnail[6:]) }}"
+                                                 alt="{{ item.name }}" loading="lazy" style="width:64px;height:64px;object-fit:cover;border-radius:4px;">
                                             {% elif item.thumbnail.startswith('icon:') %}
-                                            <img src="{{ url_for('share.share_serve', category='icon', filename=item.thumbnail[5:]) }}"
-                                                 alt="{{ item.name }}" style="width:64px;height:64px;object-fit:contain;border-radius:4px;">
+                                            <img src="{{ share_thumb_url('icon', item.thumbnail[5:]) }}"
+                                                 alt="{{ item.name }}" loading="lazy" style="width:64px;height:64px;object-fit:contain;border-radius:4px;">
                                             {% else %}
-                                            <img src="{{ url_for('uploaded_file', filename=item.thumbnail) }}"
-                                                 alt="{{ item.name }}" style="width:64px;height:64px;object-fit:cover;border-radius:4px;">
+                                            <img src="{{ thumb_url(item.thumbnail) }}"
+                                                 alt="{{ item.name }}" loading="lazy" style="width:64px;height:64px;object-fit:cover;border-radius:4px;">
                                             {% endif %}
                                         {% else %}
                                             {% set img_found = [] %}
                                             {% for att in item.attachments %}
                                                 {% if not img_found and att.file_type and att.file_type in ['png', 'jpg', 'jpeg', 'gif', 'webp'] %}
-                                                <img src="{{ url_for('uploaded_file', filename=att.filename) }}"
-                                                     alt="{{ item.name }}" style="width:64px;height:64px;object-fit:cover;border-radius:4px;">
+                                                <img src="{{ thumb_url(att.filename) }}"
+                                                     alt="{{ item.name }}" loading="lazy" style="width:64px;height:64px;object-fit:cover;border-radius:4px;">
                                                 {% if img_found.append(1) %}{% endif %}
                                                 {% endif %}
                                             {% endfor %}
@@ -504,21 +504,21 @@
                                             <i class="bi bi-{{ item.thumbnail[7:] }}" style="font-size:4rem;color:#333;"></i>
                                         </div>
                                         {% elif item.thumbnail.startswith('share:') %}
-                                        <img src="{{ url_for('share.share_serve', category='item', filename=item.thumbnail[6:]) }}"
-                                             alt="{{ item.name }}" style="width:100%;height:100%;object-fit:cover;display:block;">
+                                        <img src="{{ share_thumb_url('item', item.thumbnail[6:]) }}"
+                                             alt="{{ item.name }}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;">
                                         {% elif item.thumbnail.startswith('icon:') %}
-                                        <img src="{{ url_for('share.share_serve', category='icon', filename=item.thumbnail[5:]) }}"
-                                             alt="{{ item.name }}" style="width:100%;height:100%;object-fit:contain;display:block;padding:8px;">
+                                        <img src="{{ share_thumb_url('icon', item.thumbnail[5:]) }}"
+                                             alt="{{ item.name }}" loading="lazy" style="width:100%;height:100%;object-fit:contain;display:block;padding:8px;">
                                         {% else %}
-                                        <img src="{{ url_for('uploaded_file', filename=item.thumbnail) }}"
-                                             alt="{{ item.name }}" style="width:100%;height:100%;object-fit:cover;display:block;">
+                                        <img src="{{ thumb_url(item.thumbnail) }}"
+                                             alt="{{ item.name }}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;">
                                         {% endif %}
                                     {% else %}
                                         {% set image_found = false %}
                                         {% for attachment in item.attachments %}
                                             {% if not image_found and attachment.file_type and attachment.file_type in ['png', 'jpg', 'jpeg', 'gif', 'webp'] %}
-                                                <img src="{{ url_for('uploaded_file', filename=attachment.filename) }}"
-                                                     alt="{{ item.name }}"
+                                                <img src="{{ thumb_url(attachment.filename) }}"
+                                                     alt="{{ item.name }}" loading="lazy"
                                                      style="max-width:100%;max-height:100%;width:100%;height:100%;object-fit:contain;display:block;">
                                                 {% set image_found = true %}
                                             {% endif %}

@@ -765,6 +765,13 @@ def item_delete(uuid):
                 full_path = os.path.join(_upload_dir, attachment.file_path)
                 if is_safe_file_path(full_path, _upload_dir) and os.path.exists(full_path):
                     os.remove(full_path)
+            if attachment.filename:
+                thumb_path = os.path.join(_upload_dir, 'thumbs', attachment.filename)
+                try:
+                    if os.path.exists(thumb_path):
+                        os.remove(thumb_path)
+                except OSError:
+                    pass
         except Exception as e:
             logging.error(f"Error deleting attachment file {attachment.id}: {e}")
 
@@ -841,6 +848,13 @@ def bulk_delete_items():
                         full_path = os.path.join(_upload_dir, attachment.file_path)
                         if is_safe_file_path(full_path, _upload_dir) and os.path.exists(full_path):
                             os.remove(full_path)
+                    if attachment.filename:
+                        thumb_path = os.path.join(_upload_dir, 'thumbs', attachment.filename)
+                        try:
+                            if os.path.exists(thumb_path):
+                                os.remove(thumb_path)
+                        except OSError:
+                            pass
                 except Exception as e:
                     logging.error(f"Error deleting attachment file {attachment.id}: {e}")
             
@@ -1112,12 +1126,20 @@ def delete_attachment(id):
             full_path = os.path.join(_upload_dir, attachment.file_path)
             if is_safe_file_path(full_path, _upload_dir) and os.path.exists(full_path):
                 os.remove(full_path)
+            # Remove thumbnail (keyed on relative filename, not absolute file_path)
+            if attachment.filename:
+                thumb_path = os.path.join(_upload_dir, 'thumbs', attachment.filename)
+                try:
+                    if os.path.exists(thumb_path):
+                        os.remove(thumb_path)
+                except OSError:
+                    pass
     except Exception as e:
         logging.error(f"Error deleting attachment file {attachment.id}: {e}")
 
     db.session.delete(attachment)
     db.session.commit()
-    
+
     log_audit(current_user.id, 'delete', 'attachment', id, f'Deleted attachment: {attachment.original_filename}')
     flash('Attachment deleted successfully!', 'success')
     return redirect(url_for('item.item_edit', uuid=item.uuid))

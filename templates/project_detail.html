@@ -35,9 +35,9 @@
                         {% if project.thumbnail.startswith('biicon:') %}
                         <i class="bi bi-{{ project.thumbnail[7:] }}" style="font-size:32px;color:var(--bs-body-color);"></i>
                         {% elif project.thumbnail.startswith('icon:') %}
-                        <img src="{{ url_for('share.share_serve', category='icon', filename=project.thumbnail[5:]) }}" style="width:100%;height:100%;object-fit:contain;padding:4px;">
+                        <img src="{{ share_thumb_url('icon', project.thumbnail[5:]) }}" style="width:100%;height:100%;object-fit:contain;padding:4px;">
                         {% elif project.thumbnail.startswith('share:') %}
-                        <img src="{{ url_for('share.share_serve', category='project', filename=project.thumbnail[6:]) }}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">
+                        <img src="{{ share_thumb_url('project', project.thumbnail[6:]) }}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">
                         {% endif %}
                     </div>
                     <strong class="fs-5">{{ project.name }}</strong>
@@ -163,7 +163,7 @@
                         {% if att_type == 'picture' %}
                         <div class="image-grid">
                             {% for att in attachments[att_type] %}
-                            <div class="image-grid-item" onclick="openProjLightbox('{{ url_for('uploaded_file', filename=att.file_path) }}', '{{ att.original_filename|e }}')"><img src="{{ url_for('uploaded_file', filename=att.file_path) }}" alt="{{ att.original_filename }}"></div>
+                            <div class="image-grid-item" onclick="openProjLightbox('{{ url_for('uploaded_file', filename=att.file_path) }}', '{{ att.original_filename|e }}')"><img src="{{ thumb_url(att.file_path) }}" alt="{{ att.original_filename }}" loading="lazy"></div>
                             {% endfor %}
                         </div>
                         {% else %}
@@ -195,7 +195,7 @@
                     <div class="image-grid mb-2">
                         {% for sf in sf_images %}
                         <div class="image-grid-item" onclick="openProjLightbox('{{ url_for('share.share_serve', category='project', filename=sf.filename) }}', '{{ sf.name|e }}')">
-                            <img src="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}" alt="{{ sf.name }}">
+                            <img src="{{ share_thumb_url('project', sf.filename) }}" alt="{{ sf.name }}" loading="lazy">
                         </div>
                         {% endfor %}
                     </div>

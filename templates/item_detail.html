@@ -96,13 +96,13 @@
                             {% if item.thumbnail.startswith('biicon:') %}
                             <i class="bi bi-{{ item.thumbnail[7:] }}" style="font-size:4rem;color:#333;"></i>
                             {% elif item.thumbnail.startswith('share:') %}
-                            <img src="{{ url_for('share.share_serve', category='item', filename=item.thumbnail[6:]) }}"
+                            <img src="{{ share_thumb_url('item', item.thumbnail[6:]) }}"
                                  alt="Thumbnail" style="width:100%;height:100%;object-fit:cover;">
                             {% elif item.thumbnail.startswith('icon:') %}
-                            <img src="{{ url_for('share.share_serve', category='icon', filename=item.thumbnail[5:]) }}"
+                            <img src="{{ share_thumb_url('icon', item.thumbnail[5:]) }}"
                                  alt="Thumbnail" style="width:100%;height:100%;object-fit:contain;padding:8px;">
                             {% else %}
-                            <img src="{{ url_for('uploaded_file', filename=item.thumbnail) }}"
+                            <img src="{{ thumb_url(item.thumbnail) }}"
                                  alt="Thumbnail" style="width:100%;height:100%;object-fit:cover;">
                             {% endif %}
                         </div>
@@ -447,7 +447,7 @@
                     <div class="image-grid mt-2">
                         {% for att in images %}
                         <div class="image-grid-item" onclick="openImageModal('{{ url_for('uploaded_file', filename=att.filename) }}', '{{ att.original_filename }}')">
-                            <img src="{{ url_for('uploaded_file', filename=att.filename) }}" alt="{{ att.original_filename }}">
+                            <img src="{{ thumb_url(att.filename) }}" alt="{{ att.original_filename }}" loading="lazy">
                         </div>
                         {% endfor %}
                     </div>
@@ -493,7 +493,7 @@
                     <div class="image-grid mt-2">
                         {% for sf in sf_images %}
                         <div class="image-grid-item" onclick="openImageModal('{{ url_for('share.share_serve', category='item', filename=sf.filename) }}', '{{ sf.name }}')">
-                            <img src="{{ url_for('share.share_serve', category='item', filename=sf.filename) }}" alt="{{ sf.name }}">
+                            <img src="{{ share_thumb_url('item', sf.filename) }}" alt="{{ sf.name }}" loading="lazy">
                         </div>
                         {% endfor %}
                     </div>

@@ -152,6 +152,14 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 - **Max files semantics:** `-1` = unlimited, `0` = new uploads disabled (existing files are never affected), `>0` = batch limit enforced on every upload request
 - Share Files section defaults to a higher max-files limit (acts as a drive); all others default to 5
 
+### Image Caching & Thumbnails
+- Thumbnails are generated automatically on upload for image attachments (`png`, `jpg`, `jpeg`, `gif`, `webp`) on items, project pictures, and share-library files
+- Thumbnails are stored under `uploads/thumbs/` mirroring the original file structure; they are deleted automatically when the original file is removed
+- List views (item list, project detail image grid, share-files library) serve thumbnails (400 × 400 px max) so only small images are downloaded; full-resolution originals are only fetched when opening the lightbox preview
+- All image responses include `Cache-Control: public, max-age=86400` so browsers and proxies cache them for 24 hours and avoid redundant downloads on page reload
+- SVG files are served as-is (no raster thumbnail generated)
+- If Pillow is not installed, thumbnail generation is silently skipped; the fallback route always serves the full-size original
+
 ### In/Out — Sound Effects
 - The In/Out scanning workflow plays audio feedback when a barcode/QR is scanned
 - Toggle in the scan interface settings panel
@@ -356,6 +364,12 @@ ElectroManager/
 │       └── theme/                # Drop theme CSS files here
 │
 ├── uploads/                      # User file uploads (runtime, bind-mounted in Docker)
+│   ├── items/                    # Item file attachments — organised by item UUID
+│   ├── projects/                 # Project attachments — organised by project ID and type
+│   ├── share/                    # Shared file library — organised by category
+│   ├── thumbs/                   # Auto-generated thumbnails — mirrors the structure above
+│   ├── userpicture/              # User profile photos uploaded directly
+│   └── kanban/                   # Kanban card attachments — organised by card UUID
 └── instance/
     └── inventory.db              # SQLite database (runtime, bind-mounted in Docker)
 ```
