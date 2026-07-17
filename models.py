@@ -63,7 +63,11 @@ class Location(db.Model):
         super(Location, self).__init__(**kwargs)
         if not self.uuid:
             chars = string.ascii_uppercase + string.digits
-            self.uuid = ''.join(secrets.choice(chars) for _ in range(11)) + 'L'
+            while True:
+                candidate = ''.join(secrets.choice(chars) for _ in range(11)) + 'L'
+                if not Location.query.filter_by(uuid=candidate).first():
+                    self.uuid = candidate
+                    break
     
     def __repr__(self):
         return f'<Location {self.name}>'
@@ -123,7 +127,7 @@ class User(UserMixin, db.Model):
     theme = db.Column(db.String(20), default='light')
     user_font = db.Column(db.String(50), default='system')
     table_columns_view = db.Column(db.Text, default='["name", "category", "tags", "type_model", "sku", "footprint", "quantity", "total_price", "price_per_unit", "location", "uuid", "status"]')
-    project_table_columns_view = db.Column(db.Text, default='["project_name", "info", "categories", "tags", "date_start", "dateline", "total_cost", "status", "users", "group", "project_id"]')
+    project_table_columns_view = db.Column(db.Text, default='["project_name", "info", "categories", "tags", "date_start", "dateline", "total_cost", "est_total_cost", "status", "users", "group", "project_id"]')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     is_active = db.Column(db.Boolean, default=True)
     is_demo_user = db.Column(db.Boolean, default=False)
@@ -149,7 +153,11 @@ class User(UserMixin, db.Model):
         super(User, self).__init__(**kwargs)
         if not self.user_uid:
             chars = string.ascii_uppercase + string.digits
-            self.user_uid = 'U' + ''.join(secrets.choice(chars) for _ in range(5))
+            while True:
+                candidate = 'U' + ''.join(secrets.choice(chars) for _ in range(5))
+                if not User.query.filter_by(user_uid=candidate).first():
+                    self.user_uid = candidate
+                    break
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -173,11 +181,10 @@ class User(UserMixin, db.Model):
         try:
             return json.loads(self.project_table_columns_view)
         except (json.JSONDecodeError, TypeError):
-            return ["project_name", "info", "categories", "tags", "date_start", "dateline", "total_cost", "status", "users", "group", "project_id"]
+            return ["project_name", "info", "categories", "tags", "date_start", "dateline", "total_cost", "est_total_cost", "status", "users", "group", "project_id"]
 
     def set_project_table_columns(self, columns):
         self.project_table_columns_view = json.dumps(columns)
-        self.table_columns_view = json.dumps(columns)
     
     def __repr__(self):
         return f'<User {self.username}>'
@@ -246,7 +253,11 @@ class Rack(db.Model):
         super(Rack, self).__init__(**kwargs)
         if not self.uuid:
             chars = string.ascii_uppercase + string.digits
-            self.uuid = ''.join(secrets.choice(chars) for _ in range(11)) + 'R'
+            while True:
+                candidate = ''.join(secrets.choice(chars) for _ in range(11)) + 'R'
+                if not Rack.query.filter_by(uuid=candidate).first():
+                    self.uuid = candidate
+                    break
 
     def get_unavailable_drawers(self):
         if not self.unavailable_drawers:
@@ -391,6 +402,12 @@ project_share_files = db.Table(
     db.Column('shared_file_id', db.Integer, db.ForeignKey('shared_files.id'), primary_key=True),
 )
 
+kanban_card_share_files = db.Table(
+    'kanban_card_share_files',
+    db.Column('card_id', db.Integer, db.ForeignKey('kanban_cards.id'), primary_key=True),
+    db.Column('shared_file_id', db.Integer, db.ForeignKey('shared_files.id'), primary_key=True),
+)
+
 
 class Item(db.Model):
     __tablename__ = 'items'
@@ -442,7 +459,11 @@ class Item(db.Model):
         super(Item, self).__init__(**kwargs)
         if not self.uuid:
             chars = string.ascii_uppercase + string.digits
-            self.uuid = ''.join(secrets.choice(chars) for _ in range(11)) + 'I'
+            while True:
+                candidate = ''.join(secrets.choice(chars) for _ in range(11)) + 'I'
+                if not Item.query.filter_by(uuid=candidate).first():
+                    self.uuid = candidate
+                    break
     
     def get_full_location(self):
         if self.rack_id and self.drawer:
@@ -1465,7 +1486,11 @@ class Project(db.Model):
         super(Project, self).__init__(**kwargs)
         if not self.project_id:
             chars = string.ascii_uppercase + string.digits
-            self.project_id = ''.join(secrets.choice(chars) for _ in range(11)) + 'P'
+            while True:
+                candidate = ''.join(secrets.choice(chars) for _ in range(11)) + 'P'
+                if not Project.query.filter_by(project_id=candidate).first():
+                    self.project_id = candidate
+                    break
     def get_tags_list(self):
         if not self.tags: return []
         try:
@@ -1499,6 +1524,9 @@ class Project(db.Model):
     def get_project_total_cost(self):
         qty = self.quantity or 1
         return (self.get_bom_actual_cost() + self.get_cost_per_qty_total()) * qty + self.get_overall_cost_total()
+    def get_estimated_project_total_cost(self):
+        qty = self.quantity or 1
+        return (self.get_bom_total_cost() + self.get_cost_per_qty_total()) * qty + self.get_overall_cost_total()
     def get_cost_per_qty_total(self):
         return sum(i.total for i in self.cost_items if i.cost_type == 'per_qty')
     def get_overall_cost_total(self):
@@ -1665,7 +1693,11 @@ class KanbanBoard(db.Model):
         super(KanbanBoard, self).__init__(**kwargs)
         if not self.board_uuid:
             chars = string.ascii_uppercase + string.digits
-            self.board_uuid = ''.join(secrets.choice(chars) for _ in range(11)) + 'K'
+            while True:
+                candidate = ''.join(secrets.choice(chars) for _ in range(11)) + 'K'
+                if not KanbanBoard.query.filter_by(board_uuid=candidate).first():
+                    self.board_uuid = candidate
+                    break
 
 
 class KanbanBoardUserState(db.Model):
@@ -1702,6 +1734,7 @@ class KanbanColumn(db.Model):
 class KanbanCard(db.Model):
     __tablename__ = 'kanban_cards'
     id          = db.Column(db.Integer, primary_key=True)
+    uuid        = db.Column(db.String(12), unique=True, nullable=False)
     board_id    = db.Column(db.Integer, db.ForeignKey('kanban_boards.id'), nullable=False)
     column_id   = db.Column(db.Integer, db.ForeignKey('kanban_columns.id'), nullable=False)
     title       = db.Column(db.String(256), nullable=False)
@@ -1724,9 +1757,25 @@ class KanbanCard(db.Model):
     tasks      = db.relationship('KanbanTask', backref='card', lazy=True,
                                  cascade='all, delete-orphan',
                                  order_by='KanbanTask.position')
+    attachments = db.relationship('KanbanAttachment', backref='card', lazy=True,
+                                  cascade='all, delete-orphan',
+                                  order_by='KanbanAttachment.uploaded_at')
+    linked_share_files = db.relationship('SharedFile', secondary='kanban_card_share_files',
+                                         lazy='subquery',
+                                         backref=db.backref('linked_kanban_cards', lazy=True))
     category   = db.relationship('KanbanCategory', foreign_keys=[category_id], lazy='joined')
     created_by = db.relationship('User', foreign_keys=[created_by_id])
     updated_by = db.relationship('User', foreign_keys=[updated_by_id])
+
+    def __init__(self, **kwargs):
+        super(KanbanCard, self).__init__(**kwargs)
+        if not self.uuid:
+            chars = string.ascii_uppercase + string.digits
+            while True:
+                candidate = ''.join(secrets.choice(chars) for _ in range(11)) + 'C'
+                if not KanbanCard.query.filter_by(uuid=candidate).first():
+                    self.uuid = candidate
+                    break
 
     def get_key_persons(self):
         """Return list of {id, name, type} dicts; handles legacy plain-string lists."""
@@ -1760,6 +1809,21 @@ class KanbanCard(db.Model):
     @property
     def completed_task_count(self):
         return sum(1 for t in self.tasks if t.completed)
+
+
+class KanbanAttachment(db.Model):
+    __tablename__ = 'kanban_attachments'
+    id                = db.Column(db.Integer, primary_key=True)
+    card_id           = db.Column(db.Integer, db.ForeignKey('kanban_cards.id'), nullable=False)
+    filename          = db.Column(db.String(255), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    file_path         = db.Column(db.String(500), nullable=False)
+    file_type         = db.Column(db.String(50))
+    file_size         = db.Column(db.Integer)
+    uploaded_at       = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    uploaded_by       = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    uploader = db.relationship('User', foreign_keys=[uploaded_by])
 
 
 class KanbanTask(db.Model):

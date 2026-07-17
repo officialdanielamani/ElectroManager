@@ -290,6 +290,7 @@
                     <div class="mb-2">
                         <label class="form-label form-label-sm">Description <small class="text-muted">(Markdown)</small></label>
                         <textarea class="form-control form-control-sm" name="description" id="projectDescription" rows="6">{{ project.description or '' }}</textarea>
+                        <div class="text-end mt-1"><small id="projDescCounter" class="text-muted">0 / 65,535</small></div>
                     </div>
 
                     <!-- Dateline Notification (edit only) -->
@@ -484,11 +485,12 @@
         {% set _cpq    = project.get_cost_per_qty_total() %}
         {% set _ov     = project.get_overall_cost_total() %}
         {% set _qty    = project.quantity or 1 %}
-        {% set _total  = (_bom_act + _cpq) * _qty + _ov %}
+        {% set _total     = (_bom_act + _cpq) * _qty + _ov %}
+        {% set _est_total = (_bom_est + _cpq) * _qty + _ov %}
         <table class="table table-bordered mb-2" style="table-layout:fixed;">
             <tbody>
                 <tr>
-                    <td rowspan="2" class="text-center align-middle table-secondary" style="width:22%;">
+                    <td class="text-center p-2 table-secondary" style="width:22%;">
                         <small class="text-muted d-block">Quantity</small>
                         <strong class="fs-5">{{ _qty }}</strong>
                     </td>
@@ -503,9 +505,13 @@
                     <td rowspan="2" class="text-center align-middle bg-primary text-white" style="width:34%;">
                         <small class="d-block opacity-75">Project Total Cost</small>
                         <strong class="fs-5">{{ currency }} {{ '{:,.{}f}'.format(_total, currency_decimal) }}</strong>
+                        <hr class="border-light my-2 opacity-50">
+                        <small class="d-block opacity-75">Est. Project Total Cost</small>
+                        <strong class="fs-5">{{ currency }} {{ '{:,.{}f}'.format(_est_total, currency_decimal) }}</strong>
                     </td>
                 </tr>
                 <tr>
+                    <td class="table-secondary"></td>
                     <td class="text-center p-2 table-secondary">
                         <small class="text-muted d-block">Actual BOM</small>
                         <strong>{{ currency }} {{ '{:,.{}f}'.format(_bom_act, currency_decimal) }}</strong>
@@ -517,7 +523,10 @@
                 </tr>
             </tbody>
         </table>
-        <p class="text-muted small mb-3"><i class="bi bi-info-circle"></i> Formula: <code>((Actual BOM + Cost per Qty) × Quantity) + Overall Cost = Project Total Cost</code></p>
+        <p class="text-muted small mb-3"><i class="bi bi-info-circle"></i>
+            Project Total Cost: <code>((Actual BOM + Cost per Qty) × Quantity) + Overall Cost</code> &nbsp;|&nbsp;
+            Est. Project Total Cost: <code>((Estimate BOM + Cost per Qty) × Quantity) + Overall Cost</code>
+        </p>
 
         <!-- BOM -->
         <div class="card mt-2 border-0 shadow-sm">
@@ -845,23 +854,6 @@
     </div>
 </div>
 
-<!-- Project Thumbnail Icon Picker Modal -->
-<div class="modal fade" id="projThumbIconPickerModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-star me-2"></i>Select Icon for Thumbnail</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <input type="text" class="form-control form-control-sm mb-3" id="ptIpSearch" placeholder="Search icons…" oninput="_ptRenderIcons(_ptIconsCache||[])">
-                <div id="ptIpGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:4px;max-height:400px;overflow-y:auto;">
-                    <p class="text-muted text-center py-4">Loading…</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Project Thumbnail Picture Picker Modal -->
 <div class="modal fade" id="projThumbPicturePickerModal" tabindex="-1">
@@ -921,7 +913,6 @@
     const _pid = '{{ project.project_id }}';
 
     /* ---- Project thumbnail helpers ---- */
-    let _ptIconsCache = null;
     let _ptShareCache = null;
     const _ptClearBtnHtml = `<button type="button" onclick="clearProjThumb()" style="position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:none;background:var(--bs-danger);color:var(--bs-white);font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;z-index:1;" title="Remove thumbnail"><i class="bi bi-x"></i></button>`;
 
@@ -951,42 +942,13 @@
 
     /* Icon picker */
     window.openProjThumbIconPicker = function() {
-        const modal = new bootstrap.Modal(document.getElementById('projThumbIconPickerModal'));
-        modal.show();
-        _ptLoadIcons();
-    };
-
-    async function _ptLoadIcons() {
-        if (_ptIconsCache) { _ptRenderIcons(_ptIconsCache); return; }
-        const grid = document.getElementById('ptIpGrid');
-        if (grid) grid.innerHTML = '<p class="text-muted text-center py-4">Loading…</p>';
-        try {
-            const resp = await fetch('/api/icons');
-            _ptIconsCache = await resp.json();
-            _ptRenderIcons(_ptIconsCache);
-        } catch (e) {
-            if (grid) grid.innerHTML = '<p class="text-danger text-center py-4">Error loading icons.</p>';
-        }
-    }
-
-    window._ptRenderIcons = function(icons) {
-        const current = document.getElementById('projThumbnailValue').value;
-        const curIcon = current.startsWith('biicon:') ? current.slice(7) : '';
-        const query = (document.getElementById('ptIpSearch')?.value || '').toLowerCase();
-        const filtered = query ? icons.filter(ic => ic.name.includes(query)) : icons;
-        const grid = document.getElementById('ptIpGrid');
-        if (!grid) return;
-        grid.innerHTML = filtered.map(ic => {
-            const sel = ic.name === curIcon ? 'background:color-mix(in srgb, var(--bs-primary) 15%, transparent);outline:2px solid var(--bs-primary);border-radius:4px;' : '';
-            return `<button type="button" style="border:1px solid var(--bs-border-color);border-radius:4px;padding:4px 2px;background:var(--bs-body-bg);color:var(--bs-body-color);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:52px;${sel}" title="${ic.name}" onclick="ptSelectIcon('${ic.name}')"><i class="${ic.class}" style="font-size:18px;"></i><span style="font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${ic.name}</span></button>`;
-        }).join('') || '<p class="text-muted text-center py-4" style="grid-column:1/-1;">No icons found.</p>';
-    };
-
-    window.ptSelectIcon = function(iconName) {
-        document.getElementById('projThumbnailValue').value = 'biicon:' + iconName;
-        _ptUpdatePreview('icon', iconName, '');
-        _ptRenderIcons(_ptIconsCache || []);
-        bootstrap.Modal.getInstance(document.getElementById('projThumbIconPickerModal')).hide();
+        const cur = document.getElementById('projThumbnailValue').value;
+        const curIcon = cur.startsWith('biicon:') ? 'bi-' + cur.slice(7) : '';
+        IconPicker.open(function(iconClass) {
+            const name = iconClass.replace(/^bi-/, '');
+            document.getElementById('projThumbnailValue').value = 'biicon:' + name;
+            _ptUpdatePreview('icon', name, '');
+        }, curIcon);
     };
 
     /* Picture picker (project uploaded pictures) */
@@ -1953,7 +1915,20 @@ function setSfView(view) {
 document.addEventListener('DOMContentLoaded', function () {
     var ta = document.getElementById('projectDescription');
     if (ta) initMdEditor(ta);
+    _initCharCounter('projectDescription', 'projDescCounter', 65535);
 });
+function _initCharCounter(taId, counterId, max) {
+    var ta = document.getElementById(taId);
+    var ct = document.getElementById(counterId);
+    if (!ta || !ct) return;
+    function update() {
+        var len = ta.value.length;
+        ct.textContent = len.toLocaleString() + ' / ' + max.toLocaleString();
+        ct.className = len >= max ? 'text-danger' : len >= max * 0.9 ? 'text-warning' : 'text-muted';
+    }
+    ta.addEventListener('input', update);
+    update();
+}
 </script>
 
 {% endblock %}

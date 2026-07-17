@@ -125,8 +125,8 @@ def projects():
     status_id = request.args.get('status', 0, type=int)
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 25, type=int)
-    if per_page > 999999:
-        per_page = 999999
+    if per_page < 1 or per_page > 100:
+        per_page = 25
 
     query = Project.query
 
@@ -221,6 +221,7 @@ def project_new():
         project = Project(
             name=name,
             info=request.form.get('info', '').strip()[:128],
+            description=request.form.get('description', '').strip()[:65535] or None,
             category_id=cat_id,
             status_id=stat_id,
             quantity=request.form.get('quantity', 1, type=int),
@@ -367,7 +368,7 @@ def project_edit(project_id):
 
         project.name = name
         project.info = request.form.get('info', '').strip()[:128]
-        project.description = request.form.get('description', '').strip()
+        project.description = request.form.get('description', '').strip()[:65535]
         project.category_id = cat_id
         project.status_id = stat_id
         project.quantity = request.form.get('quantity', 1, type=int)
@@ -909,7 +910,7 @@ def cost_item_add(project_id):
         project_id=project.id,
         cost_type=cost_type,
         name=(data.get('name') or '').strip(),
-        description=(data.get('description') or '').strip(),
+        description=(data.get('description') or '').strip()[:512],
         price=price,
         unit_label=(data.get('unit_label') or '').strip(),
         quantity=qty,
@@ -944,7 +945,7 @@ def cost_item_edit(project_id, cost_id):
         return jsonify({'error': 'Invalid price or quantity'}), 400
 
     item.name = name
-    item.description = (data.get('description') or '').strip()
+    item.description = (data.get('description') or '').strip()[:512]
     item.price = price
     item.unit_label = (data.get('unit_label') or '').strip()
     item.quantity = qty
@@ -1010,10 +1011,26 @@ def project_upload(project_id, attachment_type):
     project = Project.query.filter_by(project_id=project_id).first_or_404()
 
     files = request.files.getlist('files')
+
+    # Enforce max number of files per upload (-1=unlimited, 0=disabled, >0=total limit)
+    max_files = int(Setting.get(f'project_upload_{attachment_type}_max_files', '5'))
+    valid_files = [f for f in files if f and f.filename]
+    if max_files == 0:
+        flash('File uploads are currently disabled for this attachment type.', 'danger')
+        return redirect(url_for('project.project_edit', project_id=project_id))
+    if max_files > 0:
+        existing_count = ProjectAttachment.query.filter_by(
+            project_id=project.id, attachment_type=attachment_type).count()
+        if existing_count >= max_files:
+            flash(f'Upload limit reached. This project already has {existing_count} {attachment_type} file(s) (max {max_files}).', 'danger')
+            return redirect(url_for('project.project_edit', project_id=project_id))
+        if existing_count + len(valid_files) > max_files:
+            remaining = max_files - existing_count
+            flash(f'Too many files. Selecting {len(valid_files)} would exceed the limit (max {max_files}, already {existing_count}, room for {remaining} more).', 'danger')
+            return redirect(url_for('project.project_edit', project_id=project_id))
+
     uploaded = 0
-    for file in files:
-        if not file or not file.filename:
-            continue
+    for file in valid_files:
         result, error = save_project_file(file, project.project_id, attachment_type)
         if error:
             flash(error, 'danger')
@@ -1150,7 +1167,7 @@ def project_url_add(project_id):
         project_id=project.id,
         url=url_val,
         title=request.form.get('title', '').strip() or None,
-        description=request.form.get('url_description', '').strip() or None
+        description=request.form.get('url_description', '').strip()[:512] or None
     )
     db.session.add(purl)
     db.session.commit()
@@ -1385,7 +1402,7 @@ def save_project_table_columns():
     try:
         columns = json.loads(columns_json)
         valid_columns = ['project_name', 'info', 'categories', 'tags', 'date_start', 'dateline',
-                         'total_cost', 'status', 'users', 'group', 'project_id']
+                         'total_cost', 'est_total_cost', 'status', 'users', 'group', 'project_id']
         columns = [col for col in columns if col in valid_columns]
         current_user.set_project_table_columns(columns)
         db.session.commit()

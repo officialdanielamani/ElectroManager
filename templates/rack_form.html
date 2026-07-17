@@ -719,40 +719,11 @@ function selectRackIcon(filename, name, url) {
 }
 
 // ── Bootstrap Icon Picker ─────────────────────────────────────────────────
-var _rackBiCache = null;
-
 function openRackBiIconPicker() {
-    const modal = new bootstrap.Modal(document.getElementById('rackBiIconModal'));
-    modal.show();
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('rackBiIconModal')?.addEventListener('show.bs.modal', async function() {
-        if (_rackBiCache) { _rackBiRenderIcons(_rackBiCache); return; }
-        const grid = document.getElementById('rackBiIconGrid');
-        if (grid) grid.innerHTML = '<p class="text-muted text-center py-4">Loading…</p>';
-        try {
-            const resp = await fetch('/api/icons');
-            _rackBiCache = await resp.json();
-            _rackBiRenderIcons(_rackBiCache);
-        } catch(e) {
-            if (grid) grid.innerHTML = '<p class="text-danger text-center py-4">Error loading icons.</p>';
-        }
-    });
-});
-
-function _rackBiRenderIcons(icons) {
-    const query = (document.getElementById('rackBiIconSearch')?.value || '').toLowerCase();
-    const filtered = query ? icons.filter(ic => ic.name.includes(query)) : icons;
-    const grid = document.getElementById('rackBiIconGrid');
-    if (!grid) return;
-    if (!filtered.length) {
-        grid.innerHTML = '<p class="text-muted mb-0" style="grid-column:1/-1;text-align:center;padding:12px 0;">No icons found</p>';
-        return;
-    }
-    grid.innerHTML = filtered.map(ic =>
-        `<button type="button" style="border:1px solid #dee2e6;border-radius:4px;padding:4px 2px;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:52px;" title="${ic.name}" onclick="selectRackBiIcon('${ic.name}')"><i class="${ic.class}" style="font-size:18px;"></i><span style="font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${ic.name}</span></button>`
-    ).join('');
+    const curIcon = document.getElementById('biiconFile')?.value || '';
+    IconPicker.open(function(iconClass) {
+        selectRackBiIcon(iconClass.replace(/^bi-/, ''));
+    }, curIcon ? 'bi-' + curIcon : '');
 }
 
 function selectRackBiIcon(iconName) {
@@ -778,27 +749,8 @@ function selectRackBiIcon(iconName) {
         iEl.innerHTML = `<i class="bi bi-${iconName}" style="font-size:4rem;"></i>`;
     }
     document.getElementById('rackShareIndicator').style.display = 'none';
-    bootstrap.Modal.getInstance(document.getElementById('rackBiIconModal'))?.hide();
 }
 </script>
-
-<!-- Bootstrap Icon Picker Modal -->
-<div class="modal fade" id="rackBiIconModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-star me-2"></i>Select Icon for Rack</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <input type="text" class="form-control form-control-sm mb-3" id="rackBiIconSearch" placeholder="Search icons…" oninput="_rackBiRenderIcons(_rackBiCache||[])">
-                <div id="rackBiIconGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:4px;max-height:400px;overflow-y:auto;">
-                    <p class="text-muted text-center py-4">Loading…</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Icon Share Files Modal -->
 <div class="modal fade" id="iconShareModal" tabindex="-1">

@@ -92,19 +92,6 @@
     color: var(--brd-color, inherit);
 }
 
-/* ── Icon picker ─────────────────────────────────────────── */
-.icon-picker-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
-    gap: 3px; max-height: 340px; overflow-y: auto;
-}
-.icon-opt {
-    text-align: center; padding: .35rem .2rem; border-radius: .3rem; cursor: pointer;
-    font-size: 1.1rem; border: 2px solid transparent;
-}
-.icon-opt:hover { background: var(--bs-secondary-bg); }
-.icon-opt.selected { border-color: var(--bs-primary); background: var(--bs-primary-bg-subtle); }
-.icon-opt small { display: block; font-size: .6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
 /* ── Board listing (drag-reorder) ────────────────────────── */
 .board-listing-item {
     display: flex; align-items: center; gap: .5rem;
@@ -117,11 +104,16 @@
 .board-listing-item .board-name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── Contact picker ──────────────────────────────────────── */
+#selected-contacts {
+    display: flex; flex-wrap: wrap; align-items: center; gap: .2rem;
+}
 .contact-badge {
     display: inline-flex; align-items: center; gap: .25rem;
     background: var(--bs-secondary-bg); border: 1px solid var(--bs-border-color);
-    border-radius: 999px; padding: .15rem .5rem; font-size: .8rem; margin: .15rem .15rem 0 0;
+    border-radius: 999px; padding: .15rem .5rem; font-size: .8rem;
+    line-height: 1.2; white-space: nowrap;
 }
+.contact-badge img { display: block; flex-shrink: 0; }
 .contact-badge .remove-contact { cursor: pointer; color: var(--bs-danger); font-size: .85rem; }
 
 /* ── Board settings category list ───────────────────────── */
@@ -351,7 +343,7 @@
                     {# Updated timestamp — hidden when tasks are collapsed #}
                     {% if card.updated_at %}
                     <div class="card-dates-row card-updated-row" style="border-top:1px solid var(--bs-border-color,#dee2e6)">
-                        <span><i class="bi bi-pencil" style="font-size:.65rem"></i> <time class="js-utc-ts" data-utc="{{ card.updated_at.strftime('%Y-%m-%dT%H:%M:%SZ') }}">{{ card.updated_at.strftime('%d %b %Y | %H:%M') }}</time>{% if card.updated_by %} · {{ (card.updated_by.name or '') }}{% endif %}</span>
+                        <span><time class="js-utc-ts" data-utc="{{ card.updated_at.strftime('%Y-%m-%dT%H:%M:%SZ') }}">{{ card.updated_at.strftime('%d %b %Y | %H:%M') }}</time>{% if card.updated_by %} · {{ (card.updated_by.name or '') }}{% endif %}</span>
                     </div>
                     {% endif %}
                     {# Key persons #}
@@ -740,20 +732,7 @@
     </div></div>
 </div>
 
-{# ── Icon Picker ───────────────────────────────── #}
-<div class="modal fade" id="colIconPickerModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
-        <div class="modal-header">
-            <h5 class="modal-title"><i class="bi bi-grid-3x3-gap"></i> Pick Icon</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-            <input type="text" class="form-control form-control-sm mb-3" id="colIconSearch"
-                   placeholder="Search icons…">
-            <div id="colIconGrid"><p class="text-muted text-center py-4">Loading…</p></div>
-        </div>
-    </div></div>
-</div>
+
 
 {# ── Delete Column Confirm ─────────────────────── #}
 <div class="modal fade" id="deleteColModal" tabindex="-1">
@@ -769,23 +748,6 @@
         <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
             <button type="button" class="btn btn-danger" id="btn-delete-col">Delete</button>
-        </div>
-    </div></div>
-</div>
-
-{# ── Shared Icon Picker ───────────────────────── #}
-<div class="modal fade" id="iconPickerModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
-        <div class="modal-header">
-            <h5 class="modal-title"><i class="bi bi-grid-3x3-gap"></i> Pick Icon</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-            <input type="text" class="form-control form-control-sm mb-3" id="iconPickerSearch"
-                   placeholder="Search icons…">
-            <div class="icon-picker-grid" id="iconPickerGrid">
-                <p class="text-muted text-center py-4">Loading…</p>
-            </div>
         </div>
     </div></div>
 </div>
@@ -935,6 +897,41 @@
                 </div>
             </div>
 
+            <hr>
+
+            {# Uploads section #}
+            <div class="mb-3">
+                <label class="form-label fw-semibold"><i class="bi bi-paperclip"></i> Uploads</label>
+                <div id="card-attachments" class="mb-2">
+                    <small class="text-muted">No files attached.</small>
+                </div>
+                <div id="card-upload-section" style="display:none;">
+                    <div class="d-flex align-items-center gap-2 mt-1">
+                        <input type="file" id="card-file-input" class="form-control form-control-sm flex-grow-1" multiple>
+                        <button type="button" class="btn btn-sm btn-primary flex-shrink-0" onclick="uploadCardFiles()">
+                            <i class="bi bi-upload"></i> Upload
+                        </button>
+                    </div>
+                    <small class="text-muted d-block mt-1" id="card-upload-hint"></small>
+                </div>
+            </div>
+
+            <hr>
+
+            {# Share Files section #}
+            <div class="mb-3">
+                <label class="form-label fw-semibold"><i class="bi bi-folder-fill text-warning"></i> Share Files</label>
+                <div id="card-linked-share-files" class="d-flex flex-wrap gap-2 mb-2">
+                    <small class="text-muted" id="card-sf-empty">No share files linked.</small>
+                </div>
+                <div id="card-sf-browse-wrap" style="display:none;">
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            onclick="openKanbanSfPicker()">
+                        <i class="bi bi-folder2-open"></i> Browse Share Files
+                    </button>
+                </div>
+            </div>
+
             {# Card created / updated timestamps #}
             <div id="card-modal-timestamps" class="mt-3 pt-2 border-top text-muted" style="font-size:.8rem">
                 <div id="card-modal-created-info"></div>
@@ -954,8 +951,343 @@
     </div></div>
 </div>
 
+{# ── Kanban Image Lightbox Modal ──────────────── #}
+<div class="modal fade" id="kanbanImageModal" tabindex="-1" style="z-index:1090;">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title mb-0" id="kanbanImageModalLabel"></h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center p-2">
+                <img id="kanbanModalImage" src="" class="img-fluid rounded" alt="" style="max-height:80vh;">
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── Kanban Share File Picker Modal ───────────── #}
+<div class="modal fade" id="kanbanSfPickerModal" tabindex="-1" style="z-index:1092;">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-folder-fill text-warning"></i> Select Share Files</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                {# Toolbar #}
+                <div class="d-flex gap-2 align-items-center mb-2 flex-wrap">
+                    <div class="input-group input-group-sm" style="max-width:260px;">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="knsfSearch"
+                               placeholder="Search files…" oninput="knsfFilter(this.value)">
+                        <button class="btn btn-outline-secondary" type="button"
+                                onclick="document.getElementById('knsfSearch').value=''; knsfFilter('');">×</button>
+                    </div>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary active" id="knsfViewCard"
+                                onclick="knsfSetView('card')" title="Card view">
+                            <i class="bi bi-grid-3x3-gap"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="knsfViewList"
+                                onclick="knsfSetView('list')" title="List view">
+                            <i class="bi bi-list-ul"></i>
+                        </button>
+                    </div>
+                    <span class="text-muted small ms-auto" id="knsfSelectedCount">0 selected</span>
+                </div>
+                {# Category tabs #}
+                <ul class="nav nav-tabs mb-3" id="knsfCatTabs">
+                    <li class="nav-item">
+                        <button class="nav-link active" data-cat="item" onclick="knsfSetCat('item')">
+                            <i class="bi bi-box-seam"></i> Item
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-cat="project" onclick="knsfSetCat('project')">
+                            <i class="bi bi-diagram-3"></i> Project
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-cat="icon" onclick="knsfSetCat('icon')">
+                            <i class="bi bi-image"></i> Icon
+                        </button>
+                    </li>
+                </ul>
+                {# Item panel #}
+                <div id="knsfPanel-item" class="knsf-panel">
+                    {% if share_files_item %}
+                    <div id="knsfCardView-item" class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3">
+                        {% for sf in share_files_item %}
+                        <div class="col knsf-picker-item" data-name="{{ sf.name|lower }}.{{ sf.ext }}">
+                            <div class="card h-100 shadow-sm position-relative knsf-picker-card"
+                                 id="knsfpcard_{{ sf.id }}"
+                                 data-sf-id="{{ sf.id }}"
+                                 data-sf-name="{{ sf.name }}"
+                                 data-sf-image="{{ 'true' if sf.is_image else 'false' }}"
+                                 data-sf-category="item"
+                                 data-sf-filename="{{ sf.filename }}"
+                                 style="cursor:pointer;"
+                                 onclick="knsfTogglePick(this)">
+                                <div class="position-absolute top-0 start-0 p-1" style="z-index:2;pointer-events:none;">
+                                    <span class="knsf-check-icon d-none">
+                                        <i class="bi bi-check-circle-fill text-success" style="font-size:1.1rem;filter:drop-shadow(0 0 2px #fff);"></i>
+                                    </span>
+                                </div>
+                                <div class="card-img-top d-flex align-items-center justify-content-center bg-light"
+                                     style="width:100%;aspect-ratio:1/1;overflow:hidden;pointer-events:none;">
+                                    {% if sf.is_image %}
+                                    <img src="{{ url_for('share.share_serve', category='item', filename=sf.filename) }}"
+                                         alt="{{ sf.name }}" style="width:100%;height:100%;object-fit:cover;">
+                                    {% else %}
+                                    {% set ext = sf.ext %}
+                                    {% if ext == 'pdf' %}<i class="bi bi-file-earmark-pdf text-danger" style="font-size:2.5rem;"></i>
+                                    {% elif ext in ['doc','docx'] %}<i class="bi bi-file-earmark-word text-primary" style="font-size:2.5rem;"></i>
+                                    {% elif ext in ['txt','md'] %}<i class="bi bi-file-earmark-text text-secondary" style="font-size:2.5rem;"></i>
+                                    {% else %}<i class="bi bi-file-earmark text-muted" style="font-size:2.5rem;"></i>
+                                    {% endif %}
+                                    {% endif %}
+                                </div>
+                                <div class="card-body p-1" style="pointer-events:none;">
+                                    <p class="card-text small fw-semibold text-truncate mb-0" title="{{ sf.name }}.{{ sf.ext }}">{{ sf.name }}</p>
+                                    <small class="text-muted">{{ sf.ext|upper }} · {{ sf.size_display() }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div id="knsfListView-item" class="d-none">
+                        <table class="table table-hover align-middle table-sm">
+                            <thead class="table-light"><tr>
+                                <th width="36"></th><th width="44">Preview</th>
+                                <th>Name</th><th>Type</th><th>Size</th>
+                            </tr></thead>
+                            <tbody>
+                                {% for sf in share_files_item %}
+                                <tr class="knsf-picker-item knsf-picker-row"
+                                    data-name="{{ sf.name|lower }}.{{ sf.ext }}"
+                                    data-sf-id="{{ sf.id }}"
+                                    data-sf-name="{{ sf.name }}"
+                                    data-sf-image="{{ 'true' if sf.is_image else 'false' }}"
+                                    data-sf-category="item"
+                                    data-sf-filename="{{ sf.filename }}"
+                                    style="cursor:pointer;"
+                                    onclick="knsfTogglePickRow(this)">
+                                    <td>
+                                        <span class="knsf-check-icon d-none"><i class="bi bi-check-circle-fill text-success"></i></span>
+                                        <span class="knsf-uncheck-icon"><i class="bi bi-circle text-muted"></i></span>
+                                    </td>
+                                    <td>
+                                        {% if sf.is_image %}
+                                        <img src="{{ url_for('share.share_serve', category='item', filename=sf.filename) }}"
+                                             alt="{{ sf.name }}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;">
+                                        {% else %}
+                                        {% set ext = sf.ext %}
+                                        {% if ext == 'pdf' %}<i class="bi bi-file-earmark-pdf text-danger fs-4"></i>
+                                        {% elif ext in ['doc','docx'] %}<i class="bi bi-file-earmark-word text-primary fs-4"></i>
+                                        {% elif ext in ['txt','md'] %}<i class="bi bi-file-earmark-text text-secondary fs-4"></i>
+                                        {% else %}<i class="bi bi-file-earmark text-muted fs-4"></i>
+                                        {% endif %}
+                                        {% endif %}
+                                    </td>
+                                    <td><span class="fw-semibold">{{ sf.name }}</span></td>
+                                    <td><span class="badge bg-secondary">{{ sf.ext|upper }}</span></td>
+                                    <td><small class="text-muted">{{ sf.size_display() }}</small></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4">No share files in the Item category yet.</p>
+                    {% endif %}
+                </div>
+                {# Project panel #}
+                <div id="knsfPanel-project" class="knsf-panel d-none">
+                    {% if share_files_project %}
+                    <div id="knsfCardView-project" class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3">
+                        {% for sf in share_files_project %}
+                        <div class="col knsf-picker-item" data-name="{{ sf.name|lower }}.{{ sf.ext }}">
+                            <div class="card h-100 shadow-sm position-relative knsf-picker-card"
+                                 id="knsfpcard_{{ sf.id }}"
+                                 data-sf-id="{{ sf.id }}"
+                                 data-sf-name="{{ sf.name }}"
+                                 data-sf-image="{{ 'true' if sf.is_image else 'false' }}"
+                                 data-sf-category="project"
+                                 data-sf-filename="{{ sf.filename }}"
+                                 style="cursor:pointer;"
+                                 onclick="knsfTogglePick(this)">
+                                <div class="position-absolute top-0 start-0 p-1" style="z-index:2;pointer-events:none;">
+                                    <span class="knsf-check-icon d-none">
+                                        <i class="bi bi-check-circle-fill text-success" style="font-size:1.1rem;filter:drop-shadow(0 0 2px #fff);"></i>
+                                    </span>
+                                </div>
+                                <div class="card-img-top d-flex align-items-center justify-content-center bg-light"
+                                     style="width:100%;aspect-ratio:1/1;overflow:hidden;pointer-events:none;">
+                                    {% if sf.is_image %}
+                                    <img src="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}"
+                                         alt="{{ sf.name }}" style="width:100%;height:100%;object-fit:cover;">
+                                    {% else %}
+                                    {% set ext = sf.ext %}
+                                    {% if ext == 'pdf' %}<i class="bi bi-file-earmark-pdf text-danger" style="font-size:2.5rem;"></i>
+                                    {% elif ext in ['doc','docx'] %}<i class="bi bi-file-earmark-word text-primary" style="font-size:2.5rem;"></i>
+                                    {% elif ext in ['txt','md'] %}<i class="bi bi-file-earmark-text text-secondary" style="font-size:2.5rem;"></i>
+                                    {% else %}<i class="bi bi-file-earmark text-muted" style="font-size:2.5rem;"></i>
+                                    {% endif %}
+                                    {% endif %}
+                                </div>
+                                <div class="card-body p-1" style="pointer-events:none;">
+                                    <p class="card-text small fw-semibold text-truncate mb-0" title="{{ sf.name }}.{{ sf.ext }}">{{ sf.name }}</p>
+                                    <small class="text-muted">{{ sf.ext|upper }} · {{ sf.size_display() }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div id="knsfListView-project" class="d-none">
+                        <table class="table table-hover align-middle table-sm">
+                            <thead class="table-light"><tr>
+                                <th width="36"></th><th width="44">Preview</th>
+                                <th>Name</th><th>Type</th><th>Size</th>
+                            </tr></thead>
+                            <tbody>
+                                {% for sf in share_files_project %}
+                                <tr class="knsf-picker-item knsf-picker-row"
+                                    data-name="{{ sf.name|lower }}.{{ sf.ext }}"
+                                    data-sf-id="{{ sf.id }}"
+                                    data-sf-name="{{ sf.name }}"
+                                    data-sf-image="{{ 'true' if sf.is_image else 'false' }}"
+                                    data-sf-category="project"
+                                    data-sf-filename="{{ sf.filename }}"
+                                    style="cursor:pointer;"
+                                    onclick="knsfTogglePickRow(this)">
+                                    <td>
+                                        <span class="knsf-check-icon d-none"><i class="bi bi-check-circle-fill text-success"></i></span>
+                                        <span class="knsf-uncheck-icon"><i class="bi bi-circle text-muted"></i></span>
+                                    </td>
+                                    <td>
+                                        {% if sf.is_image %}
+                                        <img src="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}"
+                                             alt="{{ sf.name }}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;">
+                                        {% else %}
+                                        {% set ext = sf.ext %}
+                                        {% if ext == 'pdf' %}<i class="bi bi-file-earmark-pdf text-danger fs-4"></i>
+                                        {% elif ext in ['doc','docx'] %}<i class="bi bi-file-earmark-word text-primary fs-4"></i>
+                                        {% elif ext in ['txt','md'] %}<i class="bi bi-file-earmark-text text-secondary fs-4"></i>
+                                        {% else %}<i class="bi bi-file-earmark text-muted fs-4"></i>
+                                        {% endif %}
+                                        {% endif %}
+                                    </td>
+                                    <td><span class="fw-semibold">{{ sf.name }}</span></td>
+                                    <td><span class="badge bg-secondary">{{ sf.ext|upper }}</span></td>
+                                    <td><small class="text-muted">{{ sf.size_display() }}</small></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4">No share files in the Project category yet.</p>
+                    {% endif %}
+                </div>
+                {# Icon panel #}
+                <div id="knsfPanel-icon" class="knsf-panel d-none">
+                    {% if share_files_icon %}
+                    <div id="knsfCardView-icon" class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3">
+                        {% for sf in share_files_icon %}
+                        <div class="col knsf-picker-item" data-name="{{ sf.name|lower }}.{{ sf.ext }}">
+                            <div class="card h-100 shadow-sm position-relative knsf-picker-card"
+                                 id="knsfpcard_{{ sf.id }}"
+                                 data-sf-id="{{ sf.id }}"
+                                 data-sf-name="{{ sf.name }}"
+                                 data-sf-image="{{ 'true' if sf.is_image else 'false' }}"
+                                 data-sf-category="icon"
+                                 data-sf-filename="{{ sf.filename }}"
+                                 style="cursor:pointer;"
+                                 onclick="knsfTogglePick(this)">
+                                <div class="position-absolute top-0 start-0 p-1" style="z-index:2;pointer-events:none;">
+                                    <span class="knsf-check-icon d-none">
+                                        <i class="bi bi-check-circle-fill text-success" style="font-size:1.1rem;filter:drop-shadow(0 0 2px #fff);"></i>
+                                    </span>
+                                </div>
+                                <div class="card-img-top d-flex align-items-center justify-content-center bg-light"
+                                     style="width:100%;aspect-ratio:1/1;overflow:hidden;pointer-events:none;">
+                                    {% if sf.is_image %}
+                                    <img src="{{ url_for('share.share_serve', category='icon', filename=sf.filename) }}"
+                                         alt="{{ sf.name }}" style="width:100%;height:100%;object-fit:cover;">
+                                    {% else %}
+                                    {% set ext = sf.ext %}
+                                    {% if ext == 'pdf' %}<i class="bi bi-file-earmark-pdf text-danger" style="font-size:2.5rem;"></i>
+                                    {% elif ext in ['doc','docx'] %}<i class="bi bi-file-earmark-word text-primary" style="font-size:2.5rem;"></i>
+                                    {% elif ext in ['txt','md'] %}<i class="bi bi-file-earmark-text text-secondary" style="font-size:2.5rem;"></i>
+                                    {% else %}<i class="bi bi-file-earmark text-muted" style="font-size:2.5rem;"></i>
+                                    {% endif %}
+                                    {% endif %}
+                                </div>
+                                <div class="card-body p-1" style="pointer-events:none;">
+                                    <p class="card-text small fw-semibold text-truncate mb-0" title="{{ sf.name }}.{{ sf.ext }}">{{ sf.name }}</p>
+                                    <small class="text-muted">{{ sf.ext|upper }} · {{ sf.size_display() }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div id="knsfListView-icon" class="d-none">
+                        <table class="table table-hover align-middle table-sm">
+                            <thead class="table-light"><tr>
+                                <th width="36"></th><th width="44">Preview</th>
+                                <th>Name</th><th>Type</th><th>Size</th>
+                            </tr></thead>
+                            <tbody>
+                                {% for sf in share_files_icon %}
+                                <tr class="knsf-picker-item knsf-picker-row"
+                                    data-name="{{ sf.name|lower }}.{{ sf.ext }}"
+                                    data-sf-id="{{ sf.id }}"
+                                    data-sf-name="{{ sf.name }}"
+                                    data-sf-image="{{ 'true' if sf.is_image else 'false' }}"
+                                    data-sf-category="icon"
+                                    data-sf-filename="{{ sf.filename }}"
+                                    style="cursor:pointer;"
+                                    onclick="knsfTogglePickRow(this)">
+                                    <td>
+                                        <span class="knsf-check-icon d-none"><i class="bi bi-check-circle-fill text-success"></i></span>
+                                        <span class="knsf-uncheck-icon"><i class="bi bi-circle text-muted"></i></span>
+                                    </td>
+                                    <td>
+                                        {% if sf.is_image %}
+                                        <img src="{{ url_for('share.share_serve', category='icon', filename=sf.filename) }}"
+                                             alt="{{ sf.name }}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;">
+                                        {% else %}
+                                        {% set ext = sf.ext %}
+                                        {% if ext == 'pdf' %}<i class="bi bi-file-earmark-pdf text-danger fs-4"></i>
+                                        {% elif ext in ['doc','docx'] %}<i class="bi bi-file-earmark-word text-primary fs-4"></i>
+                                        {% elif ext in ['txt','md'] %}<i class="bi bi-file-earmark-text text-secondary fs-4"></i>
+                                        {% else %}<i class="bi bi-file-earmark text-muted fs-4"></i>
+                                        {% endif %}
+                                        {% endif %}
+                                    </td>
+                                    <td><span class="fw-semibold">{{ sf.name }}</span></td>
+                                    <td><span class="badge bg-secondary">{{ sf.ext|upper }}</span></td>
+                                    <td><small class="text-muted">{{ sf.size_display() }}</small></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4">No share files in the Icon category yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {# ── Task Edit Modal ───────────────────────────── #}
-<div class="modal fade" id="taskEditModal" tabindex="-1">
+<div class="modal fade" id="taskEditModal" tabindex="-1" data-bs-backdrop="false">
     <div class="modal-dialog modal-sm"><div class="modal-content">
         <div class="modal-header">
             <h5 class="modal-title" style="font-size:.95rem">
@@ -997,7 +1329,11 @@ const LOGOUT_URL    = '{{ url_for("auth.logout") }}';
 const CAN_SHARE_BOARD = {{ can_share_board | tojson }};
 const IS_OWNER        = {{ is_owner | tojson }};
 const ACTIVE_SHARE_TYPE = {{ active_share_type | tojson }};
-const CAN_EDIT = IS_OWNER || ACTIVE_SHARE_TYPE === 'edit';
+const CAN_EDIT   = IS_OWNER || ACTIVE_SHARE_TYPE === 'edit';
+const CAN_UPLOAD = IS_OWNER || ACTIVE_SHARE_TYPE === 'edit' || ACTIVE_SHARE_TYPE === 'view';
+const KANBAN_UPLOAD_EXTS     = {{ kanban_upload_exts | tojson }};
+const KANBAN_UPLOAD_MAX_SIZE = {{ kanban_upload_max_size | tojson }};
+const KANBAN_UPLOAD_MAX_FILES = {{ kanban_upload_max_files | tojson }};
 const CURRENT_USER_ID   = {{ current_user.id | tojson }};
 const CURRENT_USER_NAME = {{ (current_user.name or current_user.username) | tojson }};
 
@@ -1167,13 +1503,6 @@ document.addEventListener('click', function(e) {
     const contactRow = e.target.closest('.js-contact-result');
     if (contactRow) {
         addContact(parseInt(contactRow.dataset.id), contactRow.dataset.name, contactRow.dataset.type, contactRow.dataset.pic || '');
-        return;
-    }
-
-    // Shared icon picker pick
-    const iconOpt = e.target.closest('.js-pick-icon');
-    if (iconOpt) {
-        _onPickIcon(iconOpt.dataset.icon);
         return;
     }
 
@@ -1455,7 +1784,7 @@ document.addEventListener('click', function(e) {
 
 // Board icon picker button
 document.getElementById('btn-open-board-icon-picker')?.addEventListener('click', () => {
-    openIconPicker(icon => {
+    IconPicker.open(icon => {
         _selectedBoardIcon = icon;
         document.getElementById('settings-board-icon').value = icon;
         document.getElementById('settings-board-icon-preview').className = 'bi ' + icon;
@@ -1906,63 +2235,9 @@ function editCol(id, name, color, icon) {
     setTimeout(() => getModal('colModal').show(), 200);
 }
 
-// ── Shared icon picker (callback-based) ─────────────────────────
-let _allIconsCache = null;
-let _iconPickerCallback = null;   // set before opening; called with chosen iconClass
-let _iconPickerSelected = '';
-
-function openIconPicker(callback, currentIcon) {
-    _iconPickerCallback = callback;
-    _iconPickerSelected = (currentIcon || '').replace(/^bi-/, '');
-    getModal('iconPickerModal').show();
-    if (!_allIconsCache) loadAllIcons(); else renderIconGrid();
-}
-
-async function loadAllIcons() {
-    document.getElementById('iconPickerGrid').innerHTML =
-        '<p class="text-muted text-center py-4">Loading…</p>';
-    try {
-        const r = await fetch('/api/icons');
-        _allIconsCache = await r.json();
-        renderIconGrid();
-    } catch(e) {
-        document.getElementById('iconPickerGrid').innerHTML =
-            '<p class="text-danger text-center py-4">Error loading icons.</p>';
-    }
-}
-
-function renderIconGrid() {
-    const grid = document.getElementById('iconPickerGrid');
-    if (!grid || !_allIconsCache) return;
-    const q = (document.getElementById('iconPickerSearch')?.value || '').toLowerCase();
-    const filtered = q ? _allIconsCache.filter(ic => ic.name.includes(q)) : _allIconsCache;
-    // Show first 240 unfiltered; show all when searching
-    const visible = q ? filtered : filtered.slice(0, 240);
-    grid.innerHTML = visible.map(ic =>
-        `<div class="icon-opt js-pick-icon${ic.name === _iconPickerSelected ? ' selected' : ''}"
-              data-icon="bi-${escHtml(ic.name)}" title="${escHtml(ic.name)}">
-            <i class="bi bi-${escHtml(ic.name)}"></i>
-            <small>${escHtml(ic.name)}</small>
-        </div>`
-    ).join('') +
-    (!q && filtered.length > 240
-        ? `<p class="text-muted text-center py-2 small" style="grid-column:1/-1">
-               Showing 240 of ${filtered.length} — search to filter</p>` : '') ||
-    '<p class="text-muted text-center py-4" style="grid-column:1/-1">No icons found.</p>';
-}
-
-document.getElementById('iconPickerSearch')?.addEventListener('input', renderIconGrid);
-
-// js-pick-icon handler is in the main delegation; route to callback
-function _onPickIcon(iconClass) {
-    _iconPickerSelected = iconClass.replace(/^bi-/, '');
-    if (_iconPickerCallback) { _iconPickerCallback(iconClass); _iconPickerCallback = null; }
-    hideModal('iconPickerModal');
-}
-
 // Wire column icon picker button to shared picker
 document.getElementById('btn-open-col-icon-picker')?.addEventListener('click', () => {
-    openIconPicker(icon => setColIcon(icon), _selectedColIcon);
+    IconPicker.open(icon => setColIcon(icon), _selectedColIcon);
 });
 
 document.getElementById('btn-save-col')?.addEventListener('click', async () => {
@@ -2102,8 +2377,8 @@ function renderSelectedContacts() {
     div.innerHTML = _selectedContacts.map(c => {
         const picUrl = c.pic || (c.type === 'user' ? _lookupContactPic(c.id) : '');
         const avatar = picUrl
-            ? `<img src="${escHtml(picUrl)}" style="width:18px;height:18px;border-radius:50%;object-fit:cover;flex-shrink:0;vertical-align:middle" alt="">`
-            : `<i class="bi ${_contactIcon(c.type)} text-muted" style="font-size:.75rem"></i>`;
+            ? `<img src="${escHtml(picUrl)}" style="width:18px;height:18px;border-radius:50%;object-fit:cover;" alt="">`
+            : `<i class="bi ${_contactIcon(c.type)} text-muted" style="font-size:.75rem;line-height:1;"></i>`;
         return `<span class="contact-badge">
             ${avatar}
             ${escHtml(c.name)}
@@ -2166,6 +2441,8 @@ function _updateCardModalTimestamps(card) {
 let _currentCardId = null;
 let _currentBoardCategories = [];
 let _editingCardId = null;
+let _cardShareFileIds = new Set();
+let _cardAttachmentCount = 0;
 
 async function openCard(cardId) {
     try {
@@ -2232,6 +2509,10 @@ function populateCardModal(card) {
     updateMarkDoneState(card.task_count, card.completed_task_count);
     _applyCardModalReadOnly(!CAN_EDIT);
     _updateCardModalTimestamps(card);
+    renderCardAttachments(card.attachments || []);
+    renderCardSfChips(card.share_files || []);
+    const browseWrap = document.getElementById('card-sf-browse-wrap');
+    if (browseWrap) browseWrap.style.display = CAN_EDIT ? '' : 'none';
 }
 
 function renderModalTaskList(tasks, total, done) {
@@ -2327,18 +2608,306 @@ async function refreshModalTasks() {
     _updateCardModalTimestamps(card);
 }
 
+// ── Card attachments ─────────────────────────────────────────────
+
+function renderCardAttachments(attachments) {
+    _cardAttachmentCount = (attachments || []).length;
+    const container = document.getElementById('card-attachments');
+    const section   = document.getElementById('card-upload-section');
+    const hint      = document.getElementById('card-upload-hint');
+
+    if (section) section.style.display = CAN_UPLOAD ? '' : 'none';
+    if (hint) {
+        const maxF = KANBAN_UPLOAD_MAX_FILES === -1 ? 'unlimited'
+                   : KANBAN_UPLOAD_MAX_FILES === 0  ? 'disabled'
+                   : KANBAN_UPLOAD_MAX_FILES;
+        hint.textContent = `Allowed: ${KANBAN_UPLOAD_EXTS} | Max: ${KANBAN_UPLOAD_MAX_SIZE} MB per file | Max files: ${maxF}`;
+    }
+
+    if (!container) return;
+    if (!attachments || attachments.length === 0) {
+        container.innerHTML = '<small class="text-muted">No files attached.</small>';
+        return;
+    }
+
+    const imgExts = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']);
+    const images  = attachments.filter(a => imgExts.has(a.file_type));
+    const others  = attachments.filter(a => !imgExts.has(a.file_type));
+
+    let html = '';
+
+    if (images.length) {
+        html += '<div class="d-flex flex-wrap gap-2 mb-2">';
+        images.forEach(a => {
+            const delBtn = CAN_UPLOAD
+                ? `<button type="button" class="position-absolute top-0 end-0 btn btn-danger p-0 js-del-attachment"
+                       data-id="${a.id}" style="width:18px;height:18px;font-size:.6rem;line-height:1;">×</button>`
+                : '';
+            html += `<div class="position-relative" style="width:72px;height:72px;flex-shrink:0;cursor:pointer;">
+                <img src="/uploads/${escHtml(a.filename)}" alt="${escHtml(a.original_filename)}"
+                     class="rounded border js-preview-img"
+                     data-src="/uploads/${escHtml(a.filename)}"
+                     data-title="${escHtml(a.original_filename)}"
+                     style="width:72px;height:72px;object-fit:cover;"
+                     title="${escHtml(a.original_filename)}">
+                ${delBtn}
+            </div>`;
+        });
+        html += '</div>';
+    }
+
+    if (others.length) {
+        others.forEach(a => {
+            const sizeMb  = (a.file_size / 1048576).toFixed(2);
+            const icon    = a.file_type === 'pdf'  ? 'bi-file-earmark-pdf text-danger'
+                          : a.file_type === 'txt'  ? 'bi-file-earmark-text text-secondary'
+                          : 'bi-file-earmark text-muted';
+            const delBtn  = CAN_UPLOAD
+                ? `<button type="button" class="btn btn-link btn-sm p-0 text-danger ms-2 js-del-attachment"
+                       data-id="${a.id}" title="Delete"><i class="bi bi-trash"></i></button>`
+                : '';
+            html += `<div class="d-flex align-items-center py-1 border-bottom small">
+                <i class="bi ${icon} me-2"></i>
+                <a href="/uploads/${escHtml(a.filename)}" target="_blank"
+                   class="flex-grow-1 text-truncate">${escHtml(a.original_filename)}</a>
+                <span class="text-muted ms-2 text-nowrap">${sizeMb} MB</span>
+                ${delBtn}
+            </div>`;
+        });
+    }
+
+    container.innerHTML = html;
+    container.querySelectorAll('.js-del-attachment').forEach(btn => {
+        btn.addEventListener('click', () => deleteCardAttachment(parseInt(btn.dataset.id)));
+    });
+    container.querySelectorAll('.js-preview-img').forEach(img => {
+        img.addEventListener('click', () => openKanbanImageModal(img.dataset.src, img.dataset.title));
+    });
+}
+
+function openKanbanImageModal(src, title) {
+    document.getElementById('kanbanModalImage').src = src;
+    document.getElementById('kanbanImageModalLabel').textContent = title;
+    new bootstrap.Modal(document.getElementById('kanbanImageModal')).show();
+}
+
+async function uploadCardFiles() {
+    if (!_currentCardId) return;
+    const input = document.getElementById('card-file-input');
+    const files = input?.files;
+    if (!files || files.length === 0) { alert('Please select files to upload.'); return; }
+
+    if (KANBAN_UPLOAD_MAX_FILES === 0) {
+        alert('File uploads are currently disabled by the administrator.');
+        return;
+    }
+    if (KANBAN_UPLOAD_MAX_FILES > 0) {
+        if (_cardAttachmentCount >= KANBAN_UPLOAD_MAX_FILES) {
+            alert(`Upload limit reached. This card already has ${_cardAttachmentCount} file(s) (max ${KANBAN_UPLOAD_MAX_FILES}).`);
+            return;
+        }
+        if (_cardAttachmentCount + files.length > KANBAN_UPLOAD_MAX_FILES) {
+            const remaining = KANBAN_UPLOAD_MAX_FILES - _cardAttachmentCount;
+            alert(`Too many files. Selecting ${files.length} would exceed the limit (max ${KANBAN_UPLOAD_MAX_FILES}, already ${_cardAttachmentCount}, room for ${remaining} more).`);
+            return;
+        }
+    }
+
+    const fd = new FormData();
+    for (const f of files) fd.append('files', f);
+
+    try {
+        const r    = await fetch(`/kanban/cards/${_currentCardId}/upload`,
+                                 { method: 'POST', headers: { 'X-CSRFToken': CSRF }, body: fd });
+        const data = await r.json();
+        if (data.errors?.length) {
+            const prefix = data.uploaded > 0 ? `${data.uploaded} file(s) uploaded.\n\nRejected:\n` : '';
+            alert(prefix + '• ' + data.errors.join('\n• '));
+        }
+        const card = await api('GET', '/kanban/cards/' + _currentCardId);
+        renderCardAttachments(card.attachments);
+        if (input) input.value = '';
+    } catch(e) { showErr(e.message); }
+}
+
+async function deleteCardAttachment(id) {
+    if (!confirm('Delete this file?')) return;
+    try {
+        await api('DELETE', '/kanban/cards/attachments/' + id);
+        const card = await api('GET', '/kanban/cards/' + _currentCardId);
+        renderCardAttachments(card.attachments);
+    } catch(e) { showErr(e.message); }
+}
+
+// ── Card share files ─────────────────────────────────────────────
+
+function renderCardSfChips(shareFiles) {
+    _cardShareFileIds = new Set((shareFiles || []).map(sf => sf.id));
+    const container = document.getElementById('card-linked-share-files');
+    const empty = document.getElementById('card-sf-empty');
+    if (!container) return;
+    container.querySelectorAll('.knsf-chip').forEach(el => el.remove());
+    if (!shareFiles || shareFiles.length === 0) {
+        if (empty) empty.style.display = '';
+        return;
+    }
+    if (empty) empty.style.display = 'none';
+    shareFiles.forEach(sf => _addKanbanSfChip(sf.id, sf.name, sf.is_image, sf.category, sf.filename));
+}
+
+function _addKanbanSfChip(id, name, isImage, category, filename) {
+    if (document.getElementById('knsf_chip_' + id)) return;
+    const container = document.getElementById('card-linked-share-files');
+    const empty = document.getElementById('card-sf-empty');
+    if (empty) empty.style.display = 'none';
+    const imgUrl = `/uploads/share/${category}/${filename}`;
+    const div = document.createElement('div');
+    div.className = 'position-relative border rounded p-1 bg-light d-flex align-items-center justify-content-center knsf-chip';
+    div.id = 'knsf_chip_' + id;
+    div.style.cssText = 'width:80px;height:80px;overflow:hidden;flex-shrink:0;';
+    const inner = isImage
+        ? `<img src="${imgUrl}" alt="${escHtml(name)}" style="width:100%;height:100%;object-fit:cover;border-radius:4px;">`
+        : `<div class="text-center"><i class="bi bi-file-earmark text-muted" style="font-size:1.5rem;"></i><div class="text-truncate" style="font-size:0.65rem;max-width:72px;">${escHtml(name)}</div></div>`;
+    div.innerHTML = inner + (CAN_EDIT
+        ? `<button type="button" class="position-absolute top-0 end-0 btn btn-danger btn-sm p-0"
+               style="width:18px;height:18px;font-size:0.6rem;line-height:1;"
+               onclick="removeKanbanSfChip(${id})">×</button>`
+        : '');
+    container.appendChild(div);
+    _cardShareFileIds.add(id);
+    _knsfUpdateCount();
+}
+
+function removeKanbanSfChip(id) {
+    const chip = document.getElementById('knsf_chip_' + id);
+    if (chip) chip.remove();
+    _cardShareFileIds.delete(id);
+    const empty = document.getElementById('card-sf-empty');
+    if (empty && _cardShareFileIds.size === 0) empty.style.display = '';
+    const card = document.getElementById('knsfpcard_' + id);
+    if (card) _knsfSetCardSel(card, false);
+    const row = document.querySelector('.knsf-picker-row[data-sf-id="' + id + '"]');
+    if (row) _knsfSetRowSel(row, false);
+    _knsfUpdateCount();
+}
+
+function openKanbanSfPicker() {
+    _knsfSyncState();
+    new bootstrap.Modal(document.getElementById('kanbanSfPickerModal')).show();
+}
+
+function _knsfSyncState() {
+    document.querySelectorAll('.knsf-picker-card').forEach(card => {
+        _knsfSetCardSel(card, _cardShareFileIds.has(parseInt(card.dataset.sfId)));
+    });
+    document.querySelectorAll('.knsf-picker-row').forEach(row => {
+        _knsfSetRowSel(row, _cardShareFileIds.has(parseInt(row.dataset.sfId)));
+    });
+    _knsfUpdateCount();
+}
+
+function _knsfSetCardSel(card, sel) {
+    const icon = card.querySelector('.knsf-check-icon');
+    card.classList.toggle('border-success', sel);
+    card.classList.toggle('border-2', sel);
+    if (icon) icon.classList.toggle('d-none', !sel);
+}
+
+function _knsfSetRowSel(row, sel) {
+    const checkIcon = row.querySelector('.knsf-check-icon');
+    const uncheckIcon = row.querySelector('.knsf-uncheck-icon');
+    row.classList.toggle('table-success', sel);
+    if (checkIcon) checkIcon.classList.toggle('d-none', !sel);
+    if (uncheckIcon) uncheckIcon.classList.toggle('d-none', sel);
+}
+
+function _knsfUpdateCount() {
+    const el = document.getElementById('knsfSelectedCount');
+    if (el) el.textContent = _cardShareFileIds.size + ' selected';
+}
+
+function knsfTogglePick(card) {
+    const id = parseInt(card.dataset.sfId);
+    if (_cardShareFileIds.has(id)) {
+        _knsfSetCardSel(card, false);
+        const row = document.querySelector('.knsf-picker-row[data-sf-id="' + id + '"]');
+        if (row) _knsfSetRowSel(row, false);
+        removeKanbanSfChip(id);
+    } else {
+        _knsfSetCardSel(card, true);
+        const row = document.querySelector('.knsf-picker-row[data-sf-id="' + id + '"]');
+        if (row) _knsfSetRowSel(row, true);
+        _addKanbanSfChip(id, card.dataset.sfName, card.dataset.sfImage === 'true',
+                         card.dataset.sfCategory, card.dataset.sfFilename);
+    }
+}
+
+function knsfTogglePickRow(row) {
+    const id = parseInt(row.dataset.sfId);
+    if (_cardShareFileIds.has(id)) {
+        _knsfSetRowSel(row, false);
+        const card = document.getElementById('knsfpcard_' + id);
+        if (card) _knsfSetCardSel(card, false);
+        removeKanbanSfChip(id);
+    } else {
+        _knsfSetRowSel(row, true);
+        const card = document.getElementById('knsfpcard_' + id);
+        if (card) _knsfSetCardSel(card, true);
+        _addKanbanSfChip(id, row.dataset.sfName, row.dataset.sfImage === 'true',
+                         row.dataset.sfCategory, row.dataset.sfFilename);
+    }
+}
+
+function knsfFilter(query) {
+    const q = query.toLowerCase();
+    const activePanel = document.querySelector('.knsf-panel:not(.d-none)');
+    if (!activePanel) return;
+    activePanel.querySelectorAll('.knsf-picker-item').forEach(el => {
+        el.style.display = el.dataset.name.includes(q) ? '' : 'none';
+    });
+}
+
+function knsfSetView(view) {
+    ['item','project','icon'].forEach(cat => {
+        const cv = document.getElementById('knsfCardView-' + cat);
+        const lv = document.getElementById('knsfListView-' + cat);
+        if (cv) cv.classList.toggle('d-none', view !== 'card');
+        if (lv) lv.classList.toggle('d-none', view !== 'list');
+    });
+    document.getElementById('knsfViewCard')?.classList.toggle('active', view === 'card');
+    document.getElementById('knsfViewList')?.classList.toggle('active', view === 'list');
+}
+
+function knsfSetCat(cat) {
+    document.querySelectorAll('.knsf-panel').forEach(p => p.classList.add('d-none'));
+    const panel = document.getElementById('knsfPanel-' + cat);
+    if (panel) panel.classList.remove('d-none');
+    document.querySelectorAll('#knsfCatTabs .nav-link').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.cat === cat);
+    });
+    const search = document.getElementById('knsfSearch');
+    if (search) { search.value = ''; knsfFilter(''); }
+}
+
+document.getElementById('kanbanSfPickerModal')?.addEventListener('show.bs.modal', () => {
+    _knsfSyncState();
+});
+
 document.getElementById('btn-save-card')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-save-card');
+    if (btn.disabled) return;
+    btn.disabled = true;
     const id = _currentCardId;
-    if (!id) return;
+    if (!id) { btn.disabled = false; return; }
     const persons = JSON.parse(document.getElementById('card-modal-persons-json').value || '[]');
     const completed = document.getElementById('card-modal-completed').checked;
     const title = document.getElementById('card-modal-title').value.trim();
-    if (!title) { showErr('Title is required'); return; }
+    if (!title) { btn.disabled = false; showErr('Title is required'); return; }
     if (!validateDates(
         document.getElementById('card-modal-start-date').value,
         document.getElementById('card-modal-due-date').value,
         'Card start date'
-    )) return;
+    )) { btn.disabled = false; return; }
     const catVal = document.getElementById('card-modal-category').value;
     try {
         await api('PUT', '/kanban/cards/' + id, {
@@ -2351,10 +2920,11 @@ document.getElementById('btn-save-card')?.addEventListener('click', async () => 
             completed_at: completed ? 'now' : '',
             key_persons: persons,
             description: document.getElementById('card-modal-desc').value,
+            share_file_ids: [..._cardShareFileIds],
         });
         hideModal('cardModal');
         location.reload();
-    } catch(e) { showErr(e.message); }
+    } catch(e) { btn.disabled = false; showErr(e.message); }
 });
 
 document.getElementById('btn-delete-card-modal')?.addEventListener('click', async () => {
@@ -2386,16 +2956,26 @@ document.getElementById('taskEditModal')?.addEventListener('hide.bs.modal', () =
         _editingCardId = null;
     }
 });
+document.getElementById('taskEditModal')?.addEventListener('hidden.bs.modal', () => {
+    // Bootstrap 5 removes modal-open from body when any modal closes, even stacked ones.
+    // Restore it so the parent cardModal remains usable without a page reload.
+    if (document.getElementById('cardModal')?.classList.contains('show')) {
+        document.body.classList.add('modal-open');
+    }
+});
 
 document.getElementById('btn-save-task-edit')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-save-task-edit');
+    if (btn.disabled) return;
+    btn.disabled = true;
     const taskId = document.getElementById('task-edit-id').value;
     const title  = document.getElementById('task-edit-title').value.trim();
-    if (!title) return;
+    if (!title) { btn.disabled = false; return; }
     if (!validateDates(
         document.getElementById('task-edit-start').value,
         document.getElementById('task-edit-due').value,
         'Task start date'
-    )) return;
+    )) { btn.disabled = false; return; }
     try {
         await api('PUT', '/kanban/tasks/' + taskId, {
             title,
@@ -2405,6 +2985,7 @@ document.getElementById('btn-save-task-edit')?.addEventListener('click', async (
         hideModal('taskEditModal');
         await refreshModalTasks();
     } catch(e) { showErr(e.message); }
+    btn.disabled = false;
 });
 
 // ── Board task interactions (checkbox + edit + delete on board view) ──

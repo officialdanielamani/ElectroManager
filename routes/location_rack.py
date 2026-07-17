@@ -426,7 +426,7 @@ def rack_new():
 
         # Allow duplicate names - UUID ensures uniqueness
         short_info = request.form.get('short_info', '')[:128] or None
-        description = request.form.get('description')
+        description = (request.form.get('description') or '').strip()[:512] or None
         location_id = request.form.get('location_id')
         color = _sanitize_color(request.form.get('color', ''))
         rows = int(request.form.get('rows', 5))
@@ -526,7 +526,7 @@ def rack_edit(uuid):
         # Allow duplicate names - UUID ensures uniqueness
         rack.name = new_name
         rack.short_info = request.form.get('short_info', '')[:128] or None
-        rack.description = request.form.get('description')
+        rack.description = (request.form.get('description') or '').strip()[:512] or None
         rack.color = _sanitize_color(request.form.get('color', ''))
         location_id = request.form.get('location_id')
         rack.location_id = int(location_id) if location_id and location_id != '0' else None
@@ -772,7 +772,7 @@ def add_rack():
         flash('Rack name is required.', 'danger')
         return redirect(url_for('location_rack.rack_management'))
     short_info = request.form.get('short_info', '')[:128] or None
-    description = request.form.get('description')
+    description = (request.form.get('description') or '').strip()[:512] or None
     location = request.form.get('location')
     rows = int(request.form.get('rows', 5))
     cols = int(request.form.get('cols', 5))
@@ -808,7 +808,7 @@ def edit_rack():
     new_inline_name = _sanitize_name(request.form.get('name', ''))
     rack.name = new_inline_name if new_inline_name else rack.name
     rack.short_info = request.form.get('short_info', '')[:128] or None
-    rack.description = request.form.get('description', rack.description)
+    rack.description = (request.form.get('description', rack.description) or '').strip()[:512] or None
     rack.location_id = request.form.get('location') or None
     
     db.session.commit()

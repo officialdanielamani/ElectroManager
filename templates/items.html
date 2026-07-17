@@ -103,7 +103,6 @@
                                 <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
                                 <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
                                 <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
-                                <option value="all" {% if per_page == 999999 %}selected{% endif %}>All</option>
                             </select>
                         </div>
                         
@@ -1112,16 +1111,8 @@ function clearStatusFilter() {
 function changeItemsPerPage() {
     const perPage = document.getElementById('itemsPerPage').value;
     const url = new URL(window.location.href);
-    
-    if (perPage === 'all') {
-        url.searchParams.set('per_page', '999999');
-    } else {
-        url.searchParams.set('per_page', perPage);
-    }
-    
-    // Reset to page 1 when changing items per page
+    url.searchParams.set('per_page', perPage);
     url.searchParams.set('page', '1');
-    
     window.location.href = url.toString();
 }
 

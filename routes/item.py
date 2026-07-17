@@ -49,10 +49,8 @@ def items():
     status_filter = request.args.get('status', '')
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 25, type=int)
-    
-    # Cap per_page at a reasonable maximum
-    if per_page > 999999:
-        per_page = 999999
+    if per_page < 1 or per_page > 100:
+        per_page = 25
     
     query = Item.query
     
@@ -724,6 +722,7 @@ def item_edit(uuid):
     # Get file upload settings
     max_size_mb = int(Setting.get('max_file_size_mb', '10'))
     extensions_str = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
+    max_file_upload_count = int(Setting.get('max_file_upload_count', '5'))
     
     batch_lend_data = {b.id: b.get_lend_records_data() for b in item.batches}
     sn_all_data = {}
@@ -732,7 +731,7 @@ def item_edit(uuid):
             sn_all_data[batch.id] = batch.get_serial_numbers_data()
     share_files_item = SharedFile.query.filter_by(category='item').order_by(SharedFile.name).all()
     share_files_icon = SharedFile.query.filter_by(category='icon').order_by(SharedFile.name).all()
-    return render_template('item_form.html', form=form, item=item, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='Edit Item', currency=Setting.get('currency', '$'), max_file_size_mb=max_size_mb, allowed_file_types=extensions_str, item_perms=perms, batch_lend_data=batch_lend_data, sn_all_data=sn_all_data, share_files_item=share_files_item, share_files_icon=share_files_icon)
+    return render_template('item_form.html', form=form, item=item, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='Edit Item', currency=Setting.get('currency', '$'), max_file_size_mb=max_size_mb, allowed_file_types=extensions_str, max_file_upload_count=max_file_upload_count, item_perms=perms, batch_lend_data=batch_lend_data, sn_all_data=sn_all_data, share_files_item=share_files_item, share_files_icon=share_files_icon)
 
 
 
@@ -1007,13 +1006,37 @@ def upload_attachment(item_id):
     max_size_mb = int(Setting.get('max_file_size_mb', '10'))
     max_size_bytes = max_size_mb * 1024 * 1024
     extensions_str = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
+    max_file_upload_count = int(Setting.get('max_file_upload_count', '5'))
+
+    # Count non-empty files and enforce max_file_upload_count
+    # -1 = unlimited, 0 = uploads disabled, >0 = total limit (existing + new)
+    valid_files = [f for f in files if f and f.filename]
+    if max_file_upload_count == 0:
+        return jsonify({
+            'success': False,
+            'uploaded': 0,
+            'errors': ['File uploads are currently disabled by the administrator.'],
+        }), 400
+    if max_file_upload_count > 0:
+        existing_count = Attachment.query.filter_by(item_id=item.id).count()
+        if existing_count >= max_file_upload_count:
+            return jsonify({
+                'success': False,
+                'uploaded': 0,
+                'errors': [f'Upload limit reached. This item already has {existing_count} file(s) (max {max_file_upload_count}).'],
+            }), 400
+        if existing_count + len(valid_files) > max_file_upload_count:
+            remaining = max_file_upload_count - existing_count
+            return jsonify({
+                'success': False,
+                'uploaded': 0,
+                'errors': [f'Too many files. Selecting {len(valid_files)} would exceed the limit (max {max_file_upload_count}, already {existing_count}, room for {remaining} more).'],
+            }), 400
 
     uploaded_count = 0
     errors = []
 
-    for file in files:
-        if not file or not file.filename:
-            continue
+    for file in valid_files:
 
         fname = file.filename
 
@@ -1283,7 +1306,7 @@ def item_add_parameter(id):
     value = request.form.get('value', '').strip()
     value2 = request.form.get('value2', '').strip()
     unit = request.form.get('unit', '').strip()
-    description = request.form.get('description', '').strip()
+    description = request.form.get('description', '').strip()[:512]
 
     # Validate parameter exists
     parameter = MagicParameter.query.get(parameter_id)

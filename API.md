@@ -832,6 +832,127 @@ These endpoints are used exclusively by the browser UI. They require an active l
 | GET | `/api/in-out/session/<lending_id>/sticker-preview/<template_id>` | Sticker HTML preview for a lending session |
 | GET | `/api/in-out/session/<lending_id>/sticker-print/<template_id>` | Sticker PDF for a lending session |
 
+### Kanban
+
+All Kanban endpoints require the user to have the `kanban → view_manage` role permission.
+
+**Board access rules**
+
+| Operation | Who can call it |
+|-----------|----------------|
+| Board/column/category management | Board owner only |
+| Card & task create / edit / delete | Board owner or edit-shared users |
+| Card & task read | Owner, edit-shared, view-shared, or public board visitors |
+| Card file upload / delete | Owner, edit-shared, or view-shared users |
+| Link / unlink share files on a card | Owner or edit-shared users (via card save) |
+
+#### Boards
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/kanban` | Main Kanban board view (HTML); accepts `?board=<id>` to open a specific board |
+| POST | `/kanban/boards` | Create a new board `{name}` |
+| DELETE | `/kanban/boards/<id>` | Delete a board (owner only) |
+| PUT | `/kanban/boards/<id>` | Update board settings (name, color, icon, visibility, share users, etc.) |
+| GET | `/kanban/boards/<id>/settings` | Get board settings JSON (columns, categories, share lists) |
+| POST | `/kanban/boards/<id>/reorder` | Reorder boards `{order: [id, ...]}` |
+| POST | `/kanban/boards/<id>/status` | Set board visibility status `{status: shown|hidden|pinned}` |
+| POST | `/kanban/boards/<id>/presence` | Heartbeat — report user presence; body `{editing_card_id}` |
+| GET | `/kanban/boards/<id>/poll` | Long-poll for board events since a timestamp `?since=<ts>` |
+
+#### Columns
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/kanban/boards/<id>/columns` | Add a column `{name, color, icon}` |
+| PUT | `/kanban/columns/<id>` | Update a column |
+| DELETE | `/kanban/columns/<id>` | Delete a column |
+| POST | `/kanban/boards/<id>/columns/reorder` | Reorder columns `{order: [id, ...]}` |
+
+#### Cards
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/kanban/columns/<id>/cards` | Create a card `{title}` |
+| GET | `/kanban/cards/<id>` | Get full card detail (JSON) including tasks, attachments, and linked share files |
+| PUT | `/kanban/cards/<id>` | Update a card — accepts `title`, `description`, `priority`, `category_id`, `label_color`, `start_date`, `due_date`, `completed_at`, `key_persons`, `share_file_ids` |
+| DELETE | `/kanban/cards/<id>` | Delete a card and all its tasks and attachments |
+| POST | `/kanban/cards/reorder` | Reorder cards across columns `{column_id, order: [id, ...]}` |
+
+**`GET /kanban/cards/<id>` response shape (abbreviated):**
+
+```json
+{
+  "id": 42,
+  "title": "Design PCB",
+  "description": "...",
+  "priority": 3,
+  "label_color": "#3b82f6",
+  "category_id": 5,
+  "category_name": "Hardware",
+  "key_persons": [{"id": 1, "name": "Alice", "type": "user"}],
+  "start_date": "2025-06-01",
+  "due_date": "2025-06-30",
+  "completed_at": "",
+  "is_overdue": false,
+  "tasks": [
+    {"id": 10, "title": "Route power traces", "completed": false, "start_date": "", "due_date": "", "position": 0}
+  ],
+  "attachments": [
+    {"id": 7, "filename": "kanban/42/schematic.pdf", "original_filename": "schematic.pdf",
+     "file_type": "pdf", "file_size": 204800, "uploaded_at": "2025-06-08T10:00:00Z", "uploader_name": "Alice"}
+  ],
+  "share_files": [
+    {"id": 3, "name": "Component Datasheet", "filename": "datasheet.pdf", "category": "item",
+     "is_image": false, "ext": "pdf"}
+  ],
+  "created_at": "2025-06-01T09:00:00Z",
+  "updated_at": "2025-06-08T10:00:00Z",
+  "created_by_name": "Alice",
+  "updated_by_name": "Alice"
+}
+```
+
+**`PUT /kanban/cards/<id>` — `share_file_ids` field:**
+
+Pass an array of shared file IDs to link to the card. Only files with category `item`, `project`, or `icon` are accepted. Pass an empty array `[]` to unlink all share files.
+
+```json
+{ "share_file_ids": [3, 7, 12] }
+```
+
+#### Card Attachments
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/kanban/cards/<id>/upload` | Upload files to a card; multipart form field `files` (multiple); enforces Kanban upload settings |
+| DELETE | `/kanban/cards/attachments/<id>` | Delete a card attachment by attachment ID |
+
+Upload settings are configured at `Settings → System → File Upload Settings → Kanban Card Uploads`:
+- Allowed extensions (default: `png,jpg,jpeg,txt,pdf`)
+- Max file size in MB (default: 10 MB)
+- Max files per upload batch (default: 5; `-1` = unlimited, `0` = uploads disabled)
+
+#### Tasks
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/kanban/cards/<id>/tasks` | Create a task `{title, start_date?, due_date?}` |
+| PUT | `/kanban/tasks/<id>` | Update a task `{title?, completed?, start_date?, due_date?}` |
+| DELETE | `/kanban/tasks/<id>` | Delete a task |
+| POST | `/kanban/cards/<id>/tasks/reorder` | Reorder tasks `{order: [id, ...]}` |
+
+#### Categories (board labels)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/kanban/boards/<id>/categories` | Create a category `{name}` |
+| PUT | `/kanban/categories/<id>` | Rename a category |
+| DELETE | `/kanban/categories/<id>` | Delete a category |
+| POST | `/kanban/boards/<id>/categories/reorder` | Reorder categories |
+
+---
+
 ### System
 
 | Method | Endpoint | Description |

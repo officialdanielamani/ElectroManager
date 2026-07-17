@@ -1,0 +1,16 @@
+{# Canonical Bootstrap Icon Picker modal — included once in base.html #}
+<div class="modal fade" id="iconPickerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-grid-3x3-gap"></i> Pick Icon</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+            <input type="text" class="form-control form-control-sm mb-3" id="iconPickerSearch"
+                   placeholder="Search icons…">
+            <div class="icon-picker-grid" id="iconPickerGrid">
+                <p class="text-muted text-center py-4">Loading…</p>
+            </div>
+        </div>
+    </div></div>
+</div>

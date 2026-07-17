@@ -468,6 +468,10 @@ def settings_system():
                 # Demo mode: use fixed values, ignore form input for file settings
                 allowed_extensions = 'jpg,jpeg,png,txt,md'
                 max_file_size = 1
+                max_file_upload_count = 5
+                kanban_upload_extensions = 'png,jpg,jpeg'
+                kanban_upload_max_size = 1
+                kanban_upload_max_files = 5
             else:
                 # Production mode: validate file settings from form
                 allowed_extensions = request.form.get('allowed_extensions', '').strip()
@@ -500,6 +504,18 @@ def settings_system():
                         return redirect(url_for('settings.settings_system'))
                 except ValueError:
                     flash('Invalid max file size value!', 'danger')
+                    return redirect(url_for('settings.settings_system'))
+
+                # Max number of files validation (production mode only)
+                # -1 = unlimited, 0 = uploads disabled, >0 = batch limit
+                max_file_upload_count = request.form.get('max_file_upload_count', '5')
+                try:
+                    max_file_upload_count = int(max_file_upload_count)
+                    if max_file_upload_count < -1 or max_file_upload_count > 50:
+                        flash('Max number of files must be between -1 and 50 (-1 = unlimited, 0 = disabled)!', 'danger')
+                        return redirect(url_for('settings.settings_system'))
+                except ValueError:
+                    flash('Invalid max number of files value!', 'danger')
                     return redirect(url_for('settings.settings_system'))
             
             # Max drawer rows
@@ -624,6 +640,7 @@ def settings_system():
             Setting.set('currency_decimal_places', currency_decimal_places, 'Currency decimal places (0-5)')
             Setting.set('max_file_size_mb', max_file_size, 'Maximum file upload size in MB')
             Setting.set('allowed_extensions', allowed_extensions, 'Allowed file extensions (comma-separated)')
+            Setting.set('max_file_upload_count', max_file_upload_count, 'Maximum number of files per upload batch')
             Setting.set('max_drawer_rows', max_drawer_rows, 'Maximum drawer rows (1-32)')
             Setting.set('max_drawer_cols', max_drawer_cols, 'Maximum drawer columns (1-32)')
             Setting.set('banner_timeout', banner_timeout, 'Banner auto-dismiss timeout in seconds (0=permanent)')
@@ -643,13 +660,59 @@ def settings_system():
                 for ptype in ['picture', 'document', 'schematic', '2d_design', '3d_design', 'program']:
                     pext = request.form.get(f'project_upload_{ptype}_extensions', '').strip()
                     psize = request.form.get(f'project_upload_{ptype}_max_size', '10')
+                    pfiles = request.form.get(f'project_upload_{ptype}_max_files', '5')
                     if pext: Setting.set(f'project_upload_{ptype}_extensions', pext)
                     if psize: Setting.set(f'project_upload_{ptype}_max_size', psize)
+                    try:
+                        pfiles_int = int(pfiles)
+                        if pfiles_int < -1 or pfiles_int > 50:
+                            flash(f'Project {ptype} max files must be between -1 and 50!', 'danger')
+                            return redirect(url_for('settings.settings_system'))
+                        Setting.set(f'project_upload_{ptype}_max_files', pfiles_int, f'Project {ptype} max number of files per upload (-1=unlimited, 0=disabled)')
+                    except ValueError:
+                        flash(f'Invalid max files value for project {ptype}!', 'danger')
+                        return redirect(url_for('settings.settings_system'))
                 for stype in ['item', 'project', 'sticker', 'icon']:
                     sext = request.form.get(f'share_{stype}_extensions', '').strip()
                     ssize = request.form.get(f'share_{stype}_max_size', '10')
+                    sfiles = request.form.get(f'share_{stype}_max_files', '100')
                     if sext: Setting.set(f'share_{stype}_extensions', sext, f'Share {stype} allowed extensions')
                     if ssize: Setting.set(f'share_{stype}_max_size', ssize, f'Share {stype} max size MB')
+                    try:
+                        sfiles_int = int(sfiles)
+                        if sfiles_int < -1 or sfiles_int > 9999:
+                            flash(f'Share {stype} max files must be between -1 and 9999!', 'danger')
+                            return redirect(url_for('settings.settings_system'))
+                        Setting.set(f'share_{stype}_max_files', sfiles_int, f'Share {stype} max number of files per upload (-1=unlimited, 0=disabled)')
+                    except ValueError:
+                        flash(f'Invalid max files value for share {stype}!', 'danger')
+                        return redirect(url_for('settings.settings_system'))
+
+            # Kanban upload settings
+            if not current_app.config.get('DEMO_MODE', False):
+                kanban_ext = request.form.get('kanban_upload_extensions', '').strip()
+                kanban_size = request.form.get('kanban_upload_max_size', '10')
+                kanban_files = request.form.get('kanban_upload_max_files', '5')
+                if kanban_ext:
+                    Setting.set('kanban_upload_extensions', kanban_ext, 'Kanban card upload allowed extensions')
+                try:
+                    kanban_size_int = int(kanban_size)
+                    if kanban_size_int < 1 or kanban_size_int > 100:
+                        flash('Kanban max file size must be between 1 and 100 MB!', 'danger')
+                        return redirect(url_for('settings.settings_system'))
+                    Setting.set('kanban_upload_max_size', kanban_size_int, 'Kanban card upload max file size MB')
+                except ValueError:
+                    flash('Invalid Kanban max file size!', 'danger')
+                    return redirect(url_for('settings.settings_system'))
+                try:
+                    kanban_files_int = int(kanban_files)
+                    if kanban_files_int < -1 or kanban_files_int > 50:
+                        flash('Kanban max files must be between -1 and 50!', 'danger')
+                        return redirect(url_for('settings.settings_system'))
+                    Setting.set('kanban_upload_max_files', kanban_files_int, 'Kanban card max files per upload (-1=unlimited, 0=disabled)')
+                except ValueError:
+                    flash('Invalid Kanban max files value!', 'danger')
+                    return redirect(url_for('settings.settings_system'))
 
             # Lending & Return settings
             lr_keys = ['lr_lend_start_date_required', 'lr_lend_start_time_required',
@@ -698,6 +761,10 @@ def settings_system():
     currency_decimal_places = Setting.get('currency_decimal_places', '2')
     max_file_size = Setting.get('max_file_size_mb', '10')
     allowed_extensions = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
+    max_file_upload_count = Setting.get('max_file_upload_count', '5')
+    kanban_upload_extensions = Setting.get('kanban_upload_extensions', 'png,jpg,jpeg,txt,pdf')
+    kanban_upload_max_size   = Setting.get('kanban_upload_max_size', '10')
+    kanban_upload_max_files  = Setting.get('kanban_upload_max_files', '5')
     max_drawer_rows = Setting.get('max_drawer_rows', '10')
     max_drawer_cols = Setting.get('max_drawer_cols', '10')
     banner_timeout = Setting.get('banner_timeout', '5')
@@ -774,6 +841,10 @@ def settings_system():
                           currency_decimal_places=currency_decimal_places,
                           max_file_size=max_file_size,
                           allowed_extensions=allowed_extensions,
+                          max_file_upload_count=max_file_upload_count,
+                          kanban_upload_extensions=kanban_upload_extensions,
+                          kanban_upload_max_size=kanban_upload_max_size,
+                          kanban_upload_max_files=kanban_upload_max_files,
                           max_drawer_rows=max_drawer_rows,
                           max_drawer_cols=max_drawer_cols,
                           banner_timeout=banner_timeout,
@@ -813,18 +884,18 @@ def settings_system():
                           instance_disk_total=instance_disk_total,
                           instance_disk_pct=instance_disk_pct,
                           project_upload_settings={
-                              'picture': {'extensions': Setting.get('project_upload_picture_extensions', 'webp,png,svg,jpeg,jpg'), 'max_size': Setting.get('project_upload_picture_max_size', '10')},
-                              'document': {'extensions': Setting.get('project_upload_document_extensions', 'txt,doc,docx,pdf'), 'max_size': Setting.get('project_upload_document_max_size', '10')},
-                              'schematic': {'extensions': Setting.get('project_upload_schematic_extensions', 'pdf,zip'), 'max_size': Setting.get('project_upload_schematic_max_size', '20')},
-                              '2d_design': {'extensions': Setting.get('project_upload_2d_design_extensions', 'pdf,zip'), 'max_size': Setting.get('project_upload_2d_design_max_size', '20')},
-                              '3d_design': {'extensions': Setting.get('project_upload_3d_design_extensions', 'pdf,zip,stl,step'), 'max_size': Setting.get('project_upload_3d_design_max_size', '50')},
-                              'program': {'extensions': Setting.get('project_upload_program_extensions', 'zip,txt,cpp,py'), 'max_size': Setting.get('project_upload_program_max_size', '10')},
+                              'picture':   {'extensions': Setting.get('project_upload_picture_extensions',   'webp,png,svg,jpeg,jpg'),  'max_size': Setting.get('project_upload_picture_max_size',   '10'), 'max_files': Setting.get('project_upload_picture_max_files',   '5')},
+                              'document':  {'extensions': Setting.get('project_upload_document_extensions',  'txt,doc,docx,pdf'),        'max_size': Setting.get('project_upload_document_max_size',  '10'), 'max_files': Setting.get('project_upload_document_max_files',  '5')},
+                              'schematic': {'extensions': Setting.get('project_upload_schematic_extensions', 'pdf,zip'),                 'max_size': Setting.get('project_upload_schematic_max_size', '20'), 'max_files': Setting.get('project_upload_schematic_max_files', '5')},
+                              '2d_design': {'extensions': Setting.get('project_upload_2d_design_extensions', 'pdf,zip'),                 'max_size': Setting.get('project_upload_2d_design_max_size', '20'), 'max_files': Setting.get('project_upload_2d_design_max_files', '5')},
+                              '3d_design': {'extensions': Setting.get('project_upload_3d_design_extensions', 'pdf,zip,stl,step'),        'max_size': Setting.get('project_upload_3d_design_max_size', '50'), 'max_files': Setting.get('project_upload_3d_design_max_files', '5')},
+                              'program':   {'extensions': Setting.get('project_upload_program_extensions',   'zip,txt,cpp,py'),          'max_size': Setting.get('project_upload_program_max_size',   '10'), 'max_files': Setting.get('project_upload_program_max_files',   '5')},
                           },
                           share_upload_settings={
-                              'item':    {'extensions': Setting.get('share_item_extensions',    'pdf,png,jpg,jpeg,gif,txt,doc,docx'), 'max_size': Setting.get('share_item_max_size',    '10')},
-                              'project': {'extensions': Setting.get('share_project_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx'), 'max_size': Setting.get('share_project_max_size', '10')},
-                              'sticker': {'extensions': Setting.get('share_sticker_extensions', 'png,jpg,jpeg'),                      'max_size': Setting.get('share_sticker_max_size', '1')},
-                              'icon':    {'extensions': Setting.get('share_icon_extensions',    'png,jpg,jpeg'),                      'max_size': Setting.get('share_icon_max_size',    '5')},
+                              'item':    {'extensions': Setting.get('share_item_extensions',    'pdf,png,jpg,jpeg,gif,txt,doc,docx'), 'max_size': Setting.get('share_item_max_size',    '10'), 'max_files': Setting.get('share_item_max_files',    '100')},
+                              'project': {'extensions': Setting.get('share_project_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx'), 'max_size': Setting.get('share_project_max_size', '10'), 'max_files': Setting.get('share_project_max_files', '100')},
+                              'sticker': {'extensions': Setting.get('share_sticker_extensions', 'png,jpg,jpeg'),                      'max_size': Setting.get('share_sticker_max_size', '1'),  'max_files': Setting.get('share_sticker_max_files', '100')},
+                              'icon':    {'extensions': Setting.get('share_icon_extensions',    'png,jpg,jpeg'),                      'max_size': Setting.get('share_icon_max_size',    '5'),  'max_files': Setting.get('share_icon_max_files',    '100')},
                           })
 
 

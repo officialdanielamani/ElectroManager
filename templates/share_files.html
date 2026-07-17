@@ -349,10 +349,11 @@
 
 <script>
 const categoryLimits = {
-    item:    { ext: '{{ share_ext.item }}',    size: '{{ share_size.item }} MB' },
-    profile: { ext: 'jpg, jpeg, png',           size: '1 MB (fixed)' },
-    project: { ext: '{{ share_ext.project }}', size: '{{ share_size.project }} MB' },
-    sticker: { ext: '{{ share_ext.sticker }}', size: '{{ share_size.sticker }} MB' },
+    item:    { ext: '{{ share_ext.item }}',    size: '{{ share_size.item }} MB',    maxFiles: {{ share_max_files.item }} },
+    profile: { ext: 'jpg, jpeg, png',           size: '1 MB (fixed)',               maxFiles: 1 },
+    project: { ext: '{{ share_ext.project }}', size: '{{ share_size.project }} MB', maxFiles: {{ share_max_files.project }} },
+    sticker: { ext: '{{ share_ext.sticker }}', size: '{{ share_size.sticker }} MB', maxFiles: {{ share_max_files.sticker }} },
+    icon:    { ext: '{{ share_ext.icon }}',    size: '{{ share_size.icon }} MB',    maxFiles: {{ share_max_files.icon }} },
 };
 
 // Update category hint in upload modal
@@ -362,11 +363,33 @@ if (catSelect) {
         const lim = categoryLimits[this.value];
         const hint = document.getElementById('categoryHint');
         if (lim && hint) {
+            let maxFilesText = lim.maxFiles === -1 ? 'unlimited' : (lim.maxFiles === 0 ? '<span class="text-danger">disabled</span>' : lim.maxFiles);
             hint.innerHTML = '<small class="text-muted"><i class="bi bi-info-circle"></i> Allowed: <strong>' +
-                lim.ext + '</strong> &nbsp;|&nbsp; Max per file: <strong>' + lim.size + '</strong></small>';
+                lim.ext + '</strong> &nbsp;|&nbsp; Max per file: <strong>' + lim.size +
+                '</strong> &nbsp;|&nbsp; Max files: <strong>' + maxFilesText + '</strong></small>';
         }
     });
     catSelect.dispatchEvent(new Event('change'));
+}
+
+// Client-side file count validation for share upload form
+const uploadForm = document.querySelector('#uploadModal form');
+if (uploadForm) {
+    uploadForm.addEventListener('submit', function(e) {
+        const cat = document.getElementById('uploadCategory').value;
+        const lim = categoryLimits[cat];
+        const filesInput = document.getElementById('uploadFiles');
+        if (!lim || !filesInput) return;
+        if (lim.maxFiles === 0) {
+            e.preventDefault();
+            alert('File uploads are currently disabled for this category by the administrator.');
+            return;
+        }
+        if (lim.maxFiles > 0 && filesInput.files.length > lim.maxFiles) {
+            e.preventDefault();
+            alert(`Too many files selected (${filesInput.files.length}). Maximum allowed per upload is ${lim.maxFiles}.\n\nPlease remove some files and try again.`);
+        }
+    });
 }
 
 // File name data map for bulk operations

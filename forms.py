@@ -101,7 +101,7 @@ class ItemAddForm(FlaskForm):
     sku = StringField('SKU', validators=[Optional(), Length(max=100)], render_kw={"class": "form-control form-control-sm"})
     short_info = StringField('Short Info', validators=[Optional(), Length(max=128)], render_kw={"class": "form-control form-control-sm"})
     info = StringField('Type / Model', validators=[Optional(), Length(max=128)], render_kw={"class": "form-control form-control-sm"})
-    description = TextAreaField('Description', validators=[Optional()], render_kw={"class": "form-control form-control-sm", "rows": "4"})
+    description = TextAreaField('Description', validators=[Optional(), Length(max=65535)], render_kw={"class": "form-control form-control-sm", "rows": "4"})
     quantity = IntegerField('Quantity', validators=[NumberRange(min=0)], default=0, render_kw={"class": "form-control form-control-sm"})
     price = FloatField('Price per Qty', validators=[Optional(), NumberRange(min=0)], render_kw={"class": "form-control form-control-sm", "placeholder": "0.00"})
 
@@ -177,7 +177,7 @@ class ItemEditForm(FlaskForm):
     sku = StringField('SKU', validators=[Optional(), Length(max=100)], render_kw={"class": "form-control form-control-sm"})
     short_info = StringField('Short Info', validators=[Optional(), Length(max=128)], render_kw={"class": "form-control form-control-sm"})
     info = StringField('Type / Model', validators=[Optional(), Length(max=128)], render_kw={"class": "form-control form-control-sm"})
-    description = TextAreaField('Description', validators=[Optional()], render_kw={"class": "form-control form-control-sm", "rows": "4"})
+    description = TextAreaField('Description', validators=[Optional(), Length(max=65535)], render_kw={"class": "form-control form-control-sm", "rows": "4"})
     quantity = IntegerField('Quantity', validators=[NumberRange(min=0)], default=0, render_kw={"class": "form-control form-control-sm"})
     price = FloatField('Price per Qty', validators=[Optional(), NumberRange(min=0)], render_kw={"class": "form-control form-control-sm", "placeholder": "0.00"})
 
@@ -294,7 +294,7 @@ class ItemParameterForm(FlaskForm):
     value2 = StringField('Second Value (for Range/Duration)', validators=[Optional(), Length(max=200)])
     unit = SelectField('Unit', validators=[Optional()])
     string_option = SelectField('Option', validators=[Optional()])
-    description = TextAreaField('Description', validators=[Optional()])
+    description = TextAreaField('Description', validators=[Optional(), Length(max=512)])
     submit = SubmitField('Add Parameter')
     
     def __init__(self, *args, **kwargs):
