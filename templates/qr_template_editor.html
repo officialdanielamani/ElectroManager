@@ -471,7 +471,7 @@
                     <div class="card-header panel-toggle" data-panel="properties" style="cursor: pointer; padding: 10px;">
                         <h6 class="mb-0" style="cursor: pointer;"><i class="bi bi-sliders"></i> Properties <span class="toggle-icon" style="float: right;">▼</span></h6>
                     </div>
-                    <div id="properties-content" class="panel-content" style="flex: 1; min-height: 0; overflow-y: auto; padding: 10px; box-sizing: border-box;">
+                    <div id="properties-content" class="panel-content" style="max-height: 500px; overflow-y: auto; padding: 10px; box-sizing: border-box;">
                         <div id="properties-panel">
                             <p class="text-muted mb-0" style="font-size: 13px;"><i class="bi bi-hand-index"></i> Select element to edit</p>
                         </div>
@@ -1569,7 +1569,7 @@ function updatePropertiesPanel(index) {
         </div>
         <hr class="my-2">
         <div class="mb-1"><h6 class="text-secondary mb-2" style="font-size: 13px;"><i class="bi bi-palette"></i> Colors</h6></div>
-        <div class="mb-2 row g-1 align-items-end">
+        <div class="row g-1 mb-1">
             <div class="col-4">
                 <label style="font-size: 11px; display:block; margin-bottom:3px;">Foreground</label>
                 <input type="color" class="form-control form-control-color w-100" id="prop-qr-fg" value="${element.fg_color || '#000000'}" style="height:30px;padding:2px;">
@@ -1577,15 +1577,21 @@ function updatePropertiesPanel(index) {
             <div class="col-4">
                 <label style="font-size: 11px; display:block; margin-bottom:3px;">Background</label>
                 <input type="color" class="form-control form-control-color w-100" id="prop-qr-bg" value="${element.bg_color || '#ffffff'}" style="height:30px;padding:2px;" ${!element.bg_color ? 'disabled' : ''}>
-                <div class="form-check mt-1">
-                    <input class="form-check-input" type="checkbox" id="prop-qr-bg-trans" ${!element.bg_color ? 'checked' : ''}>
-                    <label class="form-check-label" style="font-size:10px;">Transparent</label>
-                </div>
             </div>
             <div class="col-4">
                 <label style="font-size: 11px; display:block; margin-bottom:3px;">Label Color</label>
                 <input type="color" class="form-control form-control-color w-100" id="prop-qr-label-color" value="${element.label_color || '#000000'}" style="height:30px;padding:2px;">
             </div>
+        </div>
+        <div class="row g-1 mb-2">
+            <div class="col-4"></div>
+            <div class="col-4">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="prop-qr-bg-trans" ${!element.bg_color ? 'checked' : ''}>
+                    <label class="form-check-label" style="font-size:10px;">Transparent</label>
+                </div>
+            </div>
+            <div class="col-4"></div>
         </div>`;
     } else if (element.type === 'barcode') {
         const layerName = element.layer_name || `Barcode${index + 1}`;
@@ -1650,7 +1656,7 @@ function updatePropertiesPanel(index) {
         </div>
         <hr class="my-2">
         <div class="mb-1"><h6 class="text-secondary mb-2" style="font-size: 13px;"><i class="bi bi-palette"></i> Colors</h6></div>
-        <div class="mb-2 row g-1 align-items-end">
+        <div class="row g-1 mb-1">
             <div class="col-4">
                 <label style="font-size: 11px; display:block; margin-bottom:3px;">Foreground</label>
                 <input type="color" class="form-control form-control-color w-100" id="prop-bc-fg" value="${element.fg_color || '#000000'}" style="height:30px;padding:2px;">
@@ -1658,15 +1664,21 @@ function updatePropertiesPanel(index) {
             <div class="col-4">
                 <label style="font-size: 11px; display:block; margin-bottom:3px;">Background</label>
                 <input type="color" class="form-control form-control-color w-100" id="prop-bc-bg" value="${element.bg_color || '#ffffff'}" style="height:30px;padding:2px;" ${!element.bg_color ? 'disabled' : ''}>
-                <div class="form-check mt-1">
-                    <input class="form-check-input" type="checkbox" id="prop-bc-bg-trans" ${!element.bg_color ? 'checked' : ''}>
-                    <label class="form-check-label" style="font-size:10px;">Transparent</label>
-                </div>
             </div>
             <div class="col-4">
                 <label style="font-size: 11px; display:block; margin-bottom:3px;">Label Color</label>
                 <input type="color" class="form-control form-control-color w-100" id="prop-bc-label-color" value="${element.label_color || '#000000'}" style="height:30px;padding:2px;">
             </div>
+        </div>
+        <div class="row g-1 mb-2">
+            <div class="col-4"></div>
+            <div class="col-4">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="prop-bc-bg-trans" ${!element.bg_color ? 'checked' : ''}>
+                    <label class="form-check-label" style="font-size:10px;">Transparent</label>
+                </div>
+            </div>
+            <div class="col-4"></div>
         </div>`;
     } else if (element.type === 'icon') {
         const layerName = element.layer_name || `Icon${index + 1}`;
