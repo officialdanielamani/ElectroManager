@@ -221,7 +221,7 @@
                     {% if current_user.has_permission('sticker', 'view_manage') %}
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint and request.endpoint.startswith('qr_template.sticker') %}active{% endif %}" href="{{ url_for('qr_template.sticker_list') }}">
-                            <i class="bi bi-sticker"></i> Stickers
+                            <i class="bi bi-qr-code"></i> Stickers
                         </a>
                     </li>
                     {% endif %}

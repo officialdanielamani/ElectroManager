@@ -135,14 +135,14 @@
     {% endif %}
 
     <!-- Stickers Template -->
-    {% if current_user.has_permission('settings_sections.qr_templates', 'view') %}
+    {% if current_user.has_permission('sticker', 'view_manage') %}
     <div class="col-md-6 col-lg-4 mb-3">
         <div class="card h-100">
             <div class="card-body text-center">
                 <i class="bi bi-qr-code" style="font-size: 3rem; color: #2dd4bf;"></i>
                 <h5 class="card-title mt-3">Stickers Template</h5>
                 <p class="card-text small">Design sticker templates</p>
-                <a href="{{ url_for('qr_template.settings_qr') }}" class="btn btn-primary">Manage Templates</a>
+                <a href="{{ url_for('qr_template.sticker_list') }}" class="btn btn-primary">Manage Templates</a>
             </div>
         </div>
     </div>

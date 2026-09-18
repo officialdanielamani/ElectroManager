@@ -499,9 +499,19 @@ def _apply_column_migrations():
             logger.info(f"DB migration: backfilled board_uuid for {len(rows)} board(s)")
 
 
+def _delete_legacy_sticker_templates():
+    """Delete sticker templates with no owner (created before per-user migration)."""
+    with db.engine.connect() as conn:
+        result = conn.execute(db.text("DELETE FROM sticker_templates WHERE owner_id IS NULL"))
+        conn.commit()
+        if result.rowcount:
+            logger.info(f"DB migration: deleted {result.rowcount} legacy ownerless sticker template(s)")
+
+
 with app.app_context():
     db.create_all()          # create any brand-new tables (e.g. lending_sessions)
     _apply_column_migrations()
+    _delete_legacy_sticker_templates()
 
 
 if __name__ == '__main__':

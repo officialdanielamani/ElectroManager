@@ -27,16 +27,6 @@ def _can_print_qr():
             current_user.has_permission('settings_sections.qr_templates', 'print_qr'))
 
 
-@qr_template_bp.route('/settings/qr', methods=['GET'], endpoint='settings_qr')
-@login_required
-@permission_required('settings_sections.qr_templates', 'view')
-def settings_qr():
-    """Admin overview of all QR/Sticker templates with sharing badges."""
-    templates = StickerTemplate.query.all()
-    can_edit = current_user.has_permission('settings_sections.qr_templates', 'edit')
-    can_delete = current_user.has_permission('settings_sections.qr_templates', 'delete')
-    return render_template('settings_qr.html', templates=templates, can_edit=can_edit, can_delete=can_delete)
-
 
 @qr_template_bp.route('/sticker', methods=['GET'], endpoint='sticker_list')
 @login_required
