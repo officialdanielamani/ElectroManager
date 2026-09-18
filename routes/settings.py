@@ -428,6 +428,23 @@ def save_table_columns_view():
     return redirect(url_for('settings.settings_general'))
 
 
+@settings_bp.route('/save-navbar-config', methods=['POST'])
+@login_required
+def save_navbar_config():
+    """Save user's preferred navbar items and order."""
+    items_json = request.form.get('navbar_items', '[]')
+    show_icons = request.form.get('show_icons', 'true') == 'true'
+    try:
+        items = json.loads(items_json)
+        current_user.set_navbar_config(items, show_icons)
+        db.session.commit()
+        flash('Navbar preferences saved!', 'success')
+        log_audit(current_user.id, 'update', 'user', current_user.id, 'Updated navbar config')
+    except Exception as e:
+        logging.error(f"Error saving navbar config for user {current_user.id}: {e}")
+        flash('Error saving navbar preferences. Please try again.', 'danger')
+    return redirect(url_for('settings.settings_general'))
+
 
 @settings_bp.route('/settings/system', endpoint='settings_system', methods=['GET', 'POST'])
 @login_required

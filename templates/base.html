@@ -191,62 +191,70 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
+                {% set _nav_cfg = current_user.get_navbar_config() %}
+                {% set _nav_items = _nav_cfg.items %}
+                {% set _nav_icons = _nav_cfg.show_icons %}
                 <ul class="navbar-nav me-auto">
-                    {% if current_user.has_permission('items', 'view') %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('item.items') }}">
-                            <i class="bi bi-box"></i> Items
-                        </a>
-                    </li>
-                    {% endif %}
-                    {% if current_user.has_permission('pages.visual_storage', 'view') %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('visual_storage.visual_storage') }}">
-                            <i class="bi bi-grid-3x3"></i> Visual Storage
-                        </a>
-                    </li>
-                    {% endif %}
-                    {% if current_user.has_permission('projects', 'view') %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('project.projects') }}">
-                            <i class="bi bi-kanban"></i> Projects
-                        </a>
-                    </li>
-                    {% endif %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('kanban') %}active{% endif %}" href="{{ url_for('kanban.kanban') }}">
-                            <i class="bi bi-columns-gap"></i> Kanban
-                        </a>
-                    </li>
-                    {% if current_user.has_permission('sticker', 'view_manage') %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('qr_template.sticker') %}active{% endif %}" href="{{ url_for('qr_template.sticker_list') }}">
-                            <i class="bi bi-qr-code"></i> Stickers
-                        </a>
-                    </li>
-                    {% endif %}
-                    {% if current_user.has_permission('lending_return', 'view_page') %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('in_out') %}active{% endif %}" href="{{ url_for('in_out.in_out') }}">
-                            <i class="bi bi-arrow-left-right"></i> In/Out
-                        </a>
-                    </li>
-                    {% endif %}
-                    {% if current_user.has_permission('pages.notifications', 'view') %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('notification.notifications') }}">
-                            <i class="bi bi-bell"></i> Notifications
-                            {% if notification_count > 0 %}
-                            <span class="badge bg-danger">{{ notification_count }}</span>
-                            {% endif %}
-                        </a>
-                    </li>
-                    {% endif %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('settings.settings') }}">
-                            <i class="bi bi-gear"></i> Settings
-                        </a>
-                    </li>
+                    {% for _nav_id in _nav_items %}
+                        {% if _nav_id == 'items' and current_user.has_permission('items', 'view') %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('item') %}active{% endif %}" href="{{ url_for('item.items') }}">
+                                {% if _nav_icons %}<i class="bi bi-box"></i> {% endif %}Items
+                            </a>
+                        </li>
+                        {% elif _nav_id == 'visual_storage' and current_user.has_permission('pages.visual_storage', 'view') %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('visual_storage') %}active{% endif %}" href="{{ url_for('visual_storage.visual_storage') }}">
+                                {% if _nav_icons %}<i class="bi bi-grid-3x3"></i> {% endif %}Visual Storage
+                            </a>
+                        </li>
+                        {% elif _nav_id == 'projects' and current_user.has_permission('projects', 'view') %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('project') %}active{% endif %}" href="{{ url_for('project.projects') }}">
+                                {% if _nav_icons %}<i class="bi bi-kanban"></i> {% endif %}Projects
+                            </a>
+                        </li>
+                        {% elif _nav_id == 'kanban' %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('kanban') %}active{% endif %}" href="{{ url_for('kanban.kanban') }}">
+                                {% if _nav_icons %}<i class="bi bi-columns-gap"></i> {% endif %}Kanban
+                            </a>
+                        </li>
+                        {% elif _nav_id == 'stickers' and current_user.has_permission('sticker', 'view_manage') %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('qr_template.sticker') %}active{% endif %}" href="{{ url_for('qr_template.sticker_list') }}">
+                                {% if _nav_icons %}<i class="bi bi-qr-code"></i> {% endif %}Stickers
+                            </a>
+                        </li>
+                        {% elif _nav_id == 'in_out' and current_user.has_permission('lending_return', 'view_page') %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('in_out') %}active{% endif %}" href="{{ url_for('in_out.in_out') }}">
+                                {% if _nav_icons %}<i class="bi bi-arrow-left-right"></i> {% endif %}In/Out
+                            </a>
+                        </li>
+                        {% elif _nav_id == 'share_files' and current_user.has_permission('settings_sections.share_files', 'view') %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('share') %}active{% endif %}" href="{{ url_for('share.share_files') }}">
+                                {% if _nav_icons %}<i class="bi bi-folder-symlink"></i> {% endif %}Share Files
+                            </a>
+                        </li>
+                        {% elif _nav_id == 'notifications' and current_user.has_permission('pages.notifications', 'view') %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('notification') %}active{% endif %}" href="{{ url_for('notification.notifications') }}">
+                                {% if _nav_icons %}<i class="bi bi-bell"></i> {% endif %}Notifications
+                                {% if notification_count > 0 %}
+                                <span class="badge bg-danger">{{ notification_count }}</span>
+                                {% endif %}
+                            </a>
+                        </li>
+                        {% elif _nav_id == 'settings' %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('settings') %}active{% endif %}" href="{{ url_for('settings.settings') }}">
+                                {% if _nav_icons %}<i class="bi bi-gear"></i> {% endif %}Settings
+                            </a>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
                 </ul>
                 <ul class="navbar-nav">
                     <li class="nav-item dropdown">

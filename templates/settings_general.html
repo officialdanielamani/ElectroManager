@@ -346,6 +346,39 @@
             </div>
         </div>
 
+        <!-- Navbar Options -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5><i class="bi bi-layout-sidebar"></i> Navbar Options</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-3">
+                    <i class="bi bi-info-circle"></i> <strong>Note:</strong> Choose which items appear in the navigation bar and in what order.
+                    Drag the handle <i class="bi bi-grip-vertical"></i> to reorder.
+                </div>
+                <form method="POST" action="{{ url_for('settings.save_navbar_config') }}" id="navbarConfigForm">
+                    <input type="hidden" id="navbarItemsInput" name="navbar_items" value="">
+                    <input type="hidden" id="navbarShowIconsInput" name="show_icons" value="true">
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Navbar Items</strong></label>
+                        <div id="navbarItemsContainer" class="columns-container"></div>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="showNavIcons" onchange="updateNavbarConfig()">
+                        <label class="form-check-label" for="showNavIcons"><i class="bi bi-icons"></i> Show icons on navbar</label>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary" onclick="resetNavbarConfig()">
+                            <i class="bi bi-arrow-counterclockwise"></i> Reset to Default
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Save Navbar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         </div>
     </div>
 </div>
@@ -894,7 +927,80 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeThemeListeners();
     initializeFontListener();
     updatePreviewFont(); // Initialize font on page load
+
+    // Navbar config init
+    const _navbarUserConfig = {{ current_user.get_navbar_config() | tojson }};
+    renderNavbarContainer(_navbarUserConfig.items);
+    const _showIconsCb = document.getElementById('showNavIcons');
+    if (_showIconsCb) { _showIconsCb.checked = _navbarUserConfig.show_icons; }
+    updateNavbarConfig();
 });
+
+const _navbarAllItems = [
+    { id: 'items',         label: 'Items',          icon: 'bi-box' },
+    { id: 'visual_storage',label: 'Visual Storage', icon: 'bi-grid-3x3' },
+    { id: 'projects',      label: 'Projects',       icon: 'bi-kanban' },
+    { id: 'kanban',        label: 'Kanban',         icon: 'bi-columns-gap' },
+    { id: 'stickers',      label: 'Stickers',       icon: 'bi-qr-code' },
+    { id: 'in_out',        label: 'In/Out',         icon: 'bi-arrow-left-right' },
+    { id: 'share_files',   label: 'Share Files',    icon: 'bi-folder-symlink' },
+    { id: 'notifications', label: 'Notifications',  icon: 'bi-bell' },
+    { id: 'settings',      label: 'Settings',       icon: 'bi-gear' },
+];
+const _navbarDefaultEnabled = ['items', 'visual_storage', 'notifications', 'settings'];
+
+function renderNavbarContainer(selectedItems) {
+    const c = document.getElementById('navbarItemsContainer');
+    if (!c) return;
+    if (!selectedItems) selectedItems = _navbarDefaultEnabled;
+    let h = '<div id="sortableNavbarItems" style="display:flex;flex-direction:column;gap:8px;">';
+    selectedItems.forEach(id => {
+        const item = _navbarAllItems.find(i => i.id === id);
+        if (item) h += _createNavbarItem(item, true);
+    });
+    _navbarAllItems.forEach(item => {
+        if (!selectedItems.includes(item.id)) h += _createNavbarItem(item, false);
+    });
+    h += '</div>';
+    c.innerHTML = h;
+    Sortable.create(c.querySelector('#sortableNavbarItems'), {
+        handle: '.grip-handle', ghostClass: 'sortable-ghost', dragClass: 'sortable-drag',
+        animation: 150, onEnd: updateNavbarConfig
+    });
+}
+
+function _createNavbarItem(item, on) {
+    return '<div class="column-item p-2 rounded border-start border-start-4" style="border-left-color:' + (on ? '#28a745' : 'var(--bs-border-color,#dee2e6)') + ';" data-nav-id="' + item.id + '">' +
+        '<div class="d-flex align-items-center gap-2">' +
+        '<i class="bi bi-grip-vertical grip-handle text-muted" style="cursor:grab;"></i>' +
+        '<input type="checkbox" class="nav-item-cb form-check-input" value="' + item.id + '" ' + (on ? 'checked' : '') + ' onchange="updateNavbarConfig()">' +
+        '<i class="bi ' + item.icon + ' text-muted" style="width:16px;"></i>' +
+        '<label class="flex-grow-1 mb-0" style="cursor:pointer;">' + item.label + '</label>' +
+        '</div></div>';
+}
+
+function updateNavbarConfig() {
+    const items = [];
+    document.querySelectorAll('#sortableNavbarItems .column-item').forEach(el => {
+        const cb = el.querySelector('.nav-item-cb');
+        if (cb && cb.checked) items.push(cb.value);
+    });
+    const inp = document.getElementById('navbarItemsInput');
+    if (inp) inp.value = JSON.stringify(items);
+    const showIcons = document.getElementById('showNavIcons')?.checked ?? true;
+    const siInp = document.getElementById('navbarShowIconsInput');
+    if (siInp) siInp.value = showIcons ? 'true' : 'false';
+}
+
+function resetNavbarConfig() {
+    if (confirm('Reset navbar to default?')) {
+        renderNavbarContainer(_navbarDefaultEnabled);
+        document.getElementById('showNavIcons').checked = true;
+        updateNavbarConfig();
+    }
+}
+
+document.getElementById('navbarConfigForm')?.addEventListener('submit', updateNavbarConfig);
 </script>
 
 

@@ -451,6 +451,7 @@ def _apply_column_migrations():
         ("sticker_templates", "is_public",         "BOOLEAN DEFAULT 0"),
         ("sticker_templates", "share_view_users",  "TEXT"),
         ("sticker_templates", "share_edit_users",  "TEXT"),
+        ("users",             "navbar_config",      "TEXT"),
     ]
     with db.engine.connect() as conn:
         for table, col, col_type in additions:

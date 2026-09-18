@@ -128,6 +128,7 @@ class User(UserMixin, db.Model):
     user_font = db.Column(db.String(50), default='system')
     table_columns_view = db.Column(db.Text, default='["name", "category", "tags", "type_model", "sku", "footprint", "quantity", "total_price", "price_per_unit", "location", "uuid", "status"]')
     project_table_columns_view = db.Column(db.Text, default='["project_name", "info", "categories", "tags", "date_start", "dateline", "total_cost", "est_total_cost", "status", "users", "group", "project_id"]')
+    navbar_config = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     is_active = db.Column(db.Boolean, default=True)
     is_demo_user = db.Column(db.Boolean, default=False)
@@ -185,7 +186,22 @@ class User(UserMixin, db.Model):
 
     def set_project_table_columns(self, columns):
         self.project_table_columns_view = json.dumps(columns)
-    
+
+    _NAVBAR_DEFAULT_ITEMS = ["items", "visual_storage", "notifications", "settings"]
+    _NAVBAR_ALL_ITEMS = ["items", "visual_storage", "projects", "kanban", "stickers", "in_out", "share_files", "notifications", "settings"]
+
+    def get_navbar_config(self):
+        try:
+            cfg = json.loads(self.navbar_config)
+            items = [i for i in cfg.get("items", []) if i in self._NAVBAR_ALL_ITEMS]
+            return {"items": items, "show_icons": bool(cfg.get("show_icons", True))}
+        except (json.JSONDecodeError, TypeError):
+            return {"items": list(self._NAVBAR_DEFAULT_ITEMS), "show_icons": True}
+
+    def set_navbar_config(self, items, show_icons=True):
+        items = [i for i in items if i in self._NAVBAR_ALL_ITEMS]
+        self.navbar_config = json.dumps({"items": items, "show_icons": bool(show_icons)})
+
     def __repr__(self):
         return f'<User {self.username}>'
 
