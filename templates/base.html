@@ -218,6 +218,13 @@
                             <i class="bi bi-columns-gap"></i> Kanban
                         </a>
                     </li>
+                    {% if current_user.has_permission('sticker', 'view_manage') %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('qr_template.sticker') %}active{% endif %}" href="{{ url_for('qr_template.sticker_list') }}">
+                            <i class="bi bi-sticker"></i> Stickers
+                        </a>
+                    </li>
+                    {% endif %}
                     {% if current_user.has_permission('lending_return', 'view_page') %}
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint and request.endpoint.startswith('in_out') %}active{% endif %}" href="{{ url_for('in_out.in_out') }}">

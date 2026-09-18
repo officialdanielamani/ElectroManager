@@ -447,6 +447,10 @@ def _apply_column_migrations():
         ("kanban_boards", "last_transfer_from_id",   "INTEGER"),
         ("kanban_boards", "last_transfer_from_name", "VARCHAR(128)"),
         ("kanban_boards", "last_transfer_at",        "DATETIME"),
+        ("sticker_templates", "owner_id",          "INTEGER"),
+        ("sticker_templates", "is_public",         "BOOLEAN DEFAULT 0"),
+        ("sticker_templates", "share_view_users",  "TEXT"),
+        ("sticker_templates", "share_edit_users",  "TEXT"),
     ]
     with db.engine.connect() as conn:
         for table, col, col_type in additions:

@@ -21,82 +21,153 @@ logger = logging.getLogger(__name__)
 
 qr_template_bp = Blueprint('qr_template', __name__)
 
+def _can_print_qr():
+    """Check if current user can print QR stickers (via sticker.view_manage or legacy qr_templates.print_qr)."""
+    return (current_user.has_permission('sticker', 'view_manage') or
+            current_user.has_permission('settings_sections.qr_templates', 'print_qr'))
+
+
 @qr_template_bp.route('/settings/qr', methods=['GET'], endpoint='settings_qr')
 @login_required
 @permission_required('settings_sections.qr_templates', 'view')
 def settings_qr():
-    """QR/Sticker template list page"""
+    """Admin overview of all QR/Sticker templates with sharing badges."""
     templates = StickerTemplate.query.all()
-    
-    # Check permissions for actions
     can_edit = current_user.has_permission('settings_sections.qr_templates', 'edit')
     can_delete = current_user.has_permission('settings_sections.qr_templates', 'delete')
-    
     return render_template('settings_qr.html', templates=templates, can_edit=can_edit, can_delete=can_delete)
 
-@qr_template_bp.route('/settings/qr/new', methods=['GET', 'POST'], endpoint='create_qr_template')
+
+@qr_template_bp.route('/sticker', methods=['GET'], endpoint='sticker_list')
 @login_required
-@permission_required('settings_sections.qr_templates', 'edit')
-def create_qr_template():
-    """Create new template"""
+def sticker_list():
+    """Per-user sticker list — shows own + shared stickers."""
+    if not current_user.has_permission('sticker', 'view_manage'):
+        abort(403)
+    uid = current_user.id
+    # Own templates
+    own = StickerTemplate.query.filter_by(owner_id=uid).all()
+    # Shared with me (view or edit)
+    all_templates = StickerTemplate.query.filter(StickerTemplate.owner_id != uid).all()
+    shared = [t for t in all_templates if
+              any(u.get('id') == uid for u in t.get_share_view_users()) or
+              any(u.get('id') == uid for u in t.get_share_edit_users()) or
+              t.is_public]
+    can_create = current_user.has_permission('sticker', 'view_manage')
+    return render_template('sticker_list.html', own_templates=own, shared_templates=shared,
+                           can_create=can_create)
+
+
+@qr_template_bp.route('/sticker/new', methods=['GET', 'POST'], endpoint='create_sticker')
+@login_required
+def create_sticker():
+    """Create new sticker template (owned by current user)."""
+    if not current_user.has_permission('sticker', 'view_manage'):
+        abort(403)
     if request.method == 'POST':
         try:
             template_type = request.form.get('template_type')
             name = request.form.get('name')
             width_mm = float(request.form.get('width_mm', 30))
             height_mm = float(request.form.get('height_mm', 20))
-            
+
             if not template_type or not name:
                 flash('Template type and name are required', 'danger')
-                return redirect(url_for('qr_template.create_qr_template'))
-            
-            # Validate size: min 5mm, max 500mm
+                return redirect(url_for('qr_template.create_sticker'))
+
             if width_mm < 5 or width_mm > 500:
                 flash('Width must be between 5mm and 500mm', 'danger')
-                return redirect(url_for('qr_template.create_qr_template'))
-            
+                return redirect(url_for('qr_template.create_sticker'))
+
             if height_mm < 5 or height_mm > 500:
                 flash('Height must be between 5mm and 500mm', 'danger')
-                return redirect(url_for('qr_template.create_qr_template'))
-            
+                return redirect(url_for('qr_template.create_sticker'))
+
             template = StickerTemplate(
                 name=name,
                 template_type=template_type,
                 width_mm=width_mm,
                 height_mm=height_mm,
+                owner_id=current_user.id,
                 created_by=current_user.id,
                 layout=json.dumps([])
             )
             db.session.add(template)
             db.session.commit()
-            
-            flash(f'Template "{name}" created!', 'success')
-            return redirect(url_for('qr_template.edit_qr_template', template_id=template.id))
+
+            flash(f'Sticker template "{name}" created!', 'success')
+            return redirect(url_for('qr_template.edit_sticker', template_id=template.id))
         except ValueError:
             flash('Invalid width or height value', 'danger')
-            return redirect(url_for('qr_template.create_qr_template'))
+            return redirect(url_for('qr_template.create_sticker'))
         except Exception as e:
-            logger.error(f"Error creating template: {e}")
+            logger.error(f"Error creating sticker template: {e}")
             flash('Error creating template', 'danger')
-            return redirect(url_for('qr_template.create_qr_template'))
-    
-    return render_template('qr_template_form.html')
+            return redirect(url_for('qr_template.create_sticker'))
 
+    return render_template('qr_template_form.html', back_url=url_for('qr_template.sticker_list'))
+
+
+# Legacy redirect — keep old URLs working
+@qr_template_bp.route('/settings/qr/new', methods=['GET', 'POST'], endpoint='create_qr_template')
+@login_required
+def create_qr_template():
+    return redirect(url_for('qr_template.create_sticker'), 301)
+
+
+@qr_template_bp.route('/sticker/<int:template_id>/edit', methods=['GET'], endpoint='edit_sticker')
+@login_required
+def edit_sticker(template_id):
+    """Open canvas editor for a sticker template (owner or shared-edit or admin)."""
+    template = StickerTemplate.query.get_or_404(template_id)
+    if not template.can_edit(current_user):
+        abort(403)
+    placeholders = AVAILABLE_PLACEHOLDERS.get(template.template_type, [])
+    can_share = current_user.has_permission('sticker', 'share_sticker') and template.owner_id == current_user.id
+    from models import User
+    all_users = User.query.filter(User.id != current_user.id, User.is_active == True).order_by(User.username).all()
+    return render_template('qr_template_editor.html', template=template, placeholders=placeholders,
+                           can_share=can_share, all_users=all_users,
+                           back_url=url_for('qr_template.sticker_list'))
+
+
+# Legacy redirect — keep old editor URL working
 @qr_template_bp.route('/settings/qr/<int:template_id>/edit', methods=['GET'], endpoint='edit_qr_template')
 @login_required
-@permission_required('settings_sections.qr_templates', 'edit')
 def edit_qr_template(template_id):
-    """Open canvas editor"""
+    return redirect(url_for('qr_template.edit_sticker', template_id=template_id), 301)
+
+
+@qr_template_bp.route('/sticker/<int:template_id>/sharing', methods=['POST'], endpoint='sticker_sharing')
+@login_required
+def sticker_sharing(template_id):
+    """Save sharing settings for a sticker template."""
     template = StickerTemplate.query.get_or_404(template_id)
-    placeholders = AVAILABLE_PLACEHOLDERS.get(template.template_type, [])
-    return render_template('qr_template_editor.html', template=template, placeholders=placeholders)
+    if template.owner_id != current_user.id:
+        return jsonify({'status': 'error', 'message': 'Only the owner can change sharing settings'}), 403
+    if not current_user.has_permission('sticker', 'share_sticker'):
+        return jsonify({'status': 'error', 'message': 'No permission to share stickers'}), 403
+    data = request.get_json()
+    template.is_public = bool(data.get('is_public', False))
+    view_users = data.get('share_view_users', [])
+    edit_users = data.get('share_edit_users', [])
+    # Limit to 20 shared users per list (same guard as Kanban)
+    template.share_view_users = json.dumps(view_users[:20])
+    template.share_edit_users = json.dumps(edit_users[:20])
+    template.updated_at = datetime.now(timezone.utc)
+    template.updated_by = current_user.id
+    db.session.commit()
+    log_audit(current_user.id, 'update', 'sticker_template', template_id,
+              f'Updated sharing settings: public={template.is_public}')
+    return jsonify({'status': 'success'})
 
 @qr_template_bp.route('/api/qr-template/<int:template_id>', methods=['GET', 'POST', 'PUT'])
 @login_required
-@permission_required('settings_sections.qr_templates', 'edit')
 def api_qr_template(template_id):
     """API: Get/Update template layout"""
     template = StickerTemplate.query.get_or_404(template_id)
+    if not template.can_edit(current_user):
+        return jsonify({'status': 'error', 'message': 'Permission denied'}), 403
     
     if request.method == 'POST':
         try:
@@ -159,6 +230,8 @@ def preview_qr_template(template_id):
     """Preview template with sample data or unresolved placeholders"""
     try:
         template = StickerTemplate.query.get_or_404(template_id)
+        if not template.can_view(current_user):
+            return jsonify({'error': 'Permission denied'}), 403
         
         # Check if unresolved placeholders requested (for settings preview)
         unresolved = request.args.get('unresolved', '').lower() == 'true'
@@ -223,7 +296,7 @@ def preview_qr_template(template_id):
 @login_required
 def api_item_sticker_preview(uuid, template_id):
     """Generate sticker preview for an item"""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not _can_print_qr():
         return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
@@ -245,7 +318,7 @@ def api_item_sticker_preview(uuid, template_id):
 @login_required
 def api_item_sticker_print(uuid, template_id):
     """Generate printable sticker PDF"""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not _can_print_qr():
         return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
@@ -263,10 +336,11 @@ def api_item_sticker_print(uuid, template_id):
 @login_required
 def item_qr_sticker(uuid):
     """View and print QR stickers for an item"""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not _can_print_qr():
         abort(403)
     item = Item.query.filter_by(uuid=uuid).first_or_404()
-    templates = StickerTemplate.query.filter_by(template_type='Items').all()
+    all_t = StickerTemplate.query.filter_by(template_type='Items').all()
+    templates = [t for t in all_t if t.can_view(current_user)]
     return render_template('item_qr_sticker.html', item=item, templates=templates)
 
 @qr_template_bp.route('/qr-template/<int:template_id>/print', methods=['GET', 'POST'])
@@ -342,26 +416,32 @@ def preview_element(template_id):
         logger.error(f"Error previewing element: {e}")
         return jsonify({'error': 'Failed to preview element.', 'success': False}), 400
 
-@qr_template_bp.route('/settings/qr/<int:template_id>/delete', methods=['POST'])
+@qr_template_bp.route('/sticker/<int:template_id>/delete', methods=['POST'], endpoint='delete_sticker')
 @login_required
-@permission_required('settings_sections.qr_templates', 'delete')
-def delete_qr_template(template_id):
-    """Delete template"""
+def delete_sticker(template_id):
+    """Delete sticker template (owner or admin)."""
+    template = StickerTemplate.query.get_or_404(template_id)
+    if template.owner_id != current_user.id and not current_user.has_permission('settings_sections.qr_templates', 'delete'):
+        abort(403)
     try:
-        template = StickerTemplate.query.get_or_404(template_id)
         name = template.name
         db.session.delete(template)
         db.session.commit()
-        
-        log_audit(current_user.id, 'delete', 'sticker_template', template_id, 
-                 f'Deleted template: {name}')
-        
-        flash(f'Template "{name}" deleted.', 'success')
-        return redirect(url_for('qr_template.settings_qr'))
+        log_audit(current_user.id, 'delete', 'sticker_template', template_id,
+                  f'Deleted sticker template: {name}')
+        flash(f'Sticker template "{name}" deleted.', 'success')
+        return redirect(url_for('qr_template.sticker_list'))
     except Exception as e:
-        logger.error(f"Error deleting template: {e}")
+        logger.error(f"Error deleting sticker template: {e}")
         flash('Error deleting template', 'danger')
-        return redirect(url_for('qr_template.settings_qr'))
+        return redirect(url_for('qr_template.sticker_list'))
+
+
+# Legacy delete route redirect
+@qr_template_bp.route('/settings/qr/<int:template_id>/delete', methods=['POST'], endpoint='delete_qr_template')
+@login_required
+def delete_qr_template(template_id):
+    return redirect(url_for('qr_template.delete_sticker', template_id=template_id), 307)
 
 
 @qr_template_bp.route('/api/available-fonts')
@@ -448,7 +528,7 @@ def _parse_sn_ids(raw):
 @login_required
 def batch_qr_sticker(uuid, batch_id):
     """View and print QR stickers for an item batch (or specific serial numbers)."""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not _can_print_qr():
         abort(403)
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     batch = ItemBatch.query.filter_by(id=batch_id, item_id=item.id).first_or_404()
@@ -464,7 +544,7 @@ def batch_qr_sticker(uuid, batch_id):
 @login_required
 def api_batch_sticker_preview(uuid, batch_id, template_id):
     """Generate SVG preview for an item batch sticker (optional ?sn_id=)."""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not _can_print_qr():
         return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     batch = ItemBatch.query.filter_by(id=batch_id, item_id=item.id).first_or_404()
@@ -489,7 +569,7 @@ def api_batch_sticker_preview(uuid, batch_id, template_id):
 @login_required
 def api_batch_sticker_print(uuid, template_id):
     """Multi-page PDF: one page per SN (if sn_ids given) or one page for the batch."""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not _can_print_qr():
         return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
@@ -523,7 +603,7 @@ def api_batch_sticker_print(uuid, template_id):
 @login_required
 def api_batch_sticker_svg_zip(uuid, template_id):
     """Download SVG zip for batch stickers."""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not _can_print_qr():
         return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
@@ -555,7 +635,7 @@ def api_batch_sticker_svg_zip(uuid, template_id):
 @login_required
 def api_batch_sticker_table_print(uuid, template_id):
     """Grid-layout PDF for batch stickers."""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not _can_print_qr():
         return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)

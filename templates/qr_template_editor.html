@@ -259,6 +259,50 @@
                             <input type="number" id="settingsTemplateHeight" class="form-control form-control-sm" step="0.1" min="5" max="500">
                         </div>
                     </div>
+                    {% if can_share %}
+                    <hr class="my-3">
+                    <h6 class="mb-3"><i class="bi bi-share"></i> Sticker Sharing</h6>
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="settingsIsPublic" {% if template.is_public %}checked{% endif %}>
+                            <label class="form-check-label" for="settingsIsPublic">
+                                Set this sticker as <strong>Public</strong> (View Only — anyone can use it)
+                            </label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Can view only</strong> <small class="text-muted">(max 20 users)</small></label>
+                        <div id="shareViewList" class="mb-2" style="max-height:120px;overflow-y:auto;">
+                            {% for u in template.get_share_view_users() %}
+                            <span class="badge bg-secondary me-1 mb-1 share-view-badge" data-id="{{ u.id }}" data-name="{{ u.name }}">
+                                {{ u.name }} <button type="button" class="btn-close btn-close-white ms-1" style="font-size:9px;" onclick="removeShareUser('view',{{ u.id }})"></button>
+                            </span>
+                            {% endfor %}
+                        </div>
+                        <select id="addViewUserSelect" class="form-select form-select-sm">
+                            <option value="">— add user —</option>
+                            {% for u in all_users %}
+                            <option value="{{ u.id }}" data-name="{{ u.username }}">{{ u.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Can view and edit</strong> <small class="text-muted">(max 20 users)</small></label>
+                        <div id="shareEditList" class="mb-2" style="max-height:120px;overflow-y:auto;">
+                            {% for u in template.get_share_edit_users() %}
+                            <span class="badge bg-primary me-1 mb-1 share-edit-badge" data-id="{{ u.id }}" data-name="{{ u.name }}">
+                                {{ u.name }} <button type="button" class="btn-close btn-close-white ms-1" style="font-size:9px;" onclick="removeShareUser('edit',{{ u.id }})"></button>
+                            </span>
+                            {% endfor %}
+                        </div>
+                        <select id="addEditUserSelect" class="form-select form-select-sm">
+                            <option value="">— add user —</option>
+                            {% for u in all_users %}
+                            <option value="{{ u.id }}" data-name="{{ u.username }}">{{ u.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="document.getElementById('templateSettingsModal').style.display='none'; document.getElementById('templateSettingsModal').classList.remove('show'); document.body.classList.remove('modal-open');">Cancel</button>
@@ -309,7 +353,7 @@
                     <button id="btn-save" class="btn btn-sm btn-primary">
                         <i class="bi bi-check-circle"></i> Save
                     </button>
-                    <a href="{{ url_for('qr_template.settings_qr') }}" class="btn btn-sm btn-secondary">
+                    <a href="{{ back_url | default(url_for('qr_template.sticker_list')) }}" class="btn btn-sm btn-secondary">
                         <i class="bi bi-arrow-left"></i> Back
                     </a>
                 </div>
@@ -2718,7 +2762,82 @@ document.getElementById('btnSaveSettings').addEventListener('click', async () =>
         const errorMsg = data.message || error.message || 'Unknown error';
         alert('Error saving settings: ' + errorMsg);
     }
+
+    // Save sharing settings if section exists
+    const isPublicEl = document.getElementById('settingsIsPublic');
+    if (isPublicEl) {
+        const sharingPayload = {
+            is_public: isPublicEl.checked,
+            share_view_users: _collectShareUsers('view'),
+            share_edit_users: _collectShareUsers('edit'),
+        };
+        try {
+            await fetch(`/sticker/${templateId}/sharing`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(sharingPayload)
+            });
+        } catch (e) {
+            console.error('Error saving sharing settings:', e);
+        }
+    }
 });
+
+// ── Sticker sharing helpers ──────────────────────────────────────────────────
+const _shareViewUsers = [];
+const _shareEditUsers = [];
+
+function _collectShareUsers(type) {
+    const container = document.getElementById(type === 'view' ? 'shareViewList' : 'shareEditList');
+    if (!container) return [];
+    return Array.from(container.querySelectorAll('.share-' + type + '-badge')).map(b => ({
+        id: parseInt(b.dataset.id, 10),
+        name: b.dataset.name || b.textContent.trim().replace(/×$/, '').trim()
+    }));
+}
+
+function removeShareUser(type, userId) {
+    const listId = type === 'view' ? 'shareViewList' : 'shareEditList';
+    const container = document.getElementById(listId);
+    if (!container) return;
+    const badge = container.querySelector(`.share-${type}-badge[data-id="${userId}"]`);
+    if (badge) badge.remove();
+}
+
+function _addShareUser(type) {
+    const selectId = type === 'view' ? 'addViewUserSelect' : 'addEditUserSelect';
+    const listId   = type === 'view' ? 'shareViewList'   : 'shareEditList';
+    const badgeClass = 'share-' + type + '-badge';
+    const bgClass  = type === 'view' ? 'bg-secondary' : 'bg-primary';
+    const sel = document.getElementById(selectId);
+    const container = document.getElementById(listId);
+    if (!sel || !container || !sel.value) return;
+    const userId = parseInt(sel.value, 10);
+    const userName = sel.options[sel.selectedIndex].dataset.name || sel.options[sel.selectedIndex].text;
+    if (container.querySelector(`.${badgeClass}[data-id="${userId}"]`)) {
+        sel.value = ''; return;
+    }
+    // Remove from the other list if present
+    const otherList = document.getElementById(type === 'view' ? 'shareEditList' : 'shareViewList');
+    if (otherList) { const ob = otherList.querySelector(`.share-${type === 'view' ? 'edit' : 'view'}-badge[data-id="${userId}"]`); if (ob) ob.remove(); }
+    if (container.querySelectorAll('.' + badgeClass).length >= 20) {
+        alert('Maximum 20 users per list');
+        sel.value = '';
+        return;
+    }
+    const badge = document.createElement('span');
+    badge.className = `badge ${bgClass} me-1 mb-1 ${badgeClass}`;
+    badge.dataset.id = userId;
+    badge.dataset.name = userName;
+    badge.innerHTML = `${userName} <button type="button" class="btn-close btn-close-white ms-1" style="font-size:9px;" onclick="removeShareUser('${type}',${userId})"></button>`;
+    container.appendChild(badge);
+    sel.value = '';
+}
+
+const addViewSel = document.getElementById('addViewUserSelect');
+if (addViewSel) addViewSel.addEventListener('change', () => _addShareUser('view'));
+const addEditSel = document.getElementById('addEditUserSelect');
+if (addEditSel) addEditSel.addEventListener('change', () => _addShareUser('edit'));
 
 loadTemplate();
 </script>

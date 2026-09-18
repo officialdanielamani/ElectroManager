@@ -472,6 +472,7 @@ def role_new():
                 "share_files":        {"view": False, "add": False, "edit": False, "delete": False},
             },
             "kanban": {"view_manage": False, "share_board": False},
+            "sticker": {"view_manage": False, "share_sticker": False},
         }
 
         role = Role(
@@ -614,6 +615,12 @@ def role_edit(id):
             perms['kanban'] = {
                 'view_manage': 'kanban_view_manage' in request.form,
                 'share_board': 'kanban_share_board' in request.form,
+            }
+
+            # Sticker
+            perms['sticker'] = {
+                'view_manage': 'sticker_view_manage' in request.form,
+                'share_sticker': 'sticker_share_sticker' in request.form,
             }
 
             # Backup & Restore

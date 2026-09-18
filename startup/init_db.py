@@ -115,6 +115,7 @@ _ADMIN_PERMS = {
     },
     "users_api": {"view": True, "run": True},
     "kanban": {"view_manage": True, "share_board": True},
+    "sticker": {"view_manage": True, "share_sticker": True},
 }
 
 _MANAGER_PERMS = {
@@ -160,6 +161,7 @@ _MANAGER_PERMS = {
     },
     "users_api": {"view": True, "run": True},
     "kanban": {"view_manage": True, "share_board": False},
+    "sticker": {"view_manage": True, "share_sticker": False},
 }
 
 _VIEWER_PERMS = {
@@ -205,6 +207,7 @@ _VIEWER_PERMS = {
     },
     "users_api": {"view": True, "run": False},
     "kanban": {"view_manage": True, "share_board": False},
+    "sticker": {"view_manage": True, "share_sticker": False},
 }
 
 # Map role name → canonical permission set (used by both create and update)

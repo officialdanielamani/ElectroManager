@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}My Stickers{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="bi bi-sticker"></i> Sticker Templates</h2>
+            <p class="text-muted">Design and manage your personal sticker templates</p>
+        </div>
+        <div class="col-auto">
+            {% if can_create %}
+            <a href="{{ url_for('qr_template.create_sticker') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> New Sticker
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ── Own templates ────────────────────────────────────── #}
+    <h5 class="mb-3"><i class="bi bi-person"></i> My Stickers</h5>
+    {% if own_templates %}
+    <div class="row mb-4">
+        {% for template in own_templates %}
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card h-100">
+                <div style="height: 200px; background-color: var(--bs-gray-200, #e9ecef); border-bottom: 1px solid var(--bs-border-color, #dee2e6); display: flex; align-items: center; justify-content: center; padding: 12px; overflow: hidden;">
+                    <div id="preview-{{ template.id }}" class="template-preview" style="width: 100%; height: 100%; border: 1px solid var(--bs-gray-400, #adb5bd); background: white; display: flex; align-items: center; justify-content: center; overflow: auto;">
+                        <svg style="width:100%;height:100%;object-fit:contain;"></svg>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title mb-1">{{ template.name }}</h5>
+                    <p class="card-text mb-1">
+                        <small>
+                            <span class="badge
+                                {% if template.template_type == 'Items' %}bg-primary
+                                {% elif template.template_type == 'Item Batch' %}bg-success
+                                {% elif template.template_type == 'Location' %}bg-warning text-dark
+                                {% elif template.template_type == 'Racks' %}bg-info text-dark
+                                {% elif template.template_type == 'Drawer' %}bg-secondary
+                                {% elif template.template_type == 'In-Out' %}bg-danger
+                                {% else %}bg-primary{% endif %}">{{ template.template_type }}</span>
+                            {% if template.is_public %}
+                            <span class="badge bg-light text-dark border ms-1" title="Public"><i class="bi bi-globe2"></i> Public</span>
+                            {% elif template.is_shared() %}
+                            <span class="badge bg-light text-dark border ms-1" title="Shared"><i class="bi bi-share"></i> Shared</span>
+                            {% endif %}
+                        </small>
+                    </p>
+                    <p class="card-text mb-0">
+                        <small class="text-muted">{{ template.width_mm }}×{{ template.height_mm }}mm</small>
+                    </p>
+                </div>
+                <div class="card-footer bg-transparent">
+                    <div class="d-flex gap-2">
+                        <a href="{{ url_for('qr_template.edit_sticker', template_id=template.id) }}"
+                           class="btn btn-warning btn-sm flex-grow-1">
+                            <i class="bi bi-pencil"></i> Edit
+                        </a>
+                        <form method="POST" action="{{ url_for('qr_template.delete_sticker', template_id=template.id) }}"
+                              style="flex-grow: 1;">
+                            <button type="submit" class="btn btn-danger btn-sm w-100"
+                                    onclick="return confirm('Delete this sticker template?')">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info mb-4">
+        <i class="bi bi-info-circle"></i>
+        <strong>No sticker templates yet.</strong>
+        {% if can_create %}
+        <a href="{{ url_for('qr_template.create_sticker') }}">Create your first sticker</a> to get started.
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {# ── Shared with me ───────────────────────────────────── #}
+    {% if shared_templates %}
+    <h5 class="mb-3"><i class="bi bi-share"></i> Shared with Me</h5>
+    <div class="row mb-4">
+        {% for template in shared_templates %}
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card h-100">
+                <div style="height: 200px; background-color: var(--bs-gray-200, #e9ecef); border-bottom: 1px solid var(--bs-border-color, #dee2e6); display: flex; align-items: center; justify-content: center; padding: 12px; overflow: hidden;">
+                    <div id="preview-{{ template.id }}" class="template-preview" style="width: 100%; height: 100%; border: 1px solid var(--bs-gray-400, #adb5bd); background: white; display: flex; align-items: center; justify-content: center; overflow: auto;">
+                        <svg style="width:100%;height:100%;object-fit:contain;"></svg>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title mb-1">{{ template.name }}</h5>
+                    <p class="card-text mb-1">
+                        <small>
+                            <span class="badge
+                                {% if template.template_type == 'Items' %}bg-primary
+                                {% elif template.template_type == 'Item Batch' %}bg-success
+                                {% elif template.template_type == 'Location' %}bg-warning text-dark
+                                {% elif template.template_type == 'Racks' %}bg-info text-dark
+                                {% elif template.template_type == 'Drawer' %}bg-secondary
+                                {% elif template.template_type == 'In-Out' %}bg-danger
+                                {% else %}bg-primary{% endif %}">{{ template.template_type }}</span>
+                            {% if template.is_public %}
+                            <span class="badge bg-light text-dark border ms-1"><i class="bi bi-globe2"></i> Public</span>
+                            {% else %}
+                            <span class="badge bg-light text-dark border ms-1"><i class="bi bi-share"></i> Shared</span>
+                            {% endif %}
+                        </small>
+                    </p>
+                    <p class="card-text mb-0">
+                        <small class="text-muted">{{ template.width_mm }}×{{ template.height_mm }}mm
+                        {% if template.owner %}&nbsp;· by {{ template.owner.username }}{% endif %}
+                        </small>
+                    </p>
+                </div>
+                <div class="card-footer bg-transparent">
+                    {% if template.can_edit(current_user) %}
+                    <a href="{{ url_for('qr_template.edit_sticker', template_id=template.id) }}"
+                       class="btn btn-warning btn-sm w-100">
+                        <i class="bi bi-pencil"></i> Edit
+                    </a>
+                    {% else %}
+                    <span class="text-muted small"><i class="bi bi-eye"></i> View only</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+const _previewBlobUrls = {};
+function showSvgAsImage(svgString, container) {
+    if (_previewBlobUrls[container.id]) URL.revokeObjectURL(_previewBlobUrls[container.id]);
+    const blob = new Blob([svgString], {type: 'image/svg+xml'});
+    _previewBlobUrls[container.id] = URL.createObjectURL(blob);
+    container.innerHTML = `<img src="${_previewBlobUrls[container.id]}" style="width:100%;height:100%;object-fit:contain;display:block;">`;
+}
+
+document.querySelectorAll('.template-preview').forEach(previewDiv => {
+    const templateId = previewDiv.id.replace('preview-', '');
+    fetch(`/api/qr-template/${templateId}/preview?unresolved=true`)
+        .then(r => r.json())
+        .then(data => showSvgAsImage(data.svg, previewDiv))
+        .catch(e => console.warn('Preview failed:', e));
+});
+</script>
+{% endblock %}

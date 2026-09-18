@@ -1315,10 +1315,15 @@ class StickerTemplate(db.Model):
     height_mm = db.Column(db.Float, nullable=False)
     layout = db.Column(db.Text, nullable=False)
     is_default = db.Column(db.Boolean, default=False)
+    owner_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    is_public = db.Column(db.Boolean, default=False)
+    share_view_users = db.Column(db.Text)   # JSON [{id, name}] – view-only access
+    share_edit_users = db.Column(db.Text)   # JSON [{id, name}] – view+edit access
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     updated_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    owner = db.relationship('User', backref='owned_sticker_templates', foreign_keys=[owner_id])
     creator = db.relationship('User', backref='sticker_templates', foreign_keys=[created_by])
     updater = db.relationship('User', foreign_keys=[updated_by])
     
@@ -1327,10 +1332,48 @@ class StickerTemplate(db.Model):
             return json.loads(self.layout) if self.layout else []
         except json.JSONDecodeError:
             return []
-    
+
     def set_layout(self, layout_data):
         self.layout = json.dumps(layout_data)
-    
+
+    def get_share_view_users(self):
+        try:
+            return json.loads(self.share_view_users) if self.share_view_users else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def get_share_edit_users(self):
+        try:
+            return json.loads(self.share_edit_users) if self.share_edit_users else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def is_shared(self):
+        return bool(self.get_share_view_users() or self.get_share_edit_users())
+
+    def can_view(self, user):
+        if user is None:
+            return self.is_public
+        if self.owner_id == user.id:
+            return True
+        if self.is_public:
+            return True
+        uid = user.id
+        if any(u.get('id') == uid for u in self.get_share_view_users()):
+            return True
+        if any(u.get('id') == uid for u in self.get_share_edit_users()):
+            return True
+        return user.has_permission('settings_sections.qr_templates', 'view')
+
+    def can_edit(self, user):
+        if user is None:
+            return False
+        if self.owner_id == user.id:
+            return True
+        if any(u.get('id') == user.id for u in self.get_share_edit_users()):
+            return True
+        return user.has_permission('settings_sections.qr_templates', 'edit')
+
     def __repr__(self):
         return f'<StickerTemplate {self.name} - {self.template_type}>'
 
