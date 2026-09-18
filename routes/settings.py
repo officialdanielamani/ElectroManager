@@ -219,8 +219,16 @@ def save_ui_preference():
     user_font = validate_user_font(user_font)
     current_user.user_font = user_font
     
+    # Save navbar config
+    try:
+        items = json.loads(request.form.get('navbar_items', '[]'))
+        show_icons = request.form.get('show_icons', 'true') == 'true'
+        current_user.set_navbar_config(items, show_icons)
+    except Exception:
+        pass
+
     db.session.commit()
-    
+
     flash(f'Your UI preferences have been saved!', 'success')
     log_audit(current_user.id, 'update', 'user', current_user.id, f'Changed UI preference: theme={theme}, font={user_font}')
     return redirect(url_for('settings.settings_general'))

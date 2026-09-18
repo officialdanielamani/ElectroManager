@@ -59,6 +59,22 @@
                         </div>
                     </div>
 
+                    <!-- Navbar Options Section -->
+                    <div class="mb-4 pb-4 border-bottom">
+                        <label class="form-label"><strong><i class="bi bi-layout-sidebar"></i> Navbar Options</strong></label>
+                        <p class="text-muted small mb-2">Choose which items appear in the navigation bar and in what order. Drag <i class="bi bi-grip-vertical"></i> to reorder.</p>
+                        <div id="navbarItemsContainer" class="columns-container mb-3"></div>
+                        <div class="form-check mb-2">
+                            <input type="checkbox" class="form-check-input" id="showNavIcons" name="show_nav_icons" onchange="updateNavbarConfig()">
+                            <label class="form-check-label" for="showNavIcons"><i class="bi bi-icons"></i> Show icons on navbar</label>
+                        </div>
+                        <input type="hidden" id="navbarItemsInput" name="navbar_items" value="">
+                        <input type="hidden" id="navbarShowIconsInput" name="show_icons" value="true">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetNavbarConfig()">
+                            <i class="bi bi-arrow-counterclockwise"></i> Reset to Default
+                        </button>
+                    </div>
+
                     <!-- Preview Section -->
                     <div class="mb-4">
                         <label class="form-label"><strong>Theme & Font Selection Preview</strong></label>
@@ -346,39 +362,6 @@
             </div>
         </div>
 
-        <!-- Navbar Options -->
-        <div class="card mt-3">
-            <div class="card-header">
-                <h5><i class="bi bi-layout-sidebar"></i> Navbar Options</h5>
-            </div>
-            <div class="card-body">
-                <div class="alert alert-info mb-3">
-                    <i class="bi bi-info-circle"></i> <strong>Note:</strong> Choose which items appear in the navigation bar and in what order.
-                    Drag the handle <i class="bi bi-grip-vertical"></i> to reorder.
-                </div>
-                <form method="POST" action="{{ url_for('settings.save_navbar_config') }}" id="navbarConfigForm">
-                    <input type="hidden" id="navbarItemsInput" name="navbar_items" value="">
-                    <input type="hidden" id="navbarShowIconsInput" name="show_icons" value="true">
-                    <div class="mb-3">
-                        <label class="form-label"><strong>Navbar Items</strong></label>
-                        <div id="navbarItemsContainer" class="columns-container"></div>
-                    </div>
-                    <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="showNavIcons" onchange="updateNavbarConfig()">
-                        <label class="form-check-label" for="showNavIcons"><i class="bi bi-icons"></i> Show icons on navbar</label>
-                    </div>
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-outline-secondary" onclick="resetNavbarConfig()">
-                            <i class="bi bi-arrow-counterclockwise"></i> Reset to Default
-                        </button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-save"></i> Save Navbar
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
         </div>
     </div>
 </div>
@@ -472,8 +455,24 @@ function saveUIPreference() {
     csrfInput.name = 'csrf_token';
     csrfInput.value = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
+    updateNavbarConfig();
+    const navbarItemsVal = document.getElementById('navbarItemsInput')?.value || '[]';
+    const showIconsVal = document.getElementById('navbarShowIconsInput')?.value || 'true';
+
+    const navbarInput = document.createElement('input');
+    navbarInput.type = 'hidden';
+    navbarInput.name = 'navbar_items';
+    navbarInput.value = navbarItemsVal;
+
+    const showIconsInput = document.createElement('input');
+    showIconsInput.type = 'hidden';
+    showIconsInput.name = 'show_icons';
+    showIconsInput.value = showIconsVal;
+
     form.appendChild(themeInput);
     form.appendChild(fontInput);
+    form.appendChild(navbarInput);
+    form.appendChild(showIconsInput);
     form.appendChild(csrfInput);
     document.body.appendChild(form);
     form.submit();
