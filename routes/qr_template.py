@@ -13,11 +13,41 @@ from qr_utils import (
 from routes.settings import get_available_fonts
 from utils import log_audit, permission_required
 from datetime import datetime, timezone
+from collections import defaultdict, deque
+import threading
+import time
 import json
 import logging
 import re
 
 logger = logging.getLogger(__name__)
+
+# ── Real-time collaboration for sticker editor ────────────────────
+_STICKER_PRESENCE_TTL = 12
+_stk_lock = threading.Lock()
+_sticker_presence: dict = defaultdict(dict)   # template_id -> {user_id: {...}}
+_sticker_events: dict   = defaultdict(deque)  # template_id -> deque[(ts, event)]
+_MAX_STICKER_EVENTS = 200
+
+def _stk_push_event(template_id: int, event: dict):
+    with _stk_lock:
+        q = _sticker_events[template_id]
+        q.append((time.time(), event))
+        while len(q) > _MAX_STICKER_EVENTS:
+            q.popleft()
+
+def _stk_collect_events_since(template_id: int, since_ts: float) -> list:
+    with _stk_lock:
+        return [ev for ts, ev in _sticker_events[template_id] if ts > since_ts]
+
+def _stk_collect_presence(template_id: int) -> list:
+    now = time.time()
+    with _stk_lock:
+        stale = [uid for uid, p in _sticker_presence[template_id].items()
+                 if now - p['last_seen'] > _STICKER_PRESENCE_TTL]
+        for uid in stale:
+            del _sticker_presence[template_id][uid]
+        return list(_sticker_presence[template_id].values())
 
 qr_template_bp = Blueprint('qr_template', __name__)
 
@@ -108,11 +138,10 @@ def edit_sticker(template_id):
     if not template.can_edit(current_user):
         abort(403)
     placeholders = AVAILABLE_PLACEHOLDERS.get(template.template_type, [])
-    can_share = current_user.has_permission('sticker', 'share_sticker') and template.owner_id == current_user.id
-    from models import User
-    all_users = User.query.filter(User.id != current_user.id, User.is_active == True).order_by(User.username).all()
+    is_owner = template.owner_id == current_user.id
+    can_share = current_user.has_permission('sticker', 'share_sticker') and is_owner
     return render_template('qr_template_editor.html', template=template, placeholders=placeholders,
-                           can_share=can_share, all_users=all_users,
+                           can_share=can_share, is_owner=is_owner,
                            back_url=url_for('qr_template.sticker_list'))
 
 
@@ -141,6 +170,79 @@ def sticker_sharing(template_id):
               f'Updated sharing settings: public={template.is_public}')
     return jsonify({'status': 'success'})
 
+@qr_template_bp.route('/sticker/<int:template_id>/presence', methods=['POST'], endpoint='sticker_presence')
+@login_required
+def sticker_presence(template_id):
+    """Heartbeat: record current user's presence and which layer/field they are editing."""
+    template = StickerTemplate.query.get_or_404(template_id)
+    if not template.can_view(current_user):
+        return jsonify({'error': 'Permission denied'}), 403
+    data = request.get_json(silent=True) or {}
+    name = current_user.name or current_user.username
+    is_owner = template.owner_id == current_user.id
+    can_edit = template.can_edit(current_user)
+    access = 'edit' if can_edit else 'view'
+    pic_url = ''
+    if current_user.profile_photo:
+        if current_user.profile_photo.startswith('share/'):
+            pic_url = f"/uploads/share/profile/{current_user.profile_photo[6:]}"
+        else:
+            pic_url = f"/uploads/userpicture/{current_user.profile_photo}"
+    with _stk_lock:
+        _sticker_presence[template_id][current_user.id] = {
+            'id': current_user.id,
+            'name': name,
+            'last_seen': time.time(),
+            'editing_layer_idx': data.get('editing_layer_idx'),
+            'editing_field': data.get('editing_field'),
+            'access': access,
+            'is_owner': is_owner,
+            'pic': pic_url,
+        }
+    return jsonify({'ok': True})
+
+
+@qr_template_bp.route('/sticker/<int:template_id>/poll', methods=['GET'], endpoint='sticker_poll')
+@login_required
+def sticker_poll(template_id):
+    """Poll for presence and events since a given timestamp."""
+    template = StickerTemplate.query.get_or_404(template_id)
+    if not template.can_view(current_user):
+        return jsonify({'error': 'Permission denied'}), 403
+    since = request.args.get('since', type=float, default=0.0)
+    return jsonify({
+        'presence': _stk_collect_presence(template_id),
+        'events':   _stk_collect_events_since(template_id, since),
+        'ts':       time.time(),
+    })
+
+
+@qr_template_bp.route('/api/sticker-users', methods=['GET'])
+@login_required
+def api_sticker_users():
+    """Return all active users for sticker sharing search (same shape as /kanban/contacts)."""
+    from models import User
+    users = User.query.filter_by(is_active=True).order_by(User.username).all()
+    result = []
+    for u in users:
+        if u.id == current_user.id:
+            continue
+        pic = ''
+        if u.profile_photo:
+            if u.profile_photo.startswith('share/'):
+                pic = f"/uploads/share/profile/{u.profile_photo[6:]}"
+            else:
+                pic = f"/uploads/userpicture/{u.profile_photo}"
+        result.append({
+            'id': u.id,
+            'type': 'user',
+            'label': u.username,
+            'extra': u.name or '',
+            'pic': pic,
+        })
+    return jsonify(result)
+
+
 @qr_template_bp.route('/api/qr-template/<int:template_id>', methods=['GET', 'POST', 'PUT'])
 @login_required
 def api_qr_template(template_id):
@@ -152,10 +254,18 @@ def api_qr_template(template_id):
     if request.method == 'POST':
         try:
             data = request.get_json()
-            template.set_layout(data.get('layout', []))
+            new_layout = data.get('layout', [])
+            template.set_layout(new_layout)
             template.updated_at = datetime.now(timezone.utc)
             template.updated_by = current_user.id
             db.session.commit()
+            _stk_push_event(template_id, {
+                'type': 'layout_saved',
+                'user_id': current_user.id,
+                'user_name': current_user.name or current_user.username,
+                'layout': new_layout,
+                'ts': time.time(),
+            })
             return jsonify({'status': 'success'})
         except Exception as e:
             logger.error(f"Error saving template: {e}")
@@ -280,7 +390,8 @@ def api_item_sticker_preview(uuid, template_id):
         return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
-    
+    if not template.can_view(current_user):
+        return jsonify({'error': 'Permission denied'}), 403
     if template.template_type != 'Items':
         return jsonify({'error': 'Template must be for Items'}), 400
     
@@ -302,7 +413,8 @@ def api_item_sticker_print(uuid, template_id):
         return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
-    
+    if not template.can_view(current_user):
+        return jsonify({'error': 'Permission denied'}), 403
     try:
         data = get_item_data(item)
         pdf_data = generate_single_sticker_pdf(template, data, item.uuid)
@@ -524,6 +636,8 @@ def api_batch_sticker_preview(uuid, batch_id, template_id):
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     batch = ItemBatch.query.filter_by(id=batch_id, item_id=item.id).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
+    if not template.can_view(current_user):
+        return jsonify({'error': 'Permission denied'}), 403
     if template.template_type != 'Item Batch':
         return jsonify({'error': 'Template must be Item Batch type'}), 400
     sn = None
@@ -548,6 +662,8 @@ def api_batch_sticker_print(uuid, template_id):
         return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
+    if not template.can_view(current_user):
+        return jsonify({'error': 'Permission denied'}), 403
     if template.template_type != 'Item Batch':
         return jsonify({'error': 'Template must be Item Batch type'}), 400
     batch_id = request.args.get('batch_id', '')
@@ -582,6 +698,8 @@ def api_batch_sticker_svg_zip(uuid, template_id):
         return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
+    if not template.can_view(current_user):
+        return jsonify({'error': 'Permission denied'}), 403
     if template.template_type != 'Item Batch':
         return jsonify({'error': 'Template must be Item Batch type'}), 400
     batch_id = request.args.get('batch_id', '')
@@ -614,6 +732,8 @@ def api_batch_sticker_table_print(uuid, template_id):
         return jsonify({'error': 'Permission denied'}), 403
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
+    if not template.can_view(current_user):
+        return jsonify({'error': 'Permission denied'}), 403
     if template.template_type != 'Item Batch':
         return jsonify({'error': 'Template must be Item Batch type'}), 400
     batch_id = request.args.get('batch_id', '')

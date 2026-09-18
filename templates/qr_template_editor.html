@@ -163,6 +163,46 @@
         z-index: 19;
     }
 
+    .layer-editor-badge {
+        position: absolute;
+        bottom: -18px;
+        right: 0;
+        font-size: 9px;
+        background: rgba(13,110,253,.85);
+        color: #fff;
+        padding: 1px 4px;
+        border-radius: 3px;
+        white-space: nowrap;
+        pointer-events: none;
+        z-index: 30;
+        max-width: 80px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .layer-field-locked {
+        pointer-events: none !important;
+        opacity: .45 !important;
+    }
+    .layer-field-lock-badge {
+        display: inline-block;
+        font-size: 10px;
+        background: #dc3545;
+        color: #fff;
+        padding: 1px 5px;
+        border-radius: 3px;
+        margin-left: 4px;
+    }
+    .contact-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        font-size: .8rem;
+        margin: 2px;
+    }
+
     /* Mobile optimizations */
     @media (max-width: 768px) {
         .toolbar {
@@ -270,37 +310,47 @@
                             </label>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label"><strong>Can view only</strong> <small class="text-muted">(max 20 users)</small></label>
-                        <div id="shareViewList" class="mb-2" style="max-height:120px;overflow-y:auto;">
-                            {% for u in template.get_share_view_users() %}
-                            <span class="badge bg-secondary me-1 mb-1 share-view-badge" data-id="{{ u.id }}" data-name="{{ u.name }}">
-                                {{ u.name }} <button type="button" class="btn-close btn-close-white ms-1" style="font-size:9px;" onclick="removeShareUser('view',{{ u.id }})"></button>
-                            </span>
-                            {% endfor %}
+                    <div id="sharing-user-pickers">
+                        <div class="mb-2">
+                            <label class="form-label form-label-sm fw-semibold">
+                                <i class="bi bi-eye"></i> Can view only <small class="text-muted">(max 20)</small>
+                            </label>
+                            <div class="input-group input-group-sm mb-1">
+                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                <input type="text" class="form-control" id="share-view-search" placeholder="Search users to add…">
+                            </div>
+                            <div id="share-view-results" class="border rounded p-1 mb-1"
+                                 style="max-height:110px;overflow-y:auto;font-size:.83rem;display:none"></div>
+                            <div id="share-view-badges">
+                                {% for u in template.get_share_view_users() %}
+                                <span class="contact-badge share-badge" data-share-type="view" data-uid="{{ u.id }}" data-name="{{ u.name }}">
+                                    <i class="bi bi-person-badge-fill text-muted" style="font-size:.75rem"></i>
+                                    {{ u.name }}
+                                    <span class="remove-share-user" data-uid="{{ u.id }}" data-share-type="view" style="cursor:pointer;color:var(--bs-danger)">&times;</span>
+                                </span>
+                                {% endfor %}
+                            </div>
                         </div>
-                        <select id="addViewUserSelect" class="form-select form-select-sm">
-                            <option value="">— add user —</option>
-                            {% for u in all_users %}
-                            <option value="{{ u.id }}" data-name="{{ u.username }}">{{ u.username }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label"><strong>Can view and edit</strong> <small class="text-muted">(max 20 users)</small></label>
-                        <div id="shareEditList" class="mb-2" style="max-height:120px;overflow-y:auto;">
-                            {% for u in template.get_share_edit_users() %}
-                            <span class="badge bg-primary me-1 mb-1 share-edit-badge" data-id="{{ u.id }}" data-name="{{ u.name }}">
-                                {{ u.name }} <button type="button" class="btn-close btn-close-white ms-1" style="font-size:9px;" onclick="removeShareUser('edit',{{ u.id }})"></button>
-                            </span>
-                            {% endfor %}
+                        <div class="mb-2">
+                            <label class="form-label form-label-sm fw-semibold">
+                                <i class="bi bi-pencil-square"></i> Can view &amp; edit <small class="text-muted">(max 20)</small>
+                            </label>
+                            <div class="input-group input-group-sm mb-1">
+                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                <input type="text" class="form-control" id="share-edit-search" placeholder="Search users to add…">
+                            </div>
+                            <div id="share-edit-results" class="border rounded p-1 mb-1"
+                                 style="max-height:110px;overflow-y:auto;font-size:.83rem;display:none"></div>
+                            <div id="share-edit-badges">
+                                {% for u in template.get_share_edit_users() %}
+                                <span class="contact-badge share-badge" data-share-type="edit" data-uid="{{ u.id }}" data-name="{{ u.name }}">
+                                    <i class="bi bi-person-badge-fill text-muted" style="font-size:.75rem"></i>
+                                    {{ u.name }}
+                                    <span class="remove-share-user" data-uid="{{ u.id }}" data-share-type="edit" style="cursor:pointer;color:var(--bs-danger)">&times;</span>
+                                </span>
+                                {% endfor %}
+                            </div>
                         </div>
-                        <select id="addEditUserSelect" class="form-select form-select-sm">
-                            <option value="">— add user —</option>
-                            {% for u in all_users %}
-                            <option value="{{ u.id }}" data-name="{{ u.username }}">{{ u.username }}</option>
-                            {% endfor %}
-                        </select>
                     </div>
                     {% endif %}
                 </div>
@@ -349,7 +399,8 @@
             </div>
             
             <div class="col-12 col-md-auto">
-                <div class="d-flex gap-1 flex-wrap">
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <div id="sticker-presence-bar" class="d-flex align-items-center gap-1"></div>
                     <button id="btn-save" class="btn btn-sm btn-primary">
                         <i class="bi bi-check-circle"></i> Save
                     </button>
@@ -499,6 +550,10 @@
 
 <script>
 const templateId = {{ template.id }};
+const CURRENT_USER_ID = {{ current_user.id | tojson }};
+const IS_OWNER = {{ is_owner | tojson }};
+const CAN_EDIT = {{ (template.can_edit(current_user)) | tojson }};
+const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
 let templateWidth = {{ template.width_mm }};
 let templateHeight = {{ template.height_mm }};
 const templateType = ('{{ template.template_type | default("item") }}' || 'item').toLowerCase();  // item, location, or rack
@@ -1163,6 +1218,12 @@ function createElementDiv(element, index) {
     }
     div.appendChild(resizeHandle);
 
+    // Collaboration: badge showing who is editing this layer
+    const editorBadge = document.createElement('div');
+    editorBadge.className = 'layer-editor-badge d-none';
+    editorBadge.dataset.layerIdx = index;
+    div.appendChild(editorBadge);
+
     // Add visual indicator for locked elements
     if (element.fix_position || element.fix_size) {
         div.style.opacity = '0.85';
@@ -1711,7 +1772,8 @@ function attachPropertyListeners(index) {
     // Layer name - only re-render on blur or Enter (not on every keystroke)
     const layerNameField = document.getElementById('prop-layername');
     if (layerNameField) {
-        layerNameField.addEventListener('blur', e => updateProp('layer_name', e.target.value));
+        layerNameField.addEventListener('focus', () => _stkReportField(index, 'layer_name'));
+        layerNameField.addEventListener('blur', e => { _stkReportField(null, null); updateProp('layer_name', e.target.value); });
         layerNameField.addEventListener('keydown', e => {
             if (e.key === 'Enter') {
                 e.preventDefault();
@@ -1750,7 +1812,9 @@ function attachPropertyListeners(index) {
     positionSizeFields.forEach(fieldId => {
         const field = document.getElementById(fieldId);
         if (field) {
+            field.addEventListener('focus', () => _stkReportField(index, fieldMap[fieldId]));
             field.addEventListener('blur', e => {
+                _stkReportField(null, null);
                 // Check if position or size is locked
                 if ((fieldId === 'prop-x' || fieldId === 'prop-y') && el.fix_position) {
                     return; // Don't update if position is locked
@@ -2462,10 +2526,11 @@ function debounceAutoSave() {
 }
 
 async function saveTemplate() {
+    if (!CAN_EDIT) return; // read-only users cannot save
     try {
         const response = await fetch(`/api/qr-template/${templateId}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
             body: JSON.stringify({ layout })
         });
         
@@ -2719,10 +2784,34 @@ document.getElementById('btnSaveSettings').addEventListener('click', async () =>
         return;
     }
     
+    // Save sharing first (independent of template settings)
+    const isPublicEl = document.getElementById('settingsIsPublic');
+    if (isPublicEl) {
+        try {
+            await fetch(`/sticker/${templateId}/sharing`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+                body: JSON.stringify({
+                    is_public: isPublicEl.checked,
+                    share_view_users: _collectShareUsers('view'),
+                    share_edit_users: _collectShareUsers('edit'),
+                })
+            });
+        } catch (e) {
+            console.error('Error saving sharing settings:', e);
+        }
+    }
+
+    if (!IS_OWNER) {
+        // Non-owners can only save layout, not template metadata
+        modalElement.style.display = 'none';
+        return;
+    }
+
     try {
         const response = await fetch(`/api/qr-template/${templateId}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
             body: JSON.stringify({
                 name: newName,
                 width_mm: newWidth,
@@ -2730,116 +2819,279 @@ document.getElementById('btnSaveSettings').addEventListener('click', async () =>
                 layout: layout
             })
         });
-        
+
         if (!response.ok) throw new Error('Save failed');
-        
+
         const data = await response.json();
         if (data.status === 'success') {
             templateWidth = newWidth;
             templateHeight = newHeight;
-            
+
             document.getElementById('templateNameDisplay').textContent = newName;
             document.getElementById('templateWidthDisplay').textContent = newWidth;
             document.getElementById('templateHeightDisplay').textContent = newHeight;
-            
+
             renderCanvas();
             renderLayers();
-            
+
             modalElement.style.display = 'none';
-            
-            const alert = document.createElement('div');
-            alert.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
-            alert.style.zIndex = '9998';
-            alert.innerHTML = '<i class="bi bi-check-circle-fill"></i> Settings saved! Refreshing... <button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
-            document.body.appendChild(alert);
-            
-            // Refresh page after 1 second to reload canvas with new dimensions
+
+            const alertEl = document.createElement('div');
+            alertEl.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+            alertEl.style.zIndex = '9998';
+            alertEl.innerHTML = '<i class="bi bi-check-circle-fill"></i> Settings saved! Refreshing... <button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+            document.body.appendChild(alertEl);
+
             setTimeout(() => window.location.reload(), 1000);
         }
     } catch (error) {
         console.error('Error:', error);
-        const data = await error.json?.() || { message: error.message };
-        const errorMsg = data.message || error.message || 'Unknown error';
+        const errorMsg = error.message || 'Unknown error';
         alert('Error saving settings: ' + errorMsg);
-    }
-
-    // Save sharing settings if section exists
-    const isPublicEl = document.getElementById('settingsIsPublic');
-    if (isPublicEl) {
-        const sharingPayload = {
-            is_public: isPublicEl.checked,
-            share_view_users: _collectShareUsers('view'),
-            share_edit_users: _collectShareUsers('edit'),
-        };
-        try {
-            await fetch(`/sticker/${templateId}/sharing`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(sharingPayload)
-            });
-        } catch (e) {
-            console.error('Error saving sharing settings:', e);
-        }
     }
 });
 
 // ── Sticker sharing helpers ──────────────────────────────────────────────────
-const _shareViewUsers = [];
-const _shareEditUsers = [];
+let _shareViewUsers = [];
+let _shareEditUsers = [];
+let _allStickerUsers = null;
 
-function _collectShareUsers(type) {
-    const container = document.getElementById(type === 'view' ? 'shareViewList' : 'shareEditList');
-    if (!container) return [];
-    return Array.from(container.querySelectorAll('.share-' + type + '-badge')).map(b => ({
-        id: parseInt(b.dataset.id, 10),
-        name: b.dataset.name || b.textContent.trim().replace(/×$/, '').trim()
-    }));
+async function _loadStickerUsers() {
+    if (_allStickerUsers !== null) return;
+    try {
+        const r = await fetch('/api/sticker-users');
+        _allStickerUsers = r.ok ? await r.json() : [];
+    } catch(e) { _allStickerUsers = []; }
 }
 
-function removeShareUser(type, userId) {
-    const listId = type === 'view' ? 'shareViewList' : 'shareEditList';
-    const container = document.getElementById(listId);
-    if (!container) return;
-    const badge = container.querySelector(`.share-${type}-badge[data-id="${userId}"]`);
-    if (badge) badge.remove();
+function _escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function _addShareUser(type) {
-    const selectId = type === 'view' ? 'addViewUserSelect' : 'addEditUserSelect';
-    const listId   = type === 'view' ? 'shareViewList'   : 'shareEditList';
-    const badgeClass = 'share-' + type + '-badge';
-    const bgClass  = type === 'view' ? 'bg-secondary' : 'bg-primary';
-    const sel = document.getElementById(selectId);
-    const container = document.getElementById(listId);
-    if (!sel || !container || !sel.value) return;
-    const userId = parseInt(sel.value, 10);
-    const userName = sel.options[sel.selectedIndex].dataset.name || sel.options[sel.selectedIndex].text;
-    if (container.querySelector(`.${badgeClass}[data-id="${userId}"]`)) {
-        sel.value = ''; return;
+function _stkSyncPublicState() {
+    const isPublic = document.getElementById('settingsIsPublic')?.checked;
+    const pickers = document.getElementById('sharing-user-pickers');
+    if (pickers) {
+        pickers.style.opacity = isPublic ? '.45' : '';
+        pickers.style.pointerEvents = isPublic ? 'none' : '';
     }
-    // Remove from the other list if present
-    const otherList = document.getElementById(type === 'view' ? 'shareEditList' : 'shareViewList');
-    if (otherList) { const ob = otherList.querySelector(`.share-${type === 'view' ? 'edit' : 'view'}-badge[data-id="${userId}"]`); if (ob) ob.remove(); }
-    if (container.querySelectorAll('.' + badgeClass).length >= 20) {
-        alert('Maximum 20 users per list');
-        sel.value = '';
+}
+document.getElementById('settingsIsPublic')?.addEventListener('change', _stkSyncPublicState);
+_stkSyncPublicState();
+
+function _renderShareBadges(type) {
+    const list = type === 'view' ? _shareViewUsers : _shareEditUsers;
+    const container = document.getElementById('share-' + type + '-badges');
+    if (!container) return;
+    container.innerHTML = list.map(u => {
+        return `<span class="contact-badge share-badge" data-share-type="${type}" data-uid="${u.id}" data-name="${_escHtml(u.name)}">
+            <i class="bi bi-person-badge-fill text-muted" style="font-size:.75rem"></i>
+            ${_escHtml(u.name)}
+            <span class="remove-share-user" data-uid="${u.id}" data-share-type="${type}" style="cursor:pointer;color:var(--bs-danger)">&times;</span>
+        </span>`;
+    }).join('');
+}
+
+// Seed lists from rendered badges on page load
+document.querySelectorAll('#share-view-badges .share-badge').forEach(b => {
+    _shareViewUsers.push({ id: parseInt(b.dataset.uid), name: b.dataset.name });
+});
+document.querySelectorAll('#share-edit-badges .share-badge').forEach(b => {
+    _shareEditUsers.push({ id: parseInt(b.dataset.uid), name: b.dataset.name });
+});
+
+function _addShareUser(id, name, type) {
+    const other = type === 'view' ? _shareEditUsers : _shareViewUsers;
+    if (other.some(u => u.id === id)) {
+        alert('This user is already in the other sharing list. Remove them first.');
         return;
     }
-    const badge = document.createElement('span');
-    badge.className = `badge ${bgClass} me-1 mb-1 ${badgeClass}`;
-    badge.dataset.id = userId;
-    badge.dataset.name = userName;
-    badge.innerHTML = `${userName} <button type="button" class="btn-close btn-close-white ms-1" style="font-size:9px;" onclick="removeShareUser('${type}',${userId})"></button>`;
-    container.appendChild(badge);
-    sel.value = '';
+    const list = type === 'view' ? _shareViewUsers : _shareEditUsers;
+    if (list.some(u => u.id === id)) return;
+    if (list.length >= 20) { alert('Maximum 20 users per list'); return; }
+    list.push({ id, name });
+    _renderShareBadges(type);
+    const inp = document.getElementById('share-' + type + '-search');
+    const res = document.getElementById('share-' + type + '-results');
+    if (inp) inp.value = '';
+    if (res) res.style.display = 'none';
 }
 
-const addViewSel = document.getElementById('addViewUserSelect');
-if (addViewSel) addViewSel.addEventListener('change', () => _addShareUser('view'));
-const addEditSel = document.getElementById('addEditUserSelect');
-if (addEditSel) addEditSel.addEventListener('change', () => _addShareUser('edit'));
+function _removeShareUser(id, type) {
+    if (type === 'view') _shareViewUsers = _shareViewUsers.filter(u => u.id !== id);
+    else _shareEditUsers = _shareEditUsers.filter(u => u.id !== id);
+    _renderShareBadges(type);
+}
+
+async function _filterShareSearch(type) {
+    await _loadStickerUsers();
+    const q = (document.getElementById('share-' + type + '-search')?.value || '').toLowerCase();
+    const resultsDiv = document.getElementById('share-' + type + '-results');
+    if (!resultsDiv) return;
+    if (!q) { resultsDiv.style.display = 'none'; return; }
+    const taken = new Set((type === 'view' ? _shareViewUsers : _shareEditUsers).map(u => u.id));
+    const matches = (_allStickerUsers || []).filter(c => !taken.has(c.id) && c.label.toLowerCase().includes(q)).slice(0, 8);
+    if (!matches.length) { resultsDiv.style.display = 'none'; return; }
+    resultsDiv.innerHTML = matches.map(c => {
+        const avatar = c.pic
+            ? `<img src="${_escHtml(c.pic)}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;flex-shrink:0" alt="">`
+            : `<i class="bi bi-person-badge-fill text-muted" style="font-size:.8rem;flex-shrink:0"></i>`;
+        const extra = c.extra ? `<small class="text-muted ms-1">${_escHtml(c.extra)}</small>` : '';
+        return `<div class="py-1 px-2 rounded js-stk-share-result d-flex align-items-center gap-2" style="cursor:pointer"
+            data-uid="${c.id}" data-name="${_escHtml(c.label)}" data-share-type="${type}"
+            onmouseover="this.style.background='var(--bs-secondary-bg)'" onmouseout="this.style.background=''">
+            ${avatar}<strong>${_escHtml(c.label)}</strong>${extra}
+        </div>`;
+    }).join('');
+    resultsDiv.style.display = 'block';
+}
+
+document.getElementById('share-view-search')?.addEventListener('input', () => _filterShareSearch('view'));
+document.getElementById('share-edit-search')?.addEventListener('input', () => _filterShareSearch('edit'));
+
+document.addEventListener('click', function(e) {
+    const res = e.target.closest('.js-stk-share-result');
+    if (res) { _addShareUser(parseInt(res.dataset.uid), res.dataset.name, res.dataset.shareType); return; }
+    const rem = e.target.closest('.remove-share-user');
+    if (rem) { _removeShareUser(parseInt(rem.dataset.uid), rem.dataset.shareType); return; }
+    // Close dropdowns when clicking elsewhere
+    if (!e.target.closest('#share-view-search') && !e.target.closest('#share-view-results'))
+        document.getElementById('share-view-results') && (document.getElementById('share-view-results').style.display = 'none');
+    if (!e.target.closest('#share-edit-search') && !e.target.closest('#share-edit-results'))
+        document.getElementById('share-edit-results') && (document.getElementById('share-edit-results').style.display = 'none');
+});
+
+function _collectShareUsers(type) {
+    return type === 'view' ? _shareViewUsers : _shareEditUsers;
+}
+
+// ── Read-only enforcement ────────────────────────────────────────────────────
+if (!CAN_EDIT) {
+    // Disable all editing controls
+    document.querySelectorAll('#btn-save, #btn-add-text, #btn-add-qr, #btn-add-barcode, #btn-add-icon, #btn-add-picture, #btn-edit-template').forEach(el => {
+        el.disabled = true;
+        el.title = 'View only — you cannot edit this sticker';
+    });
+    // Show view-only banner
+    const toolbar = document.querySelector('.toolbar');
+    if (toolbar) {
+        const banner = document.createElement('div');
+        banner.className = 'alert alert-info py-1 px-2 mb-0 mt-1 small';
+        banner.innerHTML = '<i class="bi bi-eye"></i> View only — editing is disabled.';
+        toolbar.appendChild(banner);
+    }
+}
+if (!IS_OWNER) {
+    // Non-owners cannot delete template, change name/size
+    document.getElementById('btn-edit-template') && (document.getElementById('btn-edit-template').disabled = true);
+    document.getElementById('settingsTemplateName') && (document.getElementById('settingsTemplateName').disabled = true);
+    document.getElementById('settingsTemplateWidth') && (document.getElementById('settingsTemplateWidth').disabled = true);
+    document.getElementById('settingsTemplateHeight') && (document.getElementById('settingsTemplateHeight').disabled = true);
+}
+
+// ── Real-time collaboration ──────────────────────────────────────────────────
+let _stkPollTs = 0, _stkPollTimer = null, _stkHeartbeatTimer = null;
+let _stkEditingLayerIdx = null, _stkEditingField = null;
+
+function _stkReportField(layerIdx, field) {
+    _stkEditingLayerIdx = layerIdx;
+    _stkEditingField = field;
+}
+
+function _stkStart() {
+    _stkStop();
+    _stkPollTs = Date.now() / 1000 - 0.5;
+    _stkHeartbeat();
+    _stkHeartbeatTimer = setInterval(_stkHeartbeat, 5000);
+    _stkPollTimer      = setInterval(_stkPoll, 2500);
+}
+function _stkStop() {
+    clearInterval(_stkPollTimer); _stkPollTimer = null;
+    clearInterval(_stkHeartbeatTimer); _stkHeartbeatTimer = null;
+}
+async function _stkHeartbeat() {
+    try {
+        await fetch('/sticker/' + templateId + '/presence', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','X-CSRFToken': CSRF},
+            body: JSON.stringify({editing_layer_idx: _stkEditingLayerIdx, editing_field: _stkEditingField}),
+        });
+    } catch(e) {}
+}
+async function _stkPoll() {
+    try {
+        const r = await fetch('/sticker/' + templateId + '/poll?since=' + _stkPollTs);
+        if (!r.ok) return;
+        const data = await r.json();
+        _stkPollTs = data.ts;
+        _stkUpdatePresence(data.presence || []);
+        for (const ev of (data.events || [])) {
+            if (ev.user_id === CURRENT_USER_ID) continue;
+            if (ev.type === 'layout_saved') {
+                // Another editor saved — reload the layout silently
+                layout = ev.layout || layout;
+                renderCanvas();
+            }
+        }
+    } catch(e) {}
+}
+function _stkUpdatePresence(presence) {
+    // Update presence bar
+    const bar = document.getElementById('sticker-presence-bar');
+    if (bar) {
+        const others = presence.filter(p => p.id !== CURRENT_USER_ID);
+        if (others.length === 0) { bar.innerHTML = ''; }
+        else {
+            bar.innerHTML = others.map(p => {
+                const col = p.access === 'edit' ? '#0d6efd' : '#6c757d';
+                const ring = p.editing_layer_idx != null ? ';outline:2px solid #dc3545;outline-offset:2px' : '';
+                const tip = _escHtml(p.name) + ' (' + (p.access==='edit'?'Edit':'View') + ')' + (p.editing_layer_idx!=null?' — editing layer':'');
+                const baseStyle = `width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;cursor:default;overflow:hidden${ring}`;
+                if (p.pic) {
+                    return `<span title="${tip}" style="${baseStyle};border:2px solid ${col}"><img src="${_escHtml(p.pic)}" style="width:100%;height:100%;object-fit:cover" alt=""></span>`;
+                }
+                const ini = (p.name||'?').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';
+                return `<span title="${tip}" style="background:${col};${baseStyle};font-size:.65rem;font-weight:700;color:#fff">${_escHtml(ini)}</span>`;
+            }).join('');
+        }
+    }
+    // Update per-layer editor badges
+    const editingByLayer = {};
+    presence.filter(p => p.id !== CURRENT_USER_ID && p.editing_layer_idx != null).forEach(p => {
+        editingByLayer[p.editing_layer_idx] = p.name;
+    });
+    document.querySelectorAll('.layer-editor-badge').forEach(badge => {
+        const idx = parseInt(badge.dataset.layerIdx);
+        const editorName = editingByLayer[idx];
+        if (editorName) {
+            badge.textContent = editorName;
+            badge.classList.remove('d-none');
+        } else {
+            badge.classList.add('d-none');
+        }
+    });
+    // Lock properties panel fields being edited by others (only when the same layer is selected)
+    if (selectedElement !== null && editingByLayer[selectedElement]) {
+        const editor = editingByLayer[selectedElement];
+        document.querySelectorAll('#properties-panel input, #properties-panel select, #properties-panel textarea').forEach(field => {
+            if (!field.classList.contains('layer-field-locked')) {
+                field.classList.add('layer-field-locked');
+                if (!field.parentElement.querySelector('.layer-field-lock-badge')) {
+                    const b = document.createElement('span');
+                    b.className = 'layer-field-lock-badge';
+                    b.textContent = editor;
+                    field.parentElement.appendChild(b);
+                }
+            }
+        });
+    } else {
+        document.querySelectorAll('.layer-field-locked').forEach(f => f.classList.remove('layer-field-locked'));
+        document.querySelectorAll('.layer-field-lock-badge').forEach(b => b.remove());
+    }
+}
 
 loadTemplate();
+_stkStart();
 </script>
 
 <!-- Share Files Picker Modal -->
