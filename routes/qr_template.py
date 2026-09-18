@@ -498,7 +498,12 @@ def preview_element(template_id):
             return jsonify({'svg': svg, 'success': True})
         elif element_type == 'barcode':
             from qr_utils import generate_barcode_svg
-            svg = generate_barcode_svg(preview_content, barcode_format, width, height, show_label)
+            fg_color = data.get('fg_color', '#000000') or '#000000'
+            bg_color = data.get('bg_color', '')
+            label_color = data.get('label_color', '#000000') or '#000000'
+            svg = generate_barcode_svg(preview_content, barcode_format, width, height,
+                                       show_label=show_label, fg_color=fg_color,
+                                       bg_color=bg_color, label_color=label_color)
             return jsonify({'svg': svg, 'success': True})
         elif element_type == 'icon':
             from qr_utils import generate_icon_svg

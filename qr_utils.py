@@ -546,8 +546,16 @@ def render_template_to_svg(template, data):
             source_field = element['source_field']
             qr_data = replace_placeholders(source_field, data)
             print(f"[SVG] Element {idx}: QR = '{qr_data}' (template: '{source_field}')")
+            qr_ec = element.get('error_correction', 'M')
+            qr_fg = element.get('fg_color', '#000000') or '#000000'
+            qr_bg = element.get('bg_color', '')
+            qr_show_label = element.get('show_label', False)
+            qr_lbl_color = element.get('label_color', '#000000') or '#000000'
             try:
-                qr_svg = generate_qr_svg(qr_data, int(w_px), int(h_px))
+                qr_svg = generate_qr_svg(qr_data, int(w_px), int(h_px),
+                                         error_correction=qr_ec, fg_color=qr_fg,
+                                         bg_color=qr_bg, show_label=qr_show_label,
+                                         label_color=qr_lbl_color)
                 svg += f'  <g transform="translate({x_px}, {y_px})">{qr_svg}</g>\n'
             except Exception as e:
                 print(f"[SVG] QR generation error: {e}")
@@ -560,8 +568,13 @@ def render_template_to_svg(template, data):
             print(f"[SVG] Element {idx}: BARCODE = '{barcode_data}' (template: '{source_field}')")
             barcode_format = element.get('format', 'CODE128')
             show_label = element.get('show_label', False)
+            bc_fg = element.get('fg_color', '#000000') or '#000000'
+            bc_bg = element.get('bg_color')  # None if not set; '' means transparent
+            bc_lbl = element.get('label_color', '#000000') or '#000000'
             try:
-                barcode_svg = generate_barcode_svg(barcode_data, barcode_format, int(w_px), int(h_px), show_label=show_label)
+                barcode_svg = generate_barcode_svg(barcode_data, barcode_format, int(w_px), int(h_px),
+                                                   show_label=show_label, fg_color=bc_fg,
+                                                   bg_color=bc_bg, label_color=bc_lbl)
                 svg += f'  <g transform="translate({x_px}, {y_px})">{barcode_svg}</g>\n'
             except Exception as e:
                 print(f"[SVG] Barcode generation error: {e}")
@@ -688,23 +701,31 @@ def generate_qr_svg(data, width, height, error_correction='M', fg_color='#000000
             # Also update viewBox if it has mm units
             result = re.sub(r'viewBox="0 0 \d+mm \d+mm"', f'viewBox="0 0 {width} {height}"', result)
 
+            # Get viewBox dimensions for correct coordinate space
+            vb_match = re.search(r'viewBox="0 0 (\S+) (\S+)"', result)
+            vb_w = float(vb_match.group(1)) if vb_match else width
+            vb_h = float(vb_match.group(2)) if vb_match else height
+
             # Apply foreground color (replace default black fill on paths)
             if fg_color and fg_color != '#000000':
                 result = re.sub(r'(<path[^>]+)fill="[^"]*"', rf'\1fill="{fg_color}"', result)
                 result = re.sub(r'(<path(?![^>]+fill)[^>]+)(/?>)', rf'\1 fill="{fg_color}"\2', result)
 
-            # Apply background color or transparent
+            # Apply background color — insert rect as first child of <svg> (do NOT replace '>')
             if bg_color:
-                bg_rect = f'<rect width="{width}" height="{height}" fill="{bg_color}"/>'
-                result = result.replace('>', bg_rect, 1)
+                bg_rect = f'<rect width="{vb_w}" height="{vb_h}" fill="{bg_color}"/>'
+                first_gt = result.index('>')
+                result = result[:first_gt + 1] + bg_rect + result[first_gt + 1:]
             # If bg_color is empty string = transparent — no background rect needed (SVG default is transparent)
 
-            # Add label below QR if requested
+            # Add label using viewBox coordinate space
             if show_label and data:
-                label_text = data[:40] + ('…' if len(data) > 40 else '')
-                font_size = max(8, min(12, width // 20))
-                label_y = height - 2
-                label_el = f'<text x="{width//2}" y="{label_y}" font-size="{font_size}" text-anchor="middle" fill="{label_color or "#000000"}" font-family="Arial,sans-serif">{label_text}</text>'
+                label_text = _html.escape(data[:40] + ('…' if len(data) > 40 else ''))
+                font_size = max(1.5, vb_h * 0.07)
+                label_y = vb_h - font_size * 0.3
+                label_el = (f'<text x="{vb_w / 2:.2f}" y="{label_y:.2f}" font-size="{font_size:.2f}" '
+                            f'text-anchor="middle" fill="{label_color or "#000000"}" '
+                            f'font-family="Arial,sans-serif">{label_text}</text>')
                 result = result.replace('</svg>', label_el + '</svg>')
 
             print(f"[QR] Success! Generated {len(result)} bytes with dimensions {width}×{height}")
@@ -720,8 +741,30 @@ def generate_qr_svg(data, width, height, error_correction='M', fg_color='#000000
         print(f"[QR] Returning placeholder")
         return placeholder
 
-def generate_barcode_svg(data, format_type, width, height, show_label=False):
-    """Generate barcode SVG - using PIL-based approach for better control"""
+def _apply_barcode_colors(img, fg_color, bg_color):
+    """Apply custom fg/bg colors to a barcode PIL image. bg_color='' means transparent."""
+    from PIL import Image, ImageOps
+
+    def hex_to_rgba(h, alpha=255):
+        h = h.lstrip('#')
+        return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), alpha
+
+    fg_rgba = hex_to_rgba(fg_color or '#000000')
+    bg_rgba = hex_to_rgba(bg_color) if bg_color else (255, 255, 255, 0)
+
+    img_l = img.convert('L')
+    # Dark pixels (bars + label text) → foreground; light pixels → background
+    dark_mask = img_l.point(lambda x: 255 if x < 128 else 0).convert('L')
+
+    fg_img = Image.new('RGBA', img.size, fg_rgba)
+    bg_img = Image.new('RGBA', img.size, bg_rgba)
+    return Image.composite(fg_img, bg_img, dark_mask)
+
+
+def generate_barcode_svg(data, format_type, width, height, show_label=False,
+                         fg_color='#000000', bg_color=None, label_color='#000000'):
+    """Generate barcode SVG - using PIL-based approach for better control.
+    bg_color=None keeps default white background; bg_color='' means transparent."""
     print(f"[BARCODE] Generating {format_type} barcode for data: '{data}' (size: {width}×{height}, show_label={show_label})")
     try:
         import barcode
@@ -729,97 +772,71 @@ def generate_barcode_svg(data, format_type, width, height, show_label=False):
         from io import BytesIO
         from PIL import Image
         import base64
-        
+
+        # Apply color processing when fg is non-default OR bg is explicitly set (including '' for transparent)
+        needs_color = (fg_color and fg_color != '#000000') or (bg_color is not None)
+
+        def _render(fmt, opts=None):
+            BarCodeClass = barcode.get_barcode_class(fmt.lower())
+            bc = BarCodeClass(data, writer=ImageWriter())
+            buf = BytesIO()
+            write_opts = opts or {}
+            if not show_label:
+                write_opts['font_size'] = 0
+            bc.write(buf, options=write_opts)
+            buf.seek(0)
+            return Image.open(buf), buf
+
         # Validate format
         valid_formats = ['CODE128', 'CODE39', 'EAN13', 'EAN8', 'UPCA', 'UPCE']
         if format_type not in valid_formats:
             print(f"[BARCODE] Format '{format_type}' not valid, using CODE128")
             format_type = 'CODE128'
-        
-        # For placeholder strings (like {ItemUUID}), use CODE128 which accepts any characters
+
         if data.startswith('{') and data.endswith('}'):
-            print(f"[BARCODE] Detected placeholder format, using CODE128 for flexibility")
             format_type = 'CODE128'
-        # For formats that require digits only (EAN, UPC), check if data is numeric
         elif format_type in ['EAN13', 'EAN8', 'UPCA', 'UPCE']:
             if not data.isdigit():
-                print(f"[BARCODE] Data '{data}' contains non-digits, format {format_type} requires digits, using CODE128")
+                print(f"[BARCODE] Non-digit data for {format_type}, using CODE128")
                 format_type = 'CODE128'
-        
+
         try:
-            # Generate barcode as PNG image
-            BarCodeClass = barcode.get_barcode_class(format_type.lower())
-            
-            # Create barcode instance
-            barcode_instance = BarCodeClass(data, writer=ImageWriter())
-            
-            img_output = BytesIO()
-            # If show_label is False, disable text label in barcode image
-            # If show_label is True, use PIL's default (with text)
-            if not show_label:
-                barcode_instance.write(img_output, options={'font_size': 0})
-                print(f"[BARCODE] Generated image without text label")
-            else:
-                barcode_instance.write(img_output)
-                print(f"[BARCODE] Generated image with text label (from PIL)")
-            
-            img_output.seek(0)
-            
-            # Open image and get dimensions
-            img = Image.open(img_output)
-            img_width, img_height = img.size
-            print(f"[BARCODE] Generated image dimensions: {img_width}×{img_height}")
-            
-            # Convert image to base64 SVG embedding
-            img_output.seek(0)
-            img_base64 = base64.b64encode(img_output.read()).decode('utf-8')
-            
-            # Create SVG with embedded image
-            svg = f'''<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMid meet">
-    <image x="0" y="0" width="{width}" height="{height}" href="data:image/png;base64,{img_base64}" preserveAspectRatio="none"/>
-</svg>'''
-            
-            print(f"[BARCODE] Success! Generated SVG with embedded PNG, {len(svg)} bytes")
-            return svg
-            
+            img, raw_buf = _render(format_type)
         except Exception as e:
             print(f"[BARCODE] {format_type} failed ({type(e).__name__}), falling back to CODE128")
-            format_type = 'CODE128'
-            BarCodeClass = barcode.get_barcode_class(format_type.lower())
-            
-            barcode_instance = BarCodeClass(data, writer=ImageWriter())
-            
-            img_output = BytesIO()
-            # Same logic for fallback
-            if not show_label:
-                barcode_instance.write(img_output, options={'font_size': 0})
-                print(f"[BARCODE] Fallback generated image without text label")
-            else:
-                barcode_instance.write(img_output)
-                print(f"[BARCODE] Fallback generated image with text label (from PIL)")
-            
-            img_output.seek(0)
-            
-            img = Image.open(img_output)
-            img_width, img_height = img.size
-            print(f"[BARCODE] Fallback image dimensions: {img_width}×{img_height}")
-            
-            img_output.seek(0)
-            img_base64 = base64.b64encode(img_output.read()).decode('utf-8')
-            
-            svg = f'''<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMid meet">
-    <image x="0" y="0" width="{width}" height="{height}" href="data:image/png;base64,{img_base64}" preserveAspectRatio="none"/>
-</svg>'''
-            
-            print(f"[BARCODE] Success! Generated fallback SVG with embedded PNG, {len(svg)} bytes")
-            return svg
-            
+            img, raw_buf = _render('CODE128')
+
+        print(f"[BARCODE] Generated image dimensions: {img.size[0]}×{img.size[1]}")
+
+        if needs_color:
+            img = _apply_barcode_colors(img, fg_color, bg_color)
+            mime = 'image/png'
+            out_buf = BytesIO()
+            img.save(out_buf, format='PNG')
+            out_buf.seek(0)
+            img_base64 = base64.b64encode(out_buf.read()).decode('utf-8')
+        else:
+            raw_buf.seek(0)
+            img_base64 = base64.b64encode(raw_buf.read()).decode('utf-8')
+            mime = 'image/png'
+
+        svg = (f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg" '
+               f'viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMid meet">'
+               f'<image x="0" y="0" width="{width}" height="{height}" '
+               f'href="data:{mime};base64,{img_base64}" preserveAspectRatio="none"/>'
+               f'</svg>')
+
+        print(f"[BARCODE] Success! Generated SVG, {len(svg)} bytes")
+        return svg
+
     except Exception as e:
         print(f"[BARCODE] ERROR: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
-        # Return placeholder SVG
-        placeholder = f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg"><rect width="{width}" height="{height}" fill="lightgray" stroke="red" stroke-width="2"/><text x="{width/2}" y="{height/2}" font-size="12" text-anchor="middle" dominant-baseline="middle">Barcode Error</text></svg>'
+        placeholder = (f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">'
+                       f'<rect width="{width}" height="{height}" fill="lightgray" stroke="red" stroke-width="2"/>'
+                       f'<text x="{width/2}" y="{height/2}" font-size="12" text-anchor="middle" dominant-baseline="middle">Barcode Error</text>'
+                       f'</svg>')
         print(f"[BARCODE] Returning placeholder")
         return placeholder
 
