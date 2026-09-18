@@ -192,8 +192,8 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 {% set _nav_cfg = current_user.get_navbar_config() %}
-                {% set _nav_items = _nav_cfg.items %}
-                {% set _nav_icons = _nav_cfg.show_icons %}
+                {% set _nav_items = _nav_cfg['items'] %}
+                {% set _nav_icons = _nav_cfg['show_icons'] %}
                 <ul class="navbar-nav me-auto">
                     {% for _nav_id in _nav_items %}
                         {% if _nav_id == 'items' and current_user.has_permission('items', 'view') %}
