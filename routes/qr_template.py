@@ -488,7 +488,13 @@ def preview_element(template_id):
         if element_type == 'qr':
             from qr_utils import generate_qr_svg
             error_correction = data.get('error_correction', 'M')
-            svg = generate_qr_svg(preview_content, width, height, error_correction)
+            fg_color = data.get('fg_color', '#000000') or '#000000'
+            bg_color = data.get('bg_color', '')
+            qr_show_label = data.get('show_label', False)
+            label_color = data.get('label_color', '#000000') or '#000000'
+            svg = generate_qr_svg(preview_content, width, height, error_correction,
+                                  fg_color=fg_color, bg_color=bg_color,
+                                  show_label=qr_show_label, label_color=label_color)
             return jsonify({'svg': svg, 'success': True})
         elif element_type == 'barcode':
             from qr_utils import generate_barcode_svg

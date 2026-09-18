@@ -645,13 +645,13 @@ def render_template_to_svg(template, data):
     print(f"[SVG] Complete! SVG size: {len(svg)} bytes")
     return svg
 
-def generate_qr_svg(data, width, height, error_correction='M'):
+def generate_qr_svg(data, width, height, error_correction='M', fg_color='#000000', bg_color='', show_label=False, label_color='#000000'):
     """Generate QR code SVG using qrcode library"""
     print(f"[QR] Generating QR for data: '{data}' (size: {width}×{height}, EC: {error_correction})")
     try:
         import qrcode
         from qrcode.image.svg import SvgPathImage
-        
+
         # Map error correction levels
         ec_map = {
             'L': qrcode.constants.ERROR_CORRECT_L,
@@ -660,7 +660,7 @@ def generate_qr_svg(data, width, height, error_correction='M'):
             'H': qrcode.constants.ERROR_CORRECT_H
         }
         ec_level = ec_map.get(error_correction, qrcode.constants.ERROR_CORRECT_M)
-        
+
         qr = qrcode.QRCode(
             version=1,
             error_correction=ec_level,
@@ -669,25 +669,44 @@ def generate_qr_svg(data, width, height, error_correction='M'):
         )
         qr.add_data(data)
         qr.make(fit=True)
-        
+
         img = qr.make_image(image_factory=SvgPathImage)
-        
+
         svg_output = BytesIO()
         img.save(svg_output)
         svg_str = svg_output.getvalue().decode('utf-8')
-        
+
         # Extract just the SVG content and fix dimensions
         import re
         svg_match = re.search(r'<svg[^>]*>.*?</svg>', svg_str, re.DOTALL)
         if svg_match:
             result = svg_match.group(0)
-            
+
             # Remove mm units and set to pixel dimensions
             result = re.sub(r'width="[^"]*mm"', f'width="{width}"', result)
             result = re.sub(r'height="[^"]*mm"', f'height="{height}"', result)
             # Also update viewBox if it has mm units
             result = re.sub(r'viewBox="0 0 \d+mm \d+mm"', f'viewBox="0 0 {width} {height}"', result)
-            
+
+            # Apply foreground color (replace default black fill on paths)
+            if fg_color and fg_color != '#000000':
+                result = re.sub(r'(<path[^>]+)fill="[^"]*"', rf'\1fill="{fg_color}"', result)
+                result = re.sub(r'(<path(?![^>]+fill)[^>]+)(/?>)', rf'\1 fill="{fg_color}"\2', result)
+
+            # Apply background color or transparent
+            if bg_color:
+                bg_rect = f'<rect width="{width}" height="{height}" fill="{bg_color}"/>'
+                result = result.replace('>', bg_rect, 1)
+            # If bg_color is empty string = transparent — no background rect needed (SVG default is transparent)
+
+            # Add label below QR if requested
+            if show_label and data:
+                label_text = data[:40] + ('…' if len(data) > 40 else '')
+                font_size = max(8, min(12, width // 20))
+                label_y = height - 2
+                label_el = f'<text x="{width//2}" y="{label_y}" font-size="{font_size}" text-anchor="middle" fill="{label_color or "#000000"}" font-family="Arial,sans-serif">{label_text}</text>'
+                result = result.replace('</svg>', label_el + '</svg>')
+
             print(f"[QR] Success! Generated {len(result)} bytes with dimensions {width}×{height}")
             return result
         print(f"[QR] Warning: Could not extract SVG from output, returning full output")

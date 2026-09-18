@@ -438,14 +438,14 @@
             </div>
 
             <!-- Layers & Properties Sidebar -->
-            <div class="properties-sidebar" style="width: 300px; min-width: 300px; max-width: 300px; border: 1px solid var(--bs-gray-300, #ddd); border-radius: 4px; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column;">
+            <div class="properties-sidebar" style="width: 300px; min-width: 300px; max-width: 300px; border: 1px solid var(--bs-gray-300, #ddd); border-radius: 4px; overflow: hidden; display: flex; flex-direction: column;">
                 
                 <!-- Fields Panel (NEW) -->
                 <div style="border-bottom: 1px solid var(--editor-border-color, #ddd);">
                     <div class="card-header panel-toggle" data-panel="fields" style="cursor: pointer; padding: 10px;">
                         <h6 class="mb-0" style="cursor: pointer;"><i class="bi bi-plus-square"></i> Fields <span class="toggle-icon" style="float: right;">▼</span></h6>
                     </div>
-                    <div id="fields-content" class="panel-content" style="max-height: 250px; overflow-y: auto; padding: 10px; box-sizing: border-box;">
+                    <div id="fields-content" class="panel-content" style="padding: 10px; box-sizing: border-box;">
                         <div class="d-grid gap-2">
                             <button id="btn-add-text" class="btn btn-sm btn-outline-primary">
                                 <i class="bi bi-type"></i> Text
@@ -1085,7 +1085,12 @@ function createElementDiv(element, index) {
                             width_mm: element.width_mm,
                             height_mm: element.height_mm,
                             mm_to_px: MM_TO_PX,
-                            error_correction: element.error_correction || 'M'
+                            error_correction: element.error_correction || 'M',
+                            qr_format: element.qr_format || 'standard',
+                            show_label: element.show_label || false,
+                            fg_color: element.fg_color || '#000000',
+                            bg_color: element.bg_color || '',
+                            label_color: element.label_color || '#000000'
                         })
                     })
                     .then(r => r.json())
@@ -1144,7 +1149,10 @@ function createElementDiv(element, index) {
                             height_mm: element.height_mm,
                             format: element.format || 'CODE128',
                             mm_to_px: MM_TO_PX,
-                            show_label: element.show_label || false
+                            show_label: element.show_label || false,
+                            fg_color: element.fg_color || '#000000',
+                            bg_color: element.bg_color || '',
+                            label_color: element.label_color || '#000000'
                         })
                     })
                     .then(r => r.json())
@@ -1203,7 +1211,9 @@ function createElementDiv(element, index) {
             const minDim = Math.min(w, h);
             div.innerHTML = `<div style="width:100%;height:100%;border:2px dashed #0d6efd;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(13,110,253,0.05);gap:2px;"><i class="bi bi-bullseye" style="font-size:${minDim*0.35}px;color:#0d6efd;"></i><span style="font-size:${Math.max(8,minDim*0.12)}px;color:#0d6efd;">Target Image</span></div>`;
         } else if (element.picture_url) {
-            div.innerHTML = `<img src="${element.picture_url}" style="max-width:100%;max-height:100%;object-fit:contain;" draggable="false">`;
+            const _imgFilter = element.image_filter || 0;
+            const _imgFilterStyle = _imgFilter === 1 ? 'filter:grayscale(100%);' : _imgFilter === 2 ? 'filter:grayscale(100%) contrast(1000%) brightness(1.5);' : '';
+            div.innerHTML = `<img src="${element.picture_url}" style="max-width:100%;max-height:100%;object-fit:contain;${_imgFilterStyle}" draggable="false">`;
         } else {
             const minDim = Math.min(w, h);
             div.innerHTML = `<div style="width:100%;height:100%;border:2px dashed #6610f2;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(102,16,242,0.05);gap:4px;"><i class="bi bi-image" style="font-size:${minDim*0.35}px;color:#6610f2;"></i><span style="font-size:${Math.max(8,minDim*0.12)}px;color:#6610f2;">Picture</span></div>`;
@@ -1538,10 +1548,44 @@ function updatePropertiesPanel(index) {
             <label class="form-label" style="font-size: 12px;"><strong>Error Correction</strong></label>
             <select class="form-select form-select-sm" id="prop-ec" style="font-size: 12px;">
                 <option value="L" ${element.error_correction === 'L' ? 'selected' : ''}>Low (7%)</option>
-                <option value="M" ${element.error_correction === 'M' ? 'selected' : ''}>Medium (15%)</option>
+                <option value="M" ${!element.error_correction || element.error_correction === 'M' ? 'selected' : ''}>Medium (15%)</option>
                 <option value="Q" ${element.error_correction === 'Q' ? 'selected' : ''}>High (25%)</option>
                 <option value="H" ${element.error_correction === 'H' ? 'selected' : ''}>Very High (30%)</option>
             </select>
+        </div>
+        <div class="mb-2">
+            <label class="form-label" style="font-size: 12px;"><strong>Format</strong></label>
+            <select class="form-select form-select-sm" id="prop-qr-format" style="font-size: 12px;">
+                <option value="standard" ${!element.qr_format || element.qr_format === 'standard' ? 'selected' : ''}>Standard (Squares)</option>
+                <option value="gapped" ${element.qr_format === 'gapped' ? 'selected' : ''}>Gapped Squares</option>
+                <option value="rounded" ${element.qr_format === 'rounded' ? 'selected' : ''}>Rounded</option>
+            </select>
+        </div>
+        <div class="mb-2">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prop-qr-show-label" ${element.show_label ? 'checked' : ''}>
+                <label class="form-check-label" style="font-size: 12px;" for="prop-qr-show-label">Show Label (data text below QR)</label>
+            </div>
+        </div>
+        <hr class="my-2">
+        <div class="mb-1"><h6 class="text-secondary mb-2" style="font-size: 13px;"><i class="bi bi-palette"></i> Colors</h6></div>
+        <div class="mb-2 row g-1 align-items-end">
+            <div class="col-4">
+                <label style="font-size: 11px; display:block; margin-bottom:3px;">Foreground</label>
+                <input type="color" class="form-control form-control-color w-100" id="prop-qr-fg" value="${element.fg_color || '#000000'}" style="height:30px;padding:2px;">
+            </div>
+            <div class="col-4">
+                <label style="font-size: 11px; display:block; margin-bottom:3px;">Background</label>
+                <input type="color" class="form-control form-control-color w-100" id="prop-qr-bg" value="${element.bg_color || '#ffffff'}" style="height:30px;padding:2px;" ${!element.bg_color ? 'disabled' : ''}>
+                <div class="form-check mt-1">
+                    <input class="form-check-input" type="checkbox" id="prop-qr-bg-trans" ${!element.bg_color ? 'checked' : ''}>
+                    <label class="form-check-label" style="font-size:10px;">Transparent</label>
+                </div>
+            </div>
+            <div class="col-4">
+                <label style="font-size: 11px; display:block; margin-bottom:3px;">Label Color</label>
+                <input type="color" class="form-control form-control-color w-100" id="prop-qr-label-color" value="${element.label_color || '#000000'}" style="height:30px;padding:2px;">
+            </div>
         </div>`;
     } else if (element.type === 'barcode') {
         const layerName = element.layer_name || `Barcode${index + 1}`;
@@ -1602,6 +1646,26 @@ function updatePropertiesPanel(index) {
                 <label class="form-check-label" style="font-size: 12px;" for="prop-show-label">
                     Show Label (data text below barcode)
                 </label>
+            </div>
+        </div>
+        <hr class="my-2">
+        <div class="mb-1"><h6 class="text-secondary mb-2" style="font-size: 13px;"><i class="bi bi-palette"></i> Colors</h6></div>
+        <div class="mb-2 row g-1 align-items-end">
+            <div class="col-4">
+                <label style="font-size: 11px; display:block; margin-bottom:3px;">Foreground</label>
+                <input type="color" class="form-control form-control-color w-100" id="prop-bc-fg" value="${element.fg_color || '#000000'}" style="height:30px;padding:2px;">
+            </div>
+            <div class="col-4">
+                <label style="font-size: 11px; display:block; margin-bottom:3px;">Background</label>
+                <input type="color" class="form-control form-control-color w-100" id="prop-bc-bg" value="${element.bg_color || '#ffffff'}" style="height:30px;padding:2px;" ${!element.bg_color ? 'disabled' : ''}>
+                <div class="form-check mt-1">
+                    <input class="form-check-input" type="checkbox" id="prop-bc-bg-trans" ${!element.bg_color ? 'checked' : ''}>
+                    <label class="form-check-label" style="font-size:10px;">Transparent</label>
+                </div>
+            </div>
+            <div class="col-4">
+                <label style="font-size: 11px; display:block; margin-bottom:3px;">Label Color</label>
+                <input type="color" class="form-control form-control-color w-100" id="prop-bc-label-color" value="${element.label_color || '#000000'}" style="height:30px;padding:2px;">
             </div>
         </div>`;
     } else if (element.type === 'icon') {
@@ -1675,6 +1739,16 @@ function updatePropertiesPanel(index) {
         <button type="button" class="btn btn-sm btn-outline-secondary w-100" onclick="openShareFilePicker()" ${element.use_target_image ? 'disabled' : ''}>
             <i class="bi bi-folder2-open"></i> Browse Share Files
         </button>
+    </div>
+    <hr class="my-2">
+    <div class="mb-1"><h6 class="text-secondary mb-2" style="font-size: 13px;"><i class="bi bi-palette"></i> Colors</h6></div>
+    <div class="mb-3">
+        <label style="font-size: 12px; display:block; margin-bottom:6px;"><strong>Image Filter</strong></label>
+        <input type="range" class="form-range" id="prop-img-filter" min="0" max="2" step="1" value="${element.image_filter || 0}" style="margin-bottom:2px;">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#666;pointer-events:none;">
+            <span>Normal</span><span>Grayscale</span><span>B&amp;W</span>
+        </div>
+        <div class="text-center mt-1" id="prop-img-filter-label" style="font-size:11px;color:#0d6efd;font-weight:500;">${['Normal','Grayscale','Black & White'][element.image_filter || 0]}</div>
     </div>`;
     }
 
@@ -1733,9 +1807,14 @@ function updatePropertiesPanel(index) {
         </div>
     </div>
     
-    <button class="btn btn-danger btn-sm w-100" onclick="deleteElement(${index})" style="font-size: 12px;">
-        <i class="bi bi-trash"></i> Delete Element
-    </button>`;
+    <div class="d-flex gap-2">
+        <button class="btn btn-danger btn-sm flex-grow-1" onclick="deleteElement(${index})" style="font-size: 12px;">
+            <i class="bi bi-trash"></i> Delete
+        </button>
+        <button class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="duplicateElement(${index})" style="font-size: 12px;">
+            <i class="bi bi-copy"></i> Duplicate
+        </button>
+    </div>`;
 
     panel.innerHTML = html;
     attachPropertyListeners(index);
@@ -1978,6 +2057,52 @@ function attachPropertyListeners(index) {
     document.getElementById('prop-ec')?.addEventListener('change', e => updateProp('error_correction', e.target.value));
     document.getElementById('prop-format')?.addEventListener('change', e => updateProp('format', e.target.value));
     document.getElementById('prop-show-label')?.addEventListener('change', e => updateProp('show_label', e.target.checked));
+
+    // QR-specific: format, show_label, colors
+    document.getElementById('prop-qr-format')?.addEventListener('change', e => updateProp('qr_format', e.target.value));
+    document.getElementById('prop-qr-show-label')?.addEventListener('change', e => updateProp('show_label', e.target.checked));
+    document.getElementById('prop-qr-fg')?.addEventListener('change', e => updateProp('fg_color', e.target.value));
+    document.getElementById('prop-qr-label-color')?.addEventListener('change', e => updateProp('label_color', e.target.value));
+    const qrBgInput = document.getElementById('prop-qr-bg');
+    const qrBgTrans = document.getElementById('prop-qr-bg-trans');
+    if (qrBgTrans && qrBgInput) {
+        qrBgTrans.addEventListener('change', e => {
+            qrBgInput.disabled = e.target.checked;
+            updateProp('bg_color', e.target.checked ? '' : qrBgInput.value);
+        });
+        qrBgInput.addEventListener('change', e => {
+            if (!qrBgTrans.checked) updateProp('bg_color', e.target.value);
+        });
+    }
+
+    // Barcode colors
+    document.getElementById('prop-bc-fg')?.addEventListener('change', e => updateProp('fg_color', e.target.value));
+    document.getElementById('prop-bc-label-color')?.addEventListener('change', e => updateProp('label_color', e.target.value));
+    const bcBgInput = document.getElementById('prop-bc-bg');
+    const bcBgTrans = document.getElementById('prop-bc-bg-trans');
+    if (bcBgTrans && bcBgInput) {
+        bcBgTrans.addEventListener('change', e => {
+            bcBgInput.disabled = e.target.checked;
+            updateProp('bg_color', e.target.checked ? '' : bcBgInput.value);
+        });
+        bcBgInput.addEventListener('change', e => {
+            if (!bcBgTrans.checked) updateProp('bg_color', e.target.value);
+        });
+    }
+
+    // Picture image filter slider
+    const imgFilterInput = document.getElementById('prop-img-filter');
+    const imgFilterLabel = document.getElementById('prop-img-filter-label');
+    if (imgFilterInput) {
+        const filterNames = ['Normal', 'Grayscale', 'Black & White'];
+        imgFilterInput.addEventListener('input', e => {
+            const val = parseInt(e.target.value);
+            if (imgFilterLabel) imgFilterLabel.textContent = filterNames[val] || 'Normal';
+        });
+        imgFilterInput.addEventListener('change', e => {
+            updateProp('image_filter', parseInt(e.target.value));
+        });
+    }
     
     // Icon element handlers
     const iconSearchInput = document.getElementById('prop-icon-search');
@@ -2408,6 +2533,25 @@ function deleteElement(index) {
         renderLayers();
         document.getElementById('properties-panel').innerHTML = '<p class="text-muted mb-0" style="font-size: 13px;"><i class="bi bi-hand-index"></i> Select element to edit</p>';
     }
+}
+
+function duplicateElement(index) {
+    const original = layout[index];
+    const copy = JSON.parse(JSON.stringify(original));
+    copy.id = original.type + '-' + Date.now();
+    // Generate unique layer name: base_name + _1, _2, etc.
+    const baseName = (original.layer_name || original.type).replace(/_\d+$/, '');
+    let n = 1;
+    while (layout.some(el => el.layer_name === baseName + '_' + n)) n++;
+    copy.layer_name = baseName + '_' + n;
+    // Offset position slightly so it's visible
+    copy.x_mm = Math.min((copy.x_mm || 0) + 2, templateWidth - (copy.width_mm || 10));
+    copy.y_mm = Math.min((copy.y_mm || 0) + 2, templateHeight - (copy.height_mm || 10));
+    layout.splice(index + 1, 0, copy);
+    renderCanvas();
+    renderLayers();
+    const newDiv = document.querySelector(`[data-index="${index + 1}"]`);
+    if (newDiv) selectElement(index + 1, newDiv);
 }
 
 document.getElementById('btn-add-text').addEventListener('click', () => {
