@@ -385,9 +385,10 @@ def item_detail(uuid):
     currency_symbol = Setting.get('currency', '$')
     currency_decimal_places = int(Setting.get('currency_decimal_places', '2'))
     
-    # Get available QR sticker templates for Items
+    # Get available QR sticker templates for Items (only those the user can view)
     from models import StickerTemplate
-    qr_templates = StickerTemplate.query.filter_by(template_type='Items').all()
+    qr_templates = [t for t in StickerTemplate.query.filter_by(template_type='Items').all()
+                    if t.can_view(current_user)]
     
     return render_template('item_detail.html', item=item, attachment_form=attachment_form,
                          currency_symbol=currency_symbol, currency_decimal_places=currency_decimal_places, qr_templates=qr_templates,
@@ -1810,7 +1811,7 @@ def api_item_sticker_preview(uuid, template_id):
     Generate sticker preview for an item with a specific template
     Returns: SVG image
     """
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         return jsonify({'error': 'No permission to use QR stickers'}), 403
 
     from models import StickerTemplate
@@ -1843,7 +1844,7 @@ def api_item_sticker_print(uuid, template_id):
     Generate printable sticker for an item
     Returns: PDF file download
     """
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         abort(403)
 
     from models import StickerTemplate
@@ -1877,7 +1878,7 @@ def items_bulk_qr_sticker():
     if not current_user.has_permission('items', 'view'):
         flash('You do not have permission to view items.', 'danger')
         return redirect(url_for('index'))
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         flash('You do not have permission to use QR stickers.', 'danger')
         return redirect(url_for('item.items'))
 
@@ -1897,7 +1898,8 @@ def items_bulk_qr_sticker():
         flash('No items found.', 'warning')
         return redirect(url_for('item.items'))
 
-    templates = StickerTemplate.query.filter_by(template_type='Items').order_by(StickerTemplate.name).all()
+    all_t = StickerTemplate.query.filter_by(template_type='Items').order_by(StickerTemplate.name).all()
+    templates = [t for t in all_t if t.can_view(current_user)]
 
     return render_template('items_bulk_qr_sticker.html',
                            items=items_list,
@@ -1910,7 +1912,7 @@ def items_bulk_qr_sticker():
 def api_items_bulk_sticker_print(template_id):
     """Generate a multi-page PDF with one sticker per item (Normal mode)."""
     if not current_user.has_permission('items', 'view') or \
-       not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+       not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         abort(403)
 
     item_ids_str = request.args.get('item_ids', '')
@@ -1925,6 +1927,8 @@ def api_items_bulk_sticker_print(template_id):
     template = StickerTemplate.query.get_or_404(template_id)
     if template.template_type != 'Items':
         abort(400)
+    if not template.can_view(current_user):
+        abort(403)
 
     items_list = Item.query.filter(Item.id.in_(item_ids)).order_by(Item.name).all()
     if not items_list:
@@ -1944,7 +1948,7 @@ def api_items_bulk_sticker_print(template_id):
 def api_items_bulk_sticker_table_print(template_id):
     """Generate a table-layout PDF with stickers for multiple items."""
     if not current_user.has_permission('items', 'view') or \
-       not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+       not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         abort(403)
 
     item_ids_str = request.args.get('item_ids', '')
@@ -1959,6 +1963,8 @@ def api_items_bulk_sticker_table_print(template_id):
     template = StickerTemplate.query.get_or_404(template_id)
     if template.template_type != 'Items':
         abort(400)
+    if not template.can_view(current_user):
+        abort(403)
 
     items_list = Item.query.filter(Item.id.in_(item_ids)).order_by(Item.name).all()
     if not items_list:
@@ -1993,16 +1999,17 @@ def item_qr_sticker(uuid):
     """
     Page showing QR sticker preview and print options for an item
     """
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         flash('You do not have permission to use QR stickers.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
 
     from models import StickerTemplate
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     
-    # Get all "Items" type templates
-    templates = StickerTemplate.query.filter_by(template_type='Items').all()
-    
+    # Get all "Items" type templates the user can view
+    templates = [t for t in StickerTemplate.query.filter_by(template_type='Items').all()
+                 if t.can_view(current_user)]
+
     if not templates:
         flash('No QR/Barcode templates available for items.', 'warning')
         return redirect(url_for('item.item_detail', uuid=uuid))

@@ -943,11 +943,12 @@ def in_out_delete_batch(batch_id):
 @login_required
 def session_qr_sticker(lending_id):
     """Show QR sticker page for a lending/return session."""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         abort(403)
     from models import StickerTemplate
     session = LendingSession.query.filter_by(lending_id=lending_id).first_or_404()
-    templates = StickerTemplate.query.filter_by(template_type='In-Out').order_by(StickerTemplate.name).all()
+    templates = [t for t in StickerTemplate.query.filter_by(template_type='In-Out').order_by(StickerTemplate.name).all()
+                 if t.can_view(current_user)]
     return render_template('in_out_qr_sticker.html', session=session, templates=templates)
 
 
@@ -955,7 +956,7 @@ def session_qr_sticker(lending_id):
 @login_required
 def api_session_inline_qr(lending_id):
     """Return a simple QR SVG for the session ID (for inline notification display)."""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         return jsonify({'error': 'Permission denied'}), 403
     from flask import Response
     from qr_utils import generate_session_qr_svg
@@ -968,7 +969,7 @@ def api_session_inline_qr(lending_id):
 @login_required
 def api_session_sticker_preview(lending_id, template_id):
     """Return JSON with SVG preview for a session sticker."""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         return jsonify({'error': 'Permission denied'}), 403
     from flask import send_file
     from models import StickerTemplate
@@ -977,6 +978,8 @@ def api_session_sticker_preview(lending_id, template_id):
     template = StickerTemplate.query.get_or_404(template_id)
     if template.template_type != 'In-Out':
         return jsonify({'error': 'Template must be In-Out type'}), 400
+    if not template.can_view(current_user):
+        return jsonify({'error': 'Permission denied'}), 403
     data = get_session_data(session)
     svg = render_template_to_svg(template, data)
     return jsonify({
@@ -991,7 +994,7 @@ def api_session_sticker_preview(lending_id, template_id):
 @login_required
 def api_session_sticker_print(lending_id, template_id):
     """Generate and return a PDF sticker for a session."""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         return jsonify({'error': 'Permission denied'}), 403
     from flask import send_file
     from models import StickerTemplate
@@ -1000,6 +1003,8 @@ def api_session_sticker_print(lending_id, template_id):
     template = StickerTemplate.query.get_or_404(template_id)
     if template.template_type != 'In-Out':
         return jsonify({'error': 'Template must be In-Out type'}), 400
+    if not template.can_view(current_user):
+        return jsonify({'error': 'Permission denied'}), 403
     data = get_session_data(session)
     output = generate_single_sticker_pdf(template, data, lending_id)
     log_audit(current_user.id, 'print', 'lending_session', session.id,

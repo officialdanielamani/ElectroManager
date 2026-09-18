@@ -863,15 +863,16 @@ def rack_qr_svg(uuid):
 @login_required
 def location_qr_sticker(uuid):
     """Display QR sticker generation page for location"""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         abort(403)
     from models import Location
     from qr_utils import get_location_data
     
     location = Location.query.filter_by(uuid=uuid).first_or_404()
-    templates = StickerTemplate.query.filter_by(template_type='Location').all()
-    
-    return render_template('location_qr_sticker.html', 
+    templates = [t for t in StickerTemplate.query.filter_by(template_type='Location').all()
+                 if t.can_view(current_user)]
+
+    return render_template('location_qr_sticker.html',
                           location=location,
                           templates=templates)
 
@@ -883,19 +884,17 @@ def api_location_sticker_preview(uuid, template_id):
     Generate sticker preview for a location with a specific template
     Returns: SVG image
     """
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         return jsonify({'error': 'Permission denied'}), 403
     from models import Location
     from qr_utils import get_location_data, render_template_to_svg
     
     location = Location.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
-    
-    # Verify template is for Location type
     if template.template_type != 'Location':
         return jsonify({'error': 'Template must be for Location'}), 400
-    
-    # Get location data with all placeholders
+    if not template.can_view(current_user):
+        return jsonify({'error': 'Permission denied'}), 403
     data = get_location_data(location)
     
     # Render to SVG
@@ -916,7 +915,7 @@ def api_location_sticker_print(uuid, template_id):
     Generate printable sticker for a location
     Returns: PDF file download
     """
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         return jsonify({'error': 'Permission denied'}), 403
     from models import Location
     from qr_utils import get_location_data, generate_single_sticker_pdf
@@ -942,15 +941,16 @@ def api_location_sticker_print(uuid, template_id):
 @login_required
 def rack_qr_sticker(uuid):
     """Display QR sticker generation page for rack"""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         abort(403)
     from models import Rack
     from qr_utils import get_rack_data
     
     rack = Rack.query.filter_by(uuid=uuid).first_or_404()
-    templates = StickerTemplate.query.filter_by(template_type='Racks').all()
-    
-    return render_template('rack_qr_sticker.html', 
+    templates = [t for t in StickerTemplate.query.filter_by(template_type='Racks').all()
+                 if t.can_view(current_user)]
+
+    return render_template('rack_qr_sticker.html',
                           rack=rack,
                           templates=templates)
 
@@ -962,19 +962,17 @@ def api_rack_sticker_preview(uuid, template_id):
     Generate sticker preview for a rack with a specific template
     Returns: SVG image
     """
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         return jsonify({'error': 'Permission denied'}), 403
     from models import Rack
     from qr_utils import get_rack_data, render_template_to_svg
     
     rack = Rack.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
-    
-    # Verify template is for Racks type
     if template.template_type != 'Racks':
         return jsonify({'error': 'Template must be for Racks'}), 400
-    
-    # Get rack data with all placeholders
+    if not template.can_view(current_user):
+        return jsonify({'error': 'Permission denied'}), 403
     data = get_rack_data(rack)
     
     # Render to SVG
@@ -995,17 +993,17 @@ def api_rack_sticker_print(uuid, template_id):
     Generate printable sticker for a rack
     Returns: PDF file download
     """
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         return jsonify({'error': 'Permission denied'}), 403
     from models import Rack
     from qr_utils import get_rack_data, generate_single_sticker_pdf
     
     rack = Rack.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
-    
     if template.template_type != 'Racks':
         return jsonify({'error': 'Template must be for Racks'}), 400
-    
+    if not template.can_view(current_user):
+        return jsonify({'error': 'Permission denied'}), 403
     data = get_rack_data(rack)
     
     # Generate single-sticker PDF
@@ -1021,13 +1019,14 @@ def api_rack_sticker_print(uuid, template_id):
 @login_required
 def drawer_qr_sticker(uuid, drawer_id):
     """Display QR sticker page for a single rack drawer (backward compat)."""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         abort(403)
     safe_drawer_id = _sanitize_drawer_id(drawer_id)
     if not safe_drawer_id:
         abort(400)
     rack = Rack.query.filter_by(uuid=uuid).first_or_404()
-    templates = StickerTemplate.query.filter_by(template_type='Drawer').all()
+    templates = [t for t in StickerTemplate.query.filter_by(template_type='Drawer').all()
+                 if t.can_view(current_user)]
     return render_template('drawer_qr_sticker.html',
                            rack=rack,
                            drawer_ids=[safe_drawer_id],
@@ -1038,7 +1037,7 @@ def drawer_qr_sticker(uuid, drawer_id):
 @login_required
 def drawers_qr_sticker(uuid):
     """Display QR sticker page for one or more rack drawers."""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         abort(403)
     rack = Rack.query.filter_by(uuid=uuid).first_or_404()
     raw = request.args.get('drawers', '')
@@ -1046,7 +1045,8 @@ def drawers_qr_sticker(uuid):
     drawer_ids = [d for d in drawer_ids if d]
     if not drawer_ids:
         abort(400)
-    templates = StickerTemplate.query.filter_by(template_type='Drawer').all()
+    templates = [t for t in StickerTemplate.query.filter_by(template_type='Drawer').all()
+                 if t.can_view(current_user)]
     return render_template('drawer_qr_sticker.html',
                            rack=rack,
                            drawer_ids=drawer_ids,
@@ -1057,7 +1057,7 @@ def drawers_qr_sticker(uuid):
 @login_required
 def api_drawer_sticker_preview(uuid, drawer_id, template_id):
     """Generate sticker preview SVG for a rack drawer"""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         return jsonify({'error': 'Permission denied'}), 403
     safe_drawer_id = _sanitize_drawer_id(drawer_id)
     if not safe_drawer_id:
@@ -1067,6 +1067,8 @@ def api_drawer_sticker_preview(uuid, drawer_id, template_id):
     template = StickerTemplate.query.get_or_404(template_id)
     if template.template_type != 'Drawer':
         return jsonify({'error': 'Template must be Drawer type'}), 400
+    if not template.can_view(current_user):
+        return jsonify({'error': 'Permission denied'}), 403
     data = get_drawer_data(rack, safe_drawer_id)
     svg_data = render_template_to_svg(template, data)
     return jsonify({
@@ -1081,7 +1083,7 @@ def api_drawer_sticker_preview(uuid, drawer_id, template_id):
 @login_required
 def api_drawer_sticker_print(uuid, drawer_id, template_id):
     """Generate PDF sticker for a rack drawer"""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         return jsonify({'error': 'Permission denied'}), 403
     safe_drawer_id = _sanitize_drawer_id(drawer_id)
     if not safe_drawer_id:
@@ -1091,6 +1093,8 @@ def api_drawer_sticker_print(uuid, drawer_id, template_id):
     template = StickerTemplate.query.get_or_404(template_id)
     if template.template_type != 'Drawer':
         return jsonify({'error': 'Template must be Drawer type'}), 400
+    if not template.can_view(current_user):
+        return jsonify({'error': 'Permission denied'}), 403
     data = get_drawer_data(rack, safe_drawer_id)
     output = generate_single_sticker_pdf(template, data, f"{rack.uuid}_{safe_drawer_id}")
     if not isinstance(output, BytesIO):
@@ -1105,13 +1109,15 @@ def api_drawer_sticker_print(uuid, drawer_id, template_id):
 @login_required
 def api_drawers_sticker_print(uuid, template_id):
     """Generate multi-page PDF for multiple rack drawers."""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         return jsonify({'error': 'Permission denied'}), 403
     from qr_utils import get_drawer_data, generate_batch_stickers_pdf
     rack = Rack.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
     if template.template_type != 'Drawer':
         return jsonify({'error': 'Template must be Drawer type'}), 400
+    if not template.can_view(current_user):
+        return jsonify({'error': 'Permission denied'}), 403
     raw = request.args.get('drawers', '')
     drawer_ids = [_sanitize_drawer_id(d) for d in raw.split(',')]
     drawer_ids = [d for d in drawer_ids if d]
@@ -1129,13 +1135,15 @@ def api_drawers_sticker_print(uuid, template_id):
 @login_required
 def api_drawers_sticker_svg_zip(uuid, template_id):
     """Generate a zip of SVG stickers for multiple rack drawers."""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         return jsonify({'error': 'Permission denied'}), 403
     from qr_utils import get_drawer_data, generate_svg_zip
     rack = Rack.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
     if template.template_type != 'Drawer':
         return jsonify({'error': 'Template must be Drawer type'}), 400
+    if not template.can_view(current_user):
+        return jsonify({'error': 'Permission denied'}), 403
     raw = request.args.get('drawers', '')
     drawer_ids = [d.strip() for d in raw.split(',') if d.strip()]
     if not drawer_ids:
@@ -1155,13 +1163,15 @@ def api_drawers_sticker_svg_zip(uuid, template_id):
 @login_required
 def api_drawers_sticker_table_print(uuid, template_id):
     """Generate a table-layout PDF (grid of stickers) for multiple rack drawers."""
-    if not current_user.has_permission('settings_sections.qr_templates', 'print_qr'):
+    if not (current_user.has_permission('sticker', 'view_manage') or current_user.has_permission('settings_sections.qr_templates', 'print_qr')):
         return jsonify({'error': 'Permission denied'}), 403
     from qr_utils import get_drawer_data, generate_table_sticker_pdf
     rack = Rack.query.filter_by(uuid=uuid).first_or_404()
     template = StickerTemplate.query.get_or_404(template_id)
     if template.template_type != 'Drawer':
         return jsonify({'error': 'Template must be Drawer type'}), 400
+    if not template.can_view(current_user):
+        return jsonify({'error': 'Permission denied'}), 403
     raw = request.args.get('drawers', '')
     drawer_ids = [d.strip() for d in raw.split(',') if d.strip()]
     if not drawer_ids:

@@ -108,11 +108,6 @@ def create_sticker():
     return render_template('qr_template_form.html', back_url=url_for('qr_template.sticker_list'))
 
 
-# Legacy redirect — keep old URLs working
-@qr_template_bp.route('/settings/qr/new', methods=['GET', 'POST'], endpoint='create_qr_template')
-@login_required
-def create_qr_template():
-    return redirect(url_for('qr_template.create_sticker'), 301)
 
 
 @qr_template_bp.route('/sticker/<int:template_id>/edit', methods=['GET'], endpoint='edit_sticker')
@@ -131,11 +126,6 @@ def edit_sticker(template_id):
                            back_url=url_for('qr_template.sticker_list'))
 
 
-# Legacy redirect — keep old editor URL working
-@qr_template_bp.route('/settings/qr/<int:template_id>/edit', methods=['GET'], endpoint='edit_qr_template')
-@login_required
-def edit_qr_template(template_id):
-    return redirect(url_for('qr_template.edit_sticker', template_id=template_id), 301)
 
 
 @qr_template_bp.route('/sticker/<int:template_id>/sharing', methods=['POST'], endpoint='sticker_sharing')
@@ -437,11 +427,6 @@ def delete_sticker(template_id):
         return redirect(url_for('qr_template.sticker_list'))
 
 
-# Legacy delete route redirect
-@qr_template_bp.route('/settings/qr/<int:template_id>/delete', methods=['POST'], endpoint='delete_qr_template')
-@login_required
-def delete_qr_template(template_id):
-    return redirect(url_for('qr_template.delete_sticker', template_id=template_id), 307)
 
 
 @qr_template_bp.route('/api/available-fonts')
