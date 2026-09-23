@@ -1003,22 +1003,6 @@
     </div></div>
 </div>
 
-{# ── Icon Picker Modal ─────────────────────────── #}
-<div class="modal fade" id="cardIconPickerModal" tabindex="-1" style="z-index:1098;">
-    <div class="modal-dialog modal-lg"><div class="modal-content">
-        <div class="modal-header py-2">
-            <h6 class="modal-title">Pick Card Icon</h6>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-            <div class="mb-2">
-                <input type="text" class="form-control form-control-sm" id="iconPickerSearch"
-                       placeholder="Search icons (e.g. star, flag, check)…">
-            </div>
-            <div id="iconPickerGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(2.8rem,1fr));gap:.35rem;max-height:60vh;overflow-y:auto;"></div>
-        </div>
-    </div></div>
-</div>
 
 {# ── Kanban Image Lightbox Modal ──────────────── #}
 <div class="modal fade" id="kanbanImageModal" tabindex="-1" style="z-index:1090;">
@@ -3415,86 +3399,24 @@ if (CAN_EDIT) {
     });
 }
 
-// ── Card Icon Picker ─────────────────────────────────────────────
-const _ICON_LIST = [
-    'bi-star','bi-star-fill','bi-flag','bi-flag-fill','bi-bookmark','bi-bookmark-fill',
-    'bi-heart','bi-heart-fill','bi-lightning','bi-lightning-fill','bi-fire','bi-award',
-    'bi-shield','bi-shield-fill','bi-lock','bi-lock-fill','bi-key','bi-gear',
-    'bi-tools','bi-wrench','bi-screwdriver','bi-hammer','bi-cpu','bi-cpu-fill',
-    'bi-server','bi-hdd','bi-hdd-fill','bi-cloud','bi-cloud-fill','bi-wifi',
-    'bi-ethernet','bi-router','bi-phone','bi-laptop','bi-monitor','bi-tv',
-    'bi-printer','bi-camera','bi-camera-fill','bi-image','bi-images',
-    'bi-folder','bi-folder-fill','bi-folder2-open','bi-file','bi-file-text',
-    'bi-file-code','bi-clipboard','bi-clipboard-check','bi-journal','bi-journal-text',
-    'bi-check-circle','bi-check-circle-fill','bi-x-circle','bi-x-circle-fill',
-    'bi-exclamation-triangle','bi-exclamation-circle','bi-info-circle','bi-question-circle',
-    'bi-bell','bi-bell-fill','bi-chat','bi-chat-fill','bi-envelope','bi-envelope-fill',
-    'bi-person','bi-person-fill','bi-people','bi-people-fill','bi-person-badge',
-    'bi-building','bi-house','bi-shop','bi-box','bi-box-fill','bi-boxes',
-    'bi-cart','bi-bag','bi-tags','bi-tag','bi-receipt','bi-currency-dollar',
-    'bi-graph-up','bi-graph-down','bi-bar-chart','bi-pie-chart','bi-calendar',
-    'bi-calendar-check','bi-clock','bi-hourglass','bi-stopwatch','bi-alarm',
-    'bi-map','bi-geo-alt','bi-compass','bi-globe','bi-pin','bi-pin-fill',
-    'bi-arrow-up','bi-arrow-down','bi-arrow-left','bi-arrow-right',
-    'bi-shuffle','bi-repeat','bi-play','bi-pause','bi-stop','bi-record',
-    'bi-music-note','bi-headphones','bi-volume-up','bi-emoji-smile',
-    'bi-trophy','bi-rocket','bi-bug','bi-puzzle','bi-braces','bi-code-slash',
-    'bi-activity','bi-broadcast','bi-eye','bi-eye-slash','bi-hand-thumbs-up',
-    'bi-recycle','bi-battery','bi-battery-half','bi-plug','bi-lightbulb',
-];
-
+// ── Card Icon Picker (uses shared IconPicker) ────────────────────
 function _setCardIcon(iconClass) {
     const hidden = document.getElementById('card-modal-icon');
     const previewBtn = document.getElementById('card-icon-preview-btn');
     if (!hidden || !previewBtn) return;
     hidden.value = iconClass || '';
-    if (iconClass) {
-        previewBtn.className = 'bi ' + iconClass;
-    } else {
-        previewBtn.className = 'bi bi-emoji-smile';
-    }
-}
-
-function _buildIconPickerGrid(filter) {
-    const grid = document.getElementById('iconPickerGrid');
-    if (!grid) return;
-    const q = (filter || '').toLowerCase().replace('bi-', '');
-    const filtered = q ? _ICON_LIST.filter(ic => ic.replace('bi-', '').includes(q)) : _ICON_LIST;
-    grid.innerHTML = filtered.map(ic =>
-        `<button type="button" class="btn btn-outline-secondary p-1 js-icon-pick-btn" data-icon="${ic}" title="${ic}"
-                 style="font-size:1.3rem;line-height:1;border-radius:.4rem;">
-            <i class="bi ${ic}"></i>
-         </button>`
-    ).join('');
+    previewBtn.className = iconClass ? ('bi ' + iconClass) : 'bi bi-emoji-smile';
 }
 
 document.getElementById('btn-card-icon-pick')?.addEventListener('click', () => {
-    _buildIconPickerGrid('');
-    document.getElementById('iconPickerSearch').value = '';
-    getModal('cardIconPickerModal').show();
+    const current = document.getElementById('card-modal-icon')?.value || '';
+    IconPicker.open(iconClass => {
+        _setCardIcon(iconClass);
+    }, current);
 });
 
 document.getElementById('btn-card-icon-clear')?.addEventListener('click', () => {
     _setCardIcon('');
-});
-
-document.getElementById('iconPickerSearch')?.addEventListener('input', function() {
-    _buildIconPickerGrid(this.value);
-});
-
-document.getElementById('iconPickerGrid')?.addEventListener('click', e => {
-    const btn = e.target.closest('.js-icon-pick-btn');
-    if (!btn) return;
-    _setCardIcon(btn.dataset.icon);
-    getModal('cardIconPickerModal').hide();
-    document.body.classList.add('modal-open'); // keep card modal scroll active
-});
-
-// Ensure card modal stays scrollable when icon picker closes
-document.getElementById('cardIconPickerModal')?.addEventListener('hidden.bs.modal', () => {
-    if (document.getElementById('cardModal')?.classList.contains('show')) {
-        document.body.classList.add('modal-open');
-    }
 });
 
 // ── Move / Duplicate Card ────────────────────────────────────────
