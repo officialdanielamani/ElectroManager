@@ -279,6 +279,7 @@ def _card_to_dict(card):
         'description': card.description or '',
         'priority': card.priority,
         'label_color': card.label_color or '',
+        'card_icon': card.card_icon or '',
         'category_id': card.category_id,
         'category_name': card.category.name if card.category_id and card.category else '',
         'key_persons': card.get_key_persons(),
@@ -989,6 +990,7 @@ def create_card(board_id):
         description=_strip(data.get('description'), _LIMITS['card_desc']),
         priority=prio,
         label_color=_safe_color(data.get('label_color'), ''),
+        card_icon=_safe_icon(data.get('card_icon', 'bi-circle')) if data.get('card_icon') else None,
         category_id=cat_id,
         label_name=cat_name,
         key_persons=json.dumps(_safe_persons(data.get('key_persons', []))),
@@ -1028,6 +1030,9 @@ def update_card(card_id):
         card.priority = max(1, min(4, int(data['priority'])))
     if 'label_color' in data:
         card.label_color = _safe_color(data['label_color'], card.label_color or '')
+    if 'card_icon' in data:
+        raw_icon = (data['card_icon'] or '').strip()
+        card.card_icon = _safe_icon(raw_icon) if raw_icon else None
     if 'category_id' in data:
         cat_id = data['category_id']
         if cat_id:
@@ -1324,6 +1329,129 @@ def delete_task(task_id):
             'card_completed_task_count': card.completed_task_count,
         })
     return jsonify({'ok': True})
+
+
+@kanban_bp.route('/kanban/boards/writable', methods=['GET'])
+@login_required
+def writable_boards():
+    """Return all boards the current user can write to (own + edit-shared), with their columns."""
+    own = KanbanBoard.query.filter_by(user_id=current_user.id).order_by(KanbanBoard.position).all()
+    edit_shared = []
+    for b in KanbanBoard.query.filter(
+        KanbanBoard.user_id != current_user.id,
+        KanbanBoard.share_edit_users.isnot(None),
+    ).all():
+        try:
+            if any(u.get('id') == current_user.id for u in json.loads(b.share_edit_users or '[]')):
+                edit_shared.append(b)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    result = []
+    for b in own + edit_shared:
+        cols = sorted(b.columns, key=lambda c: c.position)
+        result.append({
+            'id': b.id,
+            'name': b.name,
+            'board_icon': b.board_icon or 'bi-kanban',
+            'board_color': b.board_color or '#6b7280',
+            'is_own': b.user_id == current_user.id,
+            'columns': [{'id': c.id, 'name': c.name, 'color': c.color, 'icon': c.icon} for c in cols],
+        })
+    return jsonify(result)
+
+
+@kanban_bp.route('/kanban/cards/<int:card_id>/move', methods=['POST'])
+@login_required
+def move_card(card_id):
+    """Move card to a different board/column. Requires write access to BOTH source and destination."""
+    card = _card_or_404(card_id)  # ensures write access to source board
+    data = request.get_json(silent=True) or {}
+    dest_board_id = data.get('board_id')
+    dest_col_id   = data.get('column_id')
+    if not dest_board_id or not dest_col_id:
+        return jsonify({'error': 'board_id and column_id required'}), 400
+
+    dest_board = _writable_board_or_404(dest_board_id)
+    dest_col = KanbanColumn.query.filter_by(id=dest_col_id, board_id=dest_board.id).first()
+    if not dest_col:
+        return jsonify({'error': 'Column not found in destination board'}), 400
+
+    card_count = KanbanCard.query.filter_by(board_id=dest_board.id).count()
+    if card_count >= _MAX_CARDS_PER_BOARD:
+        return jsonify({'error': f'Destination board is full (max {_MAX_CARDS_PER_BOARD} cards)'}), 400
+
+    src_board_id = card.board_id
+    max_pos = db.session.query(db.func.max(KanbanCard.position)).filter_by(column_id=dest_col.id).scalar() or 0
+    card.board_id  = dest_board.id
+    card.column_id = dest_col.id
+    card.position  = max_pos + 1
+    card.updated_at = datetime.now(timezone.utc)
+    card.updated_by_id = current_user.id
+    db.session.commit()
+
+    if src_board_id != dest_board.id:
+        _push_event(src_board_id, {'type': 'card_deleted', 'user_id': current_user.id, 'card_id': card_id})
+    _push_event(dest_board.id, {'type': 'card_created', 'user_id': current_user.id, 'card': _card_to_dict(card)})
+    return jsonify({'ok': True, 'card': _card_to_dict(card)})
+
+
+@kanban_bp.route('/kanban/cards/<int:card_id>/duplicate', methods=['POST'])
+@login_required
+def duplicate_card(card_id):
+    """Duplicate card to destination board/column.
+    Source: any readable board. Destination: own or edit-shared board."""
+    src_card = _card_readable_or_404(card_id)
+    data = request.get_json(silent=True) or {}
+    dest_board_id = data.get('board_id')
+    dest_col_id   = data.get('column_id')
+    if not dest_board_id or not dest_col_id:
+        return jsonify({'error': 'board_id and column_id required'}), 400
+
+    dest_board = _writable_board_or_404(dest_board_id)
+    dest_col = KanbanColumn.query.filter_by(id=dest_col_id, board_id=dest_board.id).first()
+    if not dest_col:
+        return jsonify({'error': 'Column not found in destination board'}), 400
+
+    card_count = KanbanCard.query.filter_by(board_id=dest_board.id).count()
+    if card_count >= _MAX_CARDS_PER_BOARD:
+        return jsonify({'error': f'Destination board is full (max {_MAX_CARDS_PER_BOARD} cards)'}), 400
+
+    new_title = (src_card.title + '-copy')[:_LIMITS['card_title']]
+    max_pos = db.session.query(db.func.max(KanbanCard.position)).filter_by(column_id=dest_col.id).scalar() or 0
+    new_card = KanbanCard(
+        board_id=dest_board.id,
+        column_id=dest_col.id,
+        title=new_title,
+        description=src_card.description,
+        priority=src_card.priority,
+        label_color=src_card.label_color,
+        card_icon=src_card.card_icon,
+        category_id=None,  # categories belong to the source board; don't copy
+        key_persons=src_card.key_persons,
+        start_date=src_card.start_date,
+        due_date=src_card.due_date,
+        position=max_pos + 1,
+        created_by_id=current_user.id,
+        updated_by_id=current_user.id,
+    )
+    db.session.add(new_card)
+    db.session.flush()
+
+    # Copy tasks
+    for t in sorted(src_card.tasks, key=lambda x: x.position):
+        db.session.add(KanbanTask(
+            card_id=new_card.id,
+            title=t.title,
+            completed=False,
+            start_date=t.start_date,
+            due_date=t.due_date,
+            position=t.position,
+        ))
+
+    db.session.commit()
+    _push_event(dest_board.id, {'type': 'card_created', 'user_id': current_user.id, 'card': _card_to_dict(new_card)})
+    return jsonify({'ok': True, 'card': _card_to_dict(new_card)})
 
 
 @kanban_bp.route('/kanban/tasks/reorder', methods=['POST'])

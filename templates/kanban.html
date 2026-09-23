@@ -258,7 +258,7 @@
                            style="font-size:.55rem;vertical-align:middle;margin-right:2px"
                            title="Being edited by another user"></i>
                         <span class="card-title-text js-open-card"
-                              data-card-id="{{ card.id }}">{{ card.title }}</span>
+                              data-card-id="{{ card.id }}">{% if card.card_icon %}<i class="bi {{ card.card_icon }} me-1" style="font-size:.85em;opacity:.8"></i>{% endif %}{{ card.title }}</span>
                         <button class="btn btn-link btn-sm p-0 text-muted flex-shrink-0 js-open-card"
                                 data-card-id="{{ card.id }}" title="Card details"
                                 style="font-size:.8rem">
@@ -817,10 +817,25 @@
                         <option value="">— none —</option>
                     </select>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-2">
                     <label class="form-label">Label color</label>
                     <input type="color" class="form-control form-control-color w-100"
                            id="card-modal-label-color" value="#3b82f6">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Card icon</label>
+                    <div class="d-flex gap-1 align-items-center">
+                        <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0"
+                                id="btn-card-icon-pick" title="Pick icon"
+                                style="min-width:2.2rem;font-size:.9rem;">
+                            <i class="bi bi-emoji-smile" id="card-icon-preview-btn"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-danger btn-sm flex-shrink-0"
+                                id="btn-card-icon-clear" title="Remove icon" style="min-width:2rem;">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                        <input type="hidden" id="card-modal-icon" value="">
+                    </div>
                 </div>
             </div>
 
@@ -938,15 +953,69 @@
                 <div id="card-modal-updated-info" class="mt-1"></div>
             </div>
         </div>
-        <div class="modal-footer justify-content-between">
+        <div class="modal-footer justify-content-between flex-wrap gap-2">
             {# Delete button on the left #}
-            <button type="button" class="btn btn-outline-danger" id="btn-delete-card-modal">
-                <i class="bi bi-trash"></i> Delete Card
-            </button>
+            <div class="d-flex gap-1 flex-wrap">
+                <button type="button" class="btn btn-outline-danger" id="btn-delete-card-modal">
+                    <i class="bi bi-trash"></i> Delete Card
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="btn-move-card">
+                    <i class="bi bi-box-arrow-right"></i> Move Card
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="btn-duplicate-card">
+                    <i class="bi bi-copy"></i> Duplicate Card
+                </button>
+            </div>
             <div class="d-flex gap-2">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 <button type="button" class="btn btn-primary" id="btn-save-card">Save</button>
             </div>
+        </div>
+    </div></div>
+</div>
+
+{# ── Move / Duplicate Card Picker Modal ───────── #}
+<div class="modal fade" id="cardMoveModal" tabindex="-1" style="z-index:1095;">
+    <div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title" id="cardMoveModalTitle"><i class="bi bi-box-arrow-right"></i> Move Card</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Destination Board</label>
+                <select class="form-select" id="cardMoveBoard">
+                    <option value="">— select board —</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Destination Column</label>
+                <select class="form-select" id="cardMoveColumn" disabled>
+                    <option value="">— select column —</option>
+                </select>
+            </div>
+            <div id="cardMoveErr" class="alert alert-danger d-none py-2"></div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="btnCardMoveConfirm" disabled>Confirm</button>
+        </div>
+    </div></div>
+</div>
+
+{# ── Icon Picker Modal ─────────────────────────── #}
+<div class="modal fade" id="cardIconPickerModal" tabindex="-1" style="z-index:1098;">
+    <div class="modal-dialog modal-lg"><div class="modal-content">
+        <div class="modal-header py-2">
+            <h6 class="modal-title">Pick Card Icon</h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+            <div class="mb-2">
+                <input type="text" class="form-control form-control-sm" id="iconPickerSearch"
+                       placeholder="Search icons (e.g. star, flag, check)…">
+            </div>
+            <div id="iconPickerGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(2.8rem,1fr));gap:.35rem;max-height:60vh;overflow-y:auto;"></div>
         </div>
     </div></div>
 </div>
@@ -2395,7 +2464,8 @@ function savePersonsJson() {
 function _applyCardModalReadOnly(readOnly) {
     ['card-modal-title','card-modal-priority','card-modal-category','card-modal-label-color',
      'card-modal-start-date','card-modal-due-date','card-modal-completed',
-     'contact-search-input','card-modal-desc'].forEach(id => {
+     'contact-search-input','card-modal-desc',
+     'btn-card-icon-pick','btn-card-icon-clear'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.disabled = readOnly;
     });
@@ -2477,6 +2547,7 @@ function populateCardModal(card) {
     document.getElementById('card-modal-title').value = card.title;
     document.getElementById('card-modal-priority').value = card.priority;
     document.getElementById('card-modal-label-color').value = card.label_color || '#3b82f6';
+    _setCardIcon(card.card_icon || '');
     document.getElementById('card-modal-start-date').value = card.start_date || '';
     document.getElementById('card-modal-due-date').value = card.due_date || '';
     document.getElementById('card-modal-completed').checked = !!card.completed_at;
@@ -2935,6 +3006,7 @@ document.getElementById('btn-save-card')?.addEventListener('click', async () => 
             priority: parseInt(document.getElementById('card-modal-priority').value),
             category_id: catVal ? parseInt(catVal) : null,
             label_color: document.getElementById('card-modal-label-color').value,
+            card_icon: document.getElementById('card-modal-icon').value || '',
             start_date: document.getElementById('card-modal-start-date').value,
             due_date: document.getElementById('card-modal-due-date').value,
             completed_at: completed ? 'now' : '',
@@ -3273,7 +3345,7 @@ function _rtcCardHtml(card) {
     return `<div class="kanban-card" id="card-${card.id}" data-card-id="${card.id}">
   <div class="card-header-band" style="${hdr}" data-card-id="${card.id}">
     <i class="bi bi-circle-fill text-danger card-editing-indicator d-none" id="edit-ind-${card.id}" style="font-size:.55rem;vertical-align:middle;margin-right:2px" title="Being edited"></i>
-    <span class="card-title-text js-open-card" data-card-id="${card.id}">${escHtml(card.title)}</span>
+    <span class="card-title-text js-open-card" data-card-id="${card.id}">${card.card_icon?`<i class="bi ${escHtml(card.card_icon)} me-1" style="font-size:.85em;opacity:.8"></i>`:''  }${escHtml(card.title)}</span>
     <button class="btn btn-link btn-sm p-0 text-muted flex-shrink-0 js-open-card" data-card-id="${card.id}" title="Card details" style="font-size:.8rem"><i class="bi bi-info-circle"></i></button>
   </div>
   <div class="card-meta-row">
@@ -3342,5 +3414,189 @@ if (CAN_EDIT) {
         });
     });
 }
+
+// ── Card Icon Picker ─────────────────────────────────────────────
+const _ICON_LIST = [
+    'bi-star','bi-star-fill','bi-flag','bi-flag-fill','bi-bookmark','bi-bookmark-fill',
+    'bi-heart','bi-heart-fill','bi-lightning','bi-lightning-fill','bi-fire','bi-award',
+    'bi-shield','bi-shield-fill','bi-lock','bi-lock-fill','bi-key','bi-gear',
+    'bi-tools','bi-wrench','bi-screwdriver','bi-hammer','bi-cpu','bi-cpu-fill',
+    'bi-server','bi-hdd','bi-hdd-fill','bi-cloud','bi-cloud-fill','bi-wifi',
+    'bi-ethernet','bi-router','bi-phone','bi-laptop','bi-monitor','bi-tv',
+    'bi-printer','bi-camera','bi-camera-fill','bi-image','bi-images',
+    'bi-folder','bi-folder-fill','bi-folder2-open','bi-file','bi-file-text',
+    'bi-file-code','bi-clipboard','bi-clipboard-check','bi-journal','bi-journal-text',
+    'bi-check-circle','bi-check-circle-fill','bi-x-circle','bi-x-circle-fill',
+    'bi-exclamation-triangle','bi-exclamation-circle','bi-info-circle','bi-question-circle',
+    'bi-bell','bi-bell-fill','bi-chat','bi-chat-fill','bi-envelope','bi-envelope-fill',
+    'bi-person','bi-person-fill','bi-people','bi-people-fill','bi-person-badge',
+    'bi-building','bi-house','bi-shop','bi-box','bi-box-fill','bi-boxes',
+    'bi-cart','bi-bag','bi-tags','bi-tag','bi-receipt','bi-currency-dollar',
+    'bi-graph-up','bi-graph-down','bi-bar-chart','bi-pie-chart','bi-calendar',
+    'bi-calendar-check','bi-clock','bi-hourglass','bi-stopwatch','bi-alarm',
+    'bi-map','bi-geo-alt','bi-compass','bi-globe','bi-pin','bi-pin-fill',
+    'bi-arrow-up','bi-arrow-down','bi-arrow-left','bi-arrow-right',
+    'bi-shuffle','bi-repeat','bi-play','bi-pause','bi-stop','bi-record',
+    'bi-music-note','bi-headphones','bi-volume-up','bi-emoji-smile',
+    'bi-trophy','bi-rocket','bi-bug','bi-puzzle','bi-braces','bi-code-slash',
+    'bi-activity','bi-broadcast','bi-eye','bi-eye-slash','bi-hand-thumbs-up',
+    'bi-recycle','bi-battery','bi-battery-half','bi-plug','bi-lightbulb',
+];
+
+function _setCardIcon(iconClass) {
+    const hidden = document.getElementById('card-modal-icon');
+    const previewBtn = document.getElementById('card-icon-preview-btn');
+    if (!hidden || !previewBtn) return;
+    hidden.value = iconClass || '';
+    if (iconClass) {
+        previewBtn.className = 'bi ' + iconClass;
+    } else {
+        previewBtn.className = 'bi bi-emoji-smile';
+    }
+}
+
+function _buildIconPickerGrid(filter) {
+    const grid = document.getElementById('iconPickerGrid');
+    if (!grid) return;
+    const q = (filter || '').toLowerCase().replace('bi-', '');
+    const filtered = q ? _ICON_LIST.filter(ic => ic.replace('bi-', '').includes(q)) : _ICON_LIST;
+    grid.innerHTML = filtered.map(ic =>
+        `<button type="button" class="btn btn-outline-secondary p-1 js-icon-pick-btn" data-icon="${ic}" title="${ic}"
+                 style="font-size:1.3rem;line-height:1;border-radius:.4rem;">
+            <i class="bi ${ic}"></i>
+         </button>`
+    ).join('');
+}
+
+document.getElementById('btn-card-icon-pick')?.addEventListener('click', () => {
+    _buildIconPickerGrid('');
+    document.getElementById('iconPickerSearch').value = '';
+    getModal('cardIconPickerModal').show();
+});
+
+document.getElementById('btn-card-icon-clear')?.addEventListener('click', () => {
+    _setCardIcon('');
+});
+
+document.getElementById('iconPickerSearch')?.addEventListener('input', function() {
+    _buildIconPickerGrid(this.value);
+});
+
+document.getElementById('iconPickerGrid')?.addEventListener('click', e => {
+    const btn = e.target.closest('.js-icon-pick-btn');
+    if (!btn) return;
+    _setCardIcon(btn.dataset.icon);
+    getModal('cardIconPickerModal').hide();
+    document.body.classList.add('modal-open'); // keep card modal scroll active
+});
+
+// Ensure card modal stays scrollable when icon picker closes
+document.getElementById('cardIconPickerModal')?.addEventListener('hidden.bs.modal', () => {
+    if (document.getElementById('cardModal')?.classList.contains('show')) {
+        document.body.classList.add('modal-open');
+    }
+});
+
+// ── Move / Duplicate Card ────────────────────────────────────────
+let _writableBoards = [];
+let _cardMoveMode = 'move'; // 'move' or 'duplicate'
+
+async function _openCardMoveModal(mode) {
+    _cardMoveMode = mode;
+    const title = document.getElementById('cardMoveModalTitle');
+    const confirmBtn = document.getElementById('btnCardMoveConfirm');
+    const errEl = document.getElementById('cardMoveErr');
+    if (title) title.innerHTML = mode === 'move'
+        ? '<i class="bi bi-box-arrow-right"></i> Move Card'
+        : '<i class="bi bi-copy"></i> Duplicate Card';
+    if (errEl) { errEl.textContent = ''; errEl.classList.add('d-none'); }
+    if (confirmBtn) confirmBtn.disabled = true;
+
+    // Load writable boards
+    try {
+        _writableBoards = await api('GET', '/kanban/boards/writable');
+    } catch(e) {
+        _writableBoards = [];
+    }
+
+    const boardSel = document.getElementById('cardMoveBoard');
+    const colSel   = document.getElementById('cardMoveColumn');
+    boardSel.innerHTML = '<option value="">— select board —</option>' +
+        _writableBoards.map(b =>
+            `<option value="${b.id}">${escHtml(b.name)}${b.is_own ? '' : ' (shared)'}</option>`
+        ).join('');
+    colSel.innerHTML = '<option value="">— select column —</option>';
+    colSel.disabled = true;
+
+    getModal('cardMoveModal').show();
+}
+
+document.getElementById('cardMoveBoard')?.addEventListener('change', function() {
+    const boardId = parseInt(this.value);
+    const colSel = document.getElementById('cardMoveColumn');
+    const confirmBtn = document.getElementById('btnCardMoveConfirm');
+    colSel.disabled = true;
+    colSel.innerHTML = '<option value="">— select column —</option>';
+    if (confirmBtn) confirmBtn.disabled = true;
+    if (!boardId) return;
+    const board = _writableBoards.find(b => b.id === boardId);
+    if (!board) return;
+    colSel.innerHTML = '<option value="">— select column —</option>' +
+        board.columns.map(c =>
+            `<option value="${c.id}">${escHtml(c.name)}</option>`
+        ).join('');
+    colSel.disabled = false;
+});
+
+document.getElementById('cardMoveColumn')?.addEventListener('change', function() {
+    const confirmBtn = document.getElementById('btnCardMoveConfirm');
+    if (confirmBtn) confirmBtn.disabled = !this.value;
+});
+
+document.getElementById('btn-move-card')?.addEventListener('click', () => {
+    if (!_currentCardId) return;
+    _openCardMoveModal('move');
+});
+
+document.getElementById('btn-duplicate-card')?.addEventListener('click', () => {
+    if (!_currentCardId) return;
+    _openCardMoveModal('duplicate');
+});
+
+document.getElementById('btnCardMoveConfirm')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btnCardMoveConfirm');
+    const errEl = document.getElementById('cardMoveErr');
+    const boardId = parseInt(document.getElementById('cardMoveBoard').value);
+    const colId   = parseInt(document.getElementById('cardMoveColumn').value);
+    if (!boardId || !colId) return;
+    btn.disabled = true;
+    errEl.classList.add('d-none');
+    const endpoint = _cardMoveMode === 'move'
+        ? '/kanban/cards/' + _currentCardId + '/move'
+        : '/kanban/cards/' + _currentCardId + '/duplicate';
+    try {
+        await api('POST', endpoint, { board_id: boardId, column_id: colId });
+        getModal('cardMoveModal').hide();
+        hideModal('cardModal');
+        location.reload();
+    } catch(e) {
+        errEl.textContent = e.message || 'Operation failed';
+        errEl.classList.remove('d-none');
+        btn.disabled = false;
+    }
+});
+
+// Keep card modal open if move modal is dismissed without confirming
+document.getElementById('cardMoveModal')?.addEventListener('hidden.bs.modal', () => {
+    if (document.getElementById('cardModal')?.classList.contains('show')) {
+        document.body.classList.add('modal-open');
+    }
+});
+
+// Show/hide Move Card button based on CAN_EDIT (only owners / edit-shared can move)
+document.addEventListener('DOMContentLoaded', () => {
+    const moveBtn = document.getElementById('btn-move-card');
+    if (moveBtn && !CAN_EDIT) moveBtn.style.display = 'none';
+});
 </script>
 {% endblock %}

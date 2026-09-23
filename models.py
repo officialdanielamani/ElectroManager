@@ -1803,6 +1803,7 @@ class KanbanCard(db.Model):
     label_name  = db.Column(db.String(64))           # kept for backward-compat; UI uses category_id
     category_id = db.Column(db.Integer, db.ForeignKey('kanban_categories.id'), nullable=True)
     key_persons = db.Column(db.Text)                 # JSON list of {id, name} dicts
+    card_icon   = db.Column(db.String(48))           # optional Bootstrap icon class e.g. bi-star
     start_date  = db.Column(db.Date)
     due_date    = db.Column(db.Date)
     completed_at  = db.Column(db.DateTime)

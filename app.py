@@ -452,6 +452,7 @@ def _apply_column_migrations():
         ("sticker_templates", "share_view_users",  "TEXT"),
         ("sticker_templates", "share_edit_users",  "TEXT"),
         ("users",             "navbar_config",      "TEXT"),
+        ("kanban_cards",      "card_icon",           "VARCHAR(48)"),
     ]
     with db.engine.connect() as conn:
         for table, col, col_type in additions:
