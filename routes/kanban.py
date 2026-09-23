@@ -1326,6 +1326,25 @@ def delete_task(task_id):
     return jsonify({'ok': True})
 
 
+@kanban_bp.route('/kanban/tasks/reorder', methods=['POST'])
+@login_required
+def reorder_tasks():
+    data = request.get_json(silent=True) or {}
+    card_id = data.get('card_id')
+    order = data.get('order', [])
+    if not card_id:
+        return jsonify({'error': 'card_id required'}), 400
+    card = _card_or_404(card_id)
+    tasks = {t.id: t for t in KanbanTask.query.filter_by(card_id=card.id).all()}
+    for pos, tid in enumerate(order):
+        if tid in tasks:
+            tasks[tid].position = pos
+    card.updated_at = datetime.now(timezone.utc)
+    card.updated_by_id = current_user.id
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
 # ── Contacts ─────────────────────────────────────────────────────
 
 @kanban_bp.route('/kanban/contacts', methods=['GET'])

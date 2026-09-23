@@ -285,6 +285,10 @@
                     <button type="button" class="btn-close" onclick="document.getElementById('templateSettingsModal').style.display='none'; document.getElementById('templateSettingsModal').classList.remove('show'); document.body.classList.remove('modal-open');"></button>
                 </div>
                 <div class="modal-body">
+                    <div class="mb-3 p-2 rounded" style="background:rgba(128,128,128,0.08);font-size:13px;">
+                        <span class="text-muted"><i class="bi bi-person-circle"></i> Owner:</span>
+                        <strong id="settingsOwnerName">{{ template.owner.name if template.owner else 'Unknown' }}</strong>
+                    </div>
                     <div class="mb-3">
                         <label class="form-label">Template Name</label>
                         <input type="text" id="settingsTemplateName" class="form-control form-control-sm">
@@ -1756,9 +1760,11 @@ function updatePropertiesPanel(index) {
     <div class="mb-1"><h6 class="text-secondary mb-2" style="font-size: 13px;"><i class="bi bi-palette"></i> Colors</h6></div>
     <div class="mb-3">
         <label style="font-size: 12px; display:block; margin-bottom:6px;"><strong>Image Filter</strong></label>
-        <input type="range" class="form-range" id="prop-img-filter" min="0" max="2" step="1" value="${element.image_filter || 0}" style="margin-bottom:2px;">
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:#666;pointer-events:none;">
-            <span>Normal</span><span>Grayscale</span><span>B&amp;W</span>
+        <div style="background:rgba(128,128,128,0.12);border-radius:6px;padding:8px 10px 4px;">
+            <input type="range" class="form-range" id="prop-img-filter" min="0" max="2" step="1" value="${element.image_filter || 0}" style="margin-bottom:4px;accent-color:#0d6efd;width:100%;">
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--bs-secondary-color,#666);pointer-events:none;">
+                <span>Normal</span><span>Grayscale</span><span>B&amp;W</span>
+            </div>
         </div>
         <div class="text-center mt-1" id="prop-img-filter-label" style="font-size:11px;color:#0d6efd;font-weight:500;">${['Normal','Grayscale','Black & White'][element.image_filter || 0]}</div>
     </div>`;
@@ -3138,11 +3144,15 @@ if (!CAN_EDIT) {
     }
 }
 if (!IS_OWNER) {
-    // Non-owners cannot delete template, change name/size
-    document.getElementById('btn-edit-template') && (document.getElementById('btn-edit-template').disabled = true);
-    document.getElementById('settingsTemplateName') && (document.getElementById('settingsTemplateName').disabled = true);
-    document.getElementById('settingsTemplateWidth') && (document.getElementById('settingsTemplateWidth').disabled = true);
-    document.getElementById('settingsTemplateHeight') && (document.getElementById('settingsTemplateHeight').disabled = true);
+    // Non-owners can open the modal to see info but cannot change name/size
+    const _nameF = document.getElementById('settingsTemplateName');
+    const _widthF = document.getElementById('settingsTemplateWidth');
+    const _heightF = document.getElementById('settingsTemplateHeight');
+    const _saveBtn = document.getElementById('btnSaveSettings');
+    if (_nameF)  { _nameF.readOnly  = true; _nameF.classList.add('form-control-plaintext'); }
+    if (_widthF) { _widthF.readOnly = true; }
+    if (_heightF){ _heightF.readOnly = true; }
+    if (_saveBtn && !CAN_EDIT) _saveBtn.style.display = 'none';
 }
 
 // ── Real-time collaboration ──────────────────────────────────────────────────

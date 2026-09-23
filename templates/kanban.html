@@ -2528,6 +2528,9 @@ function renderModalTaskList(tasks, total, done) {
                 t.start_date && t.due_date ? '–' : ''}${
                 t.due_date ? t.due_date : ''}</small>`
             : '';
+        const dragHandle = CAN_EDIT
+            ? `<span class="js-task-drag-handle text-muted flex-shrink-0" style="cursor:grab;padding:0 2px;touch-action:none;" title="Drag to reorder"><i class="bi bi-grip-vertical"></i></span>`
+            : '';
         const taskBtns = CAN_EDIT
             ? `<button class="btn btn-link btn-sm p-0 text-primary ms-1 js-modal-task-info"
                     data-task-id="${t.id}"
@@ -2538,7 +2541,8 @@ function renderModalTaskList(tasks, total, done) {
                <button class="btn btn-link btn-sm p-0 text-danger ms-1 js-modal-task-del"
                     data-task-id="${t.id}" title="Delete"><i class="bi bi-trash"></i></button>`
             : '';
-        return `<div class="d-flex align-items-center gap-1 mb-1 py-1 border-bottom" id="m-task-row-${t.id}">
+        return `<div class="d-flex align-items-center gap-1 mb-1 py-1 border-bottom" id="m-task-row-${t.id}" data-task-id="${t.id}">
+            ${dragHandle}
             <input class="form-check-input flex-shrink-0 js-modal-task-check"
                    type="checkbox" data-task-id="${t.id}" ${t.completed ? 'checked' : ''} ${IS_OWNER ? '' : 'disabled'}>
             <span class="flex-grow-1 ${t.completed ? 'text-decoration-line-through text-muted' : ''}"
@@ -2560,6 +2564,22 @@ function renderModalTaskList(tasks, total, done) {
     list.querySelectorAll('.js-modal-task-del').forEach(btn => {
         btn.addEventListener('click', () => deleteTaskModal(parseInt(btn.dataset.taskId)));
     });
+
+    if (CAN_EDIT && tasks.length > 1) {
+        if (window._taskListSortable) window._taskListSortable.destroy();
+        window._taskListSortable = Sortable.create(list, {
+            handle: '.js-task-drag-handle',
+            animation: 120,
+            ghostClass: 'opacity-50',
+            onEnd: async () => {
+                const order = [...list.querySelectorAll('[data-task-id]')]
+                    .map(el => parseInt(el.dataset.taskId));
+                try {
+                    await api('POST', '/kanban/tasks/reorder', { card_id: _currentCardId, order });
+                } catch(e) { console.error('Task reorder failed:', e); }
+            }
+        });
+    }
 }
 
 document.getElementById('btn-add-task')?.addEventListener('click', addTaskModal);
