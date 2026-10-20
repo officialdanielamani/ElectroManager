@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Plugins{% endblock %}
+{% block content %}
+<div class="row mb-3">
+    <div class="col">
+        <h2><i class="bi bi-puzzle-fill"></i> Plugins</h2>
+        <p class="text-muted">Install and manage server extensions. Only administrators can manage plugins.</p>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('settings.settings') }}" class="btn btn-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Back to Settings
+        </a>
+    </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% for cat, msg in messages %}
+<div class="alert alert-{{ cat }} alert-dismissible fade show">{{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endfor %}
+{% endwith %}
+
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i>
+    Plugins are loaded from the <code>plugins/</code> directory. To add a plugin, place its package folder
+    inside that directory and restart the server.
+</div>
+
+{% if plugins %}
+<div class="row g-3">
+    {% for plugin in plugins %}
+    {% set instance = registered.get(plugin.slug) %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 {% if plugin.enabled %}border-success{% endif %}">
+            <div class="card-header d-flex align-items-center gap-2">
+                <i class="bi bi-puzzle{% if plugin.enabled %}-fill text-success{% endif %} fs-5"></i>
+                <strong class="flex-grow-1">{{ plugin.name }}</strong>
+                <span class="badge {% if plugin.enabled %}bg-success{% else %}bg-secondary{% endif %}">
+                    {{ 'Enabled' if plugin.enabled else 'Disabled' }}
+                </span>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-2">{{ plugin.description or '—' }}</p>
+                <div class="d-flex gap-2 text-muted small">
+                    <span><i class="bi bi-tag"></i> {{ plugin.plugin_type }}</span>
+                    <span><i class="bi bi-code-square"></i> v{{ plugin.version }}</span>
+                </div>
+            </div>
+            <div class="card-footer d-flex gap-2">
+                <form method="POST" action="{{ url_for('plugins.plugin_toggle', slug=plugin.slug) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm {% if plugin.enabled %}btn-outline-danger{% else %}btn-outline-success{% endif %}">
+                        <i class="bi bi-{% if plugin.enabled %}stop-circle{% else %}play-circle{% endif %}"></i>
+                        {{ 'Disable' if plugin.enabled else 'Enable' }}
+                    </button>
+                </form>
+                {% if instance and instance.config_schema %}
+                <a href="{{ url_for('plugins.plugin_config', slug=plugin.slug) }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-gear"></i> Configure
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+    <i class="bi bi-puzzle" style="font-size:3rem;"></i>
+    <p class="mt-3">No plugins installed yet. Place plugin packages in the <code>plugins/</code> directory and restart the server.</p>
+</div>
+{% endif %}
+{% endblock %}

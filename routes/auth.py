@@ -1,11 +1,11 @@
 """
 Auth Routes Blueprint
 """
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file, abort, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file, abort, current_app, session
 from flask_login import login_required, current_user, login_user, logout_user
 from extensions import limiter
 from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate
-from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEditForm, AttachmentForm, 
+from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEditForm, AttachmentForm,
                    SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm)
 from helpers import is_safe_url, format_currency, is_safe_file_path
 from utils import save_file, log_audit, admin_required, permission_required, item_permission_required, format_file_size, allowed_file
@@ -18,6 +18,10 @@ import json
 import secrets
 import string
 import logging
+import pyotp
+import qrcode
+import io
+import base64
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +66,12 @@ def login():
             user.failed_login_attempts = 0
             user.account_locked_until = None
             db.session.commit()
+
+            # If MFA is enabled, stash user id and redirect to MFA challenge
+            if user.mfa_enabled:
+                session['mfa_pending_user_id'] = user.id
+                session['mfa_remember_me'] = bool(form.remember_me.data)
+                return redirect(url_for('auth.login_mfa'))
 
             login_user(user, remember=form.remember_me.data)
             log_audit(user.id, 'login', 'user', user.id, 'User logged in')
@@ -129,7 +139,63 @@ def logout():
 
 
 
+@auth_bp.route('/login/mfa', endpoint='login_mfa', methods=['GET', 'POST'])
+@limiter.limit("10 per minute; 3 per second", methods=["POST"])
+def login_mfa():
+    """TOTP MFA challenge step — only reachable after password check."""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    user_id = session.get('mfa_pending_user_id')
+    if not user_id:
+        return redirect(url_for('auth.login'))
+    user = db.session.get(User, user_id)
+    if not user:
+        session.pop('mfa_pending_user_id', None)
+        return redirect(url_for('auth.login'))
+
+    error = None
+    if request.method == 'POST':
+        code = (request.form.get('totp_code') or '').strip().replace(' ', '')
+        totp = pyotp.TOTP(user.mfa_secret)
+        valid = totp.verify(code, valid_window=1)
+
+        if not valid:
+            # Check backup codes
+            backup = _use_backup_code(user, code)
+            if backup:
+                valid = True
+            else:
+                log_audit(user.id, 'mfa_failed', 'user', user.id, 'MFA code rejected')
+                error = 'Invalid authentication code. Please try again.'
+
+        if valid:
+            remember = session.pop('mfa_remember_me', False)
+            session.pop('mfa_pending_user_id', None)
+            login_user(user, remember=remember)
+            log_audit(user.id, 'login', 'user', user.id, 'User logged in (MFA)')
+            return redirect(url_for('index'))
+
+    return render_template('login_mfa.html', error=error)
+
+
+def _use_backup_code(user, code):
+    """Consume a single-use backup code. Returns True if valid."""
+    try:
+        codes = json.loads(user.mfa_backup_codes or '[]')
+    except (json.JSONDecodeError, TypeError):
+        codes = []
+    code = code.upper().replace('-', '').replace(' ', '')
+    for stored in codes:
+        if secrets.compare_digest(stored, code):
+            codes.remove(stored)
+            user.mfa_backup_codes = json.dumps(codes)
+            db.session.commit()
+            return True
+    return False
+
+
 @auth_bp.route('/register', endpoint='register', methods=['GET', 'POST'])
+@limiter.limit("10 per minute; 3 per second", methods=["POST"])
 def register():
     from models import Setting, Role
     signup_enabled = Setting.get('signup_enabled', True)
@@ -171,6 +237,7 @@ def register():
 
 @auth_bp.route('/verify-password', endpoint='verify_password', methods=['POST'])
 @login_required
+@limiter.limit("10 per minute; 3 per second")
 def verify_password():
     """Verify user's password"""
     try:
@@ -192,3 +259,71 @@ def verify_password():
 
 
 
+
+
+# ── MFA Setup Routes ────────────────────────────────────────────────────────
+
+@auth_bp.route('/settings/mfa/setup', endpoint='mfa_setup', methods=['GET', 'POST'])
+@login_required
+def mfa_setup():
+    """Begin TOTP setup: generate secret, show QR code."""
+    if current_user.mfa_enabled:
+        flash('Two-factor authentication is already enabled.', 'info')
+        return redirect(url_for('settings.settings_general'))
+
+    if request.method == 'POST':
+        secret = request.form.get('mfa_secret', '').strip()
+        code = request.form.get('totp_code', '').strip().replace(' ', '')
+        if not secret or not code:
+            flash('Missing data. Please try again.', 'danger')
+            return redirect(url_for('auth.mfa_setup'))
+
+        totp = pyotp.TOTP(secret)
+        if not totp.verify(code, valid_window=1):
+            flash('Invalid code. Please scan the QR code again and re-enter the 6-digit code.', 'danger')
+            return redirect(url_for('auth.mfa_setup'))
+
+        # Generate 8 backup codes (8 chars each, uppercase alphanumeric)
+        backup_codes = [
+            ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+            for _ in range(8)
+        ]
+        current_user.mfa_secret = secret
+        current_user.mfa_enabled = True
+        current_user.mfa_backup_codes = json.dumps(backup_codes)
+        db.session.commit()
+        log_audit(current_user.id, 'mfa_enabled', 'user', current_user.id, 'TOTP MFA enabled')
+        flash('Two-factor authentication has been enabled.', 'success')
+        return render_template('mfa_backup_codes.html', backup_codes=backup_codes)
+
+    # GET — generate a fresh secret and QR code
+    secret = pyotp.random_base32()
+    app_name = Setting.get('system_name') or Setting.get('app_name') or 'ElectroManager'
+    totp_uri = pyotp.TOTP(secret).provisioning_uri(
+        name=current_user.email, issuer_name=app_name
+    )
+    # Build a data-URI QR image
+    img = qrcode.make(totp_uri)
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    qr_data = 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()
+    return render_template('mfa_setup.html', secret=secret, qr_data=qr_data, totp_uri=totp_uri)
+
+
+@auth_bp.route('/settings/mfa/disable', endpoint='mfa_disable', methods=['POST'])
+@login_required
+@limiter.limit("5 per minute")
+def mfa_disable():
+    """Disable MFA after confirming password."""
+    password = (request.form.get('password') or '').strip()
+    if not password or not current_user.check_password(password):
+        flash('Incorrect password. MFA was not disabled.', 'danger')
+        return redirect(url_for('settings.settings_general'))
+
+    current_user.mfa_enabled = False
+    current_user.mfa_secret = None
+    current_user.mfa_backup_codes = None
+    db.session.commit()
+    log_audit(current_user.id, 'mfa_disabled', 'user', current_user.id, 'TOTP MFA disabled')
+    flash('Two-factor authentication has been disabled.', 'warning')
+    return redirect(url_for('settings.settings_general'))

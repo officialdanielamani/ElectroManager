@@ -366,6 +366,22 @@ def set_security_headers(response):
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    # Content-Security-Policy — tightened but allows Bootstrap CDN fallback and inline styles used by app
+    csp = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com data:; "
+        "img-src 'self' data: blob:; "
+        "connect-src 'self'; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self';"
+    )
+    response.headers['Content-Security-Policy'] = csp
+    # HSTS — only send when served over HTTPS (configured via SESSION_COOKIE_SECURE)
+    if app.config.get('SESSION_COOKIE_SECURE'):
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     return response
 
 
@@ -453,6 +469,9 @@ def _apply_column_migrations():
         ("sticker_templates", "share_edit_users",  "TEXT"),
         ("users",             "navbar_config",      "TEXT"),
         ("kanban_cards",      "card_icon",           "VARCHAR(48)"),
+        ("users",             "mfa_secret",          "VARCHAR(64)"),
+        ("users",             "mfa_enabled",         "BOOLEAN DEFAULT 0"),
+        ("users",             "mfa_backup_codes",    "TEXT"),
     ]
     with db.engine.connect() as conn:
         for table, col, col_type in additions:
@@ -514,6 +533,13 @@ with app.app_context():
     db.create_all()          # create any brand-new tables (e.g. lending_sessions)
     _apply_column_migrations()
     _delete_legacy_sticker_templates()
+
+# Register plugins blueprint and load plugins
+from routes.plugins import plugins_bp
+app.register_blueprint(plugins_bp)
+
+from plugins import load_all_plugins
+load_all_plugins(app)
 
 
 if __name__ == '__main__':

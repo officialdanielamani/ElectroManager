@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Configure {{ plugin.name }}{% endblock %}
+{% block content %}
+<div class="row mb-3">
+    <div class="col">
+        <h2><i class="bi bi-gear"></i> Configure: {{ plugin.name }}</h2>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('plugins.plugin_list') }}" class="btn btn-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Back to Plugins
+        </a>
+    </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% for cat, msg in messages %}
+<div class="alert alert-{{ cat }} alert-dismissible fade show">{{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+{% endfor %}
+{% endwith %}
+
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header">
+                <strong>{{ plugin.name }}</strong>
+                <span class="badge ms-2 {% if plugin.enabled %}bg-success{% else %}bg-secondary{% endif %}">
+                    {{ 'Enabled' if plugin.enabled else 'Disabled' }}
+                </span>
+            </div>
+            <div class="card-body">
+                {% if schema %}
+                <form method="POST" action="{{ url_for('plugins.plugin_config', slug=plugin.slug) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {% for field in schema %}
+                    <div class="mb-3">
+                        <label class="form-label">
+                            {{ field.label }}
+                            {% if field.get('required') %}<span class="text-danger">*</span>{% endif %}
+                        </label>
+                        {% if field.type == 'bool' %}
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="{{ field.key }}" id="field_{{ field.key }}"
+                                   {% if config.get(field.key, field.get('default', False)) %}checked{% endif %}>
+                            <label class="form-check-label" for="field_{{ field.key }}">Enabled</label>
+                        </div>
+                        {% elif field.type == 'password' %}
+                        <input type="password" class="form-control" name="{{ field.key }}"
+                               placeholder="(leave blank to keep current value)"
+                               autocomplete="new-password">
+                        {% elif field.type == 'select' %}
+                        <select class="form-select" name="{{ field.key }}">
+                            {% for opt in field.get('options', []) %}
+                            <option value="{{ opt }}" {% if config.get(field.key, field.get('default')) == opt %}selected{% endif %}>{{ opt }}</option>
+                            {% endfor %}
+                        </select>
+                        {% else %}
+                        <input type="text" class="form-control" name="{{ field.key }}"
+                               value="{{ config.get(field.key, field.get('default', '')) }}">
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check"></i> Save Configuration
+                    </button>
+                </form>
+                {% else %}
+                <p class="text-muted">This plugin has no configurable settings.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

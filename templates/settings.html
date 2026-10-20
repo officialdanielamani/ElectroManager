@@ -176,6 +176,20 @@
     </div>
     {% endif %}
 
+    <!-- Plugins -->
+    {% if current_user.has_permission('settings_sections.system_settings', 'view') %}
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-puzzle-fill" style="font-size: 3rem; color: #7c3aed;"></i>
+                <h5 class="card-title mt-3">Plugins</h5>
+                <p class="card-text small">Manage server extensions and integrations</p>
+                <a href="{{ url_for('plugins.plugin_list') }}" class="btn btn-primary">Manage Plugins</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Backup & Restore -->
     {% if current_user.has_permission('settings_sections.backup_restore', 'view') %}
     <div class="col-md-6 col-lg-4 mb-3">

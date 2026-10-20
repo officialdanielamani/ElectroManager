@@ -36,3 +36,7 @@ class Config:
     REMEMBER_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() == 'true'
 
     WTF_CSRF_TIME_LIMIT = 3600  # 1 hour CSRF token lifetime
+
+    # Session lifetime: default 8 hours, overridable via SESSION_LIFETIME_HOURS env var
+    from datetime import timedelta as _td
+    PERMANENT_SESSION_LIFETIME = _td(hours=int(os.environ.get('SESSION_LIFETIME_HOURS', '8')))

@@ -149,6 +149,9 @@ class User(UserMixin, db.Model):
     api_item_search    = db.Column(db.Boolean, default=False)
     api_rack_drawer    = db.Column(db.Boolean, default=False)
     api_lending_return = db.Column(db.Boolean, default=False)
+    mfa_secret         = db.Column(db.String(64), nullable=True)
+    mfa_enabled        = db.Column(db.Boolean, default=False)
+    mfa_backup_codes   = db.Column(db.Text, nullable=True)
 
     def __init__(self, **kwargs):
         super(User, self).__init__(**kwargs)
@@ -1896,3 +1899,30 @@ class KanbanTask(db.Model):
     due_date   = db.Column(db.Date)
     position   = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class Plugin(db.Model):
+    __tablename__ = 'plugins'
+
+    id          = db.Column(db.Integer, primary_key=True)
+    slug        = db.Column(db.String(64), unique=True, nullable=False)
+    name        = db.Column(db.String(128), nullable=False)
+    description = db.Column(db.String(512))
+    version     = db.Column(db.String(32), default='1.0.0')
+    plugin_type = db.Column(db.String(32), default='general')
+    enabled     = db.Column(db.Boolean, default=False)
+    config      = db.Column(db.Text, default='{}')
+    created_at  = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at  = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    def get_config(self):
+        try:
+            return json.loads(self.config) if self.config else {}
+        except (json.JSONDecodeError, TypeError):
+            return {}
+
+    def set_config(self, cfg):
+        self.config = json.dumps(cfg)
+
+    def __repr__(self):
+        return f'<Plugin {self.slug}>'
