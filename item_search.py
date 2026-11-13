@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy.orm import selectinload
 
 from models import (db, Item, Category, Footprint, Tag, MagicParameter,
-                    ItemParameter, ItemParameterStringValue)
+                    ItemParameter, ItemParameterStringValue, item_tags)
 
 STATUS_LABELS = {'ok': 'OK', 'low': 'Low Stock', 'no': 'No Stock'}
 NUMBER_OPS = ('range', 'min', 'max', 'eq')
@@ -265,13 +265,6 @@ def param_groups(params):
     return groups
 
 
-def _item_tag_ids(item):
-    try:
-        return {int(t) for t in json.loads(item.tags or '[]')}
-    except (json.JSONDecodeError, TypeError, ValueError):
-        return set()
-
-
 def _in_range(value, low, high):
     return (low is None or value >= low) and (high is None or value <= high)
 
@@ -324,11 +317,11 @@ def find_items(filters):
             checks.append(lambda item: item.id in matching)
 
     if filters['tag_ids']:
-        wanted = set(filters['tag_ids'])
+        tagged = db.select(item_tags.c.item_id).where(item_tags.c.tag_id.in_(filters['tag_ids']))
         if filters['tag_mode'] == 'all':
-            checks.append(lambda item: wanted <= _item_tag_ids(item))
-        else:
-            checks.append(lambda item: bool(wanted & _item_tag_ids(item)))
+            tagged = (tagged.group_by(item_tags.c.item_id)
+                      .having(db.func.count(item_tags.c.tag_id) == len(filters['tag_ids'])))
+        query = query.filter(Item.id.in_(tagged))
     if filters['qty_min'] is not None or filters['qty_max'] is not None:
         checks.append(lambda item: _in_range(item.get_available_quantity(),
                                              filters['qty_min'], filters['qty_max']))

@@ -76,6 +76,31 @@ def test_legacy_database_is_adopted(engine):
         assert conn.execute(sa.text('SELECT count(*) FROM items')).scalar() == 3
 
 
+def test_item_tags_move_from_json_to_table(engine):
+    _make_legacy(engine)
+    upgrade_database(engine)
+    assert 'tags' not in _columns(engine, 'items')
+    with engine.connect() as conn:
+        links = conn.execute(sa.text('SELECT item_id, tag_id FROM item_tags ORDER BY 1, 2')).fetchall()
+    assert [tuple(row) for row in links] == [(1, 1), (1, 2)], 'unknown tag ids and bad JSON are dropped'
+
+
+def test_item_tags_downgrade_restores_json(engine):
+    from alembic import command
+    from db_migrate import _config
+    _make_legacy(engine)
+    upgrade_database(engine)
+    config = _config()
+    with engine.connect() as conn:
+        config.attributes['connection'] = conn
+        command.downgrade(config, '0001_baseline')
+        conn.commit()
+    with engine.connect() as conn:
+        assert conn.execute(sa.text('SELECT tags FROM items WHERE id = 1')).scalar() == '[1, 2]'
+        assert conn.execute(sa.text('SELECT tags FROM items WHERE id = 2')).scalar() is None
+    assert 'item_tags' not in sa.inspect(engine).get_table_names()
+
+
 def test_existing_database_is_backed_up_before_upgrade(engine):
     _make_legacy(engine)
     upgrade_database(engine)

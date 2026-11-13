@@ -409,6 +409,12 @@ class Rack(db.Model):
         return f'<Rack {self.name}>'
 
 
+item_tags = db.Table(
+    'item_tags',
+    db.Column('item_id', db.Integer, db.ForeignKey('items.id', ondelete='CASCADE'), primary_key=True),
+    db.Column('tag_id', db.Integer, db.ForeignKey('tags.id', ondelete='CASCADE'), primary_key=True, index=True),
+)
+
 item_share_files = db.Table(
     'item_share_files',
     db.Column('item_id', db.Integer, db.ForeignKey('items.id'), primary_key=True),
@@ -449,7 +455,6 @@ class Item(db.Model):
     min_quantity = db.Column(db.Integer, default=0)
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'))
     footprint_id = db.Column(db.Integer, db.ForeignKey('footprints.id'))
-    tags = db.Column(db.Text)
     
     datasheet_urls = db.Column(db.String(2048))
     no_stock_warning = db.Column(db.Boolean, default=True)
@@ -473,7 +478,8 @@ class Item(db.Model):
     attachments = db.relationship('Attachment', backref='item', lazy=True, cascade='all, delete-orphan')
     batches = db.relationship('ItemBatch', backref='item', lazy=True, cascade='all, delete-orphan', order_by='ItemBatch.batch_number')
     linked_share_files = db.relationship('SharedFile', secondary=item_share_files, lazy='subquery', backref=db.backref('linked_items', lazy=True))
-    
+    tags = db.relationship('Tag', secondary=item_tags, order_by='Tag.id', lazy=True, backref=db.backref('items', lazy=True))
+
     def __init__(self, **kwargs):
         super(Item, self).__init__(**kwargs)
         if not self.uuid:
@@ -563,18 +569,11 @@ class Item(db.Model):
     def get_total_value(self):
         return self.get_overall_total_value()
     
-    def get_tags_list(self):
-        if not self.tags:
-            return []
-        try:
-            tag_ids = json.loads(self.tags)
-            return Tag.query.filter(Tag.id.in_(tag_ids)).all()
-        except (json.JSONDecodeError, TypeError):
-            return []
-    
-    def get_tags(self):
-        return self.get_tags_list()
-    
+    def set_tag_ids(self, tag_ids):
+        """Replace this item's tags; ids that are not existing tags are dropped."""
+        ids = {int(t) for t in tag_ids or []}
+        self.tags = Tag.query.filter(Tag.id.in_(ids)).all() if ids else []
+
     def get_next_batch_number(self):
         max_batch = db.session.query(db.func.max(ItemBatch.batch_number)).filter_by(item_id=self.id).scalar()
         return (max_batch or 0) + 1

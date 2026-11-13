@@ -241,8 +241,8 @@
         <div class="info-item">
             <div class="info-label">Tags</div>
             <div class="info-value">
-                {% for tag in item.get_tags_list() %}{{ tag.name }}{% if not loop.last %}, {% endif %}{% endfor %}
-                {% if not item.get_tags_list() %}None{% endif %}
+                {% for tag in item.tags %}{{ tag.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+                {% if not item.tags %}None{% endif %}
             </div>
         </div>
     </div>

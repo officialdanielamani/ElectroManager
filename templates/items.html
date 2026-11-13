@@ -352,10 +352,10 @@
                                     {% endif %}
                                     {% if col == 'tags' and can_view_info %}
                                     <td>
-                                        {% for tag in item.get_tags_list() %}
+                                        {% for tag in item.tags %}
                                         <span class="badge" style="background-color: {{ tag.color }}; color: white;">{{ tag.name }}</span>
                                         {% endfor %}
-                                        {% if not item.get_tags_list() %}-{% endif %}
+                                        {% if not item.tags %}-{% endif %}
                                     </td>
                                     {% endif %}
                                     {% if col == 'footprint' and can_view_info %}
@@ -560,10 +560,10 @@
                                 {% if can_view_info %}
                                 <p class="mb-1 small">
                                     <strong>Tags:</strong>
-                                    {% for tag in item.get_tags_list() %}
+                                    {% for tag in item.tags %}
                                     <span class="badge" style="background-color: {{ tag.color }}; color: white; font-size: 0.65rem;">{{ tag.name }}</span>
                                     {% endfor %}
-                                    {% if not item.get_tags_list() %}-{% endif %}
+                                    {% if not item.tags %}-{% endif %}
                                 </p>
                                 <p class="mb-1 small">
                                     <strong>Footprint:</strong> {{ item.footprint.name if item.footprint else '-' }}

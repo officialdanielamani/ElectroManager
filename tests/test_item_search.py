@@ -1,5 +1,3 @@
-import json
-
 import pytest
 
 from conftest import item_names, mp
@@ -36,9 +34,9 @@ def catalog(app):
 
         def add(name, cat, tags, fp, qty, price, sku, model, short, params):
             item = Item(name=name, category_id=ids[f'cat:{cat}'], sku=sku, info=model, short_info=short,
-                        footprint_id=ids.get(f'fp:{fp}'), min_quantity=3,
-                        tags=json.dumps([ids[f'tag:{t}'] for t in tags]))
+                        footprint_id=ids.get(f'fp:{fp}'), min_quantity=3)
             db.session.add(item)
+            item.set_tag_ids(ids[f'tag:{t}'] for t in tags)
             db.session.flush()
             db.session.add(ItemBatch(item_id=item.id, batch_number=1, quantity=qty, price_per_unit=price))
             for param_id, operation, value, value2, unit, strings in params:

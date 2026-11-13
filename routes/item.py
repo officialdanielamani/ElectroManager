@@ -193,9 +193,6 @@ def item_new():
             drawer_value = None
 
         # Tags live under Item Info
-        selected_tags = request.form.getlist('tags[]')
-        tags_json = json.dumps([int(t) for t in selected_tags if t])
-
         item = Item(
             name=form.name.data,
             sku=form.sku.data if form.sku.data else None,
@@ -211,13 +208,13 @@ def item_new():
             no_stock_warning=form.no_stock_warning.data,
             category_id=form.category_id.data if form.category_id.data and form.category_id.data > 0 else None,
             footprint_id=form.footprint_id.data if form.footprint_id.data and form.footprint_id.data > 0 else None,
-            tags=tags_json,
             thumbnail=request.form.get('thumbnail', '').strip() or None,
             datasheet_urls=(form.datasheet_urls.data or '')[:2048] or None if perms['can_edit_advance'] else None,
             created_by=current_user.id,
             updated_by=current_user.id
         )
         db.session.add(item)
+        item.set_tag_ids(t for t in request.form.getlist('tags[]') if t.isdigit())
         db.session.commit()
 
         # Process any pending batches submitted from the new-item form
@@ -563,9 +560,7 @@ def item_edit(uuid):
                 item.drawer = None
 
             # Tags
-            selected_tags = request.form.getlist('tags[]')
-            tags_json = json.dumps([int(t) for t in selected_tags if t])
-            item.tags = tags_json
+            item.set_tag_ids(t for t in request.form.getlist('tags[]') if t.isdigit())
 
         # Advance Info section
         if perms['can_edit_advance']:
@@ -902,10 +897,11 @@ def bulk_edit_items():
             updates['footprint_id'] = int(fp) if fp else None
 
     # ── Tags (null = no change; list = apply, even if empty) ─────────────────
+    new_tag_ids = None
     if 'tags' in data:
         tag_list = data['tags']
         if isinstance(tag_list, list):
-            updates['tags'] = json.dumps(tag_list) if tag_list else None
+            new_tag_ids = [t for t in tag_list if str(t).isdigit()]
 
     # ── Min Quantity ──────────────────────────────────────────────────────────
     if 'min_quantity' in data:
@@ -916,7 +912,7 @@ def bulk_edit_items():
             except (ValueError, TypeError):
                 pass
 
-    if not updates:
+    if not updates and new_tag_ids is None:
         return jsonify({'success': False, 'message': 'No changes specified. Please fill in at least one field.'}), 400
 
     now = datetime.now(timezone.utc)
@@ -924,6 +920,8 @@ def bulk_edit_items():
         for item in items_to_edit:
             for field, value in updates.items():
                 setattr(item, field, value)
+            if new_tag_ids is not None:
+                item.set_tag_ids(new_tag_ids)
             item.updated_by = current_user.id
             item.updated_at = now
 
