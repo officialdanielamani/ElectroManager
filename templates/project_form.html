@@ -864,7 +864,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                {% set proj_images = attachments.get('picture', []) %}
+                {% set proj_images = (attachments or {}).get('picture', []) %}
                 {% if proj_images %}
                 <div class="row row-cols-3 row-cols-sm-4 row-cols-md-5 g-2">
                     {% for att in proj_images %}

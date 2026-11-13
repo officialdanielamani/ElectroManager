@@ -376,6 +376,33 @@ ElectroManager/
 
 ---
 
+## Development
+
+### Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+The suite runs against a throwaway SQLite database, so it never touches `instance/inventory.db`.
+It covers login and two-factor auth, item search, Kanban card move/duplicate permissions, plugins,
+backup restore, the database migrations, and a smoke test that loads every page.
+
+### Database migrations
+
+The schema is managed with [Alembic](https://alembic.sqlalchemy.org/); migrations live in
+`migrations/versions/` and are applied automatically when the app starts. Before upgrading a
+database that already holds data, the app copies it to `instance/inventory.db.before-<revision>.bak`.
+
+To change the schema, edit `models.py`, then generate and review a migration:
+
+```bash
+alembic revision --autogenerate -m "describe the change"
+```
+
+`pytest` fails if `models.py` and the migrations disagree.
+
 ## Dependencies
 
 **Python**

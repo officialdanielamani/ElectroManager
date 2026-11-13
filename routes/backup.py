@@ -8,6 +8,7 @@ from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemE
                    SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm)
 from helpers import is_safe_url, format_currency, is_safe_file_path
 from utils import save_file, log_audit, admin_required, permission_required, item_permission_required, format_file_size, allowed_file
+from db_migrate import upgrade_database
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime, timezone
@@ -85,8 +86,19 @@ def backup_restore_upload():
         db_path = current_app.config.get('SQLALCHEMY_DATABASE_URI', 'sqlite:///inventory.db').replace('sqlite:///', '')
         backup_old_path = 'inventory_backup_old.db'
         shutil.copy(db_path, backup_old_path)
+        # Drop open connections to the old file before replacing it.
+        db.session.remove()
+        db.engine.dispose()
         file.save(db_path)
-        flash('Database restored! Please restart the app.', 'success')
+        try:
+            # A backup from an older version needs its schema brought up to date.
+            upgrade_database(db.engine)
+            flash('Database restored! Please restart the app.', 'success')
+        except Exception:
+            logger.exception('Restored database could not be upgraded')
+            shutil.copy(backup_old_path, db_path)
+            db.engine.dispose()
+            flash('The uploaded database could not be upgraded to this version, so the previous database was kept.', 'danger')
     else:
         flash('Invalid file type', 'danger')
     

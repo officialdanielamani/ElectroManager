@@ -414,125 +414,10 @@ from qr_utils import validate_bootstrap_icons
 with app.app_context():
     validate_bootstrap_icons()
 
-# Apply any pending column migrations to existing databases
-def _apply_column_migrations():
-    """Add new columns to existing tables that predate them."""
-    additions = [
-        ("batch_lend_records",   "lend_note",           "VARCHAR(128)"),
-        ("batch_serial_numbers", "lend_note",           "VARCHAR(128)"),
-        ("batch_serial_numbers", "lending_session_id",  "INTEGER"),
-        ("batch_lend_records",   "lending_session_id",  "INTEGER"),
-        ("batch_lend_records",   "returned_at",         "DATETIME"),
-        ("batch_lend_records",   "return_session_id",    "INTEGER"),
-        ("batch_serial_numbers", "return_session_id",    "INTEGER"),
-        ("batch_serial_numbers", "returned_at",          "DATETIME"),
-        ("batch_serial_numbers", "returned_from_label",  "VARCHAR(128)"),
-        ("users",                "allow_change_name",    "BOOLEAN DEFAULT 1"),
-        ("item_batches",         "lend_disabled",        "BOOLEAN DEFAULT 0"),
-        ("racks",                "drawer_icons",         "TEXT DEFAULT NULL"),
-        ("racks",                "rack_icon",            "TEXT DEFAULT NULL"),
-        ("projects",             "thumbnail",            "VARCHAR(300)"),
-        ("project_bom_items",    "sort_order",           "INTEGER DEFAULT 0"),
-        ("users",                "user_uid",             "VARCHAR(6)"),
-        ("lending_sessions",     "is_api",               "BOOLEAN DEFAULT 0"),
-        ("users",                "api_key_hash",         "VARCHAR(64)"),
-        ("users",                "api_key_prefix",       "VARCHAR(16)"),
-        ("kanban_tasks",         "start_date",           "DATE"),
-        ("kanban_boards",        "notify_start_enabled", "BOOLEAN DEFAULT 0"),
-        ("kanban_boards",        "notify_start_days",    "INTEGER DEFAULT 1"),
-        ("kanban_boards",        "notify_due_enabled",   "BOOLEAN DEFAULT 0"),
-        ("kanban_boards",        "notify_due_days",      "INTEGER DEFAULT 1"),
-        ("kanban_cards",         "category_id",          "INTEGER"),
-        ("kanban_boards",        "board_icon",            "VARCHAR(48) DEFAULT 'bi-kanban'"),
-        ("kanban_boards",        "board_color",           "VARCHAR(7) DEFAULT '#6b7280'"),
-        ("kanban_boards",        "board_status",          "VARCHAR(10) DEFAULT 'shown'"),
-        ("kanban_boards",        "board_uuid",            "VARCHAR(12)"),
-        ("kanban_boards",        "is_public",             "BOOLEAN DEFAULT 0"),
-        ("kanban_boards",        "share_view_users",      "TEXT"),
-        ("kanban_boards",        "share_edit_users",      "TEXT"),
-        ("kanban_boards",        "created_at",            "DATETIME"),
-        ("kanban_boards",        "updated_at",            "DATETIME"),
-        ("kanban_cards",         "created_at",            "DATETIME"),
-        ("kanban_cards",         "updated_at",            "DATETIME"),
-        ("kanban_cards",         "created_by_id",         "INTEGER"),
-        ("kanban_cards",         "updated_by_id",         "INTEGER"),
-        ("kanban_board_user_states", "notify_start_enabled", "BOOLEAN DEFAULT 0"),
-        ("kanban_board_user_states", "notify_start_days",    "INTEGER DEFAULT 1"),
-        ("kanban_board_user_states", "notify_due_enabled",   "BOOLEAN DEFAULT 0"),
-        ("kanban_board_user_states", "notify_due_days",      "INTEGER DEFAULT 1"),
-        ("kanban_boards", "last_transfer_from_id",   "INTEGER"),
-        ("kanban_boards", "last_transfer_from_name", "VARCHAR(128)"),
-        ("kanban_boards", "last_transfer_at",        "DATETIME"),
-        ("sticker_templates", "owner_id",          "INTEGER"),
-        ("sticker_templates", "is_public",         "BOOLEAN DEFAULT 0"),
-        ("sticker_templates", "share_view_users",  "TEXT"),
-        ("sticker_templates", "share_edit_users",  "TEXT"),
-        ("users",             "navbar_config",      "TEXT"),
-        ("kanban_cards",      "card_icon",           "VARCHAR(48)"),
-        ("users",             "mfa_secret",          "VARCHAR(64)"),
-        ("users",             "mfa_enabled",         "BOOLEAN DEFAULT 0"),
-        ("users",             "mfa_backup_codes",    "TEXT"),
-    ]
-    with db.engine.connect() as conn:
-        for table, col, col_type in additions:
-            try:
-                conn.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
-                conn.commit()
-                logger.info(f"DB migration: added {table}.{col}")
-            except Exception:
-                pass  # column already exists
-
-    # Backfill user_uid for existing users that don't have one yet
-    import secrets, string
-    def _gen_uid():
-        chars = string.ascii_uppercase + string.digits
-        return 'U' + ''.join(secrets.choice(chars) for _ in range(5))
-
-    with db.engine.connect() as conn:
-        rows = conn.execute(db.text("SELECT id FROM users WHERE user_uid IS NULL")).fetchall()
-        if rows:
-            existing = {r[0] for r in conn.execute(db.text("SELECT user_uid FROM users WHERE user_uid IS NOT NULL")).fetchall()}
-            for (uid_row,) in rows:
-                uid = _gen_uid()
-                while uid in existing:
-                    uid = _gen_uid()
-                existing.add(uid)
-                conn.execute(db.text("UPDATE users SET user_uid = :uid WHERE id = :id"), {"uid": uid, "id": uid_row})
-            conn.commit()
-            logger.info(f"DB migration: backfilled user_uid for {len(rows)} user(s)")
-
-    # Backfill board_uuid for existing kanban boards that don't have one yet
-    def _gen_board_uuid():
-        chars = string.ascii_uppercase + string.digits
-        return ''.join(secrets.choice(chars) for _ in range(11)) + 'K'
-
-    with db.engine.connect() as conn:
-        rows = conn.execute(db.text("SELECT id FROM kanban_boards WHERE board_uuid IS NULL")).fetchall()
-        if rows:
-            existing = {r[0] for r in conn.execute(db.text("SELECT board_uuid FROM kanban_boards WHERE board_uuid IS NOT NULL")).fetchall()}
-            for (bid,) in rows:
-                uid = _gen_board_uuid()
-                while uid in existing:
-                    uid = _gen_board_uuid()
-                existing.add(uid)
-                conn.execute(db.text("UPDATE kanban_boards SET board_uuid = :uid WHERE id = :id"), {"uid": uid, "id": bid})
-            conn.commit()
-            logger.info(f"DB migration: backfilled board_uuid for {len(rows)} board(s)")
-
-
-def _delete_legacy_sticker_templates():
-    """Delete sticker templates with no owner (created before per-user migration)."""
-    with db.engine.connect() as conn:
-        result = conn.execute(db.text("DELETE FROM sticker_templates WHERE owner_id IS NULL"))
-        conn.commit()
-        if result.rowcount:
-            logger.info(f"DB migration: deleted {result.rowcount} legacy ownerless sticker template(s)")
-
-
+# Create or upgrade the database schema (see migrations/)
+from db_migrate import upgrade_database
 with app.app_context():
-    db.create_all()          # create any brand-new tables (e.g. lending_sessions)
-    _apply_column_migrations()
-    _delete_legacy_sticker_templates()
+    upgrade_database(db.engine)
 
 # Register plugins blueprint and load plugins
 from routes.plugins import plugins_bp
@@ -543,7 +428,5 @@ load_all_plugins(app)
 
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
     debug_mode = os.getenv('FLASK_DEBUG', '').lower() in ('1', 'true', 'yes')
     app.run(host='0.0.0.0', port=5000, debug=debug_mode)

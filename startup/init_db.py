@@ -12,10 +12,7 @@ import json
 
 def init_db():
     with app.app_context():
-        print("Creating database tables...")
-        db.create_all()
-        print("Database tables created!")
-
+        # Importing the app has already created or upgraded the schema (see db_migrate.py).
         create_default_roles()
         update_system_roles()
         
