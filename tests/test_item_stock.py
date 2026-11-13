@@ -140,8 +140,7 @@ def test_stock_sees_unsaved_changes(app, varied_stock):
         assert batch.stock.available_quantity == 6
         db.session.add(BatchLendRecord(batch_id=batch.id, lend_to_id=1, quantity=4))
         assert batch.stock.available_quantity == 2
-        item.recalculate_from_batches()
-        assert (item.quantity, item.price) == (6, 2.0)
+        assert item.stock.average_price == 2.0
         db.session.rollback()
 
 
@@ -228,3 +227,8 @@ def test_list_query_count_does_not_grow_with_items(app, admin_client, make_item)
     for n in range(40):
         make_item(f'More {n}')
     assert queries_for_list() == few
+
+
+def test_single_batch_lend_endpoints_are_gone(admin_client):
+    assert admin_client.post('/in-out/lend', json={}).status_code == 404
+    assert admin_client.post('/in-out/return', json={}).status_code == 404

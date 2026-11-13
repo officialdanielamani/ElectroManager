@@ -445,9 +445,6 @@ class Item(db.Model):
     info = db.Column(db.String(128))
     description = db.Column(db.Text)
 
-    quantity = db.Column(db.Integer, default=0)
-    price = db.Column(db.Float, default=0.0)
-
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
     rack_id = db.Column(db.Integer, db.ForeignKey('racks.id'))
     drawer = db.Column(db.String(50))
@@ -508,12 +505,6 @@ class Item(db.Model):
         """{batch.id: BatchStock} for this item's batches, in one query."""
         from item_stock import stock_for_batches
         return stock_for_batches(self.batches)
-
-    def recalculate_from_batches(self):
-        """Refresh the quantity and price stored on the item from its batches."""
-        stock = self.stock
-        self.quantity = stock.overall_quantity
-        self.price = stock.average_price
 
     def get_drawer_uuid(self):
         if not self.rack or not self.drawer:

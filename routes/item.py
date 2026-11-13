@@ -196,8 +196,6 @@ def item_new():
             short_info=form.short_info.data if form.short_info.data else None,
             info=form.info.data,
             description=form.description.data if perms['can_edit_advance'] else None,
-            quantity=0,
-            price=0.0,
             location_id=location_id_value,
             rack_id=rack_id_value,
             drawer=drawer_value,
@@ -290,7 +288,6 @@ def item_new():
                 if sn_tracking:
                     batch.generate_serial_numbers()
             if pending_batches:
-                item.recalculate_from_batches()
                 item.updated_by = current_user.id
                 db.session.commit()
 
@@ -462,7 +459,6 @@ def _apply_pending_sn_changes(item, perms):
                     sn_obj.lend_notify_enabled     = False
                     sn_obj.lend_notify_before_days = 3
 
-    item.recalculate_from_batches()
 
 
 def _apply_pending_lend_changes(item, perms):
@@ -649,7 +645,6 @@ def item_edit(uuid):
                 db.session.flush()
                 if sn_tracking:
                     batch.generate_serial_numbers()
-            item.recalculate_from_batches()
             item.updated_by = current_user.id
             db.session.commit()
 

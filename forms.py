@@ -102,8 +102,6 @@ class ItemAddForm(FlaskForm):
     short_info = StringField('Short Info', validators=[Optional(), Length(max=128)], render_kw={"class": "form-control form-control-sm"})
     info = StringField('Type / Model', validators=[Optional(), Length(max=128)], render_kw={"class": "form-control form-control-sm"})
     description = TextAreaField('Description', validators=[Optional(), Length(max=65535)], render_kw={"class": "form-control form-control-sm", "rows": "4"})
-    quantity = IntegerField('Quantity', validators=[NumberRange(min=0)], default=0, render_kw={"class": "form-control form-control-sm"})
-    price = FloatField('Price per Qty', validators=[Optional(), NumberRange(min=0)], render_kw={"class": "form-control form-control-sm", "placeholder": "0.00"})
 
     location_id = SelectField('General Location', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
     rack_id = SelectField('Rack', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
@@ -178,8 +176,6 @@ class ItemEditForm(FlaskForm):
     short_info = StringField('Short Info', validators=[Optional(), Length(max=128)], render_kw={"class": "form-control form-control-sm"})
     info = StringField('Type / Model', validators=[Optional(), Length(max=128)], render_kw={"class": "form-control form-control-sm"})
     description = TextAreaField('Description', validators=[Optional(), Length(max=65535)], render_kw={"class": "form-control form-control-sm", "rows": "4"})
-    quantity = IntegerField('Quantity', validators=[NumberRange(min=0)], default=0, render_kw={"class": "form-control form-control-sm"})
-    price = FloatField('Price per Qty', validators=[Optional(), NumberRange(min=0)], render_kw={"class": "form-control form-control-sm", "placeholder": "0.00"})
 
     location_id = SelectField('General Location', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})
     rack_id = SelectField('Rack', coerce=int, validators=[Optional()], render_kw={"class": "form-select form-select-sm"})

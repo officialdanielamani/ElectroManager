@@ -47,8 +47,6 @@ def catalog(app):
                 for text in strings or []:
                     db.session.add(ItemParameterStringValue(item_parameter_id=row.id, value=text,
                                                             is_custom=text not in ORIGINS))
-            db.session.flush()
-            item.recalculate_from_batches()
 
         add('PIR', 'Sensor', ['PIR', 'IR'], None, 12, 1.5, 'SEN-001', 'HC-SR501', 'motion sensor',
             [(volt.id, 'range', '4.5', '20', 'V', None), (origin.id, 'value', None, None, None, ['China'])])

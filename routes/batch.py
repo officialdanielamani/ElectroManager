@@ -172,8 +172,6 @@ def add_batch(uuid):
     if sn_tracking:
         batch.generate_serial_numbers()
 
-    # Recalculate item totals
-    item.recalculate_from_batches()
     item.updated_by = current_user.id
 
     db.session.commit()
@@ -321,7 +319,6 @@ def edit_batch(uuid, batch_id):
         BatchLendRecord.query.filter_by(batch_id=batch.id).delete()
         _save_lend_records(batch, lend_records_data, batch.quantity)
 
-    item.recalculate_from_batches()
     item.updated_by = current_user.id
 
     db.session.commit()
@@ -396,7 +393,6 @@ def delete_batch(uuid, batch_id):
                   f'from item: {item.name} | {len(batch.serial_numbers)} SN records purged: {isn_list}')
 
     db.session.delete(batch)
-    item.recalculate_from_batches()
     item.updated_by = current_user.id
     db.session.commit()
 
@@ -437,7 +433,6 @@ def bulk_delete_batches(uuid):
             db.session.delete(batch)
             deleted += 1
 
-    item.recalculate_from_batches()
     item.updated_by = current_user.id
     db.session.commit()
 
@@ -522,7 +517,6 @@ def transfer_batch(uuid):
             )
             db.session.add(sn)
     
-    item.recalculate_from_batches()
     item.updated_by = current_user.id
     db.session.commit()
     
@@ -796,7 +790,6 @@ def delete_selected_sn(uuid):
             deleted += 1
 
     batch.quantity = max(batch.quantity - deleted, 0)
-    item.recalculate_from_batches()
     item.updated_by = current_user.id
     db.session.commit()
 
@@ -846,7 +839,6 @@ def add_sn_to_batch(uuid):
         db.session.add(sn)
 
     batch.quantity += qty
-    item.recalculate_from_batches()
     item.updated_by = current_user.id
     db.session.commit()
 
@@ -959,7 +951,6 @@ def save_sn_pending(uuid, batch_id):
                 sn.lend_notify_before_days = 3
             lent += 1
 
-    item.recalculate_from_batches()
     item.updated_by = current_user.id
     db.session.commit()
 

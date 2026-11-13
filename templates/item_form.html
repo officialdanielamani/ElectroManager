@@ -511,8 +511,6 @@
                     </div>
                     {% endif %}
                     <input type="hidden" name="pending_batches" id="pending_batches" value="[]">
-                    <input type="hidden" name="quantity" id="quantity" value="{{ item.quantity if item else 0 }}">
-                    <input type="hidden" name="price" value="{{ item.price if item else 0 }}">
                     {% if item %}
                     <input type="hidden" name="pending_sn_changes"   id="pending_sn_changes"   value="{}">
                     <input type="hidden" name="pending_lend_changes" id="pending_lend_changes" value="{}">

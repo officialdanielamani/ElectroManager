@@ -704,160 +704,6 @@ def in_out_submit_cart():
     return jsonify({'success': False, 'message': 'Invalid mode'}), 400
 
 
-# ── Legacy single-batch endpoints (kept for backward compatibility) ──────────
-
-@in_out_bp.route('/in-out/lend', methods=['POST'])
-@login_required
-def in_out_lend():
-    can_lend = (current_user.has_permission('lending_return', 'edit_lending')
-                or current_user.has_permission('lending_return', 'only_self_lending'))
-    if not can_lend:
-        return jsonify({'success': False, 'message': 'Permission denied'}), 403
-
-    data       = request.get_json()
-    batch_id   = data.get('batch_id')
-    batch      = ItemBatch.query.get_or_404(batch_id)
-    item       = batch.item
-    now        = datetime.now(timezone.utc)
-
-    can_only_self = (current_user.has_permission('lending_return', 'only_self_lending')
-                     and not current_user.has_permission('lending_return', 'edit_lending'))
-
-    if batch.sn_tracking_enabled:
-        sn_ids    = data.get('sn_ids', [])
-        lend_type = data.get('lend_to_type', '')[:32]
-        try:
-            lend_id = int(data.get('lend_to_id')) if data.get('lend_to_id') else None
-        except (ValueError, TypeError):
-            lend_id = None
-        if can_only_self and lend_id != current_user.id:
-            return jsonify({'success': False, 'message': 'Only self-lending is allowed for your role'}), 403
-        lend_start = _parse_dt(data.get('lend_start', ''))
-        lend_end   = _parse_dt(data.get('lend_end', ''))
-        lend_note  = (data.get('lend_note', '') or '').strip()[:128] or None
-        notify     = bool(data.get('lend_notify', False))
-        try:
-            days = max(1, min(int(data.get('lend_days', 3)), 365))
-        except (ValueError, TypeError):
-            days = 3
-        updated = 0
-        for sid in sn_ids:
-            sn = BatchSerialNumber.query.get(int(sid))
-            if not sn or sn.batch_id != batch.id or sn.is_deleted:
-                continue
-            sn.lend_to_type = lend_type
-            sn.lend_to_id   = lend_id
-            sn.lend_start   = lend_start
-            sn.lend_end     = lend_end
-            sn.lend_note    = lend_note
-            sn.lend_notify_enabled     = notify
-            sn.lend_notify_before_days = days
-            updated += 1
-        item.updated_by = current_user.id
-        item.updated_at = now
-        db.session.commit()
-        log_audit(current_user.id, 'lend', 'batch', batch.id,
-                  f'Lent {updated} SN(s) from {batch.get_display_label()} of {item.name}')
-        return jsonify({'success': True, 'updated': updated})
-    else:
-        records = data.get('lend_records', [])
-        current_lent = batch.stock.lend_quantity
-        new_request_qty = sum(max(1, int(r.get('qty', 1))) for r in records if isinstance(r, dict))
-        if (current_lent + new_request_qty) > batch.quantity:
-            return jsonify({
-                'success': False,
-                'message': f'Total lend qty ({current_lent + new_request_qty}) exceeds batch qty ({batch.quantity})'
-            }), 400
-        if can_only_self:
-            for r in records:
-                try:
-                    cid = int(r.get('contact_id', 0))
-                except (ValueError, TypeError):
-                    cid = 0
-                if cid != current_user.id:
-                    return jsonify({'success': False, 'message': 'Only self-lending allowed'}), 403
-
-        from routes.batch import _save_lend_records
-        _save_lend_records(batch, records, batch.quantity)
-        item.updated_by = current_user.id
-        item.updated_at = now
-        db.session.commit()
-        log_audit(current_user.id, 'lend', 'batch', batch.id,
-                  f'Added lending for {batch.get_display_label()} of {item.name} ({len(records)} new record(s))')
-        return jsonify({'success': True})
-
-
-@in_out_bp.route('/in-out/return', methods=['POST'])
-@login_required
-def in_out_return():
-    can_lend = (current_user.has_permission('lending_return', 'edit_lending')
-                or current_user.has_permission('lending_return', 'only_self_lending'))
-    if not can_lend:
-        return jsonify({'success': False, 'message': 'Permission denied'}), 403
-
-    data       = request.get_json()
-    batch_id   = data.get('batch_id')
-    batch      = ItemBatch.query.get_or_404(batch_id)
-    item       = batch.item
-    now        = datetime.now(timezone.utc)
-    return_dt  = _parse_dt(data.get('return_datetime', '')) or now
-    return_notes = (data.get('return_notes', '') or '').strip()[:128]
-
-    if batch.sn_tracking_enabled:
-        sn_ids = data.get('sn_ids', [])
-        returned = []
-        for sid in sn_ids:
-            sn = BatchSerialNumber.query.get(int(sid))
-            if not sn or sn.batch_id != batch.id or sn.is_deleted or not sn.lend_to_id:
-                continue
-            lend_end = sn.lend_end
-            on_time  = (lend_end is None) or (return_dt.replace(tzinfo=None) <= lend_end)
-            returned.append({'isn': sn.internal_serial_number, 'on_time': on_time,
-                             'lend_end': lend_end.strftime('%Y-%m-%d %H:%M') if lend_end else None})
-            sn.lend_to_type = ''
-            sn.lend_to_id   = None
-            sn.lend_start   = None
-            sn.lend_end     = None
-            sn.lend_note    = return_notes or None
-            sn.lend_notify_enabled = False
-        all_on_time = all(r['on_time'] for r in returned)
-        item.updated_by = current_user.id
-        item.updated_at = now
-        db.session.commit()
-        log_audit(current_user.id, 'return', 'batch', batch.id,
-                  json.dumps({'count': len(returned), 'on_time': all_on_time,
-                              'return_dt': return_dt.strftime('%Y-%m-%d %H:%M'),
-                              'notes': return_notes, 'items': returned}))
-        return jsonify({'success': True, 'returned': len(returned), 'on_time': all_on_time})
-    else:
-        lend_record_ids = data.get('lend_record_ids', [])
-        return_qty  = int(data.get('return_qty', 0))
-        returned_count = 0
-        any_late = False
-        for rid in lend_record_ids:
-            rec = BatchLendRecord.query.get(int(rid))
-            if not rec or rec.batch_id != batch.id:
-                continue
-            lend_end = rec.lend_end
-            on_time  = (lend_end is None) or (return_dt.replace(tzinfo=None) <= lend_end)
-            if not on_time:
-                any_late = True
-            rqty = min(return_qty if return_qty > 0 else rec.quantity, rec.quantity)
-            if rqty >= rec.quantity:
-                rec.returned_at = return_dt.replace(tzinfo=None)
-            else:
-                rec.quantity -= rqty
-            returned_count += rqty
-        item.updated_by = current_user.id
-        item.updated_at = now
-        db.session.commit()
-        log_audit(current_user.id, 'return', 'batch', batch.id,
-                  json.dumps({'qty': returned_count, 'on_time': not any_late,
-                              'return_dt': return_dt.strftime('%Y-%m-%d %H:%M'),
-                              'notes': return_notes}))
-        return jsonify({'success': True, 'returned': returned_count, 'on_time': not any_late})
-
-
 @in_out_bp.route('/in-out/batch/<int:batch_id>/edit', methods=['POST'])
 @login_required
 def in_out_edit_batch(batch_id):
@@ -888,7 +734,6 @@ def in_out_edit_batch(batch_id):
             pass
     batch.note = (data.get('note', '') or '').strip()[:256] or None
     batch.lend_disabled = bool(data.get('lend_disabled', False))
-    item.recalculate_from_batches()
     item.updated_by = current_user.id
     item.updated_at = datetime.now(timezone.utc)
     db.session.commit()
@@ -912,7 +757,6 @@ def in_out_purge_deleted_sn(batch_id):
     isn_list = ', '.join(sn.internal_serial_number for sn in deleted_sns)
     for sn in deleted_sns:
         db.session.delete(sn)
-    item.recalculate_from_batches()
     item.updated_by = current_user.id
     item.updated_at = datetime.now(timezone.utc)
     db.session.commit()
@@ -935,7 +779,6 @@ def in_out_delete_batch(batch_id):
         log_audit(current_user.id, 'batch_sn_purge', 'batch', batch_id,
                   f'Deleted SN batch "{label}" from {item.name} | ISNs: {isn_list}')
     db.session.delete(batch)
-    item.recalculate_from_batches()
     item.updated_by = current_user.id
     item.updated_at = datetime.now(timezone.utc)
     db.session.commit()

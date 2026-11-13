@@ -80,6 +80,7 @@ def test_item_tags_move_from_json_to_table(engine):
     _make_legacy(engine)
     upgrade_database(engine)
     assert 'tags' not in _columns(engine, 'items')
+    assert not {'quantity', 'price'} & _columns(engine, 'items'), 'stock is derived from batches, not stored'
     with engine.connect() as conn:
         links = conn.execute(sa.text('SELECT item_id, tag_id FROM item_tags ORDER BY 1, 2')).fetchall()
     assert [tuple(row) for row in links] == [(1, 1), (1, 2)], 'unknown tag ids and bad JSON are dropped'
@@ -98,6 +99,7 @@ def test_item_tags_downgrade_restores_json(engine):
     with engine.connect() as conn:
         assert conn.execute(sa.text('SELECT tags FROM items WHERE id = 1')).scalar() == '[1, 2]'
         assert conn.execute(sa.text('SELECT tags FROM items WHERE id = 2')).scalar() is None
+        assert conn.execute(sa.text('SELECT quantity, price FROM items WHERE id = 1')).one() == (0, 0.0)
     assert 'item_tags' not in sa.inspect(engine).get_table_names()
 
 

@@ -85,8 +85,6 @@ def make_item(app):
             db.session.add(item)
             db.session.flush()
             db.session.add(ItemBatch(item_id=item.id, batch_number=1, quantity=quantity, price_per_unit=price))
-            db.session.flush()
-            item.recalculate_from_batches()
             db.session.commit()
             return item.id
     return _make
