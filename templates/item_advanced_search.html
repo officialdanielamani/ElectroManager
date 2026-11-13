@@ -1,19 +1,428 @@
 {% extends "base.html" %}
-{% block title %}Advanced Search Settings{% endblock %}
+{% block title %}Advanced Search - Items{% endblock %}
+
+{% macro picker(field, label, rows, selected, empty_text) %}
+<div class="adv-picker">
+    <label class="form-label d-flex justify-content-between align-items-center">
+        <span>{{ label }}</span>
+        <span class="badge text-bg-primary adv-picker-count" hidden></span>
+    </label>
+    {% if rows %}
+    <input type="search" class="form-control form-control-sm adv-picker-filter" placeholder="Type to filter…" aria-label="Filter {{ label }}">
+    <div class="adv-picker-list border rounded mt-1">
+        {% for row in rows %}
+        <label class="adv-picker-opt">
+            <input type="checkbox" class="form-check-input" name="{{ field }}" value="{{ row.id }}" {% if row.id in selected %}checked{% endif %}>
+            <span class="adv-picker-swatch" style="background-color: {{ row.color or '#6c757d' }};"></span>
+            <span class="adv-picker-text">{{ row.name }}</span>
+        </label>
+        {% endfor %}
+        <div class="adv-picker-none small text-muted px-2 py-1" hidden>No match.</div>
+    </div>
+    {% else %}
+    <div class="small text-muted">{{ empty_text }}</div>
+    {% endif %}
+</div>
+{% endmacro %}
 
 {% block content %}
+<style>
+    .adv-picker-list { max-height: 190px; overflow-y: auto; padding: .25rem 0; }
+    .adv-picker-opt { display: flex; align-items: center; gap: .5rem; padding: .2rem .6rem; margin: 0; cursor: pointer; }
+    .adv-picker-opt:hover { background-color: var(--bs-secondary-bg); }
+    .adv-picker-opt .form-check-input { margin: 0; flex-shrink: 0; }
+    .adv-picker-swatch { width: .7rem; height: .7rem; border-radius: 50%; flex-shrink: 0; }
+    .adv-picker-text { overflow-wrap: anywhere; }
+    .adv-range { display: flex; align-items: center; gap: .5rem; }
+    .adv-range .form-control { min-width: 0; }
+    .mp-row { border: 1px solid var(--bs-border-color); border-radius: var(--bs-border-radius); padding: .75rem; }
+    .mp-row + .mp-row { margin-top: .75rem; }
+    .mp-units { display: flex; flex-wrap: wrap; gap: .25rem 1rem; }
+</style>
+
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-    <h5 class="mb-0">
-        <i class="bi bi-gear"></i> Advanced Search Settings
-    </h5>
+    <h2 class="mb-0"><i class="bi bi-sliders"></i> Advanced Search</h2>
     <a href="{{ url_for('item.items') }}" class="btn btn-secondary btn-sm">
         <i class="bi bi-arrow-left"></i> Back to Items
     </a>
 </div>
 
-<div class="card">
-    <div class="card-body text-muted">
-        <i class="bi bi-tools"></i> Advanced search options will be available here.
+<form method="GET" action="{{ url_for('item.items') }}" id="advSearchForm" autocomplete="off">
+    {% if per_page %}<input type="hidden" name="per_page" value="{{ per_page }}">{% endif %}
+    <input type="hidden" name="mp" id="advMpField" disabled>
+
+    <div class="card mb-3">
+        <div class="card-header"><h5 class="mb-0"><i class="bi bi-box"></i> Item</h5></div>
+        <div class="card-body">
+            <p class="text-muted small">Every filter you fill in must match. Leave a field empty to ignore it. Text fields match any part of the value.</p>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label" for="advName">Name</label>
+                    <input type="text" class="form-control" id="advName" name="name" value="{{ filters.name }}" maxlength="200">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="advUuid">UUID</label>
+                    <input type="text" class="form-control font-monospace" id="advUuid" name="uuid" value="{{ filters.uuid }}" maxlength="32">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="advShortInfo">Short info</label>
+                    <input type="text" class="form-control" id="advShortInfo" name="short_info" value="{{ filters.short_info }}" maxlength="200">
+                </div>
+                {% if can_view_info %}
+                <div class="col-md-4">
+                    <label class="form-label" for="advSku">SKU</label>
+                    <input type="text" class="form-control" id="advSku" name="sku" value="{{ filters.sku }}" maxlength="200">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="advModel">Type / Model</label>
+                    <input type="text" class="form-control" id="advModel" name="model" value="{{ filters.model }}" maxlength="200">
+                </div>
+                {% endif %}
+                <div class="col-md-4">
+                    <label class="form-label">Status</label>
+                    <div class="d-flex flex-wrap gap-3 pt-1">
+                        {% for value, label, style in [('ok', 'OK', 'success'), ('low', 'Low Stock', 'warning'), ('no', 'No Stock', 'danger')] %}
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="status" value="{{ value }}" id="advStatus_{{ value }}" {% if value in filters.statuses %}checked{% endif %}>
+                            <label class="form-check-label" for="advStatus_{{ value }}"><span class="badge bg-{{ style }}">{{ label }}</span></label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Available Qty</label>
+                    <div class="adv-range">
+                        <input type="number" class="form-control" name="qty_min" step="1" placeholder="Min" aria-label="Minimum available quantity" value="{{ filters.qty_min|int if filters.qty_min is not none }}">
+                        <span class="text-muted">to</span>
+                        <input type="number" class="form-control" name="qty_max" step="1" placeholder="Max" aria-label="Maximum available quantity" value="{{ filters.qty_max|int if filters.qty_max is not none }}">
+                    </div>
+                </div>
+                {% if can_view_price %}
+                <div class="col-md-6">
+                    <label class="form-label">Price per Unit</label>
+                    <div class="adv-range">
+                        <input type="number" class="form-control" name="price_min" step="any" min="0" placeholder="Min" aria-label="Minimum price per unit" value="{{ '%g'|format(filters.price_min) if filters.price_min is not none }}">
+                        <span class="text-muted">to</span>
+                        <input type="number" class="form-control" name="price_max" step="any" min="0" placeholder="Max" aria-label="Maximum price per unit" value="{{ '%g'|format(filters.price_max) if filters.price_max is not none }}">
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if can_view_info %}
+                <div class="col-md-4">
+                    {{ picker('cat', 'Category', categories, filters.cat_ids, 'No categories defined yet.') }}
+                </div>
+                <div class="col-md-4">
+                    {{ picker('tag', 'Tags', tags, filters.tag_ids, 'No tags defined yet.') }}
+                    {% if tags %}
+                    <div class="d-flex gap-3 mt-2 small">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="tag_mode" value="any" id="advTagAny" {% if filters.tag_mode != 'all' %}checked{% endif %}>
+                            <label class="form-check-label" for="advTagAny">Any selected tag</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="tag_mode" value="all" id="advTagAll" {% if filters.tag_mode == 'all' %}checked{% endif %}>
+                            <label class="form-check-label" for="advTagAll">All selected tags</label>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="col-md-4">
+                    {{ picker('fp', 'Footprint', footprints, filters.fp_ids, 'No footprints defined yet.') }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
     </div>
-</div>
+
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h5 class="mb-0"><i class="bi bi-magic"></i> Magic Parameters</h5>
+            <button type="button" class="btn btn-outline-primary btn-sm" id="mpAddBtn" {% if not magic_parameters %}disabled{% endif %}>
+                <i class="bi bi-plus-lg"></i> Add parameter filter
+            </button>
+        </div>
+        <div class="card-body">
+            <div id="mpRows"></div>
+            <p class="text-muted small mb-0" id="mpEmpty">
+                {% if magic_parameters %}
+                No parameter filters yet. Add one to search by values such as voltage, size or origin.
+                {% else %}
+                No magic parameters are defined yet.
+                {% endif %}
+            </p>
+            <p class="text-muted small mt-3 mb-0" id="mpHelp" hidden>
+                An item whose parameter is stored as a range (or as a minimum / maximum) matches when that range overlaps yours.
+                Units are compared as written — no conversion between units.
+            </p>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 flex-wrap mb-4">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Search</button>
+        <a href="{{ url_for('item.item_advanced_search') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-counterclockwise"></i> Reset</a>
+    </div>
+</form>
+
+<script>
+(function () {
+    'use strict';
+
+    const PARAMS = {{ magic_parameters|tojson }};
+    const INITIAL = {{ filters.params|tojson }};
+    const TYPE_LABELS = { number: 'Number', string: 'String', date: 'Date' };
+    const paramById = new Map(PARAMS.map(p => [p.id, p]));
+    let seq = 0;
+
+    function el(tag, attrs, children) {
+        const node = document.createElement(tag);
+        Object.entries(attrs || {}).forEach(([key, value]) => {
+            if (key === 'text') node.textContent = value;
+            else if (key === 'class') node.className = value;
+            else if (value !== false && value != null) node.setAttribute(key, value === true ? '' : value);
+        });
+        (children || []).forEach(child => child && node.appendChild(child));
+        return node;
+    }
+
+    // ── Searchable checkbox lists ───────────────────────────────────────
+    function refreshPicker(picker) {
+        const count = picker.querySelectorAll('.adv-picker-opt input:checked').length;
+        const badge = picker.querySelector('.adv-picker-count');
+        if (badge) { badge.hidden = count === 0; badge.textContent = count + ' selected'; }
+    }
+
+    function filterPicker(picker, term) {
+        term = term.trim().toLowerCase();
+        let shown = 0;
+        picker.querySelectorAll('.adv-picker-opt').forEach(opt => {
+            const match = !term || opt.textContent.toLowerCase().includes(term);
+            opt.hidden = !match;
+            opt.style.display = match ? '' : 'none';
+            if (match) shown++;
+        });
+        const none = picker.querySelector('.adv-picker-none');
+        if (none) none.hidden = shown > 0;
+    }
+
+    document.addEventListener('input', e => {
+        if (e.target.classList.contains('adv-picker-filter')) {
+            filterPicker(e.target.closest('.adv-picker'), e.target.value);
+        }
+    });
+    document.addEventListener('change', e => {
+        const picker = e.target.closest('.adv-picker');
+        if (picker && e.target.type === 'checkbox') refreshPicker(picker);
+    });
+    // Enter in a filter box should not submit the whole search.
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && e.target.classList.contains('adv-picker-filter')) e.preventDefault();
+    });
+    document.querySelectorAll('.adv-picker').forEach(refreshPicker);
+
+    // ── Magic parameter rows ────────────────────────────────────────────
+    const rowsEl = document.getElementById('mpRows');
+
+    function numberBody(param, crit, id) {
+        const body = el('div', { class: 'row g-3 mt-0' });
+        if (param.units.length) {
+            const units = el('div', { class: 'mp-units' });
+            param.units.forEach((unit, i) => {
+                units.appendChild(el('div', { class: 'form-check' }, [
+                    el('input', { class: 'form-check-input mp-unit', type: 'checkbox', id: `${id}_u${i}`, value: unit,
+                                  checked: (crit.units || []).includes(unit) }),
+                    el('label', { class: 'form-check-label', for: `${id}_u${i}`, text: unit }),
+                ]));
+            });
+            body.appendChild(el('div', { class: 'col-md-4' }, [
+                el('label', { class: 'form-label small text-muted mb-1', text: 'Unit (none ticked = any unit)' }), units,
+            ]));
+        }
+        const op = el('select', { class: 'form-select mp-op', 'aria-label': 'Comparison' });
+        [['range', 'Range'], ['min', 'Min (at least)'], ['max', 'Max (at most)'], ['eq', 'Exactly']].forEach(([value, label]) => {
+            op.appendChild(el('option', { value: value, text: label, selected: (crit.op || 'range') === value }));
+        });
+        const low = el('input', { class: 'form-control mp-min', type: 'number', step: 'any', 'aria-label': 'From value',
+                                  value: crit.min != null ? crit.min : null });
+        const sep = el('span', { class: 'text-muted', text: 'to' });
+        const high = el('input', { class: 'form-control mp-max', type: 'number', step: 'any', 'aria-label': 'To value',
+                                   value: crit.max != null ? crit.max : null });
+        if (crit.op === 'max') low.value = '';
+        if (crit.op === 'min' || crit.op === 'eq') high.value = '';
+
+        function sync() {
+            const mode = op.value;
+            low.hidden = mode === 'max';
+            high.hidden = mode === 'min' || mode === 'eq';
+            sep.hidden = mode !== 'range';
+            low.placeholder = mode === 'range' ? 'From' : mode === 'min' ? 'At least' : 'Value';
+            high.placeholder = mode === 'range' ? 'To' : 'At most';
+        }
+        op.addEventListener('change', sync);
+        sync();
+
+        body.appendChild(el('div', { class: 'col-md-3' }, [
+            el('label', { class: 'form-label small text-muted mb-1', text: 'Compare' }), op,
+        ]));
+        body.appendChild(el('div', { class: 'col-md-5' }, [
+            el('label', { class: 'form-label small text-muted mb-1', text: 'Value' }),
+            el('div', { class: 'adv-range' }, [low, sep, high]),
+        ]));
+        return body;
+    }
+
+    function stringBody(param, crit, id) {
+        const values = (crit.values || []).slice();
+        const options = param.options.concat(values.filter(v => !param.options.includes(v)));
+        const body = el('div', { class: 'row g-3 mt-0' });
+        if (!options.length) {
+            body.appendChild(el('div', { class: 'col-12 small text-muted',
+                text: 'No values recorded for this parameter yet — items that have it set will match.' }));
+            return body;
+        }
+        const list = el('div', { class: 'adv-picker-list border rounded mt-1' });
+        options.forEach(value => {
+            list.appendChild(el('label', { class: 'adv-picker-opt' }, [
+                el('input', { class: 'form-check-input mp-value', type: 'checkbox', value: value, checked: values.includes(value) }),
+                el('span', { class: 'adv-picker-text', text: value }),
+            ]));
+        });
+        list.appendChild(el('div', { class: 'adv-picker-none small text-muted px-2 py-1', hidden: true, text: 'No match.' }));
+        const picker = el('div', { class: 'adv-picker' }, [
+            el('label', { class: 'form-label small text-muted mb-1 d-flex justify-content-between align-items-center' }, [
+                el('span', { text: 'Values (none ticked = any value)' }),
+                el('span', { class: 'badge text-bg-primary adv-picker-count', hidden: true }),
+            ]),
+            el('input', { class: 'form-control form-control-sm adv-picker-filter', type: 'search',
+                          placeholder: 'Type to filter…', 'aria-label': 'Filter values' }),
+            list,
+        ]);
+        refreshPicker(picker);
+        body.appendChild(el('div', { class: 'col-md-7' }, [picker]));
+
+        const mode = el('div', { class: 'small' });
+        [['any', 'Any ticked value'], ['all', 'All ticked values']].forEach(([value, label]) => {
+            mode.appendChild(el('div', { class: 'form-check' }, [
+                el('input', { class: 'form-check-input mp-mode', type: 'radio', name: `${id}_mode`, id: `${id}_${value}`,
+                              value: value, checked: (crit.mode || 'any') === value }),
+                el('label', { class: 'form-check-label', for: `${id}_${value}`, text: label }),
+            ]));
+        });
+        body.appendChild(el('div', { class: 'col-md-5' }, [
+            el('label', { class: 'form-label small text-muted mb-1', text: 'Match' }), mode,
+        ]));
+        return body;
+    }
+
+    function dateBody(param, crit) {
+        return el('div', { class: 'row g-3 mt-0' }, [
+            el('div', { class: 'col-md-7' }, [
+                el('label', { class: 'form-label small text-muted mb-1', text: 'Date between' }),
+                el('div', { class: 'adv-range' }, [
+                    el('input', { class: 'form-control mp-from', type: 'date', 'aria-label': 'From date', value: crit.from || null }),
+                    el('span', { class: 'text-muted', text: 'to' }),
+                    el('input', { class: 'form-control mp-to', type: 'date', 'aria-label': 'To date', value: crit.to || null }),
+                ]),
+            ]),
+        ]);
+    }
+
+    function addRow(crit) {
+        crit = crit || {};
+        const id = 'mp' + (++seq);
+        const select = el('select', { class: 'form-select mp-param', 'aria-label': 'Magic parameter' });
+        select.appendChild(el('option', { value: '', text: 'Choose a parameter…' }));
+        Object.keys(TYPE_LABELS).forEach(type => {
+            const group = el('optgroup', { label: TYPE_LABELS[type] + ' Parameter' });
+            PARAMS.filter(p => p.type === type).forEach(p => {
+                group.appendChild(el('option', { value: p.id, text: p.name, selected: p.id === crit.id }));
+            });
+            if (group.children.length) select.appendChild(group);
+        });
+        const remove = el('button', { type: 'button', class: 'btn btn-outline-danger', title: 'Remove this filter',
+                                      'aria-label': 'Remove this filter' }, [el('i', { class: 'bi bi-trash' })]);
+        const bodyHost = el('div', { class: 'mp-body' });
+        const row = el('div', { class: 'mp-row' }, [
+            el('div', { class: 'd-flex gap-2' }, [select, remove]),
+            bodyHost,
+        ]);
+
+        function renderBody(values) {
+            bodyHost.replaceChildren();
+            const param = paramById.get(Number(select.value));
+            if (!param) return;
+            const build = { number: numberBody, string: stringBody, date: dateBody }[param.type];
+            if (build) bodyHost.appendChild(build(param, values, id));
+        }
+        select.addEventListener('change', () => renderBody({}));
+        remove.addEventListener('click', () => { row.remove(); refreshEmpty(); });
+        renderBody(crit);
+        rowsEl.appendChild(row);
+        refreshEmpty();
+        return row;
+    }
+
+    function refreshEmpty() {
+        const any = rowsEl.children.length > 0;
+        document.getElementById('mpEmpty').hidden = any;
+        document.getElementById('mpHelp').hidden = !any;
+    }
+
+    function collectRows() {
+        const result = [];
+        rowsEl.querySelectorAll('.mp-row').forEach(row => {
+            const param = paramById.get(Number(row.querySelector('.mp-param').value));
+            if (!param) return;
+            const entry = { id: param.id };
+            if (param.type === 'number') {
+                entry.units = Array.from(row.querySelectorAll('.mp-unit:checked')).map(cb => cb.value);
+                entry.op = row.querySelector('.mp-op').value;
+                const low = row.querySelector('.mp-min').value, high = row.querySelector('.mp-max').value;
+                if (entry.op !== 'max' && low !== '') entry.min = Number(low);
+                if ((entry.op === 'range' || entry.op === 'max') && high !== '') entry.max = Number(high);
+            } else if (param.type === 'string') {
+                entry.values = Array.from(row.querySelectorAll('.mp-value:checked')).map(cb => cb.value);
+                const mode = row.querySelector('.mp-mode:checked');
+                entry.mode = mode ? mode.value : 'any';
+            } else {
+                entry.from = row.querySelector('.mp-from').value;
+                entry.to = row.querySelector('.mp-to').value;
+            }
+            result.push(entry);
+        });
+        return result;
+    }
+
+    document.getElementById('mpAddBtn').addEventListener('click', () => {
+        addRow().querySelector('.mp-param').focus();
+    });
+    INITIAL.forEach(addRow);
+    refreshEmpty();
+
+    // ── Submit: keep the URL to just the filters that are set ───────────
+    const form = document.getElementById('advSearchForm');
+    form.addEventListener('submit', () => {
+        const rows = collectRows();
+        const mpField = document.getElementById('advMpField');
+        mpField.disabled = rows.length === 0;
+        mpField.value = JSON.stringify(rows);
+        form.querySelectorAll('input[type="text"][name], input[type="number"][name]').forEach(input => {
+            if (input.value.trim() === '') input.disabled = true;
+        });
+        // Parameter rows travel in the "mp" field only.
+        rowsEl.querySelectorAll('input[name]').forEach(input => { input.disabled = true; });
+        const tagPicked = form.querySelector('input[name="tag"]:checked');
+        form.querySelectorAll('input[name="tag_mode"]').forEach(radio => {
+            if (!tagPicked || radio.value === 'any') radio.disabled = true;
+        });
+    });
+    // Coming back with the browser's Back button must not leave fields disabled.
+    window.addEventListener('pageshow', () => {
+        form.querySelectorAll('input[name]:disabled').forEach(input => {
+            if (input.id !== 'advMpField') input.disabled = false;
+        });
+    });
+})();
+</script>
 {% endblock %}

@@ -8,6 +8,8 @@ from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemE
                    SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm)
 from helpers import is_safe_url, format_currency, is_safe_file_path
 from utils import save_file, log_audit, admin_required, permission_required, item_permission_required, format_file_size, allowed_file, get_item_edit_permissions
+from item_search import (parse_item_filters, paginate_items, describe_filters,
+                         has_advanced_filters, magic_parameter_catalog)
 from qr_utils import get_item_data, render_template_to_svg, generate_single_sticker_pdf, generate_batch_stickers_pdf, generate_table_sticker_pdf
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -24,13 +26,31 @@ logger = logging.getLogger(__name__)
 item_bp = Blueprint('item', __name__)
 
 
+def _list_filter_context():
+    """Filters from the query string plus the args needed to rebuild list URLs."""
+    can_view_info = current_user.has_permission('items', 'view_info')
+    can_view_price = current_user.has_permission('items', 'view_price')
+    filters = parse_item_filters(request.args, can_view_info, can_view_price)
+    filter_args = {k: v for k, v in request.args.to_dict(flat=False).items() if k != 'page'}
+    return filters, filter_args, can_view_info, can_view_price
+
+
 @item_bp.route('/items/advanced-search', endpoint='item_advanced_search')
 @login_required
 def item_advanced_search():
     if not current_user.has_permission('items', 'view'):
         flash('You do not have permission to view items.', 'danger')
         return redirect(url_for('index'))
-    return render_template('item_advanced_search.html')
+    filters, _, can_view_info, can_view_price = _list_filter_context()
+    return render_template('item_advanced_search.html',
+                           filters=filters,
+                           categories=Category.query.order_by(Category.name).all(),
+                           footprints=Footprint.query.order_by(Footprint.name).all(),
+                           tags=Tag.query.order_by(Tag.name).all(),
+                           magic_parameters=magic_parameter_catalog(),
+                           per_page=request.args.get('per_page', type=int),
+                           can_view_info=can_view_info,
+                           can_view_price=can_view_price)
 
 
 @item_bp.route('/items', endpoint='items')
@@ -41,97 +61,20 @@ def items():
     if not current_user.has_permission('items', 'view'):
         flash('You do not have permission to view items.', 'danger')
         return redirect(url_for('index'))
-    
+
     search_form = SearchForm()
-    
-    search_query = request.args.get('search', '')
-    category_id = request.args.get('category', 0, type=int)
-    status_filter = request.args.get('status', '')
-    page = request.args.get('page', 1, type=int)
+
+    page = max(request.args.get('page', 1, type=int), 1)
     per_page = request.args.get('per_page', 25, type=int)
     if per_page < 1 or per_page > 100:
         per_page = 25
-    
-    query = Item.query
-    
-    if search_query:
-        if search_query.lower().startswith('uuid:'):
-            uuid_val = search_query[5:].strip()
-            query = query.filter(Item.uuid == uuid_val)
-        else:
-            query = query.filter(
-                db.or_(
-                    Item.name.ilike(f'%{search_query}%'),
-                    Item.short_info.ilike(f'%{search_query}%')
-                )
-            )
-    
-    if category_id > 0:
-        query = query.filter_by(category_id=category_id)
-    
-    # Apply status filter
-    if status_filter:
-        statuses = status_filter.split(',')
-        filtered_items = []
-        
-        for item in query.all():
-            if 'ok' in statuses and not item.is_no_stock() and not item.is_low_stock():
-                filtered_items.append(item)
-            elif 'low' in statuses and item.is_low_stock():
-                filtered_items.append(item)
-            elif 'no' in statuses and item.is_no_stock():
-                filtered_items.append(item)
-        
-        # Sort by updated_at descending
-        filtered_items.sort(key=lambda x: x.updated_at, reverse=True)
-        
-        # Manually paginate
-        total = len(filtered_items)
-        start = (page - 1) * per_page
-        end = start + per_page
-        items = filtered_items[start:end]
-        
-        # Create a manual pagination object
-        class Pagination:
-            def __init__(self, items, page, per_page, total):
-                self.items = items
-                self.page = page
-                self.per_page = per_page
-                self.total = total
-                self.pages = (total + per_page - 1) // per_page
-            
-            @property
-            def has_next(self):
-                return self.page < self.pages
-            
-            @property
-            def has_prev(self):
-                return self.page > 1
-            
-            @property
-            def next_num(self):
-                return self.page + 1 if self.has_next else None
-            
-            @property
-            def prev_num(self):
-                return self.page - 1 if self.has_prev else None
-            
-            def iter_pages(self, left_edge=1, right_edge=1, left_current=1, right_current=2):
-                for num in range(1, self.pages + 1):
-                    if (num <= left_edge or
-                        num > self.pages - right_edge or
-                        (self.page - left_current <= num <= self.page + right_current)):
-                        yield num
-                    elif num == left_edge + 1 or num == self.pages - right_edge:
-                        yield None
-        
-        pagination = Pagination(items, page, per_page, total)
-    else:
-        # Default sort by updated_at descending
-        pagination = query.order_by(Item.updated_at.desc()).paginate(
-            page=page, per_page=per_page, error_out=False
-        )
-    
+
+    filters, filter_args, _, _ = _list_filter_context()
+    search_query = filters['search']
+    category_id = filters['category_id']
+    status_filter = ','.join(filters['statuses'])
+    pagination = paginate_items(filters, page, per_page)
+
     items = pagination.items
 
     total_items = Item.query.count()
@@ -182,6 +125,8 @@ def items():
                          all_racks=all_racks,
                          all_tags_list=all_tags_list,
                          racks_data_bulk=racks_data_bulk,
+                         filter_args=filter_args,
+                         advanced_filters=describe_filters(filters) if has_advanced_filters(filters) else [],
                          can_view_info=current_user.has_permission('items', 'view_info'),
                          can_view_price=current_user.has_permission('items', 'view_price'))
 
@@ -1536,10 +1481,6 @@ def items_print():
         flash('You do not have permission to view items.', 'danger')
         return redirect(url_for('index'))
     
-    # Get the same parameters as the items route
-    search_query = request.args.get('search', '')
-    category_id = request.args.get('category', 0, type=int)
-    status_filter = request.args.get('status', '')
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 25, type=int)
     view_type = request.args.get('view', 'table')  # table or card
@@ -1576,84 +1517,10 @@ def items_print():
         
         pagination = SimplePagination(items)
     else:
-        # Print all items with current filters
-        query = Item.query
-        
-        if search_query:
-            query = query.filter(
-                db.or_(
-                    Item.name.ilike(f'%{search_query}%'),
-                    Item.description.ilike(f'%{search_query}%'),
-                    Item.sku.ilike(f'%{search_query}%')
-                )
-            )
-        
-        if category_id > 0:
-            query = query.filter_by(category_id=category_id)
-        
-        # Apply status filter
-        if status_filter:
-            statuses = status_filter.split(',')
-            filtered_items = []
-            
-            for item in query.all():
-                if 'ok' in statuses and not item.is_no_stock() and not item.is_low_stock():
-                    filtered_items.append(item)
-                elif 'low' in statuses and item.is_low_stock():
-                    filtered_items.append(item)
-                elif 'no' in statuses and item.is_no_stock():
-                    filtered_items.append(item)
-            
-            # Sort by updated_at descending
-            filtered_items.sort(key=lambda x: x.updated_at, reverse=True)
-            
-            # Manually paginate
-            total = len(filtered_items)
-            start = (page - 1) * per_page
-            end = start + per_page
-            items = filtered_items[start:end]
-            
-            # Create a manual pagination object
-            class Pagination:
-                def __init__(self, items, page, per_page, total):
-                    self.items = items
-                    self.page = page
-                    self.per_page = per_page
-                    self.total = total
-                    self.pages = (total + per_page - 1) // per_page
-                
-                @property
-                def has_next(self):
-                    return self.page < self.pages
-                
-                @property
-                def has_prev(self):
-                    return self.page > 1
-                
-                @property
-                def next_num(self):
-                    return self.page + 1 if self.has_next else None
-                
-                @property
-                def prev_num(self):
-                    return self.page - 1 if self.has_prev else None
-                
-                def iter_pages(self, left_edge=1, right_edge=1, left_current=1, right_current=2):
-                    for num in range(1, self.pages + 1):
-                        if (num <= left_edge or
-                            num > self.pages - right_edge or
-                            (self.page - left_current <= num <= self.page + right_current)):
-                            yield num
-                        elif num == left_edge + 1 or num == self.pages - right_edge:
-                            yield None
-            
-            pagination = Pagination(items, page, per_page, total)
-        else:
-            # Default sort by updated_at descending
-            pagination = query.order_by(Item.updated_at.desc()).paginate(
-                page=page, per_page=per_page, error_out=False
-            )
-    
+        # Same filters and page as the items list the user is looking at
+        filters, _, _, _ = _list_filter_context()
+        pagination = paginate_items(filters, max(page, 1), max(per_page, 1))
+
     items = pagination.items
     
     # Get user's table columns preference
