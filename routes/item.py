@@ -10,6 +10,7 @@ from helpers import is_safe_url, format_currency, is_safe_file_path
 from utils import save_file, log_audit, admin_required, permission_required, item_permission_required, format_file_size, allowed_file, get_item_edit_permissions
 from item_search import (parse_item_filters, paginate_items, describe_filters,
                          has_advanced_filters, magic_parameter_catalog)
+from item_stock import stock_for_items, stock_summary
 from qr_utils import get_item_data, render_template_to_svg, generate_single_sticker_pdf, generate_batch_stickers_pdf, generate_table_sticker_pdf
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -77,12 +78,7 @@ def items():
 
     items = pagination.items
 
-    total_items = Item.query.count()
-
-    # Calculate stock status based on model methods
-    all_items = Item.query.all()
-    low_stock_items = sum(1 for item in all_items if item.is_low_stock())
-    no_stock_items = sum(1 for item in all_items if item.is_no_stock())
+    total_items, low_stock_items, no_stock_items = stock_summary()
     total_categories = Category.query.count()
 
     # Get user's table columns preference
@@ -126,6 +122,7 @@ def items():
                          all_tags_list=all_tags_list,
                          racks_data_bulk=racks_data_bulk,
                          filter_args=filter_args,
+                         stock=stock_for_items(items),
                          advanced_filters=describe_filters(filters) if has_advanced_filters(filters) else [],
                          can_view_info=current_user.has_permission('items', 'view_info'),
                          can_view_price=current_user.has_permission('items', 'view_price'))
@@ -1532,6 +1529,7 @@ def items_print():
     
     return render_template('items_print.html',
                          items=items,
+                         stock=stock_for_items(items),
                          page=page,
                          per_page=per_page,
                          view_type=view_type,

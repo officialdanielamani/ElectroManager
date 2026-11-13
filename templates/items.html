@@ -325,6 +325,7 @@
                         </thead>
                         <tbody>
                             {% for item in items %}
+{% set st = stock[item.id] %}
                             <tr>
                                 <td>
                                     <input type="checkbox" class="item-checkbox" value="{{ item.id }}">
@@ -368,15 +369,15 @@
                                     </td>
                                     {% endif %}
                                     {% if col == 'quantity' %}
-                                    <td>{{ item.get_overall_quantity() }}</td>
+                                    <td>{{ st.overall_quantity }}</td>
                                     {% endif %}
                                     {% if col == 'available_quantity' %}
-                                    <td>{{ item.get_available_quantity() }}</td>
+                                    <td>{{ st.available_quantity }}</td>
                                     {% endif %}
                                     {% if col == 'total_price' and can_view_price %}
                                     <td>
-                                        {% if item.get_total_price() %}
-                                        {{ item.get_total_price()|format_amount(currency_decimal_places) }}
+                                        {% if st.total_price %}
+                                        {{ st.total_price|format_amount(currency_decimal_places) }}
                                         {% else %}
                                         -
                                         {% endif %}
@@ -384,8 +385,8 @@
                                     {% endif %}
                                     {% if col == 'total_value' and can_view_price %}
                                     <td>
-                                        {% if item.get_total_value() %}
-                                        {{ item.get_total_value()|format_amount(currency_decimal_places) }}
+                                        {% if st.total_value %}
+                                        {{ st.total_value|format_amount(currency_decimal_places) }}
                                         {% else %}
                                         -
                                         {% endif %}
@@ -393,8 +394,8 @@
                                     {% endif %}
                                     {% if col == 'price_per_unit' and can_view_price %}
                                     <td>
-                                        {% if item.get_average_price() %}
-                                        {{ item.get_average_price()|format_amount(currency_decimal_places) }}
+                                        {% if st.average_price %}
+                                        {{ st.average_price|format_amount(currency_decimal_places) }}
                                         {% else %}
                                         -
                                         {% endif %}
@@ -426,9 +427,9 @@
                                     {% endif %}
                                     {% if col == 'status' %}
                                     <td>
-                                        {% if item.is_no_stock() %}
+                                        {% if st.is_no_stock %}
                                             <span class="badge bg-danger">No Stock</span>
-                                        {% elif item.is_low_stock() %}
+                                        {% elif st.is_low_stock %}
                                             <span class="badge bg-warning">Low Stock</span>
                                         {% else %}
                                             <span class="badge bg-success">OK</span>
@@ -497,6 +498,7 @@
                 <!-- Card View -->
                 <div id="cardView" class="row g-2 justify-content-center">
                     {% for item in items %}
+{% set st = stock[item.id] %}
                     <div class="col-12 col-sm-6 col-md-3 col-lg-2-4 col-xl-2-4">
                         <div class="card h-100 border">
                             <div class="card-header p-2">
@@ -578,18 +580,18 @@
                                 </p>
                                 {% endif %}
                                 <p class="mb-1 small">
-                                    <strong>Quantity:</strong> {{ item.get_overall_quantity() }}
-                                    {% if item.is_no_stock() %}
+                                    <strong>Quantity:</strong> {{ st.overall_quantity }}
+                                    {% if st.is_no_stock %}
                                     <span class="badge bg-danger" style="font-size: 0.65rem;">No Stock</span>
-                                    {% elif item.is_low_stock() %}
+                                    {% elif st.is_low_stock %}
                                     <span class="badge bg-warning" style="font-size: 0.65rem;">Low</span>
                                     {% else %}
                                     <span class="badge bg-success" style="font-size: 0.65rem;">OK</span>
                                     {% endif %}
                                 </p>
                                 {% if can_view_price %}
-                                <p class="mb-1 small"><strong>Price/Unit:</strong> {{ item.get_average_price()|format_amount(currency_decimal_places) if item.get_average_price() else '-' }}</p>
-                                <p class="mb-2 small"><strong>Total:</strong> {{ item.get_total_price()|format_amount(currency_decimal_places) if item.get_total_price() else '-' }}</p>
+                                <p class="mb-1 small"><strong>Price/Unit:</strong> {{ st.average_price|format_amount(currency_decimal_places) if st.average_price else '-' }}</p>
+                                <p class="mb-2 small"><strong>Total:</strong> {{ st.total_price|format_amount(currency_decimal_places) if st.total_price else '-' }}</p>
                                 {% endif %}
                                 
                                 <div class="btn-group btn-group-sm w-100" role="group">

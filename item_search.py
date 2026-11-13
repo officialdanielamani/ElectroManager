@@ -4,53 +4,15 @@ Item list filtering shared by the items page, its print view and the advanced se
 import json
 from datetime import datetime
 
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
-from models import (db, Item, Category, Footprint, Tag, MagicParameter,
+from item_stock import StockColumns, item_stock_subquery
+from models import (db, Item, Category, Footprint, Rack, Tag, MagicParameter,
                     ItemParameter, ItemParameterStringValue, item_tags)
 
 STATUS_LABELS = {'ok': 'OK', 'low': 'Low Stock', 'no': 'No Stock'}
 NUMBER_OPS = ('range', 'min', 'max', 'eq')
 MAX_PARAM_FILTERS = 20
-# Above this many matching ids, filter in Python rather than a huge SQL IN list.
-_SQL_IN_LIMIT = 500
-
-
-class ListPagination:
-    """Pagination over an already-filtered list, mirroring Flask-SQLAlchemy's interface."""
-
-    def __init__(self, all_items, page, per_page):
-        self.total = len(all_items)
-        self.per_page = per_page
-        self.pages = (self.total + per_page - 1) // per_page
-        self.page = page
-        start = (page - 1) * per_page
-        self.items = all_items[start:start + per_page]
-
-    @property
-    def has_next(self):
-        return self.page < self.pages
-
-    @property
-    def has_prev(self):
-        return self.page > 1
-
-    @property
-    def next_num(self):
-        return self.page + 1 if self.has_next else None
-
-    @property
-    def prev_num(self):
-        return self.page - 1 if self.has_prev else None
-
-    def iter_pages(self, left_edge=1, right_edge=1, left_current=1, right_current=2):
-        for num in range(1, self.pages + 1):
-            if (num <= left_edge or
-                    num > self.pages - right_edge or
-                    (self.page - left_current <= num <= self.page + right_current)):
-                yield num
-            elif num == left_edge + 1 or num == self.pages - right_edge:
-                yield None
 
 
 def _to_float(raw):
@@ -265,16 +227,12 @@ def param_groups(params):
     return groups
 
 
-def _in_range(value, low, high):
-    return (low is None or value >= low) and (high is None or value <= high)
-
-
-def _status_of(item):
-    if item.is_no_stock():
-        return 'no'
-    if item.is_low_stock():
-        return 'low'
-    return 'ok'
+def _between(query, column, low, high):
+    if low is not None:
+        query = query.filter(column >= low)
+    if high is not None:
+        query = query.filter(column <= high)
+    return query
 
 
 def _like(column, text):
@@ -283,9 +241,8 @@ def _like(column, text):
 
 
 def find_items(filters):
-    """Return every item matching the filters, most recently updated first."""
+    """Query for every item matching the filters, most recently updated first."""
     query = Item.query
-    checks = []
 
     search = filters['search']
     if search:
@@ -306,47 +263,41 @@ def find_items(filters):
     if filters['fp_ids']:
         query = query.filter(Item.footprint_id.in_(filters['fp_ids']))
 
-    if filters['params']:
-        matching = None
-        for group in param_groups(filters['params']):
-            ids = set().union(*(_param_item_ids(crit) for crit in group))
-            matching = ids if matching is None else matching & ids
-        if len(matching) <= _SQL_IN_LIMIT:
-            query = query.filter(Item.id.in_(matching))
-        else:
-            checks.append(lambda item: item.id in matching)
-
     if filters['tag_ids']:
         tagged = db.select(item_tags.c.item_id).where(item_tags.c.tag_id.in_(filters['tag_ids']))
         if filters['tag_mode'] == 'all':
             tagged = (tagged.group_by(item_tags.c.item_id)
                       .having(db.func.count(item_tags.c.tag_id) == len(filters['tag_ids'])))
         query = query.filter(Item.id.in_(tagged))
-    if filters['qty_min'] is not None or filters['qty_max'] is not None:
-        checks.append(lambda item: _in_range(item.get_available_quantity(),
-                                             filters['qty_min'], filters['qty_max']))
-    if filters['price_min'] is not None or filters['price_max'] is not None:
-        checks.append(lambda item: _in_range(item.get_average_price(),
-                                             filters['price_min'], filters['price_max']))
-    if filters['statuses']:
-        checks.append(lambda item: _status_of(item) in filters['statuses'])
 
-    query = query.order_by(Item.updated_at.desc())
-    if not checks:
-        return query, None
-    return query, [item for item in query.all() if all(check(item) for check in checks)]
+    if filters['params']:
+        matching = None
+        for group in param_groups(filters['params']):
+            ids = set().union(*(_param_item_ids(crit) for crit in group))
+            matching = ids if matching is None else matching & ids
+        # Rendered inline so a large match set cannot exceed the driver's bound-parameter limit.
+        query = query.filter(Item.id.in_(
+            db.bindparam('matching_ids', sorted(matching), expanding=True, literal_execute=True)))
+
+    stock_filters = (filters['qty_min'], filters['qty_max'], filters['price_min'], filters['price_max'])
+    if filters['statuses'] or any(value is not None for value in stock_filters):
+        cols = StockColumns(item_stock_subquery())
+        query = cols.join(query)
+        query = _between(query, cols.available, filters['qty_min'], filters['qty_max'])
+        query = _between(query, cols.average_price, filters['price_min'], filters['price_max'])
+        if filters['statuses']:
+            query = query.filter(cols.status.in_(filters['statuses']))
+
+    return query.order_by(Item.updated_at.desc())
 
 
 def paginate_items(filters, page, per_page):
-    query, matched = find_items(filters)
-    if matched is None:
-        return query.paginate(page=page, per_page=per_page, error_out=False)
-    return ListPagination(matched, page, per_page)
-
-
-def all_matching_items(filters):
-    query, matched = find_items(filters)
-    return query.all() if matched is None else matched
+    """One page of matching items with what the list templates display loaded up front."""
+    query = find_items(filters).options(
+        joinedload(Item.category), joinedload(Item.footprint), joinedload(Item.general_location),
+        joinedload(Item.rack).joinedload(Rack.physical_location), selectinload(Item.tags), selectinload(Item.attachments),
+    )
+    return query.paginate(page=page, per_page=per_page, error_out=False)
 
 
 def _fmt(number):

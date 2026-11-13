@@ -55,6 +55,17 @@ def is_safe_file_path(file_path, base_dir):
         return False
 
 
+def _currency_setting(key, default):
+    """Currency settings, looked up once per request: lists format an amount in every row."""
+    from flask import g, has_app_context
+    if not has_app_context():
+        return Setting.get(key, default)
+    cache = g.setdefault('_currency_settings', {})
+    if key not in cache:
+        cache[key] = Setting.get(key, default)
+    return cache[key]
+
+
 def format_currency(amount, currency_symbol=None, decimal_places=None):
     """
     Format amount as currency with configurable decimal places.
@@ -68,9 +79,9 @@ def format_currency(amount, currency_symbol=None, decimal_places=None):
         Formatted string like "RM 1234.56" or "¥ 1050"
     """
     if currency_symbol is None:
-        currency_symbol = Setting.get('currency', '$')
+        currency_symbol = _currency_setting('currency', '$')
     if decimal_places is None:
-        decimal_places = int(Setting.get('currency_decimal_places', '2'))
+        decimal_places = int(_currency_setting('currency_decimal_places', '2'))
     
     if amount is None:
         return '-'
