@@ -321,7 +321,6 @@ ElectroManager/
 │   ├── notification.py           # Notification centre
 │   ├── report.py                 # Reports
 │   ├── backup.py                 # Backup and restore
-│   ├── print.py                  # Print views
 │   ├── qr_template.py            # QR sticker template designer
 │   ├── api.py                    # Core internal REST API endpoints
 │   ├── api_v1.py                 # External REST API v1 (/api/v1/)
