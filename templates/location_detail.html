@@ -79,7 +79,7 @@
                             {% for item in items %}
                             <tr>
                                 <td>{{ item.name }}</td>
-                                <td>{{ item.get_overall_quantity() }}</td>
+                                <td>{{ stock[item.id].overall_quantity }}</td>
                                 <td>
                                     {% if item.category %}
                                     <span class="badge" style="background-color: {{ item.category.color }};">{{ item.category.name }}</span>

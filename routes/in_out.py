@@ -176,17 +176,24 @@ def _item_json(item):
         'name': item.name,
         'uuid': item.uuid,
         'short_info': item.short_info or '',
-        'batches': [_batch_summary(b) for b in item.batches],
+        'batches': _batch_summaries(item),
     }
 
-def _batch_summary(batch):
+
+def _batch_summaries(item):
+    stock = item.batch_stock()
+    return [_batch_summary(batch, stock[batch.id]) for batch in item.batches]
+
+
+def _batch_summary(batch, stock=None):
+    stock = stock or batch.stock
     return {
         'id': batch.id,
         'display_label': batch.get_display_label(),
         'quantity': batch.quantity,
         'sn_tracking': batch.sn_tracking_enabled,
-        'lend_qty': batch.get_lend_quantity(),
-        'available_qty': batch.get_available_quantity(),
+        'lend_qty': stock.lend_quantity,
+        'available_qty': stock.available_quantity,
         'item_uuid': batch.item.uuid,
         'lend_disabled': bool(batch.lend_disabled),
     }
@@ -573,9 +580,9 @@ def in_out_submit_cart():
 
             elif item_type == 'normal':
                 qty          = max(1, int(cart_item.get('qty', 1)))
-                current_lent = batch.get_lend_quantity()
+                current_lent = batch.stock.lend_quantity
                 if current_lent + qty > batch.quantity:
-                    errors.append(f'Qty {qty} exceeds available for "{batch.get_display_label()}" (avail: {batch.get_available_quantity()})')
+                    errors.append(f'Qty {qty} exceeds available for "{batch.get_display_label()}" (avail: {batch.stock.available_quantity})')
                     continue
                 rec = BatchLendRecord(
                     batch_id               = batch.id,
@@ -754,7 +761,7 @@ def in_out_lend():
         return jsonify({'success': True, 'updated': updated})
     else:
         records = data.get('lend_records', [])
-        current_lent = batch.get_lend_quantity()
+        current_lent = batch.stock.lend_quantity
         new_request_qty = sum(max(1, int(r.get('qty', 1))) for r in records if isinstance(r, dict))
         if (current_lent + new_request_qty) > batch.quantity:
             return jsonify({

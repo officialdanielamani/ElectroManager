@@ -710,7 +710,7 @@ def bom_search_items(project_id):
                 'id': b.id,
                 'label': b.get_display_label(),
                 'quantity': b.quantity,
-                'available': b.get_available_quantity(),
+                'available': b.stock.available_quantity,
                 'price': b.price_per_unit,
                 'sn_tracking': b.sn_tracking_enabled,
             })
@@ -829,7 +829,7 @@ def bom_edit(project_id, bom_id):
     if 'used_quantity' in data:
         new_used = max(0, int(data['used_quantity']))
         if bom.batch:
-            available = bom.batch.get_available_quantity() + (bom.used_quantity or 0)
+            available = bom.batch.stock.available_quantity + (bom.used_quantity or 0)
             new_used = max(0, min(new_used, available))
         bom.used_quantity = new_used
         # Handle SN assignment for used_quantity

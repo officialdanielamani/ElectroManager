@@ -195,7 +195,7 @@ def api_lookup():
         'item_name':            item.name,
         'short_info':           item.short_info or '',
         'available_for_lending': not batch.lend_disabled,
-        'available_qty':        batch.get_available_quantity(),
+        'available_qty':        batch.stock.available_quantity,
         'total_qty':            batch.quantity,
     })
 
@@ -374,7 +374,7 @@ def api_lend():
                 qty = max(1, int(entry.get('qty', 1)))
             except (ValueError, TypeError):
                 qty = 1
-            avail = batch.get_available_quantity()
+            avail = batch.stock.available_quantity
             if qty > avail:
                 item_results.append({
                     'index': idx, 'query': q, 'status': 'error',
@@ -684,7 +684,7 @@ def _batch_summary(batch):
         'batch_uid':   batch.get_batch_uid(),
         'batch_label': batch.get_display_label(),
         'quantity':    batch.quantity,
-        'available':   batch.get_available_quantity(),
+        'available':   batch.stock.available_quantity,
         'sn_tracking': batch.sn_tracking_enabled,
     }
 
@@ -757,7 +757,7 @@ def _drawer_entries(rack, cell_id):
             'batch_uid':   batch.get_batch_uid(),
             'batch_label': batch.get_display_label(),
             'quantity':    batch.quantity,
-            'available':   batch.get_available_quantity(),
+            'available':   batch.stock.available_quantity,
             'sn_tracking': batch.sn_tracking_enabled,
         })
     return result
@@ -907,7 +907,7 @@ def api_location_info(location_uuid):
     for item in items_main:
         follow_batches = [b for b in item.batches if b.follow_main_location]
         total_qty = sum(b.quantity for b in follow_batches)
-        avail_qty = sum(b.get_available_quantity() for b in follow_batches)
+        avail_qty = sum(b.stock.available_quantity for b in follow_batches)
         item_list.append({
             'type':       'item_main',
             'name':       item.name,
@@ -934,7 +934,7 @@ def api_location_info(location_uuid):
             'batch_uid':   batch.get_batch_uid(),
             'batch_label': batch.get_display_label(),
             'quantity':    batch.quantity,
-            'available':   batch.get_available_quantity(),
+            'available':   batch.stock.available_quantity,
             'sn_tracking': batch.sn_tracking_enabled,
         })
 
@@ -994,7 +994,7 @@ def api_rack_info(rack_uuid):
         row, col = _parse_cell(cell)
         batches = [b for b in item.batches if b.follow_main_location]
         total_qty = sum(b.quantity for b in batches)
-        avail_qty = sum(b.get_available_quantity() for b in batches)
+        avail_qty = sum(b.stock.available_quantity for b in batches)
         item_list.append({
             'type':        'item_main',
             'name':        item.name,
@@ -1030,7 +1030,7 @@ def api_rack_info(rack_uuid):
                 'available':   0,
             }
         by_item[key]['quantity']  += batch.quantity
-        by_item[key]['available'] += batch.get_available_quantity()
+        by_item[key]['available'] += batch.stock.available_quantity
     item_list.extend(by_item.values())
 
     return jsonify({

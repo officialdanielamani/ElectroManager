@@ -202,7 +202,7 @@ def get_drawer_contents(rack_uuid, drawer_id):
                     'batch_id': batch.id,
                     'batch_label': batch.get_display_label(),
                     'quantity': batch.quantity,
-                    'available': batch.get_available_quantity(),
+                    'available': batch.stock.available_quantity,
                 })
         else:
             # No follow-main batches: reference-only row (no stock here yet)
@@ -224,7 +224,7 @@ def get_drawer_contents(rack_uuid, drawer_id):
             'batch_id': batch.id,
             'batch_label': batch.get_display_label(),
             'quantity': batch.quantity,
-            'available': batch.get_available_quantity(),
+            'available': batch.stock.available_quantity,
         })
 
     return jsonify({

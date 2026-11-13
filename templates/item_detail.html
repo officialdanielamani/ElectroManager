@@ -3,6 +3,8 @@
 {% block title %}{{ item.name }} - Electro Manager{% endblock %}
 
 {% block content %}
+{% set st = item.stock %}
+{% set batch_stock = item.batch_stock() %}
 
 {% if not current_user.has_permission('items', 'view') %}
 <div class="alert alert-danger" role="alert">
@@ -206,36 +208,36 @@
                 <div class="row mb-3">
                     <div class="col-md-2">
                         <strong>Overall Quantity:</strong>
-                        <h3 class="text-primary">{{ item.get_overall_quantity() }}</h3>
+                        <h3 class="text-primary">{{ st.overall_quantity }}</h3>
                     </div>
                     <div class="col-md-2">
                         <strong>Total Lend:</strong>
-                        <h3 class="{% if item.get_total_lend_quantity() > 0 %}text-warning{% else %}text-muted{% endif %}">{{ item.get_total_lend_quantity() }}</h3>
+                        <h3 class="{% if st.lend_quantity > 0 %}text-warning{% else %}text-muted{% endif %}">{{ st.lend_quantity }}</h3>
                     </div>
                     <div class="col-md-2">
                         <strong>Total in Project:</strong>
-                        <h3 class="{% if item.get_total_project_quantity() > 0 %}text-info{% else %}text-muted{% endif %}">{{ item.get_total_project_quantity() }}</h3>
+                        <h3 class="{% if st.project_used_quantity > 0 %}text-info{% else %}text-muted{% endif %}">{{ st.project_used_quantity }}</h3>
                     </div>
                     <div class="col-md-2">
                         <strong>Available:</strong>
-                        <h3 class="text-success">{{ item.get_available_quantity() }}</h3>
+                        <h3 class="text-success">{{ st.available_quantity }}</h3>
                     </div>
                     {% if can_view_price %}
                     <div class="col-md-2">
                         <strong>Total Price:</strong>
-                        <h4 class="text-success">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(item.get_overall_total_price()) }}</h4>
-                        <small class="text-muted">Avg: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(item.get_average_price()) }}/unit</small>
+                        <h4 class="text-success">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(st.total_price) }}</h4>
+                        <small class="text-muted">Avg: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(st.average_price) }}/unit</small>
                     </div>
                     <div class="col-md-2">
                         <strong>Total Value <small class="text-muted">(in stock)</small>:</strong>
-                        <h4 class="text-secondary">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(item.get_overall_total_value()) }}</h4>
+                        <h4 class="text-secondary">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(st.total_value) }}</h4>
                     </div>
                     {% endif %}
                 </div>
 
-                {% if item.is_no_stock() %}
+                {% if st.is_no_stock %}
                 <div class="alert alert-danger"><i class="bi bi-exclamation-circle-fill"></i> No Stock!</div>
-                {% elif item.is_low_stock() %}
+                {% elif st.is_low_stock %}
                 <div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> Low Stock!{% if can_view_info %} (Min: {{ item.min_quantity }}){% endif %}</div>
                 {% endif %}
 
@@ -261,6 +263,7 @@
 
                     <!-- Batch Cards -->
                     {% for batch in item.batches %}
+{% set bst = batch_stock[batch.id] %}
                     <div class="card batch-card">
                         <div class="card-header d-flex justify-content-between align-items-start gap-2 flex-wrap" data-bs-toggle="collapse" data-bs-target="#batchCollapse{{ batch.id }}">
                             <div class="d-flex flex-wrap align-items-center gap-1" style="min-width:0;flex:1;">
@@ -271,15 +274,15 @@
                                 {% endif %}
                                 {% if can_view_price %}
                                 <span class="badge bg-success">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.price_per_unit) }}/unit</span>
-                                <span class="badge bg-info">Price: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_price()) }}</span>
+                                <span class="badge bg-info">Price: {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(bst.total_price) }}</span>
                                 {% endif %}
                                 {% if not batch.follow_main_location %}
                                 <span class="badge" style="background-color: {{ batch.get_effective_location_color() }};"><i class="bi bi-geo-alt"></i> {{ batch.get_effective_location_text() }}</span>
                                 {% endif %}
-                                {% if batch.get_project_used_quantity() > 0 %}
+                                {% if bst.project_used_quantity > 0 %}
                                 <span class="badge bg-info"><i class="bi bi-diagram-3"></i> In Project</span>
                                 {% endif %}
-                                {% if batch.get_lend_quantity() > 0 %}
+                                {% if bst.lend_quantity > 0 %}
                                 <span class="badge" style="background-color:#c9a227; color:#fff;"><i class="bi bi-hand-index-thumb"></i> On Lend</span>
                                 {% endif %}
                                 {% if batch.lend_disabled %}
@@ -304,17 +307,17 @@
                                     {% if can_view_price %}
                                     <div class="col-md-3"><strong>Price/Unit:</strong> {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.price_per_unit) }}</div>
                                     <div class="col-md-3">
-                                        <strong>Total Price:</strong> {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_price()) }}
+                                        <strong>Total Price:</strong> {{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(bst.total_price) }}
                                         {% if batch.quantity == 0 %}<small class="text-muted d-block">(qty=0, shows 1×)</small>{% endif %}
                                     </div>
                                     {% endif %}
                                 </div>
                                 <div class="row mb-2">
-                                    <div class="col-md-3"><strong>Available Qty:</strong> {{ batch.get_available_quantity() }}</div>
+                                    <div class="col-md-3"><strong>Available Qty:</strong> {{ bst.available_quantity }}</div>
                                     <div class="col-md-3"><strong>Date:</strong> {{ batch.purchase_date.strftime('%d/%m/%Y') if batch.purchase_date else 'N/A' }}</div>
                                     <div class="col-md-3"><strong>Note:</strong> {{ batch.note or 'N/A' }}</div>
                                     {% if not batch.sn_tracking_enabled %}
-                                    <div class="col-md-3"><strong>Lending Qty:</strong> {{ batch.get_lend_quantity() }}</div>
+                                    <div class="col-md-3"><strong>Lending Qty:</strong> {{ bst.lend_quantity }}</div>
                                     {% endif %}
                                 </div>
                                 <div class="row mb-2">
@@ -348,7 +351,7 @@
                                 {% set proj_names = batch.get_project_names_for_batch() %}
                                 {% if proj_names %}
                                 <div class="mb-2">
-                                    <strong>Projects <small class="text-muted">({{ batch.get_project_used_quantity() }} total)</small></strong>
+                                    <strong>Projects <small class="text-muted">({{ bst.project_used_quantity }} total)</small></strong>
                                     <table class="table table-sm table-bordered mt-1 mb-0 small">
                                         <thead><tr><th>Project</th><th class="text-center">Quantity</th></tr></thead>
                                         <tbody>

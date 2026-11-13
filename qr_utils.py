@@ -86,7 +86,7 @@ def get_item_data(item):
     rack_uuid = item.rack.uuid if item.rack else ''
     draw_loc  = item.drawer if (item.rack_id and item.drawer) else ''
 
-    total_price = item.get_overall_total_price()
+    total_price = item.stock.total_price
 
     # Derive _item_icon from thumbnail value
     thumb = item.thumbnail or ''
@@ -110,7 +110,7 @@ def get_item_data(item):
         'ItemCat':      item.category.name if item.category else '',
         'ItemFoot':     item.footprint.name if item.footprint else '',
         'ItemTPrice':   f"{total_price:.2f}" if total_price else '',
-        'ItemMOvrQty':  str(item.get_overall_quantity()),
+        'ItemMOvrQty':  str(item.stock.overall_quantity),
         'ItemMinQty':   str(item.min_quantity or 0),
         'ItemMLocName': main_loc_name,
         'ItemMLocUUID': main_loc_uuid,
@@ -152,7 +152,8 @@ def get_batch_data(batch, sn=None):
         b_draw_loc  = batch.drawer if (batch.rack_id and batch.drawer) else ''
 
     price_u = f"{batch.price_per_unit:.2f}" if batch.price_per_unit else ''
-    price_t = f"{batch.get_batch_total_price():.2f}" if batch.get_batch_total_price() else ''
+    batch_price = batch.stock.total_price
+    price_t = f"{batch_price:.2f}" if batch_price else ''
     b_date  = batch.purchase_date.strftime('%Y-%m-%d') if batch.purchase_date else ''
 
     data = {**base,

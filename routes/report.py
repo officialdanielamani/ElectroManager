@@ -18,6 +18,8 @@ import secrets
 import string
 import logging
 
+from item_stock import items_needing_restock, stock_summary
+
 logger = logging.getLogger(__name__)
 
 report_bp = Blueprint('report', __name__)
@@ -26,10 +28,8 @@ report_bp = Blueprint('report', __name__)
 @report_bp.route('/low-stock', endpoint='low_stock')
 @login_required
 def low_stock():
-    all_items = Item.query.all()
-    items = [i for i in all_items if i.is_low_stock() or i.is_no_stock()]
-    items.sort(key=lambda x: x.get_overall_quantity())
-    return render_template('low_stock.html', items=items)
+    items, stock = items_needing_restock()
+    return render_template('low_stock.html', items=items, stock=stock)
 
 
 
@@ -46,7 +46,7 @@ def reports():
 
     # ── Inventory ──────────────────────────────────────────────────────────────
     if current_user.has_permission('items', 'view'):
-        all_items = Item.query.all()
+        total_items, low_stock_items, no_stock_items = stock_summary()
         total_value = db.session.query(
             db.func.sum(ItemBatch.price_per_unit * ItemBatch.quantity)
         ).scalar() or 0
@@ -62,9 +62,9 @@ def reports():
         ).join(Item).group_by(Footprint.name).order_by(db.func.count(Item.id).desc()).limit(10).all()
 
         sections['inventory'] = {
-            'total_items':    len(all_items),
-            'low_stock':      sum(1 for i in all_items if i.is_low_stock()),
-            'no_stock':       sum(1 for i in all_items if i.is_no_stock()),
+            'total_items':    total_items,
+            'low_stock':      low_stock_items,
+            'no_stock':       no_stock_items,
             'total_batches':  ItemBatch.query.count(),
             'total_value':    total_value,
             'category_stats': [[r[0], r[1]] for r in category_stats],
@@ -74,7 +74,8 @@ def reports():
     # ── Lending & Return ────────────────────────────────────────────────────────
     if current_user.has_permission('lending_return', 'view_log'):
         now = datetime.now(timezone.utc).replace(tzinfo=None)
-        active_records = BatchLendRecord.query.filter(BatchLendRecord.returned_at.is_(None)).all()
+        active_records = (BatchLendRecord.query.options(db.joinedload(BatchLendRecord.batch))
+                          .filter(BatchLendRecord.returned_at.is_(None)).all())
         overdue = [r for r in active_records if r.lend_end and r.lend_end < now]
         unique_items = set(r.batch.item_id for r in active_records if r.batch)
         recent_sessions = (LendingSession.query

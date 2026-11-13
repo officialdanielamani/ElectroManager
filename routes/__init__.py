@@ -26,7 +26,6 @@ def register_blueprints(app: Flask):
     from routes.backup import backup_bp
     from routes.magic_parameter import magic_parameter_bp
     from routes.notification import notification_bp
-    from routes.print import print_bp as print_routes_bp
     from routes.report import report_bp
     from routes.api import api_bp
     from routes.qr_template import qr_template_bp
@@ -50,7 +49,6 @@ def register_blueprints(app: Flask):
     app.register_blueprint(backup_bp)
     app.register_blueprint(magic_parameter_bp)
     app.register_blueprint(notification_bp)
-    app.register_blueprint(print_routes_bp)
     app.register_blueprint(report_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(qr_template_bp)

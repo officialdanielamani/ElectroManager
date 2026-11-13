@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+{% set st = item.stock %}{% set batch_stock = item.batch_stock() %}<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -253,19 +253,19 @@
         <div class="info-grid">
             <div class="info-item">
                 <div class="info-label">Overall Quantity</div>
-                <div class="info-value"><strong>{{ item.get_overall_quantity() }}</strong></div>
+                <div class="info-value"><strong>{{ st.overall_quantity }}</strong></div>
             </div>
             <div class="info-item">
                 <div class="info-label">Total Lend</div>
-                <div class="info-value"><strong>{{ item.get_total_lend_quantity() }}</strong></div>
+                <div class="info-value"><strong>{{ st.lend_quantity }}</strong></div>
             </div>
             <div class="info-item">
                 <div class="info-label">Total in Project</div>
-                <div class="info-value"><strong>{{ item.get_total_project_quantity() }}</strong></div>
+                <div class="info-value"><strong>{{ st.project_used_quantity }}</strong></div>
             </div>
             <div class="info-item">
                 <div class="info-label">Available</div>
-                <div class="info-value"><strong>{{ item.get_available_quantity() }}</strong></div>
+                <div class="info-value"><strong>{{ st.available_quantity }}</strong></div>
             </div>
             {% if can_view_info %}
             <div class="info-item">
@@ -278,17 +278,17 @@
         <div class="info-grid">
             <div class="info-item">
                 <div class="info-label">Overall Total Price</div>
-                <div class="info-value"><strong>{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(item.get_overall_total_price()) }}</strong></div>
+                <div class="info-value"><strong>{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(st.total_price) }}</strong></div>
             </div>
             <div class="info-item">
                 <div class="info-label">Average Price/Unit</div>
-                <div class="info-value">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(item.get_average_price()) }}</div>
+                <div class="info-value">{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(st.average_price) }}</div>
             </div>
         </div>
         {% endif %}
-        {% if item.is_no_stock() %}
+        {% if st.is_no_stock %}
             <span class="badge badge-danger">No Stock</span>
-        {% elif item.is_low_stock() %}
+        {% elif st.is_low_stock %}
             <span class="badge badge-warning">Low Stock{% if can_view_info %} (Min: {{ item.min_quantity }}){% endif %}</span>
         {% else %}
             <span class="badge badge-success">OK</span>
@@ -305,13 +305,14 @@
             </thead>
             <tbody>
                 {% for batch in item.batches %}
+{% set bst = batch_stock[batch.id] %}
                 <tr>
                     <td>{{ batch.batch_number }}</td>
                     <td>{{ batch.get_display_label() }}</td>
                     <td>{{ batch.quantity }}</td>
                     {% if can_view_price %}
                     <td>{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.price_per_unit) }}</td>
-                    <td>{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(batch.get_batch_total_price()) }}</td>
+                    <td>{{ currency_symbol }}{{ "%.{}f".format(currency_decimal_places)|format(bst.total_price) }}</td>
                     {% endif %}
                     <td>{{ batch.purchase_date.strftime('%d/%m/%Y') if batch.purchase_date else '-' }}</td>
                     <td>{% if batch.follow_main_location %}<em>Follow Main</em>{% else %}{{ batch.get_effective_location_text() }}{% endif %}</td>

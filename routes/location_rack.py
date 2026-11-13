@@ -63,6 +63,8 @@ def _bytes_response(buf, mimetype, filename):
     response.headers['Cache-Control'] = 'no-store'
     return response
 
+from item_stock import stock_for_items
+
 logger = logging.getLogger(__name__)
 
 location_rack_bp = Blueprint('location_rack', __name__)
@@ -108,6 +110,7 @@ def location_detail(uuid):
     return render_template('location_detail.html', 
                           location=location,
                           items=items,
+                          stock=stock_for_items(items),
                           racks=racks)
 
 

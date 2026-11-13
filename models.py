@@ -498,60 +498,23 @@ class Item(db.Model):
             return self.general_location.name
         return 'Not specified'
     
-    def get_available_quantity(self):
-        return sum(b.get_available_quantity() for b in self.batches)
-    
-    def get_total_lend_quantity(self):
-        """Total lent quantity across all batches"""
-        return sum(b.get_lend_quantity() for b in self.batches)
+    @property
+    def stock(self):
+        """Current stock figures for this item (see item_stock.ItemStock). Runs a query on each access."""
+        from item_stock import stock_for_items
+        return stock_for_items([self])[self.id]
 
-    def get_total_project_quantity(self):
-        """Total quantity allocated to projects across all batches"""
-        return sum(b.get_project_used_quantity() for b in self.batches)
-    
-    def get_overall_quantity(self):
-        """Total quantity across all batches"""
-        return sum(b.quantity for b in self.batches)
-    
-    def get_overall_total_price(self):
-        """Display total price (qty=0 batches count as 1 unit for price reference)."""
-        return sum(b.get_batch_total_price() for b in self.batches)
-
-    def get_overall_total_value(self):
-        """Actual stock value: sum of (price × real qty) across all batches."""
-        return sum(b.get_batch_total_value() for b in self.batches)
-
-    def get_average_price(self):
-        """Average price per unit based on actual stock value."""
-        total_qty = self.get_overall_quantity()
-        if total_qty == 0:
-            return 0.0
-        return self.get_overall_total_value() / total_qty
+    def batch_stock(self):
+        """{batch.id: BatchStock} for this item's batches, in one query."""
+        from item_stock import stock_for_batches
+        return stock_for_batches(self.batches)
 
     def recalculate_from_batches(self):
-        """Sync quantity/price fields from batches using actual values."""
-        self.quantity = self.get_overall_quantity()
-        total = self.get_overall_total_value()
-        if self.quantity > 0:
-            self.price = total / self.quantity
-        else:
-            self.price = 0.0
-    
-    def is_no_stock(self):
-        available = self.get_available_quantity()
-        return available <= 0 and self.no_stock_warning
-    
-    def is_low_stock(self):
-        available = self.get_available_quantity()
-        if available < self.min_quantity:
-            if available <= 0 and self.no_stock_warning:
-                return False
-            return True
-        return False
-    
-    def is_ok_stock(self):
-        return self.get_available_quantity() >= self.min_quantity
-    
+        """Refresh the quantity and price stored on the item from its batches."""
+        stock = self.stock
+        self.quantity = stock.overall_quantity
+        self.price = stock.average_price
+
     def get_drawer_uuid(self):
         if not self.rack or not self.drawer:
             return None
@@ -562,12 +525,6 @@ class Item(db.Model):
         row = int(match.group(1))
         col = int(match.group(2))
         return self.rack.get_drawer_uuid(row, col)
-    
-    def get_total_price(self):
-        return self.get_overall_total_price()
-
-    def get_total_value(self):
-        return self.get_overall_total_value()
     
     def set_tag_ids(self, tag_ids):
         """Replace this item's tags; ids that are not existing tags are dropped."""
@@ -639,16 +596,12 @@ class ItemBatch(db.Model):
             return self.batch_location.color or '#6c757d'
         return '#6c757d'
 
-    def get_batch_total_price(self):
-        """Display price reference: qty=0 treated as 1 so price/unit is visible when out of stock."""
-        if not self.price_per_unit:
-            return 0.0
-        return self.price_per_unit * max(1, self.quantity)
+    @property
+    def stock(self):
+        """Current stock figures for this batch (see item_stock.BatchStock). Runs a query on each access."""
+        from item_stock import stock_for_batches
+        return stock_for_batches([self])[self.id]
 
-    def get_batch_total_value(self):
-        """Actual stock value: price × real quantity (0 when qty=0)."""
-        return self.price_per_unit * self.quantity if self.price_per_unit else 0.0
-    
     def get_display_label(self):
         if self.batch_label:
             return self.batch_label
@@ -658,12 +611,6 @@ class ItemBatch(db.Model):
         """Return a stable unique identifier: {item_uuid}-B{batch_number:02d}."""
         return f"{self.item.uuid}-B{self.batch_number:02d}"
     
-    def get_lend_quantity(self):
-        """Total lend quantity across all lend records (or per-SN count for tracked batches)."""
-        if self.sn_tracking_enabled:
-            return sum(1 for sn in self.serial_numbers if sn.lend_to_id and not sn.is_deleted)
-        return sum(r.quantity for r in self.lend_records if r.returned_at is None)
-
     def get_lend_records_data(self):
         """Serialise active (not yet returned) lend records for JS embedding."""
         result = []
@@ -709,14 +656,6 @@ class ItemBatch(db.Model):
             })
         return result
 
-    def get_project_used_quantity(self):
-        """Get total used_quantity across all projects for this batch"""
-        from models import ProjectBOMItem
-        return db.session.query(db.func.coalesce(db.func.sum(ProjectBOMItem.used_quantity), 0)).filter(
-            ProjectBOMItem.batch_id == self.id,
-            ProjectBOMItem.used_quantity > 0
-        ).scalar()
-
     def get_project_used_sn_ids(self):
         """Get set of serial number IDs assigned to used_quantity in projects"""
         from models import ProjectBOMItem
@@ -746,9 +685,6 @@ class ItemBatch(db.Model):
                 names.append(bom.project.name)
         return names
 
-    def get_available_quantity(self):
-        return self.quantity - self.get_lend_quantity() - self.get_project_used_quantity()
-    
     def generate_serial_numbers(self):
         """Generate ISN serial numbers for all units in this batch"""
         item = Item.query.get(self.item_id)

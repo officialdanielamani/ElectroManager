@@ -363,8 +363,8 @@ def manage_lend(uuid, batch_id):
     new_count = len(lend_records_data)
     log_audit(current_user.id, 'lend_update', 'batch', batch.id,
               f'Updated lending for batch #{batch.batch_number} "{batch.get_display_label()}" of item: {item.name} '
-              f'(was {old_count} record(s), now {new_count} record(s), total lent: {batch.get_lend_quantity()})')
-    return jsonify({'success': True, 'lend_qty': batch.get_lend_quantity()})
+              f'(was {old_count} record(s), now {new_count} record(s), total lent: {batch.stock.lend_quantity})')
+    return jsonify({'success': True, 'lend_qty': batch.stock.lend_quantity})
 
 
 @batch_bp.route('/item/<string:uuid>/batch/<int:batch_id>/delete', methods=['POST'])
@@ -481,7 +481,7 @@ def transfer_batch(uuid):
         return redirect(url_for('item.item_detail', uuid=uuid))
     
     # Use max available quantity check instead of strictly absolute quantity
-    available_qty = from_batch.get_available_quantity()
+    available_qty = from_batch.stock.available_quantity
     if transfer_qty > available_qty:
         flash(f'Cannot transfer more than available quantity ({available_qty}). Ensure items are not lent or used in projects.', 'danger')
         return redirect(url_for('item.item_detail', uuid=uuid))
