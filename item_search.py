@@ -103,7 +103,8 @@ def _parse_param_filters(raw):
         if not param:
             continue
 
-        crit = {'id': param.id, 'name': param.name, 'type': param.param_type}
+        crit = {'id': param.id, 'name': param.name, 'type': param.param_type,
+                'join': 'or' if entry.get('join') == 'or' and result else 'and'}
         if param.param_type == 'number':
             units = entry.get('units') if isinstance(entry.get('units'), list) else []
             crit['units'] = [str(u)[:50] for u in units if str(u).strip()]
@@ -253,6 +254,17 @@ def _param_item_ids(crit):
     return ids
 
 
+def param_groups(params):
+    """Split criteria into OR-groups; a criterion joined with 'or' shares the previous one's group."""
+    groups = []
+    for crit in params:
+        if crit['join'] == 'or' and groups:
+            groups[-1].append(crit)
+        else:
+            groups.append([crit])
+    return groups
+
+
 def _item_tag_ids(item):
     try:
         return {int(t) for t in json.loads(item.tags or '[]')}
@@ -303,8 +315,8 @@ def find_items(filters):
 
     if filters['params']:
         matching = None
-        for crit in filters['params']:
-            ids = _param_item_ids(crit)
+        for group in param_groups(filters['params']):
+            ids = set().union(*(_param_item_ids(crit) for crit in group))
             matching = ids if matching is None else matching & ids
         if len(matching) <= _SQL_IN_LIMIT:
             query = query.filter(Item.id.in_(matching))
@@ -356,6 +368,26 @@ def _range_text(low, high):
     return f'≤ {_fmt(high)}'
 
 
+def _describe_param(crit):
+    text = crit['name']
+    if crit['type'] == 'number':
+        if crit['min'] is not None or crit['max'] is not None:
+            text += f" {_range_text(crit['min'], crit['max'])}"
+        if crit['units']:
+            text += f" [{', '.join(crit['units'])}]"
+    elif crit['type'] == 'date':
+        if crit['from'] and crit['to']:
+            text += f": {crit['from']} – {crit['to']}"
+        elif crit['from']:
+            text += f": from {crit['from']}"
+        elif crit['to']:
+            text += f": until {crit['to']}"
+    elif crit['values']:
+        joiner = ' + ' if crit['mode'] == 'all' else ', '
+        text += f": {joiner.join(crit['values'])}"
+    return text
+
+
 def describe_filters(filters):
     """Human-readable summary of the advanced filters, one string per filter."""
     chips = []
@@ -380,24 +412,8 @@ def describe_filters(filters):
     if filters['price_min'] is not None or filters['price_max'] is not None:
         chips.append(f"Price per Unit {_range_text(filters['price_min'], filters['price_max'])}")
 
-    for crit in filters['params']:
-        text = crit['name']
-        if crit['type'] == 'number':
-            if crit['min'] is not None or crit['max'] is not None:
-                text += f" {_range_text(crit['min'], crit['max'])}"
-            if crit['units']:
-                text += f" [{', '.join(crit['units'])}]"
-        elif crit['type'] == 'date':
-            if crit['from'] and crit['to']:
-                text += f": {crit['from']} – {crit['to']}"
-            elif crit['from']:
-                text += f": from {crit['from']}"
-            elif crit['to']:
-                text += f": until {crit['to']}"
-        elif crit['values']:
-            joiner = ' + ' if crit['mode'] == 'all' else ', '
-            text += f": {joiner.join(crit['values'])}"
-        chips.append(text)
+    for group in param_groups(filters['params']):
+        chips.append(' OR '.join(_describe_param(crit) for crit in group))
     return chips
 
 
