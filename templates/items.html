@@ -836,15 +836,24 @@
                         <small class="text-muted">(if off, tags will not be changed)</small>
                     </div>
                     <div id="be_tags_section" style="display:none;">
+                        <style>
+                            .be-tag-chip { cursor: pointer; color: #fff; font-size: 0.85rem; padding: 5px 10px; user-select: none;
+                                           opacity: 0.5; border: 2px solid transparent; }
+                            .be-tag-chip .be-tag-check { display: none; }
+                            .be-tag-chip.selected { opacity: 1; border-color: var(--bs-body-color);
+                                                    box-shadow: 0 0 0 2px var(--bs-body-bg) inset; }
+                            .be-tag-chip.selected .be-tag-check { display: inline; }
+                        </style>
                         <div class="border rounded p-2" style="max-height:160px; overflow-y:auto;">
                             {% if all_tags_list %}
                             <div class="d-flex flex-wrap gap-1" id="be_tags_chips">
                                 {% for tag in all_tags_list %}
                                 <div class="be-tag-chip badge d-flex align-items-center gap-1"
-                                     data-id="{{ tag.id }}"
-                                     style="cursor:pointer; background-color:{{ tag.color }}; color:#fff; opacity:0.45; font-size:0.85rem; padding:5px 10px; user-select:none;"
-                                     onclick="beToggleTag(this)">
-                                    {{ tag.name }}
+                                     data-id="{{ tag.id }}" data-color="{{ tag.color }}" role="checkbox" aria-checked="false" tabindex="0"
+                                     style="background-color:{{ tag.color }};"
+                                     onclick="beToggleTag(this)"
+                                     onkeydown="if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); beToggleTag(this); }">
+                                    <i class="bi bi-check-lg be-tag-check"></i>{{ tag.name }}
                                 </div>
                                 {% endfor %}
                             </div>
@@ -853,7 +862,7 @@
                             {% endif %}
                         </div>
                         <small class="text-muted mt-1 d-block">
-                            Click tags to select. Selected tags will <strong>replace</strong> all existing tags on the chosen items.
+                            Click tags to select (selected tags show a tick). Selected tags will <strong>replace</strong> all existing tags on the chosen items.
                             Select none to clear all tags.
                         </small>
                     </div>
@@ -1237,9 +1246,17 @@ document.querySelectorAll('input[name="be_location_type"]').forEach(radio => {
 
 // Tag chip toggle
 function beSetTagChip(el, selected) {
-    el.style.opacity = selected ? '1' : '0.45';
+    el.classList.toggle('selected', selected);
+    el.setAttribute('aria-checked', selected ? 'true' : 'false');
     el.dataset.selected = selected ? '1' : '';
 }
+// Dark text on light tag colours, white on dark ones, so every chip stays readable.
+document.querySelectorAll('.be-tag-chip').forEach(chip => {
+    const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(chip.dataset.color || '');
+    if (!m) return;
+    const [r, g, b] = m.slice(1).map(h => parseInt(h, 16));
+    chip.style.color = (0.299 * r + 0.587 * g + 0.114 * b) > 160 ? '#212529' : '#fff';
+});
 function beToggleTag(el) {
     beSetTagChip(el, !el.dataset.selected);
 }
