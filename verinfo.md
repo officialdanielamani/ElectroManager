@@ -21,7 +21,13 @@
 - Now system can run fully offline 
 - (only first startup need online for library download)
 
+- Advanced item search, including Magic Parameter filters with AND / OR
+- Kanban boards with card move / duplicate between boards
+- Two-factor authentication (TOTP) and rate-limited login
+- Automatic database upgrades (a backup copy is taken first)
+
 # Experimental
+- Plugins (Settings → Plugins)
 - QR for Item
 - QR template creator
 - Dynamic CSS and Font file support

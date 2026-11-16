@@ -1,7 +1,7 @@
 """
 Inventory Manager Application - Main Entry Point
 """
-from flask import Flask, render_template, request, send_from_directory, jsonify, url_for, abort
+from flask import Flask, render_template, request, send_from_directory, jsonify, url_for, abort, session
 from flask_login import LoginManager, current_user, AnonymousUserMixin, login_required
 from extensions import csrf, limiter
 from config import Config
@@ -48,6 +48,12 @@ login_manager.init_app(app)
 login_manager.login_view = 'auth.login'
 login_manager.login_message = ''
 login_manager.anonymous_user = AnonymousUser  # Use custom anonymous user
+
+@app.before_request
+def _limit_session_lifetime():
+    # Flask applies PERMANENT_SESSION_LIFETIME only to sessions marked permanent.
+    session.permanent = True
+
 
 # Create upload and instance folders
 os.makedirs(app.instance_path, exist_ok=True)

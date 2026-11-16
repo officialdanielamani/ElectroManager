@@ -140,3 +140,14 @@ def test_security_headers(app):
     headers = app.test_client().get('/login').headers
     assert "object-src 'none'" in headers['Content-Security-Policy']
     assert headers['X-Content-Type-Options'] == 'nosniff'
+
+
+def test_session_expires_after_configured_lifetime(app, make_user):
+    from datetime import datetime, timedelta, timezone
+    from email.utils import parsedate_to_datetime
+    make_user('alice')
+    response = app.test_client().post('/login', data={'username': 'alice', 'password': PASSWORD})
+    cookie = next(h for h in response.headers.getlist('Set-Cookie') if h.startswith('session='))
+    expires = parsedate_to_datetime(re.search(r'Expires=([^;]+)', cookie).group(1))
+    remaining = expires - datetime.now(timezone.utc)
+    assert timedelta(hours=7, minutes=55) < remaining <= app.config['PERMANENT_SESSION_LIFETIME'] == timedelta(hours=8)

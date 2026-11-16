@@ -3,18 +3,57 @@ name: Tests
 on:
   push:
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   pytest:
+    name: pytest (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 is what the Docker image runs; 3.13 catches breakage on current Python.
+        python-version: ['3.11', '3.13']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: requirements*.txt
       - name: Install system libraries for PDF generation
         run: sudo apt-get update && sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0 libcairo2
       - run: pip install -r requirements-dev.txt
       - run: pytest
+
+  docker:
+    name: Docker image starts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image and wait for the container to report healthy
+        run: docker compose up --build --detach --wait --wait-timeout 180
+      - name: Log in with the default admin account
+        run: |
+          curl --fail --silent --show-error --output /dev/null \
+               --cookie-jar cookies.txt http://localhost:5000/login
+          token=$(curl --silent --cookie cookies.txt --cookie-jar cookies.txt http://localhost:5000/login \
+                  | grep -o 'name="csrf_token"[^>]*value="[^"]*"' | head -1 | sed 's/.*value="//; s/"$//')
+          status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+                   --cookie cookies.txt --cookie-jar cookies.txt \
+                   --data-urlencode "csrf_token=$token" --data "username=admin&password=admin123" \
+                   http://localhost:5000/login)
+          test "$status" = "302"
+          curl --fail --silent --show-error --output /dev/null --cookie cookies.txt http://localhost:5000/items
+      - name: Container logs
+        if: always()
+        run: docker compose logs --no-color
+      - if: always()
+        run: docker compose down

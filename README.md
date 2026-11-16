@@ -27,6 +27,7 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 - Multiple datasheet URLs per item
 - Link shared library files to items (reuse the same file across multiple items without re-uploading)
 - Item thumbnail image
+- **Advanced search** — filter the item list by name, UUID, short info, SKU, type/model, stock status, available-quantity and price ranges, and multiple categories, tags and footprints; add Magic Parameter filters (number with unit and range/min/max/exact, string values, date range) combined with AND / OR; filters carry through pagination and printing
 
 ### Organisation
 - **Categories** — name, description, color; quick-add modal directly from item form
@@ -89,6 +90,7 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 - **Board sharing** — share boards in edit mode (collaborators can create, edit, and delete cards/tasks) or view-only mode; public boards visible to all logged-in users
 - **Real-time collaboration** — presence indicators show who else is viewing or editing the same board; card changes by other users sync automatically without a page reload
 - **Categories** — per-board label categories with configurable names; used to color-tag cards
+- **Move / duplicate cards across boards** — move a card to another board and column (needs edit access to both boards), or duplicate it (needs view access to the source and edit access to the destination); optional per-card icon
 - **Keyboard-friendly** — drag-and-drop column/card reordering via SortableJS; collapse/expand task lists per card with state persisted in localStorage
 
 ### Shared File Library
@@ -129,8 +131,15 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
   - Pages: notifications, visual storage
 - Admin users bypass all permission checks
 - Login-attempt limiting with configurable auto-unlock timeout; demo-user flag
+- **Two-factor authentication (TOTP)** — each user can enable 2FA under General Settings with any authenticator app; eight single-use backup codes are issued at setup
+- Rate limiting on login, 2FA, registration and password-check endpoints; session lifetime limit; Content-Security-Policy and related security headers (HSTS when served over HTTPS)
 - Per-user profile photo upload with configurable source (upload / shared library / both)
 - Configurable per-user flags: allow password reset, allow name/info changes, allow profile picture changes
+
+### Plugins
+- Server extensions live in `plugins/`; each is a small Python package discovered at startup
+- Admin page (**Settings → Plugins**) to enable, disable and configure plugins from a settings form the plugin declares
+- Ships with an example OAuth / SSO skeleton (`plugins/example_oauth/`) — a starting point, not a working login provider. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#plugins)
 
 ### Personalisation
 - **Themes** — Light, Dark, Blue, Keqing; theme CSS files are auto-detected from `static/custom/theme/` so new themes can be added by dropping in a CSS file
@@ -184,7 +193,7 @@ See **[API.md](API.md)** for the full API reference, including:
 
 ### Docker Setup (Recommended)
 
-The Dockerfile downloads all core JS/CSS dependencies (Bootstrap, Bootstrap Icons, SortableJS) **once during `docker build`** and bakes them into the image layer. No network access is needed at container startup or on restart.
+All core JS/CSS dependencies (Bootstrap, Bootstrap Icons, SortableJS) are bundled in the repository, so the image needs no network access at container startup or on restart.
 
 ```bash
 # Clone the repository
@@ -215,11 +224,9 @@ Every time the container (or local server) starts, `startup/init.py` runs throug
 | Step | What happens |
 |------|-------------|
 | Create dirs | Ensures all required directories exist |
-| Load config | Reads `js-requirements.json` |
-| Download core deps | Fetches Bootstrap, Bootstrap Icons, SortableJS if not already present |
 | **Verify core assets** | Checks that Bootstrap CSS/JS, Bootstrap Icons, SortableJS are on disk — **fatal** if any are missing |
 | **Detect custom assets** | Scans `static/custom/` and logs what it finds — informational only, never blocks startup |
-| Init database | Creates the SQLite database on first run |
+| Init database | Creates the SQLite database on first run, or upgrades an existing one to the current schema (see [Upgrading](#upgrading)); creates the built-in roles, default settings and the admin user if missing |
 
 #### Custom assets <a name="custom-assets"></a>
 
@@ -255,7 +262,11 @@ cd ElectroManager
 startup\start.bat
 ```
 
-The startup script will create a virtual environment, install Python dependencies, download JS/CSS libraries, initialise the database, and launch the server.
+The startup script initialises (or upgrades) the database and launches the server. Install the Python dependencies first with `pip install -r requirements.txt`, or run `setup_linux.sh` / `setup_windows.bat`, which create a virtual environment and install them for you.
+
+### Upgrading
+
+Pull the new code (and rebuild the image with `docker-compose up -d --build` if you use Docker), then start the app as usual. Database changes are applied automatically at startup. Before changing a database that already holds data, the app saves a copy next to it as `instance/inventory.db.before-<revision>.bak`; to roll back, stop the app, restore that file over `inventory.db`, and run the previous version of the code.
 
 ---
 
@@ -273,6 +284,8 @@ Create a `.env` file (copy from `.env.example`) to override defaults:
 | `ADMIN_USERNAME` | `admin` | Initial admin username (first-run only) |
 | `ADMIN_PASSWORD` | `admin123` | Initial admin password (first-run only) |
 | `ADMIN_EMAIL` | `admin@example.com` | Initial admin email (first-run only) |
+| `SESSION_LIFETIME_HOURS` | `8` | How long a login session lasts |
+| `SESSION_COOKIE_SECURE` | `false` | Set to `true` when the app is served over HTTPS: cookies are then sent only over HTTPS and an HSTS header is added |
 
 ---
 
@@ -286,24 +299,44 @@ ElectroManager/
 ├── forms.py                      # WTForms definitions
 ├── helpers.py                    # Jinja2 filters and helpers
 ├── utils.py                      # Shared utilities (permissions, audit log, etc.)
+├── extensions.py                 # Shared Flask extensions (CSRF, rate limiter)
 ├── importexport.py               # JSON import/export logic
 ├── qr_utils.py                   # QR code and sticker PDF generation
+├── item_search.py                # Item list filtering (quick + advanced search)
+├── item_stock.py                 # Stock figures in SQL — the one place stock is counted
+├── db_migrate.py                 # Applies database migrations at startup
+├── alembic.ini                   # Alembic configuration
 ├── API.md                        # API reference (external v1 + internal)
 ├── requirements.txt              # Python dependencies
-├── js-requirements.json          # JS/CSS library manifest (Bootstrap, etc.)
-├── Dockerfile                    # Docker image (deps baked in at build time)
+├── requirements-dev.txt          # + test dependencies
+├── pytest.ini                    # Test runner configuration
+├── Dockerfile                    # Docker image
 ├── docker-compose.yml            # Docker Compose configuration
 ├── .env.example                  # Environment variable template
 │
+├── docs/
+│   └── DEVELOPMENT.md            # Maintainer guide: architecture, workflows, known gaps
+│
+├── migrations/                   # Alembic environment
+│   └── versions/                 # One file per schema change, applied in order
+│
+├── plugins/                      # Server extensions (see docs/DEVELOPMENT.md)
+│   ├── base.py                   # PluginBase and the plugin registry
+│   └── example_oauth/            # Example OAuth / SSO skeleton
+│
+├── tests/                        # pytest suite
+│
+├── .github/workflows/tests.yml   # CI: tests + Docker image check
+│
 ├── startup/                      # Startup and initialisation scripts
-│   ├── init.py                   # Unified startup (downloads deps, inits DB)
-│   ├── init_db.py                # Database schema creation
+│   ├── init.py                   # Unified startup (checks assets, inits DB)
+│   ├── init_db.py                # Built-in roles, default settings, admin user
 │   ├── create_admin.py           # Admin user creation
 │   ├── docker.sh                 # Docker entrypoint script
 │   └── start.sh                  # Local startup script
 │
 ├── routes/                       # Flask blueprints (one per feature area)
-│   ├── item.py                   # Item CRUD, search, parameters, attachments
+│   ├── item.py                   # Item CRUD, list, search, print views, attachments
 │   ├── batch.py                  # Batch management and serial numbers
 │   ├── in_out.py                 # Lending & return sessions (In/Out)
 │   ├── project.py                # Projects, BOM, cost items, project attachments
@@ -316,12 +349,13 @@ ElectroManager/
 │   ├── contacts.py               # Contact persons, organizations, groups
 │   ├── share.py                  # Shared file library
 │   ├── user_role.py              # Users and roles
-│   ├── auth.py                   # Login, logout, authentication
+│   ├── auth.py                   # Login, logout, registration, two-factor auth
 │   ├── settings.py               # Application settings
 │   ├── notification.py           # Notification centre
 │   ├── report.py                 # Reports
 │   ├── backup.py                 # Backup and restore
 │   ├── qr_template.py            # QR sticker template designer
+│   ├── plugins.py                # Plugin admin pages
 │   ├── api.py                    # Core internal REST API endpoints
 │   ├── api_v1.py                 # External REST API v1 (/api/v1/)
 │   └── __init__.py               # Blueprint registration
@@ -348,6 +382,7 @@ ElectroManager/
 │   │   └── style.css             # Application stylesheet
 │   ├── js/
 │   │   ├── script.js             # Main application JS
+│   │   ├── icon-picker.js        # Shared Bootstrap icon picker
 │   │   ├── theme-loader.js       # Theme switching
 │   │   ├── table-sorter.js       # Client-side table sorting
 │   │   ├── md-editor.js          # Markdown editor helper
@@ -356,8 +391,8 @@ ElectroManager/
 │   │   ├── scanner.mp3           # Plays on QR/barcode scan (In/Out)
 │   │   ├── success.mp3           # Plays on successful lend/return
 │   │   └── error.mp3             # Plays on scan error
-│   ├── icons/                    # Bootstrap Icons — core, downloaded at build/startup
-│   ├── lib/                      # Bootstrap CSS/JS + SortableJS — core, downloaded at build/startup
+│   ├── icons/                    # Bootstrap Icons — bundled
+│   ├── lib/                      # Bootstrap CSS/JS, SortableJS and other bundled libraries
 │   └── custom/                   # ← User-provided: custom fonts + themes (bind-mounted in Docker)
 │       ├── font/                 # Drop font files here (.woff2, .ttf, etc.)
 │       └── theme/                # Drop theme CSS files here
@@ -377,30 +412,21 @@ ElectroManager/
 
 ## Development
 
-### Tests
-
 ```bash
 pip install -r requirements-dev.txt
 pytest
 ```
 
-The suite runs against a throwaway SQLite database, so it never touches `instance/inventory.db`.
-It covers login and two-factor auth, item search, Kanban card move/duplicate permissions, plugins,
-backup restore, the database migrations, and a smoke test that loads every page.
+The test suite runs against a throwaway SQLite database, so it never touches `instance/inventory.db`.
+GitHub Actions runs it on every push and pull request, and also builds the Docker image and checks
+that the container starts and reports healthy.
 
-### Database migrations
-
-The schema is managed with [Alembic](https://alembic.sqlalchemy.org/); migrations live in
-`migrations/versions/` and are applied automatically when the app starts. Before upgrading a
-database that already holds data, the app copies it to `instance/inventory.db.before-<revision>.bak`.
-
-To change the schema, edit `models.py`, then generate and review a migration:
-
-```bash
-alembic revision --autogenerate -m "describe the change"
-```
-
+The schema is managed with [Alembic](https://alembic.sqlalchemy.org/). To change it, edit `models.py`,
+then generate and review a migration with `alembic revision --autogenerate -m "describe the change"`.
 `pytest` fails if `models.py` and the migrations disagree.
+
+**[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** is the maintainer guide: how the code is organised,
+how stock is calculated, how to add a migration or a plugin, and what is known to be unfinished.
 
 ## Dependencies
 
@@ -412,6 +438,9 @@ alembic revision --autogenerate -m "describe the change"
 | Flask-SQLAlchemy | 3.1.1 | ORM / database |
 | Flask-Login | 0.6.3 | Session management |
 | Flask-WTF | 1.2.1 | Form handling and CSRF |
+| Flask-Limiter | ≥ 3.5.0 | Rate limiting |
+| Alembic | ≥ 1.13.0 | Database migrations |
+| pyotp | ≥ 2.9.0 | Two-factor authentication (TOTP) |
 | Pillow | ≥ 10.0.0 | Image processing |
 | qrcode | ≥ 7.4.2 | QR code generation |
 | python-barcode | ≥ 0.15.1 | Barcode generation |
@@ -420,7 +449,7 @@ alembic revision --autogenerate -m "describe the change"
 | Markdown | 3.5.1 | Markdown parsing |
 | Bleach | 6.1.0 | HTML sanitisation |
 
-**JavaScript / CSS — core** (downloaded at Docker build time or first local startup, verified at every startup)
+**JavaScript / CSS — core** (bundled in the repository, verified at every startup)
 
 | Library | Version | Purpose |
 |---------|---------|---------|

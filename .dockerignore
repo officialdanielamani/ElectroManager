@@ -31,3 +31,12 @@ Thumbs.db
 # Git
 .git/
 .gitignore
+
+# Development only
+.github/
+tests/
+docs/
+.pytest_cache/
+pytest.ini
+requirements-dev.txt
+*.bak
