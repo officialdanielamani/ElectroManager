@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
 import os
 import json
+import re
 import secrets
 import string
 import logging
@@ -125,7 +126,8 @@ def items():
                          stock=stock_for_items(items),
                          advanced_filters=describe_filters(filters) if has_advanced_filters(filters) else [],
                          can_view_info=current_user.has_permission('items', 'view_info'),
-                         can_view_price=current_user.has_permission('items', 'view_price'))
+                         can_view_price=current_user.has_permission('items', 'view_price'),
+                         can_edit_advance=current_user.has_permission('items', 'edit_advance'))
 
 # ============= ITEM ROUTES =============
 
@@ -834,6 +836,81 @@ def bulk_delete_items():
         return jsonify({'success': False, 'message': 'An error occurred during deletion.'}), 500
 
 
+_DATASHEET_URLS_MAX = 2048          # size of items.datasheet_urls
+_MAX_BULK_URLS = 20
+# Item URLs are rendered into a JS template literal and HTML on the item pages, so keep
+# characters that could break out of either out of anything added in bulk.
+_UNSAFE_URL_TEXT = re.compile(r'[<>"`\\]|\$\{')
+
+
+def _is_share_thumbnail(value):
+    """True for 'share:<file>' / 'icon:<file>' naming an image in the item or icon share library."""
+    prefix, _, filename = value.partition(':')
+    category = {'share': 'item', 'icon': 'icon'}.get(prefix)
+    if not category or not filename:
+        return False
+    shared = SharedFile.query.filter_by(category=category, filename=filename).first()
+    return bool(shared and shared.is_image)
+
+
+def _clean_bulk_urls(raw):
+    """Validate [{url, title, info}] from the bulk edit form. Returns (entries, error message)."""
+    if not isinstance(raw, list):
+        return [], 'Invalid URL list.'
+    if len(raw) > _MAX_BULK_URLS:
+        return [], f'Add at most {_MAX_BULK_URLS} URLs at a time.'
+    cleaned = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            return [], 'Invalid URL list.'
+        url = str(entry.get('url') or '').strip()
+        title = str(entry.get('title') or '').strip()[:200]
+        info = str(entry.get('info') or '').strip()[:200]
+        if not url:
+            continue
+        if len(url) > 500 or re.search(r'\s', url) or _UNSAFE_URL_TEXT.search(url):
+            return [], f'"{url[:60]}" is not a valid URL.'
+        scheme = re.match(r'^([a-z][a-z0-9+.-]*):(?!\d)', url, re.IGNORECASE)
+        if scheme and scheme.group(1).lower() not in ('http', 'https'):
+            return [], f'"{url[:60]}": only http and https links are allowed.'
+        if _UNSAFE_URL_TEXT.search(title) or _UNSAFE_URL_TEXT.search(info):
+            return [], f'The title or info for "{url[:60]}" contains characters that are not allowed (< > " ` \\).'
+        cleaned.append({'url': url, 'title': title, 'info': info})
+    return cleaned, None
+
+
+def _merge_item_urls(existing, additions):
+    """Append URL entries to an item's datasheet_urls (JSON list, or legacy newline list), skipping duplicates."""
+    entries = []
+    if existing:
+        try:
+            parsed = json.loads(existing)
+            entries = parsed if isinstance(parsed, list) else []
+        except (json.JSONDecodeError, TypeError):
+            entries = [{'url': u.strip(), 'title': '', 'info': ''} for u in existing.split('\n') if u.strip()]
+    seen = {e.get('url') for e in entries if isinstance(e, dict)}
+    for entry in additions:
+        if entry['url'] not in seen:
+            entries.append(entry)
+            seen.add(entry['url'])
+    return json.dumps(entries)
+
+
+@item_bp.route('/items/share-files', endpoint='item_share_files_list')
+@login_required
+def item_share_files_list():
+    """Item-category share files, for linking files to items in bulk."""
+    if not current_user.has_permission('items', 'edit_advance'):
+        return jsonify([]), 403
+    files = SharedFile.query.filter_by(category='item').order_by(SharedFile.name).all()
+    return jsonify([{
+        'id': f.id,
+        'name': f.name,
+        'is_image': f.is_image,
+        'url': url_for('share.share_thumb_serve', category='item', filename=f.filename) if f.is_image else None,
+    } for f in files])
+
+
 @item_bp.route('/items/bulk-edit', endpoint='bulk_edit_items', methods=['POST'])
 @login_required
 def bulk_edit_items():
@@ -904,18 +981,67 @@ def bulk_edit_items():
             except (ValueError, TypeError):
                 pass
 
-    if not updates and new_tag_ids is None:
+    # ── Short Info / Type-Model (blank = no change) ───────────────────────────
+    for key, limit in (('short_info', 128), ('info', 128)):
+        value = (data.get(key) or '').strip() if isinstance(data.get(key), str) else ''
+        if value:
+            updates[key] = value[:limit]
+
+    # ── Thumbnail, Share Files, URLs (Advance Info) ──────────────────────────
+    thumbnail = data.get('thumbnail') or None
+    share_file_ids = data.get('share_file_ids') or []
+    raw_urls = data.get('urls') or []
+    if (thumbnail or share_file_ids or raw_urls) and not current_user.has_permission('items', 'edit_advance'):
+        return jsonify({'success': False,
+                        'message': 'You do not have permission to change thumbnails, share files or URLs.'}), 403
+
+    if thumbnail:
+        if not _is_share_thumbnail(thumbnail):
+            return jsonify({'success': False, 'message': 'Thumbnail must be an image from Share Files.'}), 400
+        updates['thumbnail'] = thumbnail
+
+    add_share_files = []
+    if share_file_ids:
+        try:
+            wanted = {int(i) for i in share_file_ids}
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'message': 'Invalid share file IDs.'}), 400
+        add_share_files = SharedFile.query.filter(SharedFile.id.in_(wanted), SharedFile.category == 'item').all()
+        if len(add_share_files) != len(wanted):
+            return jsonify({'success': False, 'message': 'Some selected share files no longer exist.'}), 400
+
+    add_urls, url_error = _clean_bulk_urls(raw_urls)
+    if url_error:
+        return jsonify({'success': False, 'message': url_error}), 400
+
+    if not updates and new_tag_ids is None and not add_share_files and not add_urls:
         return jsonify({'success': False, 'message': 'No changes specified. Please fill in at least one field.'}), 400
 
     now = datetime.now(timezone.utc)
     try:
+        too_long = []
         for item in items_to_edit:
             for field, value in updates.items():
                 setattr(item, field, value)
             if new_tag_ids is not None:
                 item.set_tag_ids(new_tag_ids)
+            for sf in add_share_files:
+                if sf not in item.linked_share_files:
+                    item.linked_share_files.append(sf)
+            if add_urls:
+                merged = _merge_item_urls(item.datasheet_urls, add_urls)
+                if len(merged) > _DATASHEET_URLS_MAX:
+                    too_long.append(item.name)
+                item.datasheet_urls = merged
             item.updated_by = current_user.id
             item.updated_at = now
+
+        if too_long:
+            db.session.rollback()
+            names = ', '.join(too_long[:5]) + (f' and {len(too_long) - 5} more' if len(too_long) > 5 else '')
+            return jsonify({'success': False,
+                            'message': f'Not saved: the URL list would be too long for {names}. '
+                                       'Remove some URLs from those items first, or add fewer.'}), 400
 
         db.session.commit()
     except Exception as e:

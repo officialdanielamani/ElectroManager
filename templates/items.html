@@ -737,8 +737,122 @@
                     Only fields you actively change will be applied to all selected items.
                 </div>
 
+                {% if can_edit_advance %}
+                <!-- Thumbnail -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold"><i class="bi bi-image"></i> Thumbnail</label>
+                    <div class="d-flex align-items-center gap-2">
+                        <div id="be_thumb_preview" class="be-thumb-box"><i class="bi bi-dash-lg text-muted"></i></div>
+                        <div class="d-flex flex-column gap-1">
+                            <button type="button" class="btn btn-sm btn-outline-info" onclick="beToggleThumbPicker()"><i class="bi bi-folder"></i> Choose from Share Files</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="be_thumb_reset" onclick="beSetThumb('', '')"><i class="bi bi-arrow-counterclockwise"></i> No change</button>
+                        </div>
+                        <input type="hidden" id="be_thumbnail" value="">
+                    </div>
+                    <div id="be_thumb_picker" class="border rounded p-2 mt-2 d-none">
+                        <input type="search" class="form-control form-control-sm mb-2" id="be_thumb_search" placeholder="Search share files…" oninput="beRenderThumbs()">
+                        <div id="be_thumb_grid" class="be-pick-grid"></div>
+                    </div>
+                    <small class="text-muted d-block mt-1">Replaces the thumbnail of every selected item. Leave as is to keep each item's thumbnail.</small>
+                </div>
+                {% endif %}
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold" for="be_short_info"><i class="bi bi-card-text"></i> Short Info</label>
+                        <input type="text" class="form-control form-control-sm" id="be_short_info" maxlength="128" placeholder="Leave blank to keep unchanged">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold" for="be_min_quantity"><i class="bi bi-box"></i> Min Quantity</label>
+                        <input type="number" class="form-control form-control-sm" id="be_min_quantity" min="0" placeholder="Leave blank to keep unchanged">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold" for="be_info"><i class="bi bi-cpu"></i> Type / Model</label>
+                        <input type="text" class="form-control form-control-sm" id="be_info" maxlength="128" placeholder="Leave blank to keep unchanged">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold" for="be_footprint_id"><i class="bi bi-vector-pen"></i> Footprint</label>
+                        <select class="form-select form-select-sm" id="be_footprint_id">
+                        <option value="">— No Change —</option>
+                        <option value="0">— None (clear footprint) —</option>
+                        {% for fp in all_footprints %}
+                        <option value="{{ fp.id }}">{{ fp.name }}</option>
+                        {% endfor %}
+                    </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold" for="be_category_id"><i class="bi bi-tag"></i> Category</label>
+                        <select class="form-select form-select-sm" id="be_category_id">
+                        <option value="">— No Change —</option>
+                        <option value="0">— None (clear category) —</option>
+                        {% for cat in all_categories %}
+                        <option value="{{ cat.id }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                    </div>
+                </div>
+
+                <!-- Tags -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold"><i class="bi bi-tags"></i> Tags</label>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" id="be_tags_enabled" onchange="beToggleTags()">
+                            <label class="form-check-label" for="be_tags_enabled">Change tags</label>
+                        </div>
+                        <small class="text-muted">(if off, tags will not be changed)</small>
+                    </div>
+                    <div id="be_tags_section" style="display:none;">
+                        <style>
+                            .be-thumb-box { width: 56px; height: 56px; border: 1px solid var(--bs-border-color); border-radius: 6px;
+                                            display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
+                            .be-thumb-box img { width: 100%; height: 100%; object-fit: contain; }
+                            .be-pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px;
+                                            max-height: 260px; overflow-y: auto; }
+                            .be-pick-grid .be-pick { cursor: pointer; border: 1px solid var(--bs-border-color); border-radius: 6px; padding: 4px;
+                                                     display: flex; flex-direction: column; align-items: center; gap: 2px; background: var(--bs-body-bg); }
+                            .be-pick-grid .be-pick.selected { border: 2px solid var(--bs-primary); }
+                            .be-pick-grid img { width: 56px; height: 56px; object-fit: contain; }
+                            .be-pick-grid span { font-size: 0.7rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                            .be-pick-list { max-height: 220px; overflow-y: auto; }
+                            .be-pick-list label { display: flex; align-items: center; gap: .5rem; padding: .2rem .4rem; margin: 0; cursor: pointer; }
+                            .be-pick-list img { width: 28px; height: 28px; object-fit: cover; border-radius: 3px; }
+                            .be-sf-chip { display: inline-flex; align-items: center; gap: .35rem; padding: 2px 4px 2px 2px; font-size: .8rem; }
+                            .be-sf-chip img { width: 24px; height: 24px; object-fit: cover; border-radius: 3px; }
+                            .be-tag-chip { cursor: pointer; color: #fff; font-size: 0.85rem; padding: 5px 10px; user-select: none;
+                                           opacity: 0.5; border: 2px solid transparent; }
+                            .be-tag-chip .be-tag-check { display: none; }
+                            .be-tag-chip.selected { opacity: 1; border-color: var(--bs-body-color);
+                                                    box-shadow: 0 0 0 2px var(--bs-body-bg) inset; }
+                            .be-tag-chip.selected .be-tag-check { display: inline; }
+                        </style>
+                        <div class="border rounded p-2" style="max-height:160px; overflow-y:auto;">
+                            {% if all_tags_list %}
+                            <div class="d-flex flex-wrap gap-1" id="be_tags_chips">
+                                {% for tag in all_tags_list %}
+                                <div class="be-tag-chip badge d-flex align-items-center gap-1"
+                                     data-id="{{ tag.id }}" data-color="{{ tag.color }}" role="checkbox" aria-checked="false" tabindex="0"
+                                     style="background-color:{{ tag.color }};"
+                                     onclick="beToggleTag(this)"
+                                     onkeydown="if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); beToggleTag(this); }">
+                                    <i class="bi bi-check-lg be-tag-check"></i>{{ tag.name }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <small class="text-muted">No tags defined.</small>
+                            {% endif %}
+                        </div>
+                        <small class="text-muted mt-1 d-block">
+                            Click tags to select (selected tags show a tick). Selected tags will <strong>replace</strong> all existing tags on the chosen items.
+                            Select none to clear all tags.
+                        </small>
+                    </div>
+                </div>
+
+
                 <!-- Location -->
-                <div class="mb-4">
+                <div class="mb-3">
                     <label class="form-label fw-semibold"><i class="bi bi-geo-alt"></i> Main Location</label>
                     <div class="btn-group btn-group-sm w-100 mb-2" role="group">
                         <input type="radio" class="btn-check" name="be_location_type" id="be_loc_none"  value="no_change" checked>
@@ -799,81 +913,28 @@
                     </div>
                 </div>
 
-                <hr>
 
-                <!-- Category -->
+                {% if can_edit_advance %}
+                <!-- Share Files -->
                 <div class="mb-3">
-                    <label class="form-label fw-semibold"><i class="bi bi-tag"></i> Category</label>
-                    <select class="form-select form-select-sm" id="be_category_id">
-                        <option value="">— No Change —</option>
-                        <option value="0">— None (clear category) —</option>
-                        {% for cat in all_categories %}
-                        <option value="{{ cat.id }}">{{ cat.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <!-- Footprint -->
-                <div class="mb-3">
-                    <label class="form-label fw-semibold"><i class="bi bi-vector-pen"></i> Footprint</label>
-                    <select class="form-select form-select-sm" id="be_footprint_id">
-                        <option value="">— No Change —</option>
-                        <option value="0">— None (clear footprint) —</option>
-                        {% for fp in all_footprints %}
-                        <option value="{{ fp.id }}">{{ fp.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <!-- Tags -->
-                <div class="mb-3">
-                    <label class="form-label fw-semibold"><i class="bi bi-tags"></i> Tags</label>
-                    <div class="d-flex align-items-center gap-2 mb-1">
-                        <div class="form-check form-switch mb-0">
-                            <input class="form-check-input" type="checkbox" id="be_tags_enabled" onchange="beToggleTags()">
-                            <label class="form-check-label" for="be_tags_enabled">Change tags</label>
-                        </div>
-                        <small class="text-muted">(if off, tags will not be changed)</small>
+                    <label class="form-label fw-semibold"><i class="bi bi-folder-fill"></i> Share Files</label>
+                    <div id="be_sf_chips" class="d-flex flex-wrap gap-2 mb-2"></div>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="beToggleSharePicker()"><i class="bi bi-folder2-open"></i> Browse Share Files</button>
+                    <div id="be_sf_picker" class="border rounded p-2 mt-2 d-none">
+                        <input type="search" class="form-control form-control-sm mb-2" id="be_sf_search" placeholder="Search share files…" oninput="beRenderShareFiles()">
+                        <div id="be_sf_list" class="be-pick-list"></div>
                     </div>
-                    <div id="be_tags_section" style="display:none;">
-                        <style>
-                            .be-tag-chip { cursor: pointer; color: #fff; font-size: 0.85rem; padding: 5px 10px; user-select: none;
-                                           opacity: 0.5; border: 2px solid transparent; }
-                            .be-tag-chip .be-tag-check { display: none; }
-                            .be-tag-chip.selected { opacity: 1; border-color: var(--bs-body-color);
-                                                    box-shadow: 0 0 0 2px var(--bs-body-bg) inset; }
-                            .be-tag-chip.selected .be-tag-check { display: inline; }
-                        </style>
-                        <div class="border rounded p-2" style="max-height:160px; overflow-y:auto;">
-                            {% if all_tags_list %}
-                            <div class="d-flex flex-wrap gap-1" id="be_tags_chips">
-                                {% for tag in all_tags_list %}
-                                <div class="be-tag-chip badge d-flex align-items-center gap-1"
-                                     data-id="{{ tag.id }}" data-color="{{ tag.color }}" role="checkbox" aria-checked="false" tabindex="0"
-                                     style="background-color:{{ tag.color }};"
-                                     onclick="beToggleTag(this)"
-                                     onkeydown="if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); beToggleTag(this); }">
-                                    <i class="bi bi-check-lg be-tag-check"></i>{{ tag.name }}
-                                </div>
-                                {% endfor %}
-                            </div>
-                            {% else %}
-                            <small class="text-muted">No tags defined.</small>
-                            {% endif %}
-                        </div>
-                        <small class="text-muted mt-1 d-block">
-                            Click tags to select (selected tags show a tick). Selected tags will <strong>replace</strong> all existing tags on the chosen items.
-                            Select none to clear all tags.
-                        </small>
-                    </div>
+                    <small class="text-muted d-block mt-1"><i class="bi bi-plus-circle"></i> Selected files are <strong>added</strong> to each item's existing share files; nothing is removed.</small>
                 </div>
 
-                <!-- Min Quantity -->
+                <!-- URLs -->
                 <div class="mb-1">
-                    <label class="form-label fw-semibold"><i class="bi bi-box"></i> Min Quantity</label>
-                    <input type="number" class="form-control form-control-sm" id="be_min_quantity"
-                           min="0" placeholder="Leave blank to keep unchanged">
+                    <label class="form-label fw-semibold"><i class="bi bi-link-45deg"></i> URL</label>
+                    <div id="be_url_rows"></div>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="beAddUrlRow()"><i class="bi bi-plus-lg"></i> Add URL</button>
+                    <small class="text-muted d-block mt-1"><i class="bi bi-plus-circle"></i> URLs are <strong>added</strong> to each item's existing list; links an item already has are skipped.</small>
                 </div>
+                {% endif %}
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -1228,6 +1289,16 @@ function openBulkEditModal() {
     beToggleTags();
     document.querySelectorAll('.be-tag-chip').forEach(c => beSetTagChip(c, false));
     document.getElementById('be_min_quantity').value              = '';
+    document.getElementById('be_short_info').value                = '';
+    document.getElementById('be_info').value                      = '';
+    if (document.getElementById('be_thumbnail')) {
+        beSetThumb('', '');
+        document.getElementById('be_thumb_picker').classList.add('d-none');
+        document.getElementById('be_sf_picker').classList.add('d-none');
+        _beShareSelected.clear();
+        beRenderShareChips();
+        document.getElementById('be_url_rows').replaceChildren();
+    }
 
     // Close bulk operation modal, open edit modal
     bootstrap.Modal.getInstance(document.getElementById('bulkOperationModal'))?.hide();
@@ -1243,6 +1314,131 @@ document.querySelectorAll('input[name="be_location_type"]').forEach(radio => {
             this.value === 'drawer'  ? '' : 'none';
     });
 });
+
+// ── Thumbnail (Share Files only) ─────────────────────────────────────────
+let _beThumbCache = null;
+function beSetThumb(value, url) {
+    document.getElementById('be_thumbnail').value = value;
+    const box = document.getElementById('be_thumb_preview');
+    box.replaceChildren();
+    if (value) {
+        const img = document.createElement('img');
+        img.src = url; img.alt = '';
+        box.appendChild(img);
+    } else {
+        box.innerHTML = '<i class="bi bi-dash-lg text-muted" title="No change"></i>';
+    }
+    document.getElementById('be_thumb_reset').classList.toggle('d-none', !value);
+    if (_beThumbCache) beRenderThumbs();
+}
+async function beToggleThumbPicker() {
+    const picker = document.getElementById('be_thumb_picker');
+    picker.classList.toggle('d-none');
+    if (picker.classList.contains('d-none') || _beThumbCache) { beRenderThumbs(); return; }
+    document.getElementById('be_thumb_grid').innerHTML = '<p class="text-muted small mb-0">Loading…</p>';
+    try {
+        _beThumbCache = await (await fetch('/api/item-thumb-media')).json();
+    } catch (e) {
+        document.getElementById('be_thumb_grid').innerHTML = '<p class="text-danger small mb-0">Could not load share files.</p>';
+        return;
+    }
+    beRenderThumbs();
+}
+function beRenderThumbs() {
+    const grid = document.getElementById('be_thumb_grid');
+    if (!grid || !_beThumbCache) return;
+    const q = document.getElementById('be_thumb_search').value.trim().toLowerCase();
+    const current = document.getElementById('be_thumbnail').value;
+    grid.replaceChildren();
+    const files = _beThumbCache.filter(f => !q || f.name.toLowerCase().includes(q) || f.category.includes(q));
+    if (!files.length) { grid.innerHTML = '<p class="text-muted small mb-0">No image files in Share Files.</p>'; return; }
+    for (const f of files) {
+        const value = (f.category === 'item' ? 'share:' : 'icon:') + f.filename;
+        const cell = document.createElement('div');
+        cell.className = 'be-pick' + (value === current ? ' selected' : '');
+        cell.title = f.name;
+        const img = document.createElement('img'); img.src = f.url; img.alt = '';
+        const name = document.createElement('span'); name.textContent = f.name;
+        cell.append(img, name);
+        cell.addEventListener('click', () => {
+            beSetThumb(value, f.url);
+            document.getElementById('be_thumb_picker').classList.add('d-none');
+        });
+        grid.appendChild(cell);
+    }
+}
+
+// ── Share Files (added to each item's list) ──────────────────────────────
+let _beShareCache = null;
+const _beShareSelected = new Map();   // id -> file
+async function beToggleSharePicker() {
+    const picker = document.getElementById('be_sf_picker');
+    picker.classList.toggle('d-none');
+    if (picker.classList.contains('d-none') || _beShareCache) { beRenderShareFiles(); return; }
+    document.getElementById('be_sf_list').innerHTML = '<p class="text-muted small mb-0">Loading…</p>';
+    try {
+        _beShareCache = await (await fetch('{{ url_for("item.item_share_files_list") }}')).json();
+    } catch (e) {
+        document.getElementById('be_sf_list').innerHTML = '<p class="text-danger small mb-0">Could not load share files.</p>';
+        return;
+    }
+    beRenderShareFiles();
+}
+function beRenderShareFiles() {
+    const list = document.getElementById('be_sf_list');
+    if (!list || !_beShareCache) return;
+    const q = document.getElementById('be_sf_search').value.trim().toLowerCase();
+    list.replaceChildren();
+    const files = _beShareCache.filter(f => !q || f.name.toLowerCase().includes(q));
+    if (!files.length) { list.innerHTML = '<p class="text-muted small mb-0">No item files in Share Files.</p>'; return; }
+    for (const f of files) {
+        const label = document.createElement('label');
+        const box = document.createElement('input');
+        box.type = 'checkbox'; box.className = 'form-check-input m-0'; box.checked = _beShareSelected.has(f.id);
+        box.addEventListener('change', () => {
+            if (box.checked) _beShareSelected.set(f.id, f); else _beShareSelected.delete(f.id);
+            beRenderShareChips();
+        });
+        let icon;
+        if (f.url) { icon = document.createElement('img'); icon.src = f.url; icon.alt = ''; }
+        else { icon = document.createElement('i'); icon.className = 'bi bi-file-earmark text-muted'; }
+        const name = document.createElement('span'); name.textContent = f.name;
+        label.append(box, icon, name);
+        list.appendChild(label);
+    }
+}
+function beRenderShareChips() {
+    const chips = document.getElementById('be_sf_chips');
+    chips.replaceChildren();
+    for (const [id, f] of _beShareSelected) {
+        const chip = document.createElement('span');
+        chip.className = 'be-sf-chip border rounded';
+        if (f.url) { const img = document.createElement('img'); img.src = f.url; img.alt = ''; chip.appendChild(img); }
+        else { const i = document.createElement('i'); i.className = 'bi bi-file-earmark ms-1'; chip.appendChild(i); }
+        const name = document.createElement('span'); name.textContent = f.name;
+        const remove = document.createElement('button');
+        remove.type = 'button'; remove.className = 'btn-close btn-sm'; remove.style.fontSize = '.6rem';
+        remove.setAttribute('aria-label', 'Remove ' + f.name);
+        remove.addEventListener('click', () => { _beShareSelected.delete(id); beRenderShareChips(); beRenderShareFiles(); });
+        chip.append(name, remove);
+        chips.appendChild(chip);
+    }
+}
+
+// ── URLs (added to each item's list) ─────────────────────────────────────
+function beAddUrlRow() {
+    const rows = document.getElementById('be_url_rows');
+    const row = document.createElement('div');
+    row.className = 'be-url-row row g-2 mb-2 align-items-center';
+    row.innerHTML =
+        '<div class="col-md-5"><input type="text" class="form-control form-control-sm be-url" maxlength="500" placeholder="URL (required), e.g. https://example.com/datasheet.pdf"></div>' +
+        '<div class="col-md-3"><input type="text" class="form-control form-control-sm be-url-title" maxlength="200" placeholder="Title (optional)"></div>' +
+        '<div class="col-md-3"><input type="text" class="form-control form-control-sm be-url-info" maxlength="200" placeholder="Info (optional)"></div>' +
+        '<div class="col-md-1 text-end"><button type="button" class="btn btn-sm btn-outline-danger" title="Remove" aria-label="Remove URL"><i class="bi bi-x-lg"></i></button></div>';
+    row.querySelector('button').addEventListener('click', () => row.remove());
+    rows.appendChild(row);
+    row.querySelector('.be-url').focus();
+}
 
 // Tag chip toggle
 function beSetTagChip(el, selected) {
@@ -1470,10 +1666,31 @@ function submitBulkEdit() {
     const mq = document.getElementById('be_min_quantity').value.trim();
     if (mq !== '') payload.min_quantity = parseInt(mq);
 
+    // Short info / type-model (blank = no change)
+    const shortInfo = document.getElementById('be_short_info').value.trim();
+    if (shortInfo) payload.short_info = shortInfo;
+    const info = document.getElementById('be_info').value.trim();
+    if (info) payload.info = info;
+
+    // Thumbnail, share files, URLs (only shown with Advance Info edit permission)
+    if (document.getElementById('be_thumbnail')) {
+        const thumb = document.getElementById('be_thumbnail').value;
+        if (thumb) payload.thumbnail = thumb;
+        if (_beShareSelected.size) payload.share_file_ids = Array.from(_beShareSelected.keys());
+        const urls = [];
+        for (const row of document.querySelectorAll('#be_url_rows .be-url-row')) {
+            const url = row.querySelector('.be-url').value.trim();
+            if (!url) continue;
+            urls.push({ url, title: row.querySelector('.be-url-title').value.trim(),
+                        info: row.querySelector('.be-url-info').value.trim() });
+        }
+        if (urls.length) payload.urls = urls;
+    }
+
     // Check at least one change is present (beyond location_type)
     const hasChange = locType !== 'no_change' ||
-        'category_id' in payload || 'footprint_id' in payload ||
-        'tags' in payload || 'min_quantity' in payload;
+        ['category_id', 'footprint_id', 'tags', 'min_quantity', 'short_info', 'info',
+         'thumbnail', 'share_file_ids', 'urls'].some(k => k in payload);
     if (!hasChange) {
         alert('No changes specified. Please fill in at least one field.');
         return;
