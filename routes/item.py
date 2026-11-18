@@ -6,7 +6,8 @@ from flask_login import login_required, current_user, login_user, logout_user
 from models import db, User, Category, Item, Attachment, Rack, Footprint, Tag, Setting, Location, AuditLog, StickerTemplate, SharedFile
 from forms import (LoginForm, RegistrationForm, CategoryForm, ItemAddForm, ItemEditForm, AttachmentForm, 
                    SearchForm, UserForm, MagicParameterForm, ParameterUnitForm, ParameterStringOptionForm, ItemParameterForm)
-from helpers import is_safe_url, format_currency, is_safe_file_path
+from helpers import (is_safe_url, format_currency, is_safe_file_path, parse_item_urls, item_url_href,
+                     dump_item_urls, ITEM_URLS_MAX_LENGTH)
 from utils import save_file, log_audit, admin_required, permission_required, item_permission_required, format_file_size, allowed_file, get_item_edit_permissions
 from item_search import (parse_item_filters, paginate_items, describe_filters,
                          has_advanced_filters, magic_parameter_catalog)
@@ -206,7 +207,7 @@ def item_new():
             category_id=form.category_id.data if form.category_id.data and form.category_id.data > 0 else None,
             footprint_id=form.footprint_id.data if form.footprint_id.data and form.footprint_id.data > 0 else None,
             thumbnail=request.form.get('thumbnail', '').strip() or None,
-            datasheet_urls=(form.datasheet_urls.data or '')[:2048] or None if perms['can_edit_advance'] else None,
+            datasheet_urls=dump_item_urls(parse_item_urls(form.datasheet_urls.data)) if perms['can_edit_advance'] else None,
             created_by=current_user.id,
             updated_by=current_user.id
         )
@@ -560,7 +561,7 @@ def item_edit(uuid):
         # Advance Info section
         if perms['can_edit_advance']:
             item.description = form.description.data
-            item.datasheet_urls = (form.datasheet_urls.data or '')[:2048] or None
+            item.datasheet_urls = dump_item_urls(parse_item_urls(form.datasheet_urls.data))
             # Thumbnail
             item.thumbnail = request.form.get('thumbnail', '').strip() or None
             # Linked share files
@@ -836,11 +837,7 @@ def bulk_delete_items():
         return jsonify({'success': False, 'message': 'An error occurred during deletion.'}), 500
 
 
-_DATASHEET_URLS_MAX = 2048          # size of items.datasheet_urls
 _MAX_BULK_URLS = 20
-# Item URLs are rendered into a JS template literal and HTML on the item pages, so keep
-# characters that could break out of either out of anything added in bulk.
-_UNSAFE_URL_TEXT = re.compile(r'[<>"`\\]|\$\{')
 
 
 def _is_share_thumbnail(value):
@@ -868,27 +865,18 @@ def _clean_bulk_urls(raw):
         info = str(entry.get('info') or '').strip()[:200]
         if not url:
             continue
-        if len(url) > 500 or re.search(r'\s', url) or _UNSAFE_URL_TEXT.search(url):
+        if len(url) > 500 or re.search(r'\s', url):
             return [], f'"{url[:60]}" is not a valid URL.'
-        scheme = re.match(r'^([a-z][a-z0-9+.-]*):(?!\d)', url, re.IGNORECASE)
-        if scheme and scheme.group(1).lower() not in ('http', 'https'):
+        if item_url_href(url) is None:
             return [], f'"{url[:60]}": only http and https links are allowed.'
-        if _UNSAFE_URL_TEXT.search(title) or _UNSAFE_URL_TEXT.search(info):
-            return [], f'The title or info for "{url[:60]}" contains characters that are not allowed (< > " ` \\).'
         cleaned.append({'url': url, 'title': title, 'info': info})
     return cleaned, None
 
 
 def _merge_item_urls(existing, additions):
-    """Append URL entries to an item's datasheet_urls (JSON list, or legacy newline list), skipping duplicates."""
-    entries = []
-    if existing:
-        try:
-            parsed = json.loads(existing)
-            entries = parsed if isinstance(parsed, list) else []
-        except (json.JSONDecodeError, TypeError):
-            entries = [{'url': u.strip(), 'title': '', 'info': ''} for u in existing.split('\n') if u.strip()]
-    seen = {e.get('url') for e in entries if isinstance(e, dict)}
+    """Append URL entries to an item's stored list, skipping URLs it already has."""
+    entries = parse_item_urls(existing)
+    seen = {e['url'] for e in entries}
     for entry in additions:
         if entry['url'] not in seen:
             entries.append(entry)
@@ -1030,7 +1018,7 @@ def bulk_edit_items():
                     item.linked_share_files.append(sf)
             if add_urls:
                 merged = _merge_item_urls(item.datasheet_urls, add_urls)
-                if len(merged) > _DATASHEET_URLS_MAX:
+                if len(merged) > ITEM_URLS_MAX_LENGTH:
                     too_long.append(item.name)
                 item.datasheet_urls = merged
             item.updated_by = current_user.id
@@ -1309,9 +1297,7 @@ def update_datasheets(item_id):
             if not ds['url'].strip():
                 return jsonify({'success': False, 'error': 'URL cannot be empty'}), 400
         
-        # Save as JSON
-        import json
-        item.datasheet_urls = json.dumps(datasheets)[:2048]
+        item.datasheet_urls = dump_item_urls(datasheets)
         db.session.commit()
         
         log_audit(current_user.id, 'update', 'item', item.id, f'Updated datasheets for item: {item.name}')
@@ -1683,17 +1669,7 @@ def item_detail_print(uuid):
     current_datetime = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
     
     # Parse datasheets
-    datasheets = []
-    if item.datasheet_urls:
-        try:
-            import json
-            datasheets = json.loads(item.datasheet_urls)
-            if not isinstance(datasheets, list):
-                datasheets = []
-        except (json.JSONDecodeError, TypeError):
-            # Fallback: old format (plain URLs separated by newlines)
-            urls = item.datasheet_urls.split('\n')
-            datasheets = [{'url': url.strip(), 'title': '', 'info': ''} for url in urls if url.strip()]
+    datasheets = parse_item_urls(item.datasheet_urls)
     
     return render_template('item_detail_print.html',
                          item=item,

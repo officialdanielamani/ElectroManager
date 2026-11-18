@@ -87,13 +87,23 @@ def test_urls_are_appended_and_deduplicated(app, admin_client, two_items):
 
 
 @pytest.mark.parametrize('entry', [
-    {'url': 'javascript:alert(1)'}, {'url': 'data:text/html,hi'}, {'url': 'https://x.example/"onmouseover'},
-    {'url': 'https://x.example/${alert(1)}'}, {'url': 'https://x.example/a b'},
-    {'url': 'https://x.example/', 'title': '<img src=x>'}, {'url': 'https://x.example/', 'info': 'a`b'},
+    {'url': 'javascript:alert(1)'}, {'url': 'JavaScript:alert(1)'}, {'url': 'data:text/html,hi'},
+    {'url': 'vbscript:x'}, {'url': 'https://x.example/a b'},
 ])
-def test_unsafe_urls_are_rejected(app, admin_client, two_items, entry):
+def test_non_web_urls_are_rejected(app, admin_client, two_items, entry):
     assert _edit(admin_client, two_items, urls=[entry]).status_code == 400
     assert len(_item(app, two_items[0])['urls']) == 1
+
+
+def test_markup_in_urls_is_stored_and_shown_escaped(app, admin_client, two_items):
+    payload = {'url': 'https://x.example/"><script>alert(1)</script>', 'title': '<img src=x onerror=alert(1)>',
+               'info': '`${alert(1)}`'}
+    assert _edit(admin_client, two_items[:1], urls=[payload]).status_code == 200
+    with app.app_context():
+        uuid = db.session.get(Item, two_items[0]).uuid
+    for path in (f'/item/{uuid}', f'/item/{uuid}/edit', f'/item/{uuid}/print'):
+        body = admin_client.get(path).get_data(as_text=True)
+        assert '<script>alert(1)</script>' not in body and '<img src=x onerror' not in body, path
 
 
 def test_url_without_scheme_or_with_port_is_allowed(app, admin_client, two_items):

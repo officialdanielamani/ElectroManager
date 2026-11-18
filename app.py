@@ -6,7 +6,7 @@ from flask_login import LoginManager, current_user, AnonymousUserMixin, login_re
 from extensions import csrf, limiter
 from config import Config
 from models import db, User, Category, Item, Setting
-from helpers import filesize_filter, jinja_format_amount, markdown_filter
+from helpers import filesize_filter, jinja_format_amount, markdown_filter, item_url_entries
 import os
 import json
 import logging
@@ -77,6 +77,7 @@ def load_user(user_id):
 app.jinja_env.filters['filesize'] = filesize_filter
 app.jinja_env.filters['format_amount'] = jinja_format_amount
 app.jinja_env.filters['markdown'] = markdown_filter
+app.jinja_env.filters['item_urls'] = item_url_entries
 
 def from_json_filter(value):
     try:

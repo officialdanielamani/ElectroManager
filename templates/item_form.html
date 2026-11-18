@@ -783,15 +783,10 @@
                         const canEditAdvance = {% if item_perms and item_perms.can_edit_advance %}true{% else %}false{% endif %};
 
                         // Load existing datasheets
-                        {% if form.datasheet_urls.data %}
-                        try {
-                            formDatasheets = JSON.parse('{{ form.datasheet_urls.data|safe }}');
-                        } catch (e) {
-                            // Handle old format (plain URLs)
-                            const oldUrls = `{{ form.datasheet_urls.data|safe }}`.split('\n').filter(u => u.trim());
-                            formDatasheets = oldUrls.map(url => ({ url: url.trim(), title: '', info: '' }));
-                        }
-                        {% endif %}
+                        formDatasheets = ({{ form.datasheet_urls.data | item_urls | tojson }})
+                            .map(ds => ({ url: ds.url, title: ds.title, info: ds.info }));
+                        const _dsEsc = s => String(s ?? '').replace(/[&<>"']/g,
+                            c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
                         function renderFormDatasheets() {
                             const container = document.getElementById('datasheet-list');
@@ -811,9 +806,9 @@
                                 // Display mode
                                 html += `<div class="form-ds-display-${index}">`;
                                 html += `<i class="bi bi-link-45deg text-primary"></i> `;
-                                html += `<strong>${displayTitle}</strong>`;
+                                html += `<strong>${_dsEsc(displayTitle)}</strong>`;
                                 if (ds.info) {
-                                    html += ` <span class="text-muted">- ${ds.info}</span>`;
+                                    html += ` <span class="text-muted">- ${_dsEsc(ds.info)}</span>`;
                                 }
                                 html += ` <button type="button" class="btn btn-sm btn-outline-primary btn-sm ms-2" onclick="editFormDatasheet(${index})" ${!canEditAdvance ? 'disabled' : ''}>Edit</button>`;
                                 html += ` <button type="button" class="btn btn-sm btn-outline-danger btn-sm" onclick="deleteFormDatasheet(${index})" ${!canEditAdvance ? 'disabled' : ''}>Delete</button>`;
@@ -823,15 +818,15 @@
                                 html += `<div class="form-ds-edit-${index}" style="display:none;">`;
                                 html += `<div class="row g-2">`;
                                 html += `<div class="col-md-4">`;
-                                html += `<input type="text" class="form-control form-control-sm" id="form-url-${index}" value="${ds.url}" placeholder="URL (required)">`;
+                                html += `<input type="text" class="form-control form-control-sm" id="form-url-${index}" value="${_dsEsc(ds.url)}" placeholder="URL (required)">`;
                                 html += `<small class="text-muted">e.g., example.com</small>`;
                                 html += `</div>`;
                                 html += `<div class="col-md-4">`;
-                                html += `<input type="text" class="form-control form-control-sm" id="form-title-${index}" value="${ds.title}" placeholder="Title (optional)">`;
+                                html += `<input type="text" class="form-control form-control-sm" id="form-title-${index}" value="${_dsEsc(ds.title)}" placeholder="Title (optional)">`;
                                 html += `<small class="text-muted">Display name</small>`;
                                 html += `</div>`;
                                 html += `<div class="col-md-4">`;
-                                html += `<input type="text" class="form-control form-control-sm" id="form-info-${index}" value="${ds.info}" placeholder="Info (optional)">`;
+                                html += `<input type="text" class="form-control form-control-sm" id="form-info-${index}" value="${_dsEsc(ds.info)}" placeholder="Info (optional)">`;
                                 html += `<small class="text-muted">Additional info</small>`;
                                 html += `</div>`;
                                 html += `</div>`;

@@ -520,46 +520,28 @@
                 <hr>
                 {% endif %}
 
-                <!-- Datasheet URLs -->
-                {% if item.datasheet_urls %}
+                <!-- URLs -->
+                {% set item_links = item.datasheet_urls | item_urls %}
+                {% if item_links %}
                 <div class="mb-3 px-1">
                     <strong><i class="bi bi-link-45deg"></i> URLs:</strong>
-                    <div id="datasheet-display" class="mt-2"></div>
+                    <div class="list-group mt-2">
+                        {% for link in item_links %}
+                        <div class="list-group-item list-group-item-action p-2">
+                            <i class="bi bi-link-45deg text-primary"></i>
+                            {% if link.href %}
+                            <a href="{{ link.href }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><strong>{{ link.title or link.url }}</strong></a>
+                            {% else %}
+                            <strong>{{ link.title or link.url }}</strong> <small class="text-muted">({{ link.url }})</small>
+                            {% endif %}
+                            {% if link.info %}<span class="text-muted">- {{ link.info }}</span>{% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
                 <hr>
                 {% endif %}
 
-<script>
-{% if item.datasheet_urls %}
-let datasheets = [];
-try {
-    datasheets = JSON.parse(`{{ item.datasheet_urls|safe }}`);
-} catch(e) {
-    const oldUrls = `{{ item.datasheet_urls|safe }}`.split('\n').filter(u => u.trim());
-    datasheets = oldUrls.map(url => ({url: url.trim(), title: '', info: ''}));
-}
-function renderDatasheets() {
-    const container = document.getElementById('datasheet-display');
-    if (!container) return;
-    if (datasheets.length === 0) {
-        container.innerHTML = '<p class="text-muted small">No URLs added.</p>';
-        return;
-    }
-    let html = '<div class="list-group">';
-    datasheets.forEach((ds) => {
-        const displayTitle = ds.title || ds.url;
-        html += `<div class="list-group-item list-group-item-action p-2">`;
-        html += `<i class="bi bi-link-45deg text-primary"></i> `;
-        html += `<a href="${ds.url}" target="_blank" class="text-decoration-none"><strong>${displayTitle}</strong></a>`;
-        if (ds.info) { html += ` <span class="text-muted">- ${ds.info}</span>`; }
-        html += `</div>`;
-    });
-    html += '</div>';
-    container.innerHTML = html;
-}
-document.addEventListener('DOMContentLoaded', function() { renderDatasheets(); });
-{% endif %}
-</script>
 
                 <!-- Info -->
                 <div class="mb-3 px-1">

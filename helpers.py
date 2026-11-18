@@ -4,7 +4,9 @@ Common helper functions used across the application
 from flask import request
 from urllib.parse import urlparse, urljoin
 from models import Setting
+import json
 import os
+import re
 
 
 def is_safe_url(target):
@@ -117,3 +119,58 @@ def markdown_filter(text):
     from utils import markdown_to_html
     from markupsafe import Markup
     return Markup(markdown_to_html(text))
+
+
+# ── Item URLs ────────────────────────────────────────────────────────────────
+# Stored on items.datasheet_urls as a JSON list of {url, title, info}; very old items
+# hold one plain URL per line instead.
+
+ITEM_URLS_MAX_LENGTH = 2048   # size of the items.datasheet_urls column
+_LINK_SCHEME = re.compile(r'^([a-z][a-z0-9+.-]*):(?!\d)', re.IGNORECASE)
+
+
+def parse_item_urls(raw):
+    """The URL entries stored on an item, as a list of {'url', 'title', 'info'} strings."""
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return [{'url': line.strip(), 'title': '', 'info': ''} for line in str(raw).splitlines() if line.strip()]
+    if not isinstance(parsed, list):
+        return []
+    entries = []
+    for entry in parsed:
+        if isinstance(entry, dict) and str(entry.get('url') or '').strip():
+            entries.append({key: str(entry.get(key) or '').strip() for key in ('url', 'title', 'info')})
+        elif isinstance(entry, str) and entry.strip():
+            entries.append({'url': entry.strip(), 'title': '', 'info': ''})
+    return entries
+
+
+def item_url_href(url):
+    """A safe link target for a stored URL: http(s) as is, scheme-less gets https://, anything else None."""
+    url = (url or '').strip()
+    if not url or any(ch.isspace() for ch in url):
+        return None
+    scheme = _LINK_SCHEME.match(url)
+    if scheme is None:
+        return 'https://' + url.lstrip('/')
+    return url if scheme.group(1).lower() in ('http', 'https') else None
+
+
+def item_url_entries(raw):
+    """Jinja filter: stored item URLs with a safe 'href' (None when the URL must not be a link)."""
+    return [{**entry, 'href': item_url_href(entry['url'])} for entry in parse_item_urls(raw)]
+
+
+def dump_item_urls(entries):
+    """Serialise URL entries for items.datasheet_urls, dropping trailing entries that do not fit."""
+    entries = [{key: str(e.get(key) or '').strip() for key in ('url', 'title', 'info')}
+               for e in entries if isinstance(e, dict) and str(e.get('url') or '').strip()]
+    while entries:
+        text = json.dumps(entries)
+        if len(text) <= ITEM_URLS_MAX_LENGTH:
+            return text
+        entries.pop()
+    return None
