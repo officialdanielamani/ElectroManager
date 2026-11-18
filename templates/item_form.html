@@ -309,7 +309,7 @@
                         {% for batch in item.batches %}
 {% set bst = batch_stock[batch.id] %}
                         <div class="card batch-card mb-2">
-                            <div class="card-header p-2 d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#batchBody{{ batch.id }}" style="cursor:pointer; background: var(--bs-tertiary-bg, #f8f9fa);">
+                            <div class="card-header p-2 d-flex flex-wrap justify-content-between align-items-center gap-1" data-bs-toggle="collapse" data-bs-target="#batchBody{{ batch.id }}" style="cursor:pointer; background: var(--bs-tertiary-bg, #f8f9fa);">
                                 <div class="d-flex flex-wrap align-items-center gap-1" style="min-width:0;flex:1;">
                                     <strong><i class="bi bi-box-seam"></i> {{ batch.get_display_label() }}</strong>
                                     <span class="badge bg-primary">Qty: {{ batch.quantity }}</span>
@@ -339,7 +339,7 @@
                                     <small class="text-muted"><i class="bi bi-sticky"></i> {{ batch.note }}</small>
                                     {% endif %}
                                 </div>
-                                <div class="d-flex gap-1 align-items-center">
+                                <div class="d-flex gap-1 align-items-center ms-auto">
                                     {% if item_perms and item_perms.can_edit_info %}
                                     <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
                                             data-el-batch-id="{{ batch.id }}"
@@ -349,7 +349,16 @@
                                             data-el-drawer="{{ batch.drawer or '' }}"
                                             data-el-item-uuid="{{ item.uuid }}"
                                             onclick="openEditLocationModal(event, this)"
-                                            title="Edit batch location"><i class="bi bi-geo-alt"></i> Edit Location</button>
+                                            title="Edit batch location"><i class="bi bi-geo-alt"></i><span class="d-none d-sm-inline"> Edit Location</span></button>
+                                    {% endif %}
+                                    {# Batch edit/delete live on the In/Out page; these open it with this batch selected. #}
+                                    {% if item_perms and item_perms.can_view_lr_page and item_perms.can_edit_batch %}
+                                    <a href="{{ url_for('in_out.in_out', batch=batch.id) }}" class="btn btn-sm btn-outline-warning py-0 px-2 batch-shortcut"
+                                       title="Edit this batch on the In/Out page"><i class="bi bi-pencil"></i><span class="d-none d-sm-inline"> Edit</span></a>
+                                    {% if item_perms.can_delete_batch %}
+                                    <a href="{{ url_for('in_out.in_out', batch=batch.id, action='delete') }}" class="btn btn-sm btn-outline-danger py-0 px-2 batch-shortcut"
+                                       title="Delete this batch (asks to confirm first)"><i class="bi bi-trash"></i><span class="d-none d-sm-inline"> Delete</span></a>
+                                    {% endif %}
                                     {% endif %}
                                     <i class="bi bi-chevron-down"></i>
                                 </div>
@@ -2865,6 +2874,11 @@ function batchUpdateDrawerGrid(prefix) {
 <script>
 /* ── Batch card open tracking ── */
 var lastOpenBatchId = null;
+// Bootstrap's collapse toggle on the batch header listens in the capture phase and cancels link
+// clicks inside it, so stop shortcut-link clicks before they reach it.
+window.addEventListener('click', function(e) {
+    if (e.target.closest && e.target.closest('.batch-shortcut')) e.stopPropagation();
+}, true);
 document.addEventListener('DOMContentLoaded', function() {
     // Open batch from URL hash
     var hash = window.location.hash;

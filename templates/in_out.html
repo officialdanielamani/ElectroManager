@@ -254,6 +254,7 @@
         </div>
         <!-- end cartSection -->
 
+        <div id="shortcutBackLink" class="d-none mb-2"></div>
         <hr id="formDivider" class="d-none">
 
         <!-- ── Action / Detail Form ── -->
@@ -478,10 +479,44 @@ document.addEventListener('DOMContentLoaded', function() {
         var tog = document.getElementById('modeToggle');
         if (tog) { tog.checked = true; onModeChange(); }
     }
+    /* Opened from the Edit Item page: ?batch=<id>[&action=delete] */
+    var params = new URLSearchParams(window.location.search);
+    var shortcutBatch = parseInt(params.get('batch'), 10);
+    if (shortcutBatch > 0) {
+        history.replaceState(null, '', window.location.pathname);   // a reload must not repeat the action
+        openBatchShortcut(shortcutBatch, params.get('action') === 'delete');
+    }
     if (_scanEnabled) { _initCameraState(); }
     if (_canLend) { searchSessions(); }
     loadLog();
 });
+
+var _shortcutReturnUrl = null;
+function openBatchShortcut(batchId, wantDelete) {
+    if (!_canEditBatch) {
+        showToast('You do not have permission to edit batches.', 'danger');
+        return;
+    }
+    var eb = document.getElementById('editBatchCheck');
+    if (eb && !eb.checked) { eb.checked = true; onEditBatchChange(); }
+    fetch('/in-out/batch/' + batchId + '/detail')
+    .then(function(r) { if (!r.ok) throw new Error(r.status === 404 ? 'Batch not found.' : 'Could not load the batch.'); return r.json(); })
+    .then(function(d) {
+        _ebSnState = null;
+        _selectedBatch = d;
+        showActionForm(d);
+        _shortcutReturnUrl = '/item/' + encodeURIComponent(d.item_uuid) + '/edit';
+        var back = document.getElementById('shortcutBackLink');
+        back.innerHTML = '<a href="' + _shortcutReturnUrl + '" class="btn btn-sm btn-outline-secondary">' +
+            '<i class="bi bi-arrow-left"></i> Back to ' + _esc(d.item_name) + '</a>';
+        back.classList.remove('d-none');
+        if (wantDelete) {
+            if (_canDeleteBatch) { submitDeleteBatch(d.id, d.display_label); }
+            else { showToast('You do not have permission to delete batches.', 'danger'); }
+        }
+    })
+    .catch(function(e) { showToast(e.message, 'danger'); });
+}
 
 /* ════════════════════════════════════════════════════════
    ADVANCED OPTIONS
@@ -1962,6 +1997,7 @@ function submitDeleteBatch(batchId, label) {
     .then(function(r){ return r.json(); })
     .then(function(d){
         if (d.success) {
+            if (_shortcutReturnUrl) { window.location.href = _shortcutReturnUrl; return; }
             showToast(d.message || 'Batch deleted.', 'success');
             clearActionForm();
             document.getElementById('searchResults').innerHTML = '';
