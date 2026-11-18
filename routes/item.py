@@ -1805,6 +1805,8 @@ def api_item_sticker_preview(uuid, template_id):
     # Verify template is for Items type
     if template.template_type != 'Items':
         return jsonify({'error': 'Template must be for Items'}), 400
+    if not template.can_view(current_user):
+        return jsonify({'error': 'Permission denied'}), 403
     
     # Get item data with all placeholders
     data = get_item_data(item)
@@ -1837,6 +1839,8 @@ def api_item_sticker_print(uuid, template_id):
     
     if template.template_type != 'Items':
         return jsonify({'error': 'Template must be for Items'}), 400
+    if not template.can_view(current_user):
+        abort(403)
     
     data = get_item_data(item)
     

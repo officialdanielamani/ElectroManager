@@ -38,6 +38,13 @@
                         <img src="{{ share_thumb_url('icon', project.thumbnail[5:]) }}" style="width:100%;height:100%;object-fit:contain;padding:4px;">
                         {% elif project.thumbnail.startswith('share:') %}
                         <img src="{{ share_thumb_url('project', project.thumbnail[6:]) }}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">
+                        {% else %}
+                        {% set thumb_att = (attachments or {}).get('picture', []) | selectattr('filename', 'equalto', project.thumbnail) | first %}
+                        {% if thumb_att %}
+                        <img src="{{ thumb_url(thumb_att.file_path) }}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">
+                        {% else %}
+                        <i class="bi bi-image text-muted" style="font-size:1.5rem;" title="Picture no longer attached"></i>
+                        {% endif %}
                         {% endif %}
                     </div>
                     <strong class="fs-5">{{ project.name }}</strong>

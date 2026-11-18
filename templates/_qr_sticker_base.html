@@ -36,7 +36,11 @@
                     <div class="alert alert-warning mb-0">
                         <i class="bi bi-exclamation-triangle"></i>
                         No <strong>{% block no_templates_type %}{% endblock %}</strong> templates found.
-                        <a href="{{ url_for('qr_template.create_qr_template') }}" class="alert-link">Create one</a> in QR Settings first.
+                        {% if current_user.has_permission('sticker', 'view_manage') %}
+                        <a href="{{ url_for('qr_template.create_sticker') }}" class="alert-link">Create one</a> in Stickers Template first.
+                        {% else %}
+                        Ask someone who manages sticker templates to create or share one with you.
+                        {% endif %}
                     </div>
                     {% endif %}
                 </div>

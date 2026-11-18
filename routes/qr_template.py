@@ -631,7 +631,8 @@ def batch_qr_sticker(uuid, batch_id):
     item = Item.query.filter_by(uuid=uuid).first_or_404()
     batch = ItemBatch.query.filter_by(id=batch_id, item_id=item.id).first_or_404()
     sn_ids = _parse_sn_ids(request.args.get('sn_ids', ''))
-    templates = StickerTemplate.query.filter_by(template_type='Item Batch').all()
+    templates = [t for t in StickerTemplate.query.filter_by(template_type='Item Batch').order_by(StickerTemplate.name).all()
+                 if t.can_view(current_user)]
     return render_template('batch_qr_sticker.html',
                            item=item, batch=batch,
                            sn_ids=sn_ids,

@@ -85,7 +85,13 @@
                                     {% elif project.thumbnail.startswith('share:') %}
                                     <img src="{{ url_for('share.share_serve', category='project', filename=project.thumbnail[6:]) }}" style="width:100%;height:100%;object-fit:cover;border-radius:6px;">
                                     {% else %}
-                                    <img src="{{ url_for('project_uploaded_file', filename=project.thumbnail) }}" style="width:100%;height:100%;object-fit:cover;border-radius:6px;">
+                                    {# A picture thumbnail stores the attachment's file name; find the attachment to serve it. #}
+                                    {% set thumb_att = (attachments or {}).get('picture', []) | selectattr('filename', 'equalto', project.thumbnail) | first %}
+                                    {% if thumb_att %}
+                                    <img src="{{ thumb_url(thumb_att.file_path) }}" style="width:100%;height:100%;object-fit:cover;border-radius:6px;">
+                                    {% else %}
+                                    <i class="bi bi-image text-muted" style="font-size:1.5rem;" title="Picture no longer attached"></i>
+                                    {% endif %}
                                     {% endif %}
                                     <button type="button" onclick="clearProjThumb()" style="position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:none;background:var(--bs-danger);color:var(--bs-white);font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;z-index:1;" title="Remove thumbnail"><i class="bi bi-x"></i></button>
                                 {% else %}
