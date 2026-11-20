@@ -10,6 +10,7 @@ from models import (db, User, Item, ItemBatch, BatchSerialNumber, Setting,
                     ProjectBOMItem, ProjectCostItem, ProjectAttachment, ProjectURL, SharedFile,
                     MagicParameter, ProjectParameter, ProjectParameterStringValue)
 from utils import log_audit, permission_required, allowed_file, generate_thumbnail_for_file
+from uploads import PROJECT_ATTACHMENT_TYPES, project_rules, select_uploads, describe_rejections, remove_stored_file
 from werkzeug.utils import secure_filename
 from datetime import datetime, timezone
 import os
@@ -24,91 +25,85 @@ logger = logging.getLogger(__name__)
 project_bp = Blueprint('project', __name__)
 
 _SAFE_PROJECT_ID_RE = re.compile(r'^[A-Za-z0-9._-]+$')
-_ALLOWED_ATTACHMENT_TYPES = {'picture', 'document', 'schematic', '2d_design', '3d_design', 'program'}
 
 
 # ==================== HELPERS ====================
 
-def get_project_file_settings(attachment_type):
-    """Get allowed extensions and max size for a project attachment type"""
-    defaults = {
-        'picture': ('webp,png,svg,jpeg,jpg', '10'),
-        'document': ('txt,doc,docx,pdf', '10'),
-        'schematic': ('pdf,zip', '20'),
-        '2d_design': ('pdf,zip', '20'),
-        '3d_design': ('pdf,zip,stl,step', '50'),
-        'program': ('zip,txt,cpp,py', '10'),
-    }
-    default_ext, default_size = defaults.get(attachment_type, ('pdf,zip', '10'))
-    ext_str = Setting.get(f'project_upload_{attachment_type}_extensions', default_ext)
-    max_size = Setting.get(f'project_upload_{attachment_type}_max_size', default_size)
-    extensions = set(ext.strip().lower() for ext in ext_str.split(',') if ext.strip())
-    try:
-        max_size = int(max_size)
-    except (ValueError, TypeError):
-        max_size = 10
-    return extensions, max_size
-
-
-def save_project_file(file, project_id_str, attachment_type):
-    """Save uploaded file for a project"""
-    if not file or not file.filename:
-        return None, None
-
-    if attachment_type not in _ALLOWED_ATTACHMENT_TYPES:
-        return None, 'Invalid attachment type.'
-    if not project_id_str or not _SAFE_PROJECT_ID_RE.match(str(project_id_str)):
-        return None, 'Invalid project id.'
-
-    safe_attachment_dirs = {
-        'picture': 'picture',
-        'document': 'document',
-        'schematic': 'schematic',
-        '2d_design': '2d_design',
-        '3d_design': '3d_design',
-        'program': 'program',
-    }
-    safe_attachment_dir = safe_attachment_dirs.get(attachment_type)
-    if not safe_attachment_dir:
-        return None, 'Invalid attachment type.'
-
-    allowed_ext, max_size_mb = get_project_file_settings(attachment_type)
-    filename = secure_filename(file.filename)
-    if not filename:
-        return None, 'Invalid filename.'
-    ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
-
-    if ext not in allowed_ext:
-        return None, f'File type .{ext} not allowed for {attachment_type}. Allowed: {", ".join(allowed_ext)}'
-
-    file.seek(0, os.SEEK_END)
-    file_size = file.tell()
-    file.seek(0)
-
-    if file_size > max_size_mb * 1024 * 1024:
-        return None, f'File too large. Max {max_size_mb}MB for {attachment_type}'
-
+def _store_project_file(storage, project_id_str, attachment_type):
+    """Write an already-validated upload to uploads/projects/<project>/<type>/; returns its details."""
+    if attachment_type not in PROJECT_ATTACHMENT_TYPES or not _SAFE_PROJECT_ID_RE.match(str(project_id_str)):
+        raise ValueError('Invalid project or attachment type.')
+    filename = secure_filename(storage.filename)
+    ext = filename.rsplit('.', 1)[1].lower()
     upload_root = os.path.realpath(current_app.config['UPLOAD_FOLDER'])
-    folder = os.path.realpath(os.path.join(upload_root, 'projects', str(project_id_str), safe_attachment_dir))
+    folder = os.path.realpath(os.path.join(upload_root, 'projects', str(project_id_str), attachment_type))
     if os.path.commonpath([upload_root, folder]) != upload_root:
-        return None, 'Invalid upload path.'
+        raise ValueError('Invalid upload path.')
     os.makedirs(folder, exist_ok=True)
-
-    file_path = os.path.realpath(os.path.join(folder, filename))
-    if os.path.commonpath([folder, file_path]) != folder:
-        return None, 'Invalid file path.'
-    counter = 1
-    base_name = filename.rsplit('.', 1)[0] if '.' in filename else filename
+    base = filename.rsplit('.', 1)[0]
+    file_path, counter = os.path.join(folder, filename), 1
     while os.path.exists(file_path):
-        new_filename = f"{base_name}_{counter}.{ext}"
-        file_path = os.path.realpath(os.path.join(folder, new_filename))
-        filename = new_filename
-        counter += 1
+        filename = f'{base}_{counter}.{ext}'
+        file_path, counter = os.path.join(folder, filename), counter + 1
+    storage.save(file_path)
+    return {'filename': filename, 'original_filename': storage.filename, 'file_type': ext,
+            'file_path': os.path.relpath(file_path, upload_root), 'file_size': os.path.getsize(file_path)}
 
-    file.save(file_path)
-    rel_path = os.path.relpath(file_path, upload_root)
-    return {'filename': filename, 'original_filename': file.filename if hasattr(file, 'filename') else filename,
-            'file_path': rel_path, 'file_type': ext, 'file_size': file_size}, None
+
+def _apply_project_file_changes(project):
+    """Apply attachment removals and new uploads sent with the project form.
+
+    Returns (number of files uploaded, list of messages about files that were not)."""
+    upload_folder = current_app.config['UPLOAD_FOLDER']
+    remove_ids = {int(i) for i in request.form.getlist('remove_attachment_ids[]') if i.isdigit()}
+    if remove_ids:
+        for att in ProjectAttachment.query.filter(ProjectAttachment.project_id == project.id,
+                                                  ProjectAttachment.id.in_(remove_ids)).all():
+            remove_stored_file(att.file_path, upload_folder)
+            if project.thumbnail == att.filename:
+                project.thumbnail = None
+            log_audit(current_user.id, 'delete', 'project_attachment', att.id,
+                      f'Deleted attachment {att.original_filename} from project {project.project_id}')
+            db.session.delete(att)
+        db.session.flush()
+
+    uploaded, messages = 0, []
+    for attachment_type, (label, _, _) in PROJECT_ATTACHMENT_TYPES.items():
+        files = [f for f in request.files.getlist(f'new_files_{attachment_type}') if f and f.filename]
+        if not files:
+            continue
+        existing = ProjectAttachment.query.filter_by(project_id=project.id, attachment_type=attachment_type).count()
+        accepted, rejected = select_uploads(files, project_rules(attachment_type, existing))
+        for storage in accepted:
+            info = _store_project_file(storage, project.project_id, attachment_type)
+            db.session.add(ProjectAttachment(project_id=project.id, attachment_type=attachment_type,
+                                             uploaded_by=current_user.id, **info))
+            if attachment_type == 'picture':
+                generate_thumbnail_for_file(os.path.join(upload_folder, info['file_path']), upload_folder)
+        uploaded += len(accepted)
+        messages += describe_rejections(rejected, label)
+    if uploaded:
+        log_audit(current_user.id, 'upload', 'project', project.id,
+                  f'Uploaded {uploaded} file(s) to project {project.project_id}')
+    return uploaded, messages
+
+
+def _project_upload_rules(project=None):
+    """Browser-side upload rules for each attachment type of the project form."""
+    counts = {}
+    if project is not None:
+        for attachment_type, count in (db.session.query(ProjectAttachment.attachment_type, db.func.count())
+                                       .filter_by(project_id=project.id).group_by(ProjectAttachment.attachment_type)):
+            counts[attachment_type] = count
+    return {t: project_rules(t, counts.get(t, 0)).for_browser() for t in PROJECT_ATTACHMENT_TYPES}
+
+
+def _flash_saved(message, uploaded, problems):
+    if uploaded:
+        message += f' {uploaded} file{"s" if uploaded != 1 else ""} uploaded.'
+    flash(message, 'success')
+    for problem in problems:
+        flash(problem, 'warning')
 
 
 # ==================== PROJECT LIST ====================
@@ -197,26 +192,31 @@ def project_new():
     contact_persons = ContactPerson.query.order_by(ContactPerson.name).all()
     contact_orgs = ContactOrganization.query.order_by(ContactOrganization.name).all()
 
+    def new_project_page():
+        return render_template('project_form.html', title='New Project', project=None,
+                               categories=categories, tags=tags, statuses=statuses,
+                               users=users, contact_persons=contact_persons, contact_orgs=contact_orgs,
+                               can_view_costing=current_user.has_permission('projects', 'view_costing'),
+                               can_edit_costing=current_user.has_permission('projects', 'edit_costing'),
+                               attachments={t: [] for t in PROJECT_ATTACHMENT_TYPES},
+                               upload_rules=_project_upload_rules(),
+                               upload_request_limit=current_app.config['MAX_CONTENT_LENGTH'],
+                               share_files_project=SharedFile.query.filter_by(category='project').order_by(SharedFile.name).all())
+
     if request.method == 'POST':
         name = request.form.get('name', '').strip()[:512]
         if not name:
             flash('Project name is required.', 'danger')
-            return render_template('project_form.html', title='New Project', project=None,
-                                   categories=categories, tags=tags, statuses=statuses,
-                                   users=users, contact_persons=contact_persons, contact_orgs=contact_orgs)
+            return new_project_page()
 
         cat_id = request.form.get('category_id', type=int) or None
         stat_id = request.form.get('status_id', type=int) or None
         if cat_id and not ProjectCategory.query.get(cat_id):
             flash('Selected category does not exist.', 'danger')
-            return render_template('project_form.html', title='New Project', project=None,
-                                   categories=categories, tags=tags, statuses=statuses,
-                                   users=users, contact_persons=contact_persons, contact_orgs=contact_orgs)
+            return new_project_page()
         if stat_id and not ProjectStatus.query.get(stat_id):
             flash('Selected status does not exist.', 'danger')
-            return render_template('project_form.html', title='New Project', project=None,
-                                   categories=categories, tags=tags, statuses=statuses,
-                                   users=users, contact_persons=contact_persons, contact_orgs=contact_orgs)
+            return new_project_page()
 
         project = Project(
             name=name,
@@ -263,31 +263,29 @@ def project_new():
                 project.date_start = datetime.strptime(date_start, '%Y-%m-%d').date()
             except ValueError:
                 flash(f'Invalid start date format: "{date_start}". Use YYYY-MM-DD.', 'danger')
-                return render_template('project_form.html', title='New Project', project=None,
-                                       categories=categories, tags=tags, statuses=statuses,
-                                       users=users, contact_persons=contact_persons, contact_orgs=contact_orgs)
+                return new_project_page()
         date_end = request.form.get('date_end', '').strip()
         if date_end:
             try:
                 project.date_end = datetime.strptime(date_end, '%Y-%m-%d').date()
             except ValueError:
                 flash(f'Invalid end date format: "{date_end}". Use YYYY-MM-DD.', 'danger')
-                return render_template('project_form.html', title='New Project', project=None,
-                                       categories=categories, tags=tags, statuses=statuses,
-                                       users=users, contact_persons=contact_persons, contact_orgs=contact_orgs)
+                return new_project_page()
 
         db.session.add(project)
+        db.session.flush()
+        sf_ids = [int(i) for i in request.form.getlist('share_file_ids[]') if i.isdigit()]
+        if sf_ids:
+            project.linked_share_files = SharedFile.query.filter(SharedFile.id.in_(sf_ids),
+                                                                 SharedFile.category == 'project').all()
+        uploaded, problems = _apply_project_file_changes(project)
         db.session.commit()
 
         log_audit(current_user.id, 'create', 'project', project.id, f'Created project: {project.name}')
-        flash(f'Project "{project.name}" created successfully!', 'success')
+        _flash_saved(f'Project "{project.name}" created successfully!', uploaded, problems)
         return redirect(url_for('project.project_detail', project_id=project.project_id))
 
-    return render_template('project_form.html', title='New Project', project=None,
-                           categories=categories, tags=tags, statuses=statuses,
-                           users=users, contact_persons=contact_persons, contact_orgs=contact_orgs,
-                           can_view_costing=current_user.has_permission('projects', 'view_costing'),
-                           can_edit_costing=current_user.has_permission('projects', 'edit_costing'))
+    return new_project_page()
 
 
 # ==================== PROJECT DETAIL ====================
@@ -418,12 +416,14 @@ def project_edit(project_id):
         else:
             project.date_end = None
 
-        sf_ids = [int(i) for i in request.form.getlist('share_file_ids[]') if i]
-        project.linked_share_files = SharedFile.query.filter(SharedFile.id.in_(sf_ids)).all() if sf_ids else []
+        sf_ids = [int(i) for i in request.form.getlist('share_file_ids[]') if i.isdigit()]
+        project.linked_share_files = SharedFile.query.filter(SharedFile.id.in_(sf_ids),
+                                                             SharedFile.category == 'project').all() if sf_ids else []
+        uploaded, problems = _apply_project_file_changes(project)
 
         db.session.commit()
         log_audit(current_user.id, 'update', 'project', project.id, f'Updated project: {project.name}')
-        flash(f'Project "{project.name}" updated!', 'success')
+        _flash_saved(f'Project "{project.name}" updated!', uploaded, problems)
         return redirect(url_for('project.project_detail', project_id=project.project_id))
 
     return render_template('project_form.html', title='Edit Project', project=project,
@@ -432,7 +432,9 @@ def project_edit(project_id):
                            bom_items=ProjectBOMItem.query.filter_by(project_id=project.id).order_by(ProjectBOMItem.sort_order, ProjectBOMItem.id).all(),
                            cost_items_per_qty=ProjectCostItem.query.filter_by(project_id=project.id, cost_type='per_qty').order_by(ProjectCostItem.sort_order).all(),
                            cost_items_overall=ProjectCostItem.query.filter_by(project_id=project.id, cost_type='overall').order_by(ProjectCostItem.sort_order).all(),
-                           attachments={atype: ProjectAttachment.query.filter_by(project_id=project.id, attachment_type=atype).all() for atype in ['picture', 'document', 'schematic', '2d_design', '3d_design', 'program']},
+                           attachments={atype: ProjectAttachment.query.filter_by(project_id=project.id, attachment_type=atype).all() for atype in PROJECT_ATTACHMENT_TYPES},
+                           upload_rules=_project_upload_rules(project),
+                           upload_request_limit=current_app.config['MAX_CONTENT_LENGTH'],
                            share_files_project=SharedFile.query.filter_by(category='project').order_by(SharedFile.name).all(),
                            currency=Setting.get('currency', 'USD'),
                            currency_decimal=int(Setting.get('currency_decimal_places', '2')),
@@ -996,70 +998,6 @@ def cost_item_move(project_id, cost_id):
 
 # ==================== PROJECT ATTACHMENTS ====================
 
-@project_bp.route('/project/<project_id>/upload/<attachment_type>', endpoint='project_upload', methods=['POST'])
-@login_required
-def project_upload(project_id, attachment_type):
-    if not current_user.has_permission('projects', 'edit'):
-        flash('No permission.', 'danger')
-        return redirect(url_for('project.project_edit', project_id=project_id))
-
-    valid_types = ['picture', 'document', 'schematic', '2d_design', '3d_design', 'program']
-    if attachment_type not in valid_types:
-        flash('Invalid attachment type.', 'danger')
-        return redirect(url_for('project.project_edit', project_id=project_id))
-
-    project = Project.query.filter_by(project_id=project_id).first_or_404()
-
-    files = request.files.getlist('files')
-
-    # Enforce max number of files per upload (-1=unlimited, 0=disabled, >0=total limit)
-    max_files = int(Setting.get(f'project_upload_{attachment_type}_max_files', '5'))
-    valid_files = [f for f in files if f and f.filename]
-    if max_files == 0:
-        flash('File uploads are currently disabled for this attachment type.', 'danger')
-        return redirect(url_for('project.project_edit', project_id=project_id))
-    if max_files > 0:
-        existing_count = ProjectAttachment.query.filter_by(
-            project_id=project.id, attachment_type=attachment_type).count()
-        if existing_count >= max_files:
-            flash(f'Upload limit reached. This project already has {existing_count} {attachment_type} file(s) (max {max_files}).', 'danger')
-            return redirect(url_for('project.project_edit', project_id=project_id))
-        if existing_count + len(valid_files) > max_files:
-            remaining = max_files - existing_count
-            flash(f'Too many files. Selecting {len(valid_files)} would exceed the limit (max {max_files}, already {existing_count}, room for {remaining} more).', 'danger')
-            return redirect(url_for('project.project_edit', project_id=project_id))
-
-    uploaded = 0
-    upload_folder = current_app.config['UPLOAD_FOLDER']
-    for file in valid_files:
-        result, error = save_project_file(file, project.project_id, attachment_type)
-        if error:
-            flash(error, 'danger')
-            continue
-        att = ProjectAttachment(
-            project_id=project.id,
-            filename=result['filename'],
-            original_filename=result['original_filename'],
-            file_path=result['file_path'],
-            file_type=result['file_type'],
-            file_size=result['file_size'],
-            attachment_type=attachment_type,
-            uploaded_by=current_user.id
-        )
-        db.session.add(att)
-        # Generate thumbnail for picture attachments
-        if attachment_type == 'picture':
-            full_path = os.path.join(upload_folder, result['file_path'])
-            generate_thumbnail_for_file(full_path, upload_folder)
-        uploaded += 1
-
-    if uploaded:
-        db.session.commit()
-        flash(f'{uploaded} file(s) uploaded.', 'success')
-
-    return redirect(url_for('project.project_edit', project_id=project_id))
-
-
 @project_bp.route('/api/project-thumb-media', endpoint='api_project_thumb_media')
 @login_required
 def api_project_thumb_media():
@@ -1081,33 +1019,6 @@ def api_project_thumb_media():
             'url': _url_for('share.share_serve', category=f.category, filename=f.filename),
         })
     return jsonify(result)
-
-
-@project_bp.route('/project/attachment/<int:att_id>/delete', endpoint='project_attachment_delete', methods=['POST'])
-@login_required
-def project_attachment_delete(att_id):
-    if not current_user.has_permission('projects', 'edit'):
-        return jsonify({'error': 'No permission'}), 403
-
-    att = ProjectAttachment.query.get_or_404(att_id)
-    project = att.project
-
-    upload_folder = current_app.config['UPLOAD_FOLDER']
-    full_path = os.path.join(upload_folder, att.file_path)
-    if os.path.exists(full_path):
-        os.remove(full_path)
-    # Remove thumbnail if it exists
-    thumb_path = os.path.join(upload_folder, 'thumbs', att.file_path)
-    try:
-        if os.path.exists(thumb_path):
-            os.remove(thumb_path)
-    except OSError:
-        pass
-
-    db.session.delete(att)
-    db.session.commit()
-    flash('Attachment deleted.', 'success')
-    return redirect(url_for('project.project_detail', project_id=project.project_id))
 
 
 @project_bp.route('/project/<project_id>/download-attachments', endpoint='project_download_attachments')

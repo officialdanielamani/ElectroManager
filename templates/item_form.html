@@ -3,6 +3,8 @@
 {% block title %}{{ title }} - Electro Manager{% endblock %}
 
 {% block content %}
+{% set can_upload_files = not item_perms or item_perms.can_edit_advance %}
+{% set can_remove_files = not item_perms or item_perms.can_delete_advance %}
 {% if item %}{% set st = item.stock %}{% set batch_stock = item.batch_stock() %}{% endif %}
 
 {% if item_perms and not (item_perms.can_edit_info and item_perms.can_edit_batch and item_perms.can_edit_quantity and item_perms.can_edit_price and item_perms.can_edit_sn and item_perms.can_edit_lending and item_perms.can_edit_advance) %}
@@ -25,7 +27,7 @@
 
 <div class="row justify-content-center">
     <div class="col-md-10">
-        <form method="POST" id="itemForm">
+        <form method="POST" id="itemForm" data-upload-limit="{{ upload_request_limit or 0 }}">
             {{ form.hidden_tag() }}
             <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
 
@@ -556,90 +558,44 @@
                         {{ form.datasheet_urls(id="datasheet_urls_hidden", style="display:none;") }}
                     </div>
 
-                    {% if item %}
                     <div class="mb-3 border-top pt-3">
                         <label class="form-label form-label-sm">
-                            <i class="bi bi-upload"></i> Upload Files / Pictures
+                            <i class="bi bi-paperclip"></i> Files / Pictures
                         </label>
-
-                        {% set images = item.attachments | selectattr('file_type', 'in', ['png', 'jpg', 'jpeg', 'gif',
-                        'webp']) | list %}
-                        {% set other_files = item.attachments | rejectattr('file_type', 'in', ['png', 'jpg', 'jpeg',
-                        'gif', 'webp']) | list %}
-
-                        {% if images or other_files %}
-                        <div class="mb-2">
-                            <small class="text-muted">Current Files:</small>
-
-                            {% if images %}
-                            <div class="mt-2 mb-2">
-                                <strong class="small">Images:</strong>
-                                <div class="d-flex flex-wrap gap-2 mt-1">
-                                    {% for att in images %}
-                                    <div class="position-relative" style="width: 100px; height: 100px;">
-                                        <img src="{{ url_for('uploaded_file', filename=att.filename) }}"
-                                            class="img-thumbnail"
-                                            style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;"
-                                            alt="{{ att.original_filename }}" title="Click to view"
-                                            onclick="openImageEditModal('{{ url_for('uploaded_file', filename=att.filename) }}', '{{ att.original_filename }}', {{ att.id }})">
-                                    </div>
-                                    {% endfor %}
+                        {% if item and item.attachments %}
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            {% for att in item.attachments %}
+                            {% set is_image = att.file_type in ['png', 'jpg', 'jpeg', 'gif', 'webp'] %}
+                            <div class="existing-file pu-tile border rounded position-relative" data-area="item" tabindex="0"
+                                 data-attachment-id="{{ att.id }}" data-name="{{ att.original_filename }}"
+                                 data-url="{{ url_for('uploaded_file', filename=att.filename) }}" data-image="{{ 'true' if is_image else 'false' }}"
+                                 title="{{ att.original_filename }} — click to view, rename or remove"
+                                 onclick="openExistingFile(this)" onkeydown="if (event.key === 'Enter') openExistingFile(this)">
+                                <div class="pu-thumb">
+                                    {% if is_image %}
+                                    <img src="{{ thumb_url(att.filename) }}" alt="">
+                                    {% else %}
+                                    <i class="bi bi-file-earmark-text fs-3 text-muted"></i>
+                                    <span class="pu-ext">{{ att.file_type | upper }}</span>
+                                    {% endif %}
                                 </div>
+                                <div class="pu-name existing-file-name">{{ att.original_filename }}</div>
+                                <div class="pu-size text-muted">{{ att.file_size | filesize }}</div>
+                                <span class="badge text-bg-danger pu-new pu-removing-label">Removing</span>
                             </div>
-                            {% endif %}
-
-                            {% if other_files %}
-                            <div class="mt-2">
-                                <strong class="small">Other Files:</strong>
-                                <div class="list-group mt-1">
-                                    {% for att in other_files %}
-                                    <div class="list-group-item p-2 d-flex justify-content-between align-items-center">
-                                        <small>
-                                            <i class="bi bi-file-earmark"></i> {{ att.original_filename }}
-                                            <span class="text-muted">({{ "%.2f"|format(att.file_size / 1024 / 1024) }}
-                                                MB)</span>
-                                        </small>
-                                        <div>
-                                            <button type="button" class="btn btn-warning btn-sm"
-                                                style="padding: 0.1rem 0.4rem; font-size: 0.75rem;"
-                                                onclick="openFileRenameModal({{ att.id }}, '{{ att.original_filename }}')"
-                                                {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
-                                                <i class="bi bi-pencil"></i>
-                                            </button>
-                                            <button type="button" class="btn btn-danger btn-sm"
-                                                style="padding: 0.1rem 0.4rem; font-size: 0.75rem;"
-                                                onclick="deleteFile({{ att.id }})"
-                                                {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    {% endfor %}
-                                </div>
-                            </div>
-                            {% endif %}
+                            {% endfor %}
                         </div>
                         {% endif %}
-
-                        <div class="card bg-light">
-                            <div class="card-body p-2">
-                                <div id="uploadFormContainer">
-                                    <div class="mb-2">
-                                        <label class="form-label form-label-sm">Select Files to Upload:</label>
-                                        <input type="file" id="fileUploadInput" class="form-control form-control-sm"
-                                            multiple {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
-                                        <small class="text-muted">Allowed: {{ allowed_file_types }} | Max: {{ max_file_size_mb }}MB per file{% if max_file_upload_count == 0 %} | <span class="text-danger fw-semibold">Uploads disabled</span>{% elif max_file_upload_count == -1 %} | Max files: unlimited{% else %} | Max files: {{ item.attachments | length if item else 0 }}/{{ max_file_upload_count }} used{% endif %}</small>
-                                    </div>
-                                    <button type="button" class="btn btn-primary btn-sm" onclick="uploadFiles()" {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
-                                        <i class="bi bi-upload"></i> Upload Files
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                        <div class="pending-uploads" data-form="itemForm" data-name="new_attachments"
+                             data-rules='{{ upload_rules | tojson }}' data-existing=".existing-file[data-area='item']"
+                             data-disabled="{{ 'false' if can_upload_files else 'true' }}"></div>
+                        <input type="hidden" name="rename_attachments" id="renameAttachments" value="{}">
+                        <div id="removeAttachmentInputs"></div>
+                        <small class="text-muted d-block mt-1">New files, renames and removals are applied when you save the item.</small>
                     </div>
 
                     <!-- Share Files -->
-                    {% if item and share_files_item is defined %}
+                    {% if share_files_item is defined %}
                     <div class="mb-3 border-top pt-3">
                         <label class="form-label form-label-sm">
                             <i class="bi bi-folder-fill"></i> Share Files
@@ -647,7 +603,7 @@
 
                         <!-- Currently linked share files -->
                         <div id="linkedShareFiles" class="d-flex flex-wrap gap-2 mb-2">
-                            {% for sf in item.linked_share_files %}
+                            {% for sf in (item.linked_share_files if item else []) %}
                             <div class="position-relative border rounded p-1 bg-light d-flex align-items-center justify-content-center"
                                  id="sf_chip_{{ sf.id }}"
                                  style="width:80px; height:80px; overflow:hidden; flex-shrink:0;">
@@ -678,7 +634,6 @@
                         </button>
                         {% endif %}
                     </div>
-                    {% endif %}
                     {% endif %}
 
 
@@ -971,238 +926,101 @@
     </div>
 </div>
 
-<div class="modal fade" id="imageEditModal" tabindex="-1">
+<div class="modal fade" id="existingFileModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Image Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title">File Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="text-center mb-3">
-                    <img id="modalImagePreview" src="" class="img-fluid" style="max-height: 400px;" alt="">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">File Name:</label>
-                    <input type="text" id="imageFileName" class="form-control" value="">
-                </div>
+                <div class="text-center mb-3" id="existingFilePreview"></div>
+                <label class="form-label" for="existingFileName">File name</label>
+                <input type="text" id="existingFileName" class="form-control" maxlength="255"
+                       {% if not can_upload_files %}disabled{% endif %}>
+                <small class="text-muted">Changes are applied when you save the item.</small>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-danger" onclick="deleteImageFromModal()"
-                    {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
-                    <i class="bi bi-trash"></i> Delete
-                </button>
+                {% if can_remove_files %}
+                <button type="button" class="btn btn-outline-danger me-auto" id="existingFileRemoveBtn" onclick="toggleExistingFileRemoval()"></button>
+                {% endif %}
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="saveImageName()"
-                    {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
-                    <i class="bi bi-save"></i> Save Name
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="fileRenameModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Rename File</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">File Name:</label>
-                    <input type="text" id="fileNameInput" class="form-control" value="">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveFileName()"
-                    {% if item_perms and not item_perms.can_edit_advance %}disabled{% endif %}>
-                    <i class="bi bi-save"></i> Save
-                </button>
+                {% if can_upload_files %}
+                <button type="button" class="btn btn-primary" onclick="applyExistingFileName()"><i class="bi bi-check-lg"></i> Apply name</button>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    // File management functions
-    let currentAttachmentId = null;
-    let imageEditModalInstance = null;
-    let fileRenameModalInstance = null;
-    
-    // Permission variables from backend
-    const canEditUpload = {{ 'true' if item_perms and item_perms.can_edit_advance else 'false' }};
+    /* Existing files: view, rename or mark for removal; applied when the item is saved. */
+    let _existingFileTile = null;
+    const _renames = {};
 
-    // Initialize modals
-    document.addEventListener('DOMContentLoaded', function () {
-        const imageEditModalEl = document.getElementById('imageEditModal');
-        const fileRenameModalEl = document.getElementById('fileRenameModal');
-        if (imageEditModalEl) imageEditModalInstance = new bootstrap.Modal(imageEditModalEl);
-        if (fileRenameModalEl) fileRenameModalInstance = new bootstrap.Modal(fileRenameModalEl);
-    });
-
-    function openImageEditModal(src, filename, attachmentId) {
-        currentAttachmentId = attachmentId;
-        document.getElementById('modalImagePreview').src = src;
-        document.getElementById('imageFileName').value = filename;
-        imageEditModalInstance.show();
+    function openExistingFile(tile) {
+        _existingFileTile = tile;
+        const preview = document.getElementById('existingFilePreview');
+        preview.replaceChildren();
+        if (tile.dataset.image === 'true') {
+            const img = document.createElement('img');
+            img.src = tile.dataset.url;
+            img.alt = tile.dataset.name;
+            img.className = 'img-fluid';
+            img.style.maxHeight = '400px';
+            preview.appendChild(img);
+        } else {
+            const link = document.createElement('a');
+            link.href = tile.dataset.url;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            link.className = 'btn btn-outline-secondary';
+            link.innerHTML = '<i class="bi bi-box-arrow-up-right"></i> Open file';
+            preview.appendChild(link);
+        }
+        document.getElementById('existingFileName').value = tile.dataset.name;
+        _updateRemoveButton();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('existingFileModal')).show();
     }
 
-    function openFileRenameModal(attachmentId, filename) {
-        if (!canEditUpload) {
-            alert('You do not have permission to rename files.');
-            return;
-        }
-        currentAttachmentId = attachmentId;
-        document.getElementById('fileNameInput').value = filename;
-        fileRenameModalInstance.show();
+    function applyExistingFileName() {
+        const name = document.getElementById('existingFileName').value.trim();
+        if (!name) { alert('File name cannot be empty.'); return; }
+        const id = _existingFileTile.dataset.attachmentId;
+        _renames[id] = name;
+        _existingFileTile.dataset.name = name;
+        _existingFileTile.querySelector('.existing-file-name').textContent = name;
+        document.getElementById('renameAttachments').value = JSON.stringify(_renames);
+        bootstrap.Modal.getInstance(document.getElementById('existingFileModal')).hide();
     }
 
-    function saveImageName() {
-        if (!canEditUpload) {
-            alert('You do not have permission to rename files.');
-            return;
+    function toggleExistingFileRemoval() {
+        const tile = _existingFileTile, id = tile.dataset.attachmentId;
+        const removing = tile.classList.toggle('pu-removing');
+        const holder = document.getElementById('removeAttachmentInputs');
+        const existing = holder.querySelector(`input[value="${id}"]`);
+        if (removing && !existing) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'remove_attachment_ids[]';
+            input.value = id;
+            holder.appendChild(input);
+        } else if (!removing && existing) {
+            existing.remove();
         }
-        const newName = document.getElementById('imageFileName').value.trim();
-        if (!newName) {
-            alert('File name cannot be empty!');
-            return;
-        }
-        renameAttachment(currentAttachmentId, newName);
+        document.dispatchEvent(new Event('pending-uploads:recount'));
+        _updateRemoveButton();
     }
 
-    function saveFileName() {
-        if (!canEditUpload) {
-            alert('You do not have permission to rename files.');
-            return;
-        }
-        const newName = document.getElementById('fileNameInput').value.trim();
-        if (!newName) {
-            alert('File name cannot be empty!');
-            return;
-        }
-        renameAttachment(currentAttachmentId, newName);
+    function _updateRemoveButton() {
+        const btn = document.getElementById('existingFileRemoveBtn');
+        if (!btn || !_existingFileTile) return;
+        btn.innerHTML = _existingFileTile.classList.contains('pu-removing')
+            ? '<i class="bi bi-arrow-counterclockwise"></i> Keep this file'
+            : '<i class="bi bi-trash"></i> Remove on save';
     }
-
-    function renameAttachment(attachmentId, newName) {
-        fetch(`/attachment/${attachmentId}/rename`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ new_name: newName })
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('File renamed successfully!');
-                    location.reload();
-                } else {
-                    alert('Error: ' + (data.error || 'Failed to rename file'));
-                }
-            })
-            .catch(error => {
-                alert('Error: ' + error);
-            });
-    }
-
-    function deleteImageFromModal() {
-        if (!canEditUpload) {
-            alert('You do not have permission to delete files.');
-            return;
-        }
-        if (confirm('Delete this image?')) {
-            deleteFile(currentAttachmentId);
-        }
-    }
-
-    function deleteFile(attachmentId) {
-        if (!canEditUpload) {
-            alert('You do not have permission to delete files.');
-            return;
-        }
-        if (confirm('Delete this file?')) {
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = `/attachment/${attachmentId}/delete`;
-
-            const csrfToken = document.querySelector('input[name="csrf_token"]');
-            if (csrfToken) {
-                const tokenInput = document.createElement('input');
-                tokenInput.type = 'hidden';
-                tokenInput.name = 'csrf_token';
-                tokenInput.value = csrfToken.value;
-                form.appendChild(tokenInput);
-            }
-
-            document.body.appendChild(form);
-            form.submit();
-        }
-    }
-
-    {% if item %}
-    function uploadFiles() {
-        const fileInput = document.getElementById('fileUploadInput');
-        const files = fileInput.files;
-
-        if (files.length === 0) {
-            alert('Please select files to upload');
-            return;
-        }
-
-        const maxFiles = {{ max_file_upload_count }};
-        const existingCount = {{ item.attachments | length if item else 0 }};
-        if (maxFiles === 0) {
-            alert('File uploads are currently disabled by the administrator.');
-            return;
-        }
-        if (maxFiles > 0) {
-            if (existingCount >= maxFiles) {
-                alert(`Upload limit reached. This item already has ${existingCount} file(s) (max ${maxFiles}).`);
-                return;
-            }
-            if (existingCount + files.length > maxFiles) {
-                const remaining = maxFiles - existingCount;
-                alert(`Too many files. Selecting ${files.length} would exceed the limit (max ${maxFiles}, already ${existingCount}, room for ${remaining} more).`);
-                return;
-            }
-        }
-
-        const formData = new FormData();
-        for (let i = 0; i < files.length; i++) {
-            formData.append('files', files[i]);
-        }
-
-        // Add CSRF token to form data
-        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
-        formData.append('csrf_token', csrfToken);
-
-        fetch('{{ url_for("item.upload_attachment", item_id=item.id) }}', {
-            method: 'POST',
-            body: formData
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.errors && data.errors.length > 0) {
-                    let msg = '';
-                    if (data.uploaded > 0) {
-                        msg += data.uploaded + ' file(s) uploaded successfully.\n\n';
-                    }
-                    msg += 'The following file(s) were rejected:\n• ' + data.errors.join('\n• ');
-                    alert(msg);
-                } else if (data.success) {
-                    alert(data.uploaded + ' file(s) uploaded successfully!');
-                }
-                location.reload();
-            })
-            .catch(error => {
-                alert('Upload error: ' + error);
-            });
-    }
-    {% endif %}
 </script>
+<script src="{{ url_for('static', filename='js/pending-uploads.js') }}"></script>
 
 <style>
     .batch-card {
@@ -4191,6 +4009,10 @@ function toggleShareFilePickRow(row) {
     }
 }
 
+function _sfEsc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 function addShareFileChip(id, name, isImage, imgUrl) {
     if (document.getElementById('sf_chip_' + id)) return;
     const container = document.getElementById('linkedShareFiles');
@@ -4199,8 +4021,8 @@ function addShareFileChip(id, name, isImage, imgUrl) {
     div.id = 'sf_chip_' + id;
     div.style.cssText = 'width:80px;height:80px;overflow:hidden;flex-shrink:0;';
     const inner = isImage
-        ? `<img src="${imgUrl}" alt="${name}" style="width:100%;height:100%;object-fit:cover;border-radius:4px;">`
-        : `<div class="text-center"><i class="bi bi-file-earmark text-muted" style="font-size:1.5rem;"></i><div class="text-truncate" style="font-size:0.65rem;max-width:72px;">${name}</div></div>`;
+        ? `<img src="${_sfEsc(imgUrl)}" alt="${_sfEsc(name)}" style="width:100%;height:100%;object-fit:cover;border-radius:4px;">`
+        : `<div class="text-center"><i class="bi bi-file-earmark text-muted" style="font-size:1.5rem;"></i><div class="text-truncate" style="font-size:0.65rem;max-width:72px;">${_sfEsc(name)}</div></div>`;
     div.innerHTML = inner +
         `<button type="button" class="position-absolute top-0 end-0 btn btn-danger btn-sm p-0" style="width:18px;height:18px;font-size:0.6rem;line-height:1;" onclick="removeShareFile(${id})">×</button>` +
         `<input type="hidden" name="share_file_ids[]" value="${id}" id="sfhid_${id}">`;

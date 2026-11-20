@@ -12,6 +12,7 @@ from utils import save_file, log_audit, admin_required, permission_required, ite
 from item_search import (parse_item_filters, paginate_items, describe_filters,
                          has_advanced_filters, magic_parameter_catalog)
 from item_stock import stock_for_items, stock_summary
+from uploads import item_rules, select_uploads, describe_rejections, remove_stored_file
 from qr_utils import get_item_data, render_template_to_svg, generate_single_sticker_pdf, generate_batch_stickers_pdf, generate_table_sticker_pdf
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -132,6 +133,62 @@ def items():
 
 # ============= ITEM ROUTES =============
 
+
+
+def _apply_item_file_changes(item, perms):
+    """Apply the file removals, renames and new uploads sent with the item form.
+
+    Returns (number of files uploaded, list of messages about files that were not)."""
+    upload_folder = current_app.config['UPLOAD_FOLDER']
+    messages = []
+
+    remove_ids = {int(i) for i in request.form.getlist('remove_attachment_ids[]') if i.isdigit()}
+    if remove_ids and perms.get('can_delete_advance'):
+        for att in [a for a in item.attachments if a.id in remove_ids]:
+            remove_stored_file(att.filename, upload_folder)
+            if item.thumbnail == att.filename:
+                item.thumbnail = None
+            log_audit(current_user.id, 'delete', 'attachment', att.id, f'Deleted attachment: {att.original_filename}')
+            item.attachments.remove(att)
+            db.session.delete(att)
+    elif remove_ids:
+        messages.append('Files were not removed: you do not have permission to delete files.')
+
+    new_files = [f for f in request.files.getlist('new_attachments') if f and f.filename]
+    if not perms.get('can_edit_advance'):
+        if new_files:
+            messages.append('Files were not uploaded: you do not have permission to add files.')
+        return 0, messages
+
+    try:
+        renames = json.loads(request.form.get('rename_attachments') or '{}')
+    except (json.JSONDecodeError, TypeError):
+        renames = {}
+    if isinstance(renames, dict):
+        for att in item.attachments:
+            name = str(renames.get(str(att.id)) or '').strip()[:255]
+            if name and name != att.original_filename:
+                log_audit(current_user.id, 'update', 'attachment', att.id,
+                          f'Renamed attachment from "{att.original_filename}" to "{name}"')
+                att.original_filename = name
+
+    accepted, rejected = select_uploads(new_files, item_rules(existing=len(item.attachments)))
+    for storage in accepted:
+        info = save_file(storage, upload_folder, item.uuid)
+        db.session.add(Attachment(item_id=item.id, filename=info['filename'],
+                                  original_filename=info['original_filename'], file_path=info['file_path'],
+                                  file_type=info['file_type'], file_size=info['file_size']))
+    if accepted:
+        log_audit(current_user.id, 'upload', 'item', item.id, f'Uploaded {len(accepted)} file(s) to item: {item.name}')
+    return len(accepted), messages + describe_rejections(rejected)
+
+
+def _flash_saved(message, uploaded, problems):
+    if uploaded:
+        message += f' {uploaded} file{"s" if uploaded != 1 else ""} uploaded.'
+    flash(message, 'success')
+    for problem in problems:
+        flash(problem, 'warning')
 
 
 @item_bp.route('/item/new', endpoint='item_new', methods=['GET', 'POST'])
@@ -294,8 +351,16 @@ def item_new():
                 item.updated_by = current_user.id
                 db.session.commit()
 
+        if perms.get('can_edit_advance'):
+            sf_ids = [int(i) for i in request.form.getlist('share_file_ids[]') if i.isdigit()]
+            if sf_ids:
+                item.linked_share_files = SharedFile.query.filter(SharedFile.id.in_(sf_ids),
+                                                                  SharedFile.category == 'item').all()
+        uploaded, problems = _apply_item_file_changes(item, perms)
+        db.session.commit()
+
         log_audit(current_user.id, 'create', 'item', item.id, f'Created item: {item.name}')
-        flash(f'Item "{item.name}" created successfully!', 'success')
+        _flash_saved(f'Item "{item.name}" created successfully!', uploaded, problems)
 
         # "Save and Create New" — stay on the new-item form instead of going to detail
         if request.form.get('save_and_new'):
@@ -306,7 +371,9 @@ def item_new():
     return render_template('item_form.html', form=form, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='New Item',
                          prefill_rack_id=prefill_rack_id, prefill_drawer=prefill_drawer, 
                          currency=Setting.get('currency', '$'),
-                         item_perms=perms)
+                         item_perms=perms, upload_rules=item_rules().for_browser(),
+                         upload_request_limit=current_app.config['MAX_CONTENT_LENGTH'],
+                         share_files_item=SharedFile.query.filter_by(category='item').order_by(SharedFile.name).all())
 
 
 
@@ -651,14 +718,12 @@ def item_edit(uuid):
             item.updated_by = current_user.id
             db.session.commit()
 
+        uploaded, problems = _apply_item_file_changes(item, perms)
+        db.session.commit()
+
         log_audit(current_user.id, 'update', 'item', item.id, f'Updated item: {item.name}')
-        flash(f'Item "{item.name}" updated successfully!', 'success')
+        _flash_saved(f'Item "{item.name}" updated successfully!', uploaded, problems)
         return redirect(url_for('item.item_detail', uuid=item.uuid))
-    
-    # Get file upload settings
-    max_size_mb = int(Setting.get('max_file_size_mb', '10'))
-    extensions_str = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
-    max_file_upload_count = int(Setting.get('max_file_upload_count', '5'))
     
     batch_lend_data = {b.id: b.get_lend_records_data() for b in item.batches}
     sn_all_data = {}
@@ -667,7 +732,9 @@ def item_edit(uuid):
             sn_all_data[batch.id] = batch.get_serial_numbers_data()
     share_files_item = SharedFile.query.filter_by(category='item').order_by(SharedFile.name).all()
     share_files_icon = SharedFile.query.filter_by(category='icon').order_by(SharedFile.name).all()
-    return render_template('item_form.html', form=form, item=item, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='Edit Item', currency=Setting.get('currency', '$'), max_file_size_mb=max_size_mb, allowed_file_types=extensions_str, max_file_upload_count=max_file_upload_count, item_perms=perms, batch_lend_data=batch_lend_data, sn_all_data=sn_all_data, share_files_item=share_files_item, share_files_icon=share_files_icon)
+    return render_template('item_form.html', form=form, item=item, locations=locations, racks=racks, racks_data=racks_data, all_tags=all_tags, title='Edit Item', currency=Setting.get('currency', '$'), item_perms=perms,
+                           upload_rules=item_rules(existing=len(item.attachments)).for_browser(),
+                           upload_request_limit=current_app.config['MAX_CONTENT_LENGTH'], batch_lend_data=batch_lend_data, sn_all_data=sn_all_data, share_files_item=share_files_item, share_files_icon=share_files_icon)
 
 
 
@@ -1051,150 +1118,6 @@ def bulk_edit_items():
 
 
 
-@item_bp.route('/item/<int:item_id>/upload', methods=['POST'], endpoint='upload_attachment')
-@login_required
-@item_permission_required
-def upload_attachment(item_id):
-    item = Item.query.get_or_404(item_id)
-    form = AttachmentForm()
-    
-    # SECURITY CHECK: Verify user has advance edit permission (files live under Advance Info)
-    if not current_user.has_permission('items', 'edit_advance'):
-        flash('You do not have permission to upload files.', 'danger')
-        log_audit(current_user.id, 'denied', 'attachment_upload', item.id, f'Unauthorized upload attempt to item: {item.name}')
-        return redirect(url_for('item.item_detail', uuid=item.uuid))
-    
-    files = request.files.getlist('files')
-
-    # Get dynamic settings
-    max_size_mb = int(Setting.get('max_file_size_mb', '10'))
-    max_size_bytes = max_size_mb * 1024 * 1024
-    extensions_str = Setting.get('allowed_extensions', 'pdf,png,jpg,jpeg,gif,txt,doc,docx')
-    max_file_upload_count = int(Setting.get('max_file_upload_count', '5'))
-
-    # Count non-empty files and enforce max_file_upload_count
-    # -1 = unlimited, 0 = uploads disabled, >0 = total limit (existing + new)
-    valid_files = [f for f in files if f and f.filename]
-    if max_file_upload_count == 0:
-        return jsonify({
-            'success': False,
-            'uploaded': 0,
-            'errors': ['File uploads are currently disabled by the administrator.'],
-        }), 400
-    if max_file_upload_count > 0:
-        existing_count = Attachment.query.filter_by(item_id=item.id).count()
-        if existing_count >= max_file_upload_count:
-            return jsonify({
-                'success': False,
-                'uploaded': 0,
-                'errors': [f'Upload limit reached. This item already has {existing_count} file(s) (max {max_file_upload_count}).'],
-            }), 400
-        if existing_count + len(valid_files) > max_file_upload_count:
-            remaining = max_file_upload_count - existing_count
-            return jsonify({
-                'success': False,
-                'uploaded': 0,
-                'errors': [f'Too many files. Selecting {len(valid_files)} would exceed the limit (max {max_file_upload_count}, already {existing_count}, room for {remaining} more).'],
-            }), 400
-
-    uploaded_count = 0
-    errors = []
-
-    for file in valid_files:
-
-        fname = file.filename
-
-        # Check file extension
-        if not allowed_file(fname):
-            errors.append(f'"{fname}" — incompatible file type. Allowed: {extensions_str}')
-            continue
-
-        # MIME type validation — detect spoofed files (e.g. an EXE renamed to .jpg)
-        from utils import validate_mime_type
-        declared_ext = fname.rsplit('.', 1)[1].lower() if '.' in fname else ''
-        mime_ok, mime_reason = validate_mime_type(file, declared_ext)
-        if not mime_ok:
-            errors.append(f'"{fname}" — {mime_reason}')
-            continue
-
-        # Check file size
-        file.seek(0, 2)
-        file_size = file.tell()
-        file.seek(0)
-
-        if file_size > max_size_bytes:
-            errors.append(
-                f'"{fname}" — too large ({format_file_size(file_size)}). Max allowed: {max_size_mb} MB'
-            )
-            continue
-
-        file_info = save_file(file, current_app.config['UPLOAD_FOLDER'], item.uuid)
-
-        if file_info:
-            attachment = Attachment(
-                filename=file_info['filename'],
-                original_filename=file_info['original_filename'],
-                file_path=file_info['file_path'],
-                file_type=file_info['file_type'],
-                file_size=file_info['file_size'],
-                item_id=item.id,
-                uploaded_by=current_user.id
-            )
-            db.session.add(attachment)
-            uploaded_count += 1
-
-    if uploaded_count > 0:
-        db.session.commit()
-        log_audit(current_user.id, 'upload', 'attachment', item.id,
-                  f'Uploaded {uploaded_count} file(s) to item: {item.name}')
-
-    # Return JSON so the JS fetch handler can display real success/error messages
-    # without the flash-consumed-by-redirect silent-failure problem.
-    from flask import jsonify
-    return jsonify({
-        'success': uploaded_count > 0,
-        'uploaded': uploaded_count,
-        'errors': errors,
-    }), 200 if uploaded_count > 0 or not errors else 400
-
-
-
-@item_bp.route('/attachment/<int:id>/delete', methods=['POST'])
-@login_required
-@item_permission_required
-def delete_attachment(id):
-    attachment = Attachment.query.get_or_404(id)
-    item = attachment.item
-
-    if not current_user.has_permission('items', 'delete_advance'):
-        flash('You do not have permission to delete files.', 'danger')
-        return redirect(url_for('item.item_edit', uuid=item.uuid))
-
-    try:
-        if attachment.file_path:
-            _upload_dir = current_app.config['UPLOAD_FOLDER']
-            full_path = os.path.join(_upload_dir, attachment.file_path)
-            if is_safe_file_path(full_path, _upload_dir) and os.path.exists(full_path):
-                os.remove(full_path)
-            # Remove thumbnail (keyed on relative filename, not absolute file_path)
-            if attachment.filename:
-                thumb_path = os.path.join(_upload_dir, 'thumbs', attachment.filename)
-                try:
-                    if os.path.exists(thumb_path):
-                        os.remove(thumb_path)
-                except OSError:
-                    pass
-    except Exception as e:
-        logging.error(f"Error deleting attachment file {attachment.id}: {e}")
-
-    db.session.delete(attachment)
-    db.session.commit()
-
-    log_audit(current_user.id, 'delete', 'attachment', id, f'Deleted attachment: {attachment.original_filename}')
-    flash('Attachment deleted successfully!', 'success')
-    return redirect(url_for('item.item_edit', uuid=item.uuid))
-
-
 @item_bp.route('/item/<string:uuid>/download-attachments', endpoint='item_download_attachments')
 @login_required
 @item_permission_required
@@ -1239,39 +1162,6 @@ def item_download_share_files(uuid):
     from flask import send_file as _send_file
     log_audit(current_user.id, 'download', 'item', item.id, f'Downloaded all share files for item: {item.name}')
     return _send_file(buf, download_name=f"{item.uuid}_share_files.zip", as_attachment=True, mimetype='application/zip')
-
-
-
-
-@item_bp.route('/attachment/<int:attachment_id>/rename', methods=['POST'])
-@login_required
-@item_permission_required
-def rename_attachment(attachment_id):
-    """Rename an attachment file"""
-    attachment = Attachment.query.get_or_404(attachment_id)
-
-    if not current_user.has_permission('items', 'edit_advance'):
-        return jsonify({'success': False, 'error': 'You do not have permission to rename files.'}), 403
-
-    try:
-        data = request.get_json()
-        new_name = data.get('new_name', '').strip()
-        
-        if not new_name:
-            return jsonify({'success': False, 'error': 'New name cannot be empty'}), 400
-        
-        # Update the original filename
-        old_name = attachment.original_filename
-        attachment.original_filename = new_name
-        db.session.commit()
-        
-        log_audit(current_user.id, 'update', 'attachment', attachment_id, f'Renamed attachment from "{old_name}" to "{new_name}"')
-
-        return jsonify({'success': True})
-
-    except Exception as e:
-        logging.error(f"Error renaming attachment {attachment_id}: {str(e)}")
-        return jsonify({'success': False, 'error': 'An error occurred while renaming the attachment'}), 500
 
 
 

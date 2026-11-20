@@ -578,3 +578,20 @@ textarea.disabled {
     --bs-btn-disabled-bg: #6f42c1;
     --bs-btn-disabled-border-color: #6f42c1;
 }
+
+/* ── Pending uploads (files kept in the browser until the form is saved) ── */
+.pu-area { border: 1px dashed var(--bs-border-color); border-radius: var(--bs-border-radius); padding: .5rem; }
+.pu-area.pu-dragover { border-color: var(--bs-primary); background: var(--bs-primary-bg-subtle); }
+.pu-tile { width: 104px; padding: 4px; cursor: pointer; background: var(--bs-body-bg); }
+.pu-tile:focus-visible { outline: 2px solid var(--bs-primary); outline-offset: 1px; }
+.pu-thumb { height: 72px; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; border-radius: 4px; background: var(--bs-tertiary-bg); }
+.pu-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.pu-ext { font-size: .65rem; font-weight: 600; color: var(--bs-secondary-color); }
+.pu-name { font-size: .72rem; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pu-size { font-size: .65rem; }
+.pu-new { position: absolute; top: 2px; left: 2px; font-size: .6rem; }
+.pu-remove { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; padding: 0; line-height: 1; border-radius: 50%; font-size: .75rem; }
+.existing-file.pu-removing { opacity: .45; }
+.existing-file.pu-removing .existing-file-name { text-decoration: line-through; }
+.existing-file .pu-removing-label { display: none; }
+.existing-file.pu-removing .pu-removing-label { display: inline; }

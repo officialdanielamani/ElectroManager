@@ -80,6 +80,27 @@ to patch in. Do not edit it; add new revisions instead.
 Never call `db.create_all()` in application code — it would create tables that a later migration then
 fails to create.
 
+## File uploads in forms
+
+The New / Edit item and project forms do not upload anything until the form is saved, so editing
+files never loses the rest of the form.
+
+- `static/js/pending-uploads.js` turns each `<div class="pending-uploads">` into an upload area. It
+  checks picked files (extension, size, count, first bytes against the extension), previews them, and
+  puts the accepted ones into a hidden `<input type="file">` submitted with the form. Removing or
+  renaming an existing file only records the change in hidden inputs.
+- `uploads.py` holds the rules (`item_rules`, `project_rules`, read from System Settings) and checks
+  each file again on save (`select_uploads`). Rejections become one message per file
+  (`describe_rejections`); the item or project is still saved.
+- `routes/item.py` `_apply_item_file_changes` and `routes/project.py` `_apply_project_file_changes`
+  apply removals, renames and uploads inside the normal save.
+- Because a save can carry several files, `MAX_CONTENT_LENGTH` is computed from the upload settings
+  (`request_size_limit`) at startup and after System Settings are saved, unless the
+  `MAX_CONTENT_LENGTH` environment variable is set. A request that is still too large returns to the
+  form with a message (the 413 handler in `app.py`).
+
+Kanban card uploads and the share-file library still upload immediately; they are not part of a form.
+
 ## Tests
 
 `tests/conftest.py` points the app at a temporary database and gives each test a clean one with the
@@ -95,6 +116,7 @@ built-in roles. Useful fixtures: `make_user`, `login`, `admin_client`, `make_ite
 | `test_item_tags.py` | Tags through the item form, bulk edit and tag deletion |
 | `test_kanban.py` | Card move / duplicate permissions |
 | `test_plugins_backup.py` | Plugin admin pages, restoring a backup |
+| `test_form_uploads.py` | Files sent with the item and project forms: checks, limits, removals, permissions |
 
 A test client request must not run inside `with app.app_context():` — the request would share that
 context's `g`, which breaks Flask-Login. Do database setup inside the context, requests outside it.
@@ -137,6 +159,8 @@ Things a new maintainer should know are unfinished or weak, roughly by importanc
   to read.
 - **Print pages link a Bootstrap CSS path that does not exist** (`static/lib/bootstrap/css/…`), so
   they render without Bootstrap styling.
+- **Project URLs are still added with their own form**, so adding one on Edit Project reloads the
+  page and loses unsaved changes to the rest of the form.
 - **SQLite only in practice.** Backup and restore copy the SQLite file, and migrations are tested on
   SQLite only.
 - **Single process.** Rate limits, the API rate limiter and Kanban live updates are held in memory,

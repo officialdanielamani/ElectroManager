@@ -10,7 +10,7 @@
                 <h5><i class="bi bi-kanban"></i> {{ title }}</h5>
             </div>
             <div class="card-body">
-                <form method="POST" id="projectForm">
+                <form method="POST" id="projectForm" data-upload-limit="{{ upload_request_limit or 0 }}">
                     <p class="text-muted small mb-3"><span class="text-danger fw-bold">*</span> Required field</p>
 
                     {% if project and project.project_id %}
@@ -320,6 +320,107 @@
             </div>
         </div>
 
+        <!-- Attachments: new files, and removals, are applied when the project is saved -->
+        {% set att_types = [('picture', 'Pictures', 'bi-image'), ('document', 'Documents', 'bi-file-text'), ('schematic', 'Schematics', 'bi-cpu'), ('2d_design', '2D Designs', 'bi-pencil-square'), ('3d_design', '3D Designs', 'bi-box'), ('program', 'Programs', 'bi-code')] %}
+        <div class="card mt-3">
+            <div class="card-header"><h5 class="mb-0"><i class="bi bi-paperclip"></i> Attachments</h5></div>
+            <div class="card-body">
+                {% for att_type, att_label, att_icon in att_types %}
+                <div class="mb-3">
+                    <h6><i class="bi {{ att_icon }}"></i> {{ att_label }}</h6>
+                    {% if attachments[att_type] %}
+                    <div class="d-flex flex-wrap gap-2 mb-2">
+                        {% for att in attachments[att_type] %}
+                        {% set is_image = att.file_type in ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'] %}
+                        <div class="existing-file pu-tile border rounded position-relative" data-area="{{ att_type }}" data-attachment-id="{{ att.id }}">
+                            <a href="{{ url_for('uploaded_file', filename=att.file_path) }}" target="_blank" rel="noopener"
+                               class="d-block text-reset text-decoration-none" title="{{ att.original_filename }} — open in a new tab">
+                                <div class="pu-thumb">
+                                    {% if is_image %}
+                                    <img src="{{ thumb_url(att.file_path) if att.file_type != 'svg' else url_for('uploaded_file', filename=att.file_path) }}" alt="">
+                                    {% else %}
+                                    <i class="bi bi-file-earmark-text fs-3 text-muted"></i>
+                                    <span class="pu-ext">{{ att.file_type | upper }}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="pu-name existing-file-name">{{ att.original_filename }}</div>
+                                <div class="pu-size text-muted">{{ (att.file_size or 0) | filesize }}</div>
+                            </a>
+                            <span class="badge text-bg-danger pu-new pu-removing-label">Removing</span>
+                            <button type="button" class="btn btn-danger btn-sm pu-remove" title="Remove on save"
+                                    aria-label="Remove {{ att.original_filename }} on save" onclick="toggleProjectAttachmentRemoval(this)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <div class="pending-uploads" data-form="projectForm" data-name="new_files_{{ att_type }}"
+                         data-rules='{{ upload_rules[att_type] | tojson }}'
+                         data-existing=".existing-file[data-area='{{ att_type }}']"></div>
+                </div>
+                {% endfor %}
+                <div id="removeAttachmentInputs"></div>
+                <small class="text-muted">New files and removals are applied when you save the project.</small>
+            </div>
+        </div>
+        <script>
+        function toggleProjectAttachmentRemoval(button) {
+            const tile = button.closest('.existing-file'), id = tile.dataset.attachmentId;
+            const removing = tile.classList.toggle('pu-removing');
+            const holder = document.getElementById('removeAttachmentInputs');
+            const existing = holder.querySelector(`input[value="${id}"]`);
+            if (removing && !existing) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'remove_attachment_ids[]';
+                input.value = id;
+                input.setAttribute('form', 'projectForm');
+                holder.appendChild(input);
+            } else if (!removing && existing) {
+                existing.remove();
+            }
+            button.title = removing ? 'Keep this file' : 'Remove on save';
+            button.innerHTML = removing ? '<i class="bi bi-arrow-counterclockwise"></i>' : '<i class="bi bi-trash"></i>';
+            document.dispatchEvent(new Event('pending-uploads:recount'));
+        }
+        </script>
+
+        <!-- Share Files -->
+        {% if share_files_project is defined %}
+        <div class="card mt-3">
+            <div class="card-header"><h5 class="mb-0"><i class="bi bi-folder-fill"></i> Share Files</h5></div>
+            <div class="card-body">
+                <div id="linkedShareFiles" class="d-flex flex-wrap gap-2 mb-2">
+                    {% for sf in (project.linked_share_files if project else []) %}
+                    <div class="position-relative border rounded p-1 bg-light d-flex align-items-center justify-content-center"
+                         id="sf_chip_{{ sf.id }}"
+                         style="width:80px; height:80px; overflow:hidden; flex-shrink:0;">
+                        {% if sf.is_image %}
+                        <img src="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}"
+                             alt="{{ sf.name }}"
+                             style="width:100%; height:100%; object-fit:cover; border-radius:4px;">
+                        {% else %}
+                        <div class="text-center">
+                            <i class="bi bi-file-earmark text-muted" style="font-size:1.5rem;"></i>
+                            <div class="text-truncate" style="font-size:0.65rem; max-width:72px;">{{ sf.name }}</div>
+                        </div>
+                        {% endif %}
+                        <button type="button" class="position-absolute top-0 end-0 btn btn-danger btn-sm p-0"
+                                style="width:18px; height:18px; font-size:0.6rem; line-height:1;"
+                                onclick="removeShareFile({{ sf.id }})">×</button>
+                        <input type="hidden" name="share_file_ids[]" value="{{ sf.id }}" id="sfhid_{{ sf.id }}" form="projectForm">
+                    </div>
+                    {% endfor %}
+                </div>
+                <button type="button" class="btn btn-primary btn-sm"
+                        data-bs-toggle="modal" data-bs-target="#shareFilePickerModal">
+                    <i class="bi bi-folder2-open"></i> Browse Share Files
+                </button>
+            </div>
+        </div>
+        {% endif %}
+
         {% if project %}
         <!-- URLs (edit page only) -->
         <div class="card mt-3">
@@ -341,74 +442,6 @@
                 </form>
             </div>
         </div>
-
-        <!-- Attachments (edit page only) -->
-        {% set att_types = [('picture', 'Pictures', 'bi-image'), ('document', 'Documents', 'bi-file-text'), ('schematic', 'Schematics', 'bi-cpu'), ('2d_design', '2D Designs', 'bi-pencil-square'), ('3d_design', '3D Designs', 'bi-box'), ('program', 'Programs', 'bi-code')] %}
-        <div class="card mt-3">
-            <div class="card-header"><h5 class="mb-0"><i class="bi bi-paperclip"></i> Attachments</h5></div>
-            <div class="card-body">
-                {% for att_type, att_label, att_icon in att_types %}
-                <div class="mb-3">
-                    <h6><i class="bi {{ att_icon }}"></i> {{ att_label }}</h6>
-                    {% for att in attachments[att_type] %}
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <div>
-                            {% if att_type == 'picture' and att.file_type in ['png','jpg','jpeg','webp','svg'] %}
-                            <img src="{{ url_for('uploaded_file', filename=att.file_path) }}" alt="" style="max-height: 40px; max-width: 60px;" class="me-2 rounded">
-                            {% endif %}
-                            <a href="{{ url_for('uploaded_file', filename=att.file_path) }}" target="_blank">{{ att.original_filename }}</a>
-                            <small class="text-muted">({{ (att.file_size / 1024) | round(1) }} KB)</small>
-                        </div>
-                        <form method="POST" action="{{ url_for('project.project_attachment_delete', att_id=att.id) }}" style="display:inline;">
-                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete?')"><i class="bi bi-trash"></i></button>
-                        </form>
-                    </div>
-                    {% endfor %}
-                    <form method="POST" action="{{ url_for('project.project_upload', project_id=project.project_id, attachment_type=att_type) }}" enctype="multipart/form-data" class="mt-1">
-                        <div class="input-group input-group-sm">
-                            <input type="file" class="form-control form-control-sm" name="files" multiple>
-                            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-upload"></i></button>
-                        </div>
-                    </form>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <!-- Share Files -->
-        {% if share_files_project is defined %}
-        <div class="card mt-3">
-            <div class="card-header"><h5 class="mb-0"><i class="bi bi-folder-fill"></i> Share Files</h5></div>
-            <div class="card-body">
-                <div id="linkedShareFiles" class="d-flex flex-wrap gap-2 mb-2">
-                    {% for sf in project.linked_share_files %}
-                    <div class="position-relative border rounded p-1 bg-light d-flex align-items-center justify-content-center"
-                         id="sf_chip_{{ sf.id }}"
-                         style="width:80px; height:80px; overflow:hidden; flex-shrink:0;">
-                        {% if sf.is_image %}
-                        <img src="{{ url_for('share.share_serve', category='project', filename=sf.filename) }}"
-                             alt="{{ sf.name }}"
-                             style="width:100%; height:100%; object-fit:cover; border-radius:4px;">
-                        {% else %}
-                        <div class="text-center">
-                            <i class="bi bi-file-earmark text-muted" style="font-size:1.5rem;"></i>
-                            <div class="text-truncate" style="font-size:0.65rem; max-width:72px;">{{ sf.name }}</div>
-                        </div>
-                        {% endif %}
-                        <button type="button" class="position-absolute top-0 end-0 btn btn-danger btn-sm p-0"
-                                style="width:18px; height:18px; font-size:0.6rem; line-height:1;"
-                                onclick="removeShareFile({{ sf.id }})">×</button>
-                        <input type="hidden" name="share_file_ids[]" value="{{ sf.id }}" id="sfhid_{{ sf.id }}">
-                    </div>
-                    {% endfor %}
-                </div>
-                <button type="button" class="btn btn-primary btn-sm"
-                        data-bs-toggle="modal" data-bs-target="#shareFilePickerModal">
-                    <i class="bi bi-folder2-open"></i> Browse Share Files
-                </button>
-            </div>
-        </div>
-        {% endif %}
 
         <!-- Magic Parameters -->
         {% if project %}
@@ -1879,13 +1912,17 @@ function addShareFileChip(id, name, isImage, imgUrl) {
     div.id = 'sf_chip_' + id;
     div.style.cssText = 'width:80px;height:80px;overflow:hidden;flex-shrink:0;';
     const inner = isImage
-        ? `<img src="${imgUrl}" alt="${name}" style="width:100%;height:100%;object-fit:cover;border-radius:4px;">`
-        : `<div class="text-center"><i class="bi bi-file-earmark text-muted" style="font-size:1.5rem;"></i><div class="text-truncate" style="font-size:0.65rem;max-width:72px;">${name}</div></div>`;
+        ? `<img src="${_sfEsc(imgUrl)}" alt="${_sfEsc(name)}" style="width:100%;height:100%;object-fit:cover;border-radius:4px;">`
+        : `<div class="text-center"><i class="bi bi-file-earmark text-muted" style="font-size:1.5rem;"></i><div class="text-truncate" style="font-size:0.65rem;max-width:72px;">${_sfEsc(name)}</div></div>`;
     div.innerHTML = inner +
         `<button type="button" class="position-absolute top-0 end-0 btn btn-danger btn-sm p-0" style="width:18px;height:18px;font-size:0.6rem;line-height:1;" onclick="removeShareFile(${id})">×</button>` +
-        `<input type="hidden" name="share_file_ids[]" value="${id}" id="sfhid_${id}">`;
+        `<input type="hidden" name="share_file_ids[]" value="${id}" id="sfhid_${id}" form="projectForm">`;
     container.appendChild(div);
     updateSfCount();
+}
+
+function _sfEsc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 function removeShareFile(id) {
@@ -1937,4 +1974,5 @@ function _initCharCounter(taId, counterId, max) {
 }
 </script>
 
+<script src="{{ url_for('static', filename='js/pending-uploads.js') }}"></script>
 {% endblock %}

@@ -764,7 +764,9 @@ def settings_system():
             Setting.set('api_lending_return_enabled','true' if 'api_lending_return_enabled' in request.form else 'false', 'Enable Lending & Return API system-wide')
 
             # Update app config dynamically
-            current_app.config['MAX_CONTENT_LENGTH'] = max_file_size * 1024 * 1024
+            if not os.environ.get('MAX_CONTENT_LENGTH'):
+                from uploads import request_size_limit
+                current_app.config['MAX_CONTENT_LENGTH'] = request_size_limit()
 
             flash('System settings updated successfully!', 'success')
             log_audit(current_user.id, 'update', 'settings', 0,

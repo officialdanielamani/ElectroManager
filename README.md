@@ -23,7 +23,7 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 - **Pre-create batches** on the new-item form — add initial batches before saving the item
 - **"Save and Create New"** button — save the current item and immediately open a fresh form to enter the next one
 - Minimum quantity threshold with low-stock warnings (per item, toggleable)
-- Attach files (PDFs, images, documents) directly to items
+- Attach files (PDFs, images, documents) directly to items — on the New Item form as well as Edit. Picked files stay in the browser with a preview until you save; the browser and then the server check type, size, file count and whether the content really matches the extension (a program renamed to `.jpeg` is refused). The item is saved either way and each rejected file is reported with its reason
 - Multiple datasheet URLs per item
 - Link shared library files to items (reuse the same file across multiple items without re-uploading)
 - Item thumbnail image
@@ -72,7 +72,7 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 - **Bill of Materials (BOM)** — link inventory items (with optional specific batch) to a project with required and used quantities; track used/unused status; supports serial-number assignment
 - **Project cost tracking** — add extra cost line items per project: *per-quantity* costs (e.g. labour per unit) and *overall* costs (e.g. one-off fees); combined with BOM actual cost for a full project cost estimate
 - Available-for-BOM search excludes items already lent or assigned elsewhere
-- Project attachments with separate upload limits by category (pictures, documents, schematics, 2D/3D files)
+- Project attachments with separate upload limits by category (pictures, documents, schematics, 2D/3D files), added on New Project or Edit Project and uploaded when the project is saved, with the same checks and per-file messages as items
 - Project reference URLs with optional title and description
 - Link shared library files to projects
 - **Dateline notifications** — configurable alerts (N days before end date) visible in the notification centre

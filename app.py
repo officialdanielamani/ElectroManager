@@ -380,6 +380,7 @@ def set_security_headers(response):
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com data:; "
         "img-src 'self' data: blob:; "
+        "frame-src 'self' blob:; "      # previewing a PDF picked for upload
         "connect-src 'self'; "
         "object-src 'none'; "
         "base-uri 'self'; "
@@ -393,6 +394,15 @@ def set_security_headers(response):
 
 
 # Error handlers
+@app.errorhandler(413)
+def request_too_large(error):
+    """Files larger than the server accepts in one request: keep the user on the page they came from."""
+    from flask import flash, redirect
+    flash('Nothing was saved: the files sent were larger than the server accepts in one go. '
+          'Try again with fewer or smaller files.', 'danger')
+    return redirect(request.referrer or url_for('index'))
+
+
 @app.errorhandler(404)
 def not_found_error(error):
     """Handle 404 errors"""
@@ -425,6 +435,12 @@ with app.app_context():
 from db_migrate import upgrade_database
 with app.app_context():
     upgrade_database(db.engine)
+
+# Forms send their files when saved, so a request must fit every upload area at its limits.
+from uploads import request_size_limit
+if not os.environ.get('MAX_CONTENT_LENGTH'):
+    with app.app_context():
+        app.config['MAX_CONTENT_LENGTH'] = request_size_limit()
 
 # Register plugins blueprint and load plugins
 from routes.plugins import plugins_bp
