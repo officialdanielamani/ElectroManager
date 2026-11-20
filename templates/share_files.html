@@ -260,7 +260,8 @@
 <!-- ===== Upload Modal ===== -->
 {% if can_add %}
 <div class="modal fade" id="uploadModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
-    <form method="POST" action="{{ url_for('share.share_upload') }}" enctype="multipart/form-data">
+    <form method="POST" action="{{ url_for('share.share_upload') }}" enctype="multipart/form-data"
+          id="shareUploadForm" data-upload-limit="{{ upload_request_limit or 0 }}">
         <div class="modal-header">
             <h5 class="modal-title"><i class="bi bi-upload"></i> Upload Files</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -273,12 +274,13 @@
                     <option value="{{ cat }}" {% if category_filter == cat %}selected{% endif %}>{{ cat|capitalize }}</option>
                     {% endfor %}
                 </select>
-                <div class="mt-1" id="categoryHint"></div>
             </div>
-            <div class="mb-3">
+            <div class="mb-1">
                 <label class="form-label">Files <span class="text-danger">*</span></label>
-                <input type="file" class="form-control" name="files" id="uploadFiles" multiple required>
-                <small class="text-muted">Hold Ctrl/Cmd to select multiple files</small>
+                {% set first_category = category_filter if category_filter in categories else categories[0] %}
+                <div class="pending-uploads" id="shareUploadArea" data-form="shareUploadForm" data-name="files"
+                     data-rules='{{ upload_rules[first_category] | tojson }}'></div>
+                <small class="text-muted d-block mt-1">Files are checked here and again on the server when you click Upload.</small>
             </div>
         </div>
         <div class="modal-footer">
@@ -348,46 +350,17 @@
 {% endif %}
 
 <script>
-const categoryLimits = {
-    item:    { ext: '{{ share_ext.item }}',    size: '{{ share_size.item }} MB',    maxFiles: {{ share_max_files.item }} },
-    profile: { ext: 'jpg, jpeg, png',           size: '1 MB (fixed)',               maxFiles: 1 },
-    project: { ext: '{{ share_ext.project }}', size: '{{ share_size.project }} MB', maxFiles: {{ share_max_files.project }} },
-    sticker: { ext: '{{ share_ext.sticker }}', size: '{{ share_size.sticker }} MB', maxFiles: {{ share_max_files.sticker }} },
-    icon:    { ext: '{{ share_ext.icon }}',    size: '{{ share_size.icon }} MB',    maxFiles: {{ share_max_files.icon }} },
-};
-
-// Update category hint in upload modal
+// The upload area follows the chosen category's limits.
+const shareUploadRules = {{ upload_rules | tojson }};
 const catSelect = document.getElementById('uploadCategory');
 if (catSelect) {
-    catSelect.addEventListener('change', function() {
-        const lim = categoryLimits[this.value];
-        const hint = document.getElementById('categoryHint');
-        if (lim && hint) {
-            let maxFilesText = lim.maxFiles === -1 ? 'unlimited' : (lim.maxFiles === 0 ? '<span class="text-danger">disabled</span>' : lim.maxFiles);
-            hint.innerHTML = '<small class="text-muted"><i class="bi bi-info-circle"></i> Allowed: <strong>' +
-                lim.ext + '</strong> &nbsp;|&nbsp; Max per file: <strong>' + lim.size +
-                '</strong> &nbsp;|&nbsp; Max files: <strong>' + maxFilesText + '</strong></small>';
-        }
+    catSelect.addEventListener('change', function () {
+        PendingUploads.of(document.getElementById('shareUploadArea')).setRules(shareUploadRules[this.value]);
     });
-    catSelect.dispatchEvent(new Event('change'));
-}
-
-// Client-side file count validation for share upload form
-const uploadForm = document.querySelector('#uploadModal form');
-if (uploadForm) {
-    uploadForm.addEventListener('submit', function(e) {
-        const cat = document.getElementById('uploadCategory').value;
-        const lim = categoryLimits[cat];
-        const filesInput = document.getElementById('uploadFiles');
-        if (!lim || !filesInput) return;
-        if (lim.maxFiles === 0) {
+    document.getElementById('shareUploadForm').addEventListener('submit', function (e) {
+        if (!PendingUploads.of(document.getElementById('shareUploadArea')).files.length) {
             e.preventDefault();
-            alert('File uploads are currently disabled for this category by the administrator.');
-            return;
-        }
-        if (lim.maxFiles > 0 && filesInput.files.length > lim.maxFiles) {
-            e.preventDefault();
-            alert(`Too many files selected (${filesInput.files.length}). Maximum allowed per upload is ${lim.maxFiles}.\n\nPlease remove some files and try again.`);
+            alert('Add at least one file to upload.');
         }
     });
 }
@@ -557,4 +530,5 @@ if (slider && currentView === 'card') {
     });
 }
 </script>
+<script src="{{ url_for('static', filename='js/pending-uploads.js') }}"></script>
 {% endblock %}

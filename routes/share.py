@@ -12,27 +12,13 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from models import db, SharedFile, Setting, User
 from utils import log_audit, generate_thumbnail_for_file
+from uploads import share_rules, select_uploads, describe_rejections
 
 share_bp = Blueprint('share', __name__)
 
 SHARE_CATEGORIES = ['item', 'project', 'profile', 'sticker', 'icon']
 IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'}
 
-CATEGORY_DEFAULTS = {
-    'item':    {'extensions': 'pdf,png,jpg,jpeg,gif,txt,doc,docx', 'max_size': '10'},
-    'icon':    {'extensions': 'png,jpg,jpeg',                      'max_size': '5'},
-    'profile': {'extensions': 'jpg,jpeg,png',                      'max_size': '1'},
-    'project': {'extensions': 'pdf,png,jpg,jpeg,gif,txt,doc,docx', 'max_size': '10'},
-    'sticker': {'extensions': 'png,jpg,jpeg',                      'max_size': '1'},
-}
-
-DEMO_LIMITS = {
-    'item':    {'extensions': 'jpg,jpeg,png,txt', 'max_size': '1'},
-    'icon':    {'extensions': 'jpg,jpeg,png',     'max_size': '1'},
-    'profile': {'extensions': 'jpg,jpeg,png',     'max_size': '1'},
-    'project': {'extensions': 'jpg,jpeg,png,txt', 'max_size': '1'},
-    'sticker': {'extensions': 'jpg,jpeg,png',     'max_size': '1'},
-}
 
 PROFILE_FIXED = True  # profile limits are not configurable
 
@@ -90,25 +76,6 @@ def _unique_filename(folder: str, filename: str) -> str:
         counter += 1
 
 
-def get_share_config(category):
-    """Return (allowed_ext_set, max_bytes) for the given category."""
-    if category == 'profile':
-        return {'jpg', 'jpeg', 'png'}, 1 * 1024 * 1024
-    if current_app.config.get('DEMO_MODE', False):
-        d = DEMO_LIMITS.get(category, DEMO_LIMITS['item'])
-        exts = {e.strip().lower() for e in d['extensions'].split(',') if e.strip()}
-        return exts, int(d['max_size']) * 1024 * 1024
-    d = CATEGORY_DEFAULTS.get(category, CATEGORY_DEFAULTS['item'])
-    ext_str = Setting.get(f'share_{category}_extensions', d['extensions'])
-    size_mb_str = Setting.get(f'share_{category}_max_size', d['max_size'])
-    try:
-        size_mb = int(size_mb_str)
-    except (ValueError, TypeError):
-        size_mb = int(d['max_size'])
-    exts = {e.strip().lower() for e in ext_str.split(',') if e.strip()}
-    return exts, size_mb * 1024 * 1024
-
-
 @share_bp.route('/settings/share-files', endpoint='share_files')
 @login_required
 def share_files():
@@ -133,21 +100,6 @@ def share_files():
     for cat in SHARE_CATEGORIES:
         counts[cat] = SharedFile.query.filter_by(category=cat).count()
 
-    # Build display strings for upload hints
-    share_ext = {}
-    share_size = {}
-    share_max_files = {}
-    for cat in SHARE_CATEGORIES:
-        exts, max_b = get_share_config(cat)
-        share_ext[cat] = ', '.join(sorted(exts))
-        share_size[cat] = str(max_b // (1024 * 1024))
-        if cat == 'profile':
-            share_max_files[cat] = 1
-        elif current_app.config.get('DEMO_MODE', False):
-            share_max_files[cat] = 5
-        else:
-            share_max_files[cat] = int(Setting.get(f'share_{cat}_max_files', '100'))
-
     return render_template('share_files.html',
                            files=files,
                            categories=SHARE_CATEGORIES,
@@ -155,9 +107,8 @@ def share_files():
                            view_mode=view_mode,
                            can_add=can_add, can_edit=can_edit, can_delete=can_delete,
                            counts=counts,
-                           share_ext=share_ext,
-                           share_size=share_size,
-                           share_max_files=share_max_files,
+                           upload_rules={cat: share_rules(cat, counts[cat]).for_browser() for cat in SHARE_CATEGORIES},
+                           upload_request_limit=current_app.config['MAX_CONTENT_LENGTH'],
                            download_all_share_files_page=Setting.get('download_all_share_files_page', True))
 
 
@@ -179,7 +130,6 @@ def share_upload():
         flash('Invalid category.', 'danger')
         return redirect(url_for('share.share_files'))
 
-    allowed_exts, max_bytes = get_share_config(category)
     try:
         share_folder = _share_folder(current_app.config['UPLOAD_FOLDER'], category)
     except ValueError:
@@ -187,69 +137,25 @@ def share_upload():
         return redirect(url_for('share.share_files'))
     os.makedirs(share_folder, exist_ok=True)
 
-    # Enforce max number of files per upload (-1=unlimited, 0=disabled, >0=total limit)
-    if category != 'profile' and not current_app.config.get('DEMO_MODE', False):
-        max_files = int(Setting.get(f'share_{category}_max_files', '100'))
-        valid_files = [f for f in files if f and f.filename]
-        if max_files == 0:
-            flash('File uploads are currently disabled by the administrator.', 'danger')
-            return redirect(url_for('share.share_files', category=category))
-        if max_files > 0:
-            existing_count = SharedFile.query.filter_by(category=category).count()
-            if existing_count >= max_files:
-                flash(f'Upload limit reached. The {category} library already has {existing_count} file(s) (max {max_files}).', 'danger')
-                return redirect(url_for('share.share_files', category=category))
-            if existing_count + len(valid_files) > max_files:
-                remaining = max_files - existing_count
-                flash(f'Too many files. Selecting {len(valid_files)} would exceed the limit (max {max_files}, already {existing_count}, room for {remaining} more).', 'danger')
-                return redirect(url_for('share.share_files', category=category))
-
-    uploaded = 0
-    errors = []
-    for file in files:
-        if not file or not file.filename:
-            continue
-
-        ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
-        if ext not in allowed_exts:
-            errors.append(f'"{file.filename}": type .{ext} not allowed')
-            continue
-
-        file.seek(0, os.SEEK_END)
-        file_size = file.tell()
-        file.seek(0)
-
-        if file_size > max_bytes:
-            errors.append(f'"{file.filename}": exceeds {max_bytes // (1024 * 1024)} MB limit')
-            continue
-
-        safe_base = secure_filename(file.filename)
-        stored_name = _unique_filename(share_folder, safe_base)
+    existing = SharedFile.query.filter_by(category=category).count()
+    accepted, rejected = select_uploads(files, share_rules(category, existing))
+    for storage in accepted:
+        stored_name = _unique_filename(share_folder, secure_filename(storage.filename))
         saved_path = os.path.join(share_folder, stored_name)
-        file.save(saved_path)
-        # Generate thumbnail for images (SVG excluded — it's already vector)
-        if ext != 'svg':
+        storage.save(saved_path)
+        if not stored_name.lower().endswith('.svg'):   # SVG is already vector
             generate_thumbnail_for_file(saved_path, current_app.config['UPLOAD_FOLDER'])
-        name_base = stored_name.rsplit('.', 1)[0] if '.' in stored_name else stored_name
-
-        sf = SharedFile(
-            name=name_base,
-            filename=stored_name,
-            category=category,
-            file_size=file_size,
-            uploaded_by_id=current_user.id,
-        )
+        sf = SharedFile(name=stored_name.rsplit('.', 1)[0], filename=stored_name, category=category,
+                        file_size=os.path.getsize(saved_path), uploaded_by_id=current_user.id)
         db.session.add(sf)
         db.session.flush()
         log_audit(current_user.id, 'create', 'shared_file', sf.id, f'Uploaded shared file: {sf.name}')
-        uploaded += 1
-
     db.session.commit()
 
-    if uploaded:
-        flash(f'{uploaded} file(s) uploaded successfully.', 'success')
-    for err in errors:
-        flash(err, 'danger')
+    if accepted:
+        flash(f'{len(accepted)} file{"s" if len(accepted) != 1 else ""} uploaded to {category}.', 'success')
+    for message in describe_rejections(rejected):
+        flash(message, 'warning')
 
     return redirect(url_for('share.share_files', category=category))
 

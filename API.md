@@ -943,8 +943,7 @@ Pass an array of shared file IDs to link to the card. Only files with category `
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/kanban/cards/<id>/upload` | Upload files to a card; multipart form field `files` (multiple); enforces Kanban upload settings |
-| DELETE | `/kanban/cards/attachments/<id>` | Delete a card attachment by attachment ID |
+| POST | `/kanban/cards/<id>/files` | Save a card's files in one request: multipart field `files` (multiple) to upload and `remove_attachment_ids[]` to delete; enforces Kanban upload settings and returns `{uploaded, removed, messages}` with one message per rejected file |
 
 Upload settings are configured at `Settings → System → File Upload Settings → Kanban Card Uploads`:
 - Allowed extensions (default: `png,jpg,jpeg,txt,pdf`)

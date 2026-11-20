@@ -917,18 +917,12 @@
             {# Uploads section #}
             <div class="mb-3">
                 <label class="form-label fw-semibold"><i class="bi bi-paperclip"></i> Uploads</label>
-                <div id="card-attachments" class="mb-2">
+                <div id="card-attachments" class="d-flex flex-wrap gap-2 mb-2">
                     <small class="text-muted">No files attached.</small>
                 </div>
-                <div id="card-upload-section" style="display:none;">
-                    <div class="d-flex align-items-center gap-2 mt-1">
-                        <input type="file" id="card-file-input" class="form-control form-control-sm flex-grow-1" multiple>
-                        <button type="button" class="btn btn-sm btn-primary flex-shrink-0" onclick="uploadCardFiles()">
-                            <i class="bi bi-upload"></i> Upload
-                        </button>
-                    </div>
-                    <small class="text-muted d-block mt-1" id="card-upload-hint"></small>
-                </div>
+                <div class="pending-uploads" id="card-pending-uploads"
+                     data-rules='{{ upload_rules | tojson }}' data-existing="#card-attachments .existing-file"></div>
+                <small class="text-muted d-block mt-1" id="card-upload-note">New files and removals are applied when you save the card.</small>
             </div>
 
             <hr>
@@ -1383,10 +1377,7 @@ const CAN_SHARE_BOARD = {{ can_share_board | tojson }};
 const IS_OWNER        = {{ is_owner | tojson }};
 const ACTIVE_SHARE_TYPE = {{ active_share_type | tojson }};
 const CAN_EDIT   = IS_OWNER || ACTIVE_SHARE_TYPE === 'edit';
-const CAN_UPLOAD = IS_OWNER || ACTIVE_SHARE_TYPE === 'edit' || ACTIVE_SHARE_TYPE === 'view';
-const KANBAN_UPLOAD_EXTS     = {{ kanban_upload_exts | tojson }};
-const KANBAN_UPLOAD_MAX_SIZE = {{ kanban_upload_max_size | tojson }};
-const KANBAN_UPLOAD_MAX_FILES = {{ kanban_upload_max_files | tojson }};
+const CAN_UPLOAD = IS_OWNER || ACTIVE_SHARE_TYPE === 'edit' || ACTIVE_SHARE_TYPE === 'view_only';  // matches _card_uploadable_or_403
 const CURRENT_USER_ID   = {{ current_user.id | tojson }};
 const CURRENT_USER_NAME = {{ (current_user.name or current_user.username) | tojson }};
 
@@ -2455,7 +2446,11 @@ function _applyCardModalReadOnly(readOnly) {
     });
     const saveBtn = document.getElementById('btn-save-card');
     const delBtn  = document.getElementById('btn-delete-card-modal');
-    if (saveBtn) saveBtn.style.display = readOnly ? 'none' : '';
+    _cardModalReadOnly = readOnly;
+    if (saveBtn) {
+        saveBtn.style.display = readOnly && !CAN_UPLOAD ? 'none' : '';
+        saveBtn.textContent = readOnly ? 'Save files' : 'Save';
+    }
     if (delBtn)  delBtn.style.display  = readOnly ? 'none' : '';
     // Task add row
     const taskInputGroup = document.querySelector('#cardModal .input-group.input-group-sm.mb-1');
@@ -2684,79 +2679,77 @@ async function refreshModalTasks() {
 }
 
 // ── Card attachments ─────────────────────────────────────────────
+// Removals and new files are kept here and sent by the Save button (saveCardFiles).
+
+let _cardModalReadOnly = false;
+const _cardRemoveIds = new Set();
+
+function _cardUploads() {
+    return PendingUploads.of(document.getElementById('card-pending-uploads'));
+}
 
 function renderCardAttachments(attachments) {
-    _cardAttachmentCount = (attachments || []).length;
+    _cardRemoveIds.clear();
+    const uploads = _cardUploads();
+    if (uploads) { uploads.clear(); uploads.setDisabled(!CAN_UPLOAD); }
+    document.getElementById('card-pending-uploads').style.display = CAN_UPLOAD ? '' : 'none';
+    document.getElementById('card-upload-note').style.display = CAN_UPLOAD ? '' : 'none';
+
     const container = document.getElementById('card-attachments');
-    const section   = document.getElementById('card-upload-section');
-    const hint      = document.getElementById('card-upload-hint');
-
-    if (section) section.style.display = CAN_UPLOAD ? '' : 'none';
-    if (hint) {
-        const maxF = KANBAN_UPLOAD_MAX_FILES === -1 ? 'unlimited'
-                   : KANBAN_UPLOAD_MAX_FILES === 0  ? 'disabled'
-                   : KANBAN_UPLOAD_MAX_FILES;
-        hint.textContent = `Allowed: ${KANBAN_UPLOAD_EXTS} | Max: ${KANBAN_UPLOAD_MAX_SIZE} MB per file | Max files: ${maxF}`;
-    }
-
-    if (!container) return;
+    container.replaceChildren();
     if (!attachments || attachments.length === 0) {
         container.innerHTML = '<small class="text-muted">No files attached.</small>';
         return;
     }
-
     const imgExts = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']);
-    const images  = attachments.filter(a => imgExts.has(a.file_type));
-    const others  = attachments.filter(a => !imgExts.has(a.file_type));
-
-    let html = '';
-
-    if (images.length) {
-        html += '<div class="d-flex flex-wrap gap-2 mb-2">';
-        images.forEach(a => {
-            const delBtn = CAN_UPLOAD
-                ? `<button type="button" class="position-absolute top-0 end-0 btn btn-danger p-0 js-del-attachment"
-                       data-id="${a.id}" style="width:18px;height:18px;font-size:.6rem;line-height:1;">×</button>`
-                : '';
-            html += `<div class="position-relative" style="width:72px;height:72px;flex-shrink:0;cursor:pointer;">
-                <img src="/uploads/${escHtml(a.filename)}" alt="${escHtml(a.original_filename)}"
-                     class="rounded border js-preview-img"
-                     data-src="/uploads/${escHtml(a.filename)}"
-                     data-title="${escHtml(a.original_filename)}"
-                     style="width:72px;height:72px;object-fit:cover;"
-                     title="${escHtml(a.original_filename)}">
-                ${delBtn}
-            </div>`;
+    attachments.forEach(a => {
+        const url = '/uploads/' + a.filename;
+        const isImage = imgExts.has(a.file_type);
+        const tile = document.createElement('div');
+        tile.className = 'existing-file pu-tile border rounded position-relative';
+        tile.dataset.attachmentId = a.id;
+        tile.title = a.original_filename + (isImage ? ' — click to view' : ' — click to open');
+        const thumb = document.createElement('div');
+        thumb.className = 'pu-thumb';
+        if (isImage) {
+            const img = document.createElement('img');
+            img.src = url; img.alt = '';
+            thumb.appendChild(img);
+        } else {
+            thumb.innerHTML = '<i class="bi bi-file-earmark-text fs-3 text-muted"></i>';
+            const ext = document.createElement('span');
+            ext.className = 'pu-ext'; ext.textContent = (a.file_type || '').toUpperCase();
+            thumb.appendChild(ext);
+        }
+        const name = document.createElement('div');
+        name.className = 'pu-name existing-file-name'; name.textContent = a.original_filename;
+        const size = document.createElement('div');
+        size.className = 'pu-size text-muted'; size.textContent = (a.file_size / 1024).toFixed(1) + ' KB';
+        const badge = document.createElement('span');
+        badge.className = 'badge text-bg-danger pu-new pu-removing-label'; badge.textContent = 'Removing';
+        tile.append(thumb, name, size, badge);
+        tile.addEventListener('click', () => {
+            if (isImage) openKanbanImageModal(url, a.original_filename);
+            else window.open(url, '_blank', 'noopener');
         });
-        html += '</div>';
-    }
-
-    if (others.length) {
-        others.forEach(a => {
-            const sizeMb  = (a.file_size / 1048576).toFixed(2);
-            const icon    = a.file_type === 'pdf'  ? 'bi-file-earmark-pdf text-danger'
-                          : a.file_type === 'txt'  ? 'bi-file-earmark-text text-secondary'
-                          : 'bi-file-earmark text-muted';
-            const delBtn  = CAN_UPLOAD
-                ? `<button type="button" class="btn btn-link btn-sm p-0 text-danger ms-2 js-del-attachment"
-                       data-id="${a.id}" title="Delete"><i class="bi bi-trash"></i></button>`
-                : '';
-            html += `<div class="d-flex align-items-center py-1 border-bottom small">
-                <i class="bi ${icon} me-2"></i>
-                <a href="/uploads/${escHtml(a.filename)}" target="_blank"
-                   class="flex-grow-1 text-truncate">${escHtml(a.original_filename)}</a>
-                <span class="text-muted ms-2 text-nowrap">${sizeMb} MB</span>
-                ${delBtn}
-            </div>`;
-        });
-    }
-
-    container.innerHTML = html;
-    container.querySelectorAll('.js-del-attachment').forEach(btn => {
-        btn.addEventListener('click', () => deleteCardAttachment(parseInt(btn.dataset.id)));
-    });
-    container.querySelectorAll('.js-preview-img').forEach(img => {
-        img.addEventListener('click', () => openKanbanImageModal(img.dataset.src, img.dataset.title));
+        if (CAN_UPLOAD) {
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'btn btn-danger btn-sm pu-remove';
+            remove.title = 'Remove on save';
+            remove.setAttribute('aria-label', 'Remove ' + a.original_filename + ' on save');
+            remove.innerHTML = '<i class="bi bi-trash"></i>';
+            remove.addEventListener('click', e => {
+                e.stopPropagation();
+                const removing = tile.classList.toggle('pu-removing');
+                if (removing) _cardRemoveIds.add(a.id); else _cardRemoveIds.delete(a.id);
+                remove.title = removing ? 'Keep this file' : 'Remove on save';
+                remove.innerHTML = removing ? '<i class="bi bi-arrow-counterclockwise"></i>' : '<i class="bi bi-trash"></i>';
+                document.dispatchEvent(new Event('pending-uploads:recount'));
+            });
+            tile.appendChild(remove);
+        }
+        container.appendChild(tile);
     });
 }
 
@@ -2766,52 +2759,16 @@ function openKanbanImageModal(src, title) {
     new bootstrap.Modal(document.getElementById('kanbanImageModal')).show();
 }
 
-async function uploadCardFiles() {
-    if (!_currentCardId) return;
-    const input = document.getElementById('card-file-input');
-    const files = input?.files;
-    if (!files || files.length === 0) { alert('Please select files to upload.'); return; }
-
-    if (KANBAN_UPLOAD_MAX_FILES === 0) {
-        alert('File uploads are currently disabled by the administrator.');
-        return;
-    }
-    if (KANBAN_UPLOAD_MAX_FILES > 0) {
-        if (_cardAttachmentCount >= KANBAN_UPLOAD_MAX_FILES) {
-            alert(`Upload limit reached. This card already has ${_cardAttachmentCount} file(s) (max ${KANBAN_UPLOAD_MAX_FILES}).`);
-            return;
-        }
-        if (_cardAttachmentCount + files.length > KANBAN_UPLOAD_MAX_FILES) {
-            const remaining = KANBAN_UPLOAD_MAX_FILES - _cardAttachmentCount;
-            alert(`Too many files. Selecting ${files.length} would exceed the limit (max ${KANBAN_UPLOAD_MAX_FILES}, already ${_cardAttachmentCount}, room for ${remaining} more).`);
-            return;
-        }
-    }
-
+/* Send the dialog's file changes; the server reports the outcome as page messages after reload. */
+async function saveCardFiles(cardId) {
+    const uploads = _cardUploads();
+    const files = uploads ? uploads.files : [];
+    if (!CAN_UPLOAD || (!files.length && !_cardRemoveIds.size)) return;
     const fd = new FormData();
-    for (const f of files) fd.append('files', f);
-
-    try {
-        const r    = await fetch(`/kanban/cards/${_currentCardId}/upload`,
-                                 { method: 'POST', headers: { 'X-CSRFToken': CSRF }, body: fd });
-        const data = await r.json();
-        if (data.errors?.length) {
-            const prefix = data.uploaded > 0 ? `${data.uploaded} file(s) uploaded.\n\nRejected:\n` : '';
-            alert(prefix + '• ' + data.errors.join('\n• '));
-        }
-        const card = await api('GET', '/kanban/cards/' + _currentCardId);
-        renderCardAttachments(card.attachments);
-        if (input) input.value = '';
-    } catch(e) { showErr(e.message); }
-}
-
-async function deleteCardAttachment(id) {
-    if (!confirm('Delete this file?')) return;
-    try {
-        await api('DELETE', '/kanban/cards/attachments/' + id);
-        const card = await api('GET', '/kanban/cards/' + _currentCardId);
-        renderCardAttachments(card.attachments);
-    } catch(e) { showErr(e.message); }
+    files.forEach(f => fd.append('files', f));
+    _cardRemoveIds.forEach(id => fd.append('remove_attachment_ids[]', id));
+    const r = await fetch(`/kanban/cards/${cardId}/files`, { method: 'POST', headers: { 'X-CSRFToken': CSRF }, body: fd });
+    if (!r.ok) throw new Error(r.status === 413 ? 'The files are too large to send at once.' : 'Saving the files failed.');
 }
 
 // ── Card share files ─────────────────────────────────────────────
@@ -2985,6 +2942,12 @@ document.getElementById('btn-save-card')?.addEventListener('click', async () => 
     )) { btn.disabled = false; return; }
     const catVal = document.getElementById('card-modal-category').value;
     try {
+        if (_cardModalReadOnly) {
+            await saveCardFiles(id);
+            hideModal('cardModal');
+            location.reload();
+            return;
+        }
         await api('PUT', '/kanban/cards/' + id, {
             title,
             priority: parseInt(document.getElementById('card-modal-priority').value),
@@ -2998,6 +2961,7 @@ document.getElementById('btn-save-card')?.addEventListener('click', async () => 
             description: document.getElementById('card-modal-desc').value,
             share_file_ids: [..._cardShareFileIds],
         });
+        await saveCardFiles(id);
         hideModal('cardModal');
         location.reload();
     } catch(e) { btn.disabled = false; showErr(e.message); }
@@ -3521,4 +3485,5 @@ document.addEventListener('DOMContentLoaded', () => {
     if (moveBtn && !CAN_EDIT) moveBtn.style.display = 'none';
 });
 </script>
+<script src="{{ url_for('static', filename='js/pending-uploads.js') }}"></script>
 {% endblock %}

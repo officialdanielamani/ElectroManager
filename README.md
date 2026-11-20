@@ -73,7 +73,7 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 - **Project cost tracking** — add extra cost line items per project: *per-quantity* costs (e.g. labour per unit) and *overall* costs (e.g. one-off fees); combined with BOM actual cost for a full project cost estimate
 - Available-for-BOM search excludes items already lent or assigned elsewhere
 - Project attachments with separate upload limits by category (pictures, documents, schematics, 2D/3D files), added on New Project or Edit Project and uploaded when the project is saved, with the same checks and per-file messages as items
-- Project reference URLs with optional title and description
+- Project reference URLs with optional title and description, added or removed on New Project or Edit Project and applied when the project is saved
 - Link shared library files to projects
 - **Dateline notifications** — configurable alerts (N days before end date) visible in the notification centre
 - Project-level status tracking (active, completed, overdue; custom statuses supported)
@@ -85,7 +85,7 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 - **Boards** — create personal or shared Kanban boards with custom columns (name, color, icon), per-board color/icon, and a pin/hide/show status list
 - **Cards** — title, description (free text), priority (Low/Medium/High/Urgent), label color, category, due and start dates, key persons, and a Mark Done toggle
 - **Tasks (checklist)** — per-card task lists with individual completion checkboxes, start/due dates, and inline edit/delete; task progress badge on board view
-- **Card file uploads** — attach images and documents directly to cards; images open in a lightbox modal; enforces the Kanban upload settings (allowed types, max size, max files per batch); upload permission extends to view-shared users
+- **Card file uploads** — attach images and documents directly to cards; images open in a lightbox modal; files are picked and previewed in the card dialog and uploaded when the card is saved, with the same checks and per-file messages as item uploads; enforces the Kanban upload settings (allowed types, max size, max files per card); upload permission extends to view-shared users, who get a "Save files" button
 - **Share Files on cards** — link files from the shared library (Item, Project, or Icon categories) to a card using the same browse-picker UI as items and projects; chips display with thumbnail preview
 - **Board sharing** — share boards in edit mode (collaborators can create, edit, and delete cards/tasks) or view-only mode; public boards visible to all logged-in users
 - **Real-time collaboration** — presence indicators show who else is viewing or editing the same board; card changes by other users sync automatically without a page reload
@@ -94,7 +94,7 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 - **Keyboard-friendly** — drag-and-drop column/card reordering via SortableJS; collapse/expand task lists per card with state persisted in localStorage
 
 ### Shared File Library
-- Central file library (`Settings → Share Files`) for uploading files once and linking them to multiple items, projects, or Kanban cards
+- Central file library (`Settings → Share Files`) for uploading files once and linking them to multiple items, projects, or Kanban cards; files are previewed and checked in the browser before upload, and the server reports each rejected file with its reason
 - Categories: `item`, `project`, `icon`, `profile`, `sticker`
 - Bulk delete and bulk download
 - Files are stored in a dedicated share folder separate from item/project attachments
@@ -157,8 +157,8 @@ ElectroManager runs entirely in a web browser, making it accessible from any dev
 ### Settings — File Uploads
 - Per-section upload limits configurable at `Settings → System → File Upload Settings`
 - **Sections:** Item Uploads, Project Uploads (per attachment type), Kanban Card Uploads, Share Files Uploads
-- **Controls per section:** Allowed file types (extension list), Max file size (MB), Max files per upload batch
-- **Max files semantics:** `-1` = unlimited, `0` = new uploads disabled (existing files are never affected), `>0` = batch limit enforced on every upload request
+- **Controls per section:** Allowed file types (extension list), Max file size (MB), Max files
+- **Max files semantics:** `-1` = unlimited, `0` = new uploads disabled (existing files are never affected), `>0` = most files allowed, counting files already there (per item, per project attachment type, per Kanban card, per Share Files category)
 - Share Files section defaults to a higher max-files limit (acts as a drive); all others default to 5
 
 ### Image Caching & Thumbnails

@@ -267,3 +267,118 @@ def test_oversized_request_returns_to_the_form_with_a_message(app, admin_client)
         app.config['MAX_CONTENT_LENGTH'] = previous
     assert response.status_code == 302 and response.headers['Location'].endswith('/item/new')
     assert any('Nothing was saved' in m for _, m in flashes(admin_client))
+
+
+# ── Share Files library ──────────────────────────────────────────────────
+
+def test_share_library_upload_uses_the_same_checks(app, admin_client):
+    with app.app_context():
+        Setting.set('share_item_extensions', 'png,pdf')
+        Setting.set('share_item_max_size', '1')
+        Setting.set('share_item_max_files', '2')
+    response = admin_client.post('/settings/share-files/upload', data={
+        'category': 'item',
+        'files': files(('board.png', png_bytes()), ('trojan.pdf', EXE), ('big.png', BIG),
+                       ('notes.txt', b'hi'), ('sheet.pdf', PDF), ('third.png', png_bytes())),
+    }, content_type='multipart/form-data')
+    assert response.status_code == 302
+    with app.app_context():
+        assert sorted(f.name for f in SharedFile.query.filter_by(category='item')) == ['board', 'sheet']
+    messages = flashes(admin_client)
+    assert messages[0] == ('success', '2 files uploaded to item.')
+    warnings = [m for c, m in messages if c == 'warning']
+    assert any('"trojan.pdf"' in m and 'disguised as .pdf' in m for m in warnings)
+    assert any('"big.png"' in m and 'too large' in m for m in warnings)
+    assert any('"notes.txt"' in m and 'not permitted' in m for m in warnings)
+    assert any('"third.png"' in m and 'limit of 2 files' in m for m in warnings)
+
+
+def test_share_page_has_the_upload_area(admin_client):
+    page = admin_client.get('/settings/share-files').get_data(as_text=True)
+    assert 'id="shareUploadArea" data-form="shareUploadForm" data-name="files"' in page
+
+
+# ── Kanban cards ─────────────────────────────────────────────────────────
+
+@pytest.fixture
+def card(app, admin_client):
+    board = admin_client.post('/kanban/boards', json={'name': 'Work'}).get_json()['id']
+    column = admin_client.post(f'/kanban/boards/{board}/columns', json={'name': 'Todo'}).get_json()['id']
+    return admin_client.post(f'/kanban/boards/{board}/cards', json={'title': 'Wire it', 'column_id': column}).get_json()['id']
+
+
+def card_files(client, card_id, **data):
+    return client.post(f'/kanban/cards/{card_id}/files', data=data, content_type='multipart/form-data')
+
+
+def test_card_files_are_checked_and_removals_applied(app, admin_client, card):
+    from models import KanbanAttachment
+    with app.app_context():
+        Setting.set('kanban_upload_extensions', 'png,pdf')
+        Setting.set('kanban_upload_max_files', '2')
+    result = card_files(admin_client, card, files=files(('a.png', png_bytes()), ('b.pdf', EXE), ('c.pdf', PDF),
+                                                        ('d.png', png_bytes()))).get_json()
+    assert result['uploaded'] == 2
+    assert any('"b.pdf"' in m and 'disguised' in m for m in result['messages'])
+    assert any('"d.png"' in m and 'limit of 2 files' in m for m in result['messages'])
+    with app.app_context():
+        atts = KanbanAttachment.query.filter_by(card_id=card).all()
+        a_id = next(a.id for a in atts if a.original_filename == 'a.png')
+        a_path = next(a.filename for a in atts if a.original_filename == 'a.png')
+    result = card_files(admin_client, card, **{'remove_attachment_ids[]': [str(a_id)],
+                                               'files': files(('e.png', png_bytes()))}).get_json()
+    assert (result['uploaded'], result['removed']) == (1, 1), 'a removal frees a slot in the same save'
+    with app.app_context():
+        assert sorted(a.original_filename for a in KanbanAttachment.query.filter_by(card_id=card)) == ['c.pdf', 'e.png']
+    assert not os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], a_path))
+
+
+def test_card_files_need_board_access(app, card, make_user, login):
+    make_user('stranger')
+    response = card_files(login('stranger'), card, files=files(('a.png', png_bytes())))
+    assert response.status_code == 403
+
+
+def test_view_shared_users_may_change_files(app, admin_client, card, make_user, login):
+    from models import KanbanBoard, KanbanCard, User
+    viewer_id = make_user('viewer')
+    with app.app_context():
+        board = db.session.get(KanbanBoard, db.session.get(KanbanCard, card).board_id)
+        board.share_view_users = json.dumps([{'id': viewer_id, 'name': 'viewer'}])
+        db.session.commit()
+    assert card_files(login('viewer'), card, files=files(('a.png', png_bytes()))).get_json()['uploaded'] == 1
+
+
+def test_kanban_page_has_the_upload_area(admin_client, card):
+    assert 'id="card-pending-uploads"' in admin_client.get('/kanban').get_data(as_text=True)
+
+
+# ── Project URLs ─────────────────────────────────────────────────────────
+
+def test_project_urls_apply_on_save(app, admin_client):
+    from models import ProjectURL
+    new_project(admin_client, **{'new_url[]': ['https://a.example/spec', 'javascript:alert(1)'],
+                                 'new_url_title[]': ['Spec', 'Evil'], 'new_url_description[]': ['first', '']})
+    assert any('"javascript:alert(1)" was not added' in m for _, m in flashes(admin_client))
+    with app.app_context():
+        project = Project.query.one()
+        assert [(u.url, u.title, u.description) for u in project.urls] == [('https://a.example/spec', 'Spec', 'first')]
+        pid, url_id = project.project_id, project.urls[0].id
+    admin_client.post(f'/project/{pid}/edit', data={'name': 'Robot', 'remove_url_ids[]': [str(url_id)],
+                                                    'new_url[]': ['http://b.example'], 'new_url_title[]': [''],
+                                                    'new_url_description[]': ['']})
+    with app.app_context():
+        assert [(u.url, u.title) for u in ProjectURL.query.all()] == [('http://b.example', None)]
+
+
+def test_project_url_of_another_project_cannot_be_removed(app, admin_client):
+    from models import ProjectURL
+    new_project(admin_client, **{'new_url[]': ['https://a.example'], 'new_url_title[]': [''], 'new_url_description[]': ['']})
+    with app.app_context():
+        url_id = ProjectURL.query.one().id
+    admin_client.post('/project/new', data={'name': 'Other'})
+    with app.app_context():
+        other = Project.query.filter_by(name='Other').one().project_id
+    admin_client.post(f'/project/{other}/edit', data={'name': 'Other', 'remove_url_ids[]': [str(url_id)]})
+    with app.app_context():
+        assert ProjectURL.query.count() == 1

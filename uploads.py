@@ -1,9 +1,10 @@
 """
-Files attached to items and projects through their New / Edit forms.
+Upload rules and checks shared by every place files are uploaded: items, projects,
+Kanban cards and the Share Files library.
 
-The browser keeps picked files until the form is saved and checks them first
-(static/js/pending-uploads.js); everything is checked again here on save. The item or
-project is saved regardless, and each rejected file is reported with its reason.
+The browser keeps picked files until the user saves and checks them first
+(static/js/pending-uploads.js); everything is checked again here. What passes is
+stored, and each rejected file is reported with its reason.
 """
 import os
 from dataclasses import dataclass
@@ -26,7 +27,7 @@ _DEMO_EXTENSIONS = {'jpg', 'jpeg', 'png', 'txt', 'md'}
 _DEMO_MAX_MB = 1
 _EXECUTABLE_EXTENSIONS = {'exe', 'dll', 'so', 'bin', 'elf', 'dmg', 'app'}
 _EXECUTABLE_SIGNATURES = (b'MZ', b'\x7fELF', b'\xca\xfe\xba\xbe', b'\xfe\xed\xfa\xce', b'\xce\xfa\xed\xfe')
-# Upload counts of -1 mean "unlimited"; the request size limit then assumes this many.
+# Upload counts of -1 ("unlimited") or above this are treated as this many when sizing requests.
 _UNLIMITED_COUNT_FOR_SIZING = 50
 
 
@@ -75,6 +76,35 @@ def project_rules(attachment_type, existing=0):
     max_mb = _int_setting(f'project_upload_{attachment_type}_max_size', default_mb)
     max_files = _int_setting(f'project_upload_{attachment_type}_max_files', '5')
     return UploadRules(allowed, max_mb * 1024 * 1024, max_files, existing)
+
+
+def kanban_rules(existing=0):
+    if current_app.config.get('DEMO_MODE'):
+        return UploadRules(frozenset({'png', 'jpg', 'jpeg'}), _DEMO_MAX_MB * 1024 * 1024, 5, existing)
+    allowed = _extensions(Setting.get('kanban_upload_extensions', 'png,jpg,jpeg,txt,pdf'))
+    max_mb = _int_setting('kanban_upload_max_size', '10')
+    return UploadRules(allowed, max_mb * 1024 * 1024, _int_setting('kanban_upload_max_files', '5'), existing)
+
+
+SHARE_CATEGORIES = {   # category: (default extensions, default max MB, demo extensions)
+    'item':    ('pdf,png,jpg,jpeg,gif,txt,doc,docx', '10', 'jpg,jpeg,png,txt'),
+    'project': ('pdf,png,jpg,jpeg,gif,txt,doc,docx', '10', 'jpg,jpeg,png,txt'),
+    'profile': ('jpg,jpeg,png',                      '1',  'jpg,jpeg,png'),
+    'sticker': ('png,jpg,jpeg',                      '1',  'jpg,jpeg,png'),
+    'icon':    ('png,jpg,jpeg',                      '5',  'jpg,jpeg,png'),
+}
+
+
+def share_rules(category, existing=0):
+    """Share library rules. max_files limits how many files the category may hold in total."""
+    default_ext, default_mb, demo_ext = SHARE_CATEGORIES[category]
+    if category == 'profile':
+        return UploadRules(_extensions(default_ext), 1024 * 1024, -1, existing)
+    if current_app.config.get('DEMO_MODE'):
+        return UploadRules(_extensions(demo_ext), _DEMO_MAX_MB * 1024 * 1024, -1, existing)
+    allowed = _extensions(Setting.get(f'share_{category}_extensions', default_ext))
+    max_mb = _int_setting(f'share_{category}_max_size', default_mb)
+    return UploadRules(allowed, max_mb * 1024 * 1024, _int_setting(f'share_{category}_max_files', '100'), existing)
 
 
 def _size(storage):
@@ -133,15 +163,19 @@ def describe_rejections(rejected, area=None):
 
 
 def request_size_limit():
-    """Largest request a New/Edit form with every upload area full could make, plus room for the form."""
+    """Largest request any upload could make with its areas full, plus room for the rest of the form."""
     def total(rules):
-        count = rules.max_files if rules.max_files >= 0 else _UNLIMITED_COUNT_FOR_SIZING
+        count = rules.max_files if 0 <= rules.max_files <= _UNLIMITED_COUNT_FOR_SIZING else _UNLIMITED_COUNT_FOR_SIZING
         return rules.max_bytes * count
 
-    item = total(item_rules())
-    project = sum(total(project_rules(t)) for t in PROJECT_ATTACHMENT_TYPES)
-    kanban = _int_setting('kanban_upload_max_size', '10') * 1024 * 1024 * max(_int_setting('kanban_upload_max_files', '5'), 1)
-    return max(item, project, kanban, 16 * 1024 * 1024) + 2 * 1024 * 1024
+    candidates = [
+        total(item_rules()),
+        sum(total(project_rules(t)) for t in PROJECT_ATTACHMENT_TYPES),
+        total(kanban_rules()),
+        *(total(share_rules(c)) for c in SHARE_CATEGORIES),
+        16 * 1024 * 1024,
+    ]
+    return max(candidates) + 2 * 1024 * 1024
 
 
 def remove_stored_file(path, upload_folder):

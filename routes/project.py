@@ -88,6 +88,27 @@ def _apply_project_file_changes(project):
     return uploaded, messages
 
 
+def _apply_project_url_changes(project):
+    """Apply URL removals and additions sent with the project form; returns messages about skipped URLs."""
+    remove_ids = {int(i) for i in request.form.getlist('remove_url_ids[]') if i.isdigit()}
+    if remove_ids:
+        ProjectURL.query.filter(ProjectURL.project_id == project.id, ProjectURL.id.in_(remove_ids)).delete(
+            synchronize_session=False)
+    messages = []
+    urls = request.form.getlist('new_url[]')
+    titles = request.form.getlist('new_url_title[]')
+    descriptions = request.form.getlist('new_url_description[]')
+    for index, url in enumerate(urls):
+        url = url.strip()
+        if not re.match(r'^https?://\S+$', url, re.IGNORECASE) or len(url) > 1000:
+            messages.append(f'URL "{url[:80]}" was not added: it must start with http:// or https://.')
+            continue
+        title = (titles[index] if index < len(titles) else '').strip()[:300] or None
+        description = (descriptions[index] if index < len(descriptions) else '').strip()[:512] or None
+        db.session.add(ProjectURL(project_id=project.id, url=url, title=title, description=description))
+    return messages
+
+
 def _project_upload_rules(project=None):
     """Browser-side upload rules for each attachment type of the project form."""
     counts = {}
@@ -279,6 +300,7 @@ def project_new():
             project.linked_share_files = SharedFile.query.filter(SharedFile.id.in_(sf_ids),
                                                                  SharedFile.category == 'project').all()
         uploaded, problems = _apply_project_file_changes(project)
+        problems += _apply_project_url_changes(project)
         db.session.commit()
 
         log_audit(current_user.id, 'create', 'project', project.id, f'Created project: {project.name}')
@@ -420,6 +442,7 @@ def project_edit(project_id):
         project.linked_share_files = SharedFile.query.filter(SharedFile.id.in_(sf_ids),
                                                              SharedFile.category == 'project').all() if sf_ids else []
         uploaded, problems = _apply_project_file_changes(project)
+        problems += _apply_project_url_changes(project)
 
         db.session.commit()
         log_audit(current_user.id, 'update', 'project', project.id, f'Updated project: {project.name}')
@@ -1069,48 +1092,6 @@ def project_download_share_files(project_id):
 
 
 # ==================== PROJECT URLS ====================
-
-@project_bp.route('/project/<project_id>/url/add', endpoint='project_url_add', methods=['POST'])
-@login_required
-def project_url_add(project_id):
-    if not current_user.has_permission('projects', 'edit'):
-        flash('No permission.', 'danger')
-        return redirect(url_for('project.project_detail', project_id=project_id))
-
-    project = Project.query.filter_by(project_id=project_id).first_or_404()
-    url_val = request.form.get('url', '').strip()
-    if not url_val:
-        flash('URL is required.', 'danger')
-        return redirect(url_for('project.project_detail', project_id=project_id))
-    if not url_val.startswith(('http://', 'https://')):
-        flash('URL must start with http:// or https://', 'danger')
-        return redirect(url_for('project.project_detail', project_id=project_id))
-
-    purl = ProjectURL(
-        project_id=project.id,
-        url=url_val,
-        title=request.form.get('title', '').strip() or None,
-        description=request.form.get('url_description', '').strip()[:512] or None
-    )
-    db.session.add(purl)
-    db.session.commit()
-    flash('URL added.', 'success')
-    return redirect(url_for('project.project_detail', project_id=project_id))
-
-
-@project_bp.route('/project/url/<int:url_id>/delete', endpoint='project_url_delete', methods=['POST'])
-@login_required
-def project_url_delete(url_id):
-    if not current_user.has_permission('projects', 'edit'):
-        return jsonify({'error': 'No permission'}), 403
-
-    purl = ProjectURL.query.get_or_404(url_id)
-    project = purl.project
-    db.session.delete(purl)
-    db.session.commit()
-    flash('URL removed.', 'success')
-    return redirect(url_for('project.project_detail', project_id=project.project_id))
-
 
 # ==================== PROJECT SETTINGS (Categories, Tags, Status, Groups, Persons) ====================
 

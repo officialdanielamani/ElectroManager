@@ -12,6 +12,10 @@
  * Existing files listed elsewhere on the page count towards the limit unless they carry the
  * class "pu-removing" (marked for removal); fire a "pending-uploads:recount" event on document
  * after changing that.
+ *
+ * Without data-form the area is driven by script: PendingUploads.of(root) gives the instance,
+ * whose .files are sent by the page itself; .clear(), .setRules(rules) and .setDisabled(flag)
+ * reset it for a different record or different limits.
  */
 (function () {
     'use strict';
@@ -117,7 +121,7 @@
         this.payload.type = 'file';
         this.payload.multiple = true;
         this.payload.hidden = true;
-        this.payload.name = this.root.dataset.name;
+        if (this.root.dataset.name) this.payload.name = this.root.dataset.name;
         if (this.form) this.payload.setAttribute('form', this.form.id);
 
         this.alerts = el('div', 'pu-alerts');
@@ -177,6 +181,41 @@
             self.sync();
             self.render();
         });
+    };
+
+    PendingUploads.prototype.setRules = function (rules) {
+        this.rules = rules;
+        if (rules.allowed && rules.allowed.length) {
+            this.picker.accept = rules.allowed.map(function (e) { return '.' + e; }).join(',');
+        }
+        var self = this, kept = [], problems = [];
+        this.files.forEach(function (file) {
+            var ext = extOf(file.name), reason = null;
+            if (rules.allowed.indexOf(ext) < 0) reason = '.' + ext + ' files are not permitted here';
+            else if (file.size > rules.maxBytes) reason = 'it is larger than ' + formatSize(rules.maxBytes);
+            else if (rules.maxFiles >= 0 && self.existingCount() + kept.length >= rules.maxFiles) {
+                reason = 'the limit of ' + rules.maxFiles + ' files is reached';
+            }
+            if (reason) problems.push('"' + file.name + '" was removed: ' + reason + '.');
+            else kept.push(file);
+        });
+        this.files = kept;
+        this.showProblems(problems);
+        this.sync();
+        this.render();
+    };
+
+    PendingUploads.prototype.setDisabled = function (disabled) {
+        this.disabled = !!disabled;
+        this.render();
+    };
+
+    PendingUploads.prototype.clear = function () {
+        this.files.forEach(function (f) { if (f._url) URL.revokeObjectURL(f._url); });
+        this.files = [];
+        this.showProblems([]);
+        this.sync();
+        this.render();
     };
 
     PendingUploads.prototype.remove = function (index) {
@@ -330,5 +369,8 @@
         instances.forEach(function (i) { i.render(); });
     });
     document.addEventListener('DOMContentLoaded', mountAll);
-    window.PendingUploads = { mountAll: mountAll };
+    window.PendingUploads = {
+        mountAll: mountAll,
+        of: function (root) { mountAll(); return root ? root._pendingUploads : null; },
+    };
 })();

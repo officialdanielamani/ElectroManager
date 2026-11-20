@@ -82,24 +82,31 @@ fails to create.
 
 ## File uploads in forms
 
-The New / Edit item and project forms do not upload anything until the form is saved, so editing
-files never loses the rest of the form.
+Nothing is uploaded when files are picked: the New / Edit item and project forms, the Kanban card
+dialog and the Share Files upload dialog all upload when they are saved, so editing files never
+loses the rest of the form.
 
 - `static/js/pending-uploads.js` turns each `<div class="pending-uploads">` into an upload area. It
   checks picked files (extension, size, count, first bytes against the extension), previews them, and
   puts the accepted ones into a hidden `<input type="file">` submitted with the form. Removing or
   renaming an existing file only records the change in hidden inputs.
-- `uploads.py` holds the rules (`item_rules`, `project_rules`, read from System Settings) and checks
+  Places that are not a plain form (the Kanban card dialog) use manual mode: no `data-name`, and the
+  page reads `PendingUploads.of(root).files` and sends them itself. `setRules()` swaps the rules
+  (Share Files uses it when the category changes) and drops pending files that no longer fit.
+- `uploads.py` holds the rules (`item_rules`, `project_rules`, `kanban_rules`, `share_rules`, read
+  from System Settings) and checks
   each file again on save (`select_uploads`). Rejections become one message per file
   (`describe_rejections`); the item or project is still saved.
 - `routes/item.py` `_apply_item_file_changes` and `routes/project.py` `_apply_project_file_changes`
-  apply removals, renames and uploads inside the normal save.
+  apply removals, renames and uploads inside the normal save. The Kanban card dialog saves the card
+  and then posts its files and removals to `POST /kanban/cards/<id>/files`; `routes/share.py`
+  `share_upload` runs the same checks for the library.
+- Project URLs follow the same pattern: added or removed rows become hidden inputs (`new_url[]`,
+  `remove_url_ids[]`) applied by `_apply_project_url_changes` when the project is saved.
 - Because a save can carry several files, `MAX_CONTENT_LENGTH` is computed from the upload settings
   (`request_size_limit`) at startup and after System Settings are saved, unless the
   `MAX_CONTENT_LENGTH` environment variable is set. A request that is still too large returns to the
   form with a message (the 413 handler in `app.py`).
-
-Kanban card uploads and the share-file library still upload immediately; they are not part of a form.
 
 ## Tests
 
@@ -159,8 +166,6 @@ Things a new maintainer should know are unfinished or weak, roughly by importanc
   to read.
 - **Print pages link a Bootstrap CSS path that does not exist** (`static/lib/bootstrap/css/…`), so
   they render without Bootstrap styling.
-- **Project URLs are still added with their own form**, so adding one on Edit Project reloads the
-  page and loses unsaved changes to the rest of the form.
 - **SQLite only in practice.** Backup and restore copy the SQLite file, and migrations are tested on
   SQLite only.
 - **Single process.** Rate limits, the API rate limiter and Kanban live updates are held in memory,

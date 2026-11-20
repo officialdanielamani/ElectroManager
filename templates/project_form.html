@@ -320,6 +320,104 @@
             </div>
         </div>
 
+        <!-- URLs: added and removed when the project is saved -->
+        <div class="card mt-3">
+            <div class="card-header"><h5 class="mb-0"><i class="bi bi-link-45deg"></i> URLs</h5></div>
+            <div class="card-body">
+                <div id="projectUrlList">
+                    {% for purl in (project.urls if project else []) %}
+                    <div class="existing-file project-url d-flex justify-content-between align-items-start gap-2 mb-2" data-url-id="{{ purl.id }}">
+                        <div class="text-break">
+                            <a href="{{ purl.url }}" target="_blank" rel="noopener noreferrer" class="existing-file-name">{{ purl.title or purl.url }}</a>
+                            <span class="badge text-bg-danger pu-removing-label">Removing</span>
+                            {% if purl.description %}<br><small class="text-muted">{{ purl.description }}</small>{% endif %}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0" title="Remove on save"
+                                aria-label="Remove this URL on save" onclick="toggleProjectUrlRemoval(this)"><i class="bi bi-trash"></i></button>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="row g-2 mt-1">
+                    <div class="col-md-5"><input type="url" class="form-control form-control-sm" id="newProjectUrl" maxlength="1000" placeholder="https://..."></div>
+                    <div class="col-md-3"><input type="text" class="form-control form-control-sm" id="newProjectUrlTitle" maxlength="300" placeholder="Title"></div>
+                    <div class="col-md-3"><input type="text" class="form-control form-control-sm" id="newProjectUrlDescription" maxlength="512" placeholder="Description"></div>
+                    <div class="col-md-1"><button type="button" class="btn btn-sm btn-success w-100" title="Add URL" aria-label="Add URL" onclick="addProjectUrl()"><i class="bi bi-plus"></i></button></div>
+                </div>
+                <div id="projectUrlInputs"></div>
+                <small class="text-muted d-block mt-2">New URLs and removals are applied when you save the project.</small>
+            </div>
+        </div>
+        <script>
+        function _projectUrlInput(name, value) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            input.value = value;
+            input.setAttribute('form', 'projectForm');
+            return input;
+        }
+
+        function addProjectUrl() {
+            const urlBox = document.getElementById('newProjectUrl');
+            const url = urlBox.value.trim();
+            const title = document.getElementById('newProjectUrlTitle').value.trim();
+            const description = document.getElementById('newProjectUrlDescription').value.trim();
+            if (!/^https?:\/\/\S+$/i.test(url)) {
+                alert('Enter a URL starting with http:// or https://');
+                urlBox.focus();
+                return;
+            }
+            const row = document.createElement('div');
+            row.className = 'project-url d-flex justify-content-between align-items-start gap-2 mb-2';
+            const text = document.createElement('div');
+            text.className = 'text-break';
+            const badge = document.createElement('span');
+            badge.className = 'badge text-bg-info me-1';
+            badge.textContent = 'New';
+            const link = document.createElement('a');
+            link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+            link.textContent = title || url;
+            text.append(badge, link);
+            if (description) {
+                const small = document.createElement('small');
+                small.className = 'text-muted';
+                small.textContent = description;
+                text.append(document.createElement('br'), small);
+            }
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'btn btn-sm btn-outline-danger flex-shrink-0';
+            remove.title = 'Remove';
+            remove.setAttribute('aria-label', 'Remove this new URL');
+            remove.innerHTML = '<i class="bi bi-x-lg"></i>';
+            const inputs = [_projectUrlInput('new_url[]', url), _projectUrlInput('new_url_title[]', title),
+                            _projectUrlInput('new_url_description[]', description)];
+            remove.addEventListener('click', () => { row.remove(); inputs.forEach(i => i.remove()); });
+            row.append(text, remove);
+            document.getElementById('projectUrlList').appendChild(row);
+            inputs.forEach(i => document.getElementById('projectUrlInputs').appendChild(i));
+            ['newProjectUrl', 'newProjectUrlTitle', 'newProjectUrlDescription'].forEach(id => { document.getElementById(id).value = ''; });
+            urlBox.focus();
+        }
+
+        ['newProjectUrl', 'newProjectUrlTitle', 'newProjectUrlDescription'].forEach(id => {
+            document.getElementById(id).addEventListener('keydown', e => {
+                if (e.key === 'Enter') { e.preventDefault(); addProjectUrl(); }
+            });
+        });
+
+        function toggleProjectUrlRemoval(button) {
+            const row = button.closest('.project-url'), id = row.dataset.urlId;
+            const removing = row.classList.toggle('pu-removing');
+            const holder = document.getElementById('projectUrlInputs');
+            const existing = holder.querySelector(`input[name="remove_url_ids[]"][value="${id}"]`);
+            if (removing && !existing) holder.appendChild(_projectUrlInput('remove_url_ids[]', id));
+            else if (!removing && existing) existing.remove();
+            button.title = removing ? 'Keep this URL' : 'Remove on save';
+            button.innerHTML = removing ? '<i class="bi bi-arrow-counterclockwise"></i>' : '<i class="bi bi-trash"></i>';
+        }
+        </script>
+
         <!-- Attachments: new files, and removals, are applied when the project is saved -->
         {% set att_types = [('picture', 'Pictures', 'bi-image'), ('document', 'Documents', 'bi-file-text'), ('schematic', 'Schematics', 'bi-cpu'), ('2d_design', '2D Designs', 'bi-pencil-square'), ('3d_design', '3D Designs', 'bi-box'), ('program', 'Programs', 'bi-code')] %}
         <div class="card mt-3">
@@ -422,27 +520,6 @@
         {% endif %}
 
         {% if project %}
-        <!-- URLs (edit page only) -->
-        <div class="card mt-3">
-            <div class="card-header"><h5 class="mb-0"><i class="bi bi-link-45deg"></i> URLs</h5></div>
-            <div class="card-body">
-                {% for purl in project.urls %}
-                <div class="d-flex justify-content-between align-items-start mb-2">
-                    <div><a href="{{ purl.url }}" target="_blank">{{ purl.title or purl.url }}</a>{% if purl.description %}<br><small class="text-muted">{{ purl.description }}</small>{% endif %}</div>
-                    <form method="POST" action="{{ url_for('project.project_url_delete', url_id=purl.id) }}" style="display:inline;">
-                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove?')"><i class="bi bi-trash"></i></button>
-                    </form>
-                </div>
-                {% endfor %}
-                <form method="POST" action="{{ url_for('project.project_url_add', project_id=project.project_id) }}" class="row g-2 mt-2">
-                    <div class="col-5"><input type="url" class="form-control form-control-sm" name="url" placeholder="https://..." required></div>
-                    <div class="col-3"><input type="text" class="form-control form-control-sm" name="title" placeholder="Title"></div>
-                    <div class="col-3"><input type="text" class="form-control form-control-sm" name="url_description" placeholder="Description"></div>
-                    <div class="col-1"><button type="submit" class="btn btn-sm btn-success"><i class="bi bi-plus"></i></button></div>
-                </form>
-            </div>
-        </div>
-
         <!-- Magic Parameters -->
         {% if project %}
         <div class="card mt-3">

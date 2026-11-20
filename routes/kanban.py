@@ -1,13 +1,14 @@
 """
 Kanban Routes Blueprint
 """
-from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, flash
+from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from models import (db, KanbanBoard, KanbanBoardUserState, KanbanColumn, KanbanCard,
                     KanbanTask, KanbanAttachment, KanbanCategory, DEFAULT_KANBAN_COLUMNS,
                     ContactPerson, ContactOrganization, ContactGroup, User, Setting, SharedFile)
 from datetime import datetime, timezone, date
-from utils import log_audit, validate_mime_type, format_file_size
+from utils import log_audit
+from uploads import kanban_rules, select_uploads, describe_rejections, remove_stored_file
 import json
 import re
 import logging
@@ -434,12 +435,6 @@ def kanban():
         current_user.has_permission('kanban', 'share_board') and
         current_user.has_permission('settings_sections.contacts', 'view_users')
     )
-    from flask import current_app
-    demo = current_app.config.get('DEMO_MODE', False)
-    kanban_upload_exts    = 'png,jpg,jpeg' if demo else Setting.get('kanban_upload_extensions', 'png,jpg,jpeg,txt,pdf')
-    kanban_upload_max_size = 1 if demo else int(Setting.get('kanban_upload_max_size', '10'))
-    kanban_upload_max_files = 5 if demo else int(Setting.get('kanban_upload_max_files', '5'))
-
     share_files_item    = SharedFile.query.filter_by(category='item').order_by(SharedFile.name).all()
     share_files_project = SharedFile.query.filter_by(category='project').order_by(SharedFile.name).all()
     share_files_icon    = SharedFile.query.filter_by(category='icon').order_by(SharedFile.name).all()
@@ -454,9 +449,7 @@ def kanban():
         board_owners=board_owners,
         listing_boards=listing_boards,
         can_share_board=can_share_board,
-        kanban_upload_exts=kanban_upload_exts,
-        kanban_upload_max_size=kanban_upload_max_size,
-        kanban_upload_max_files=kanban_upload_max_files,
+        upload_rules=kanban_rules().for_browser(),
         share_files_item=share_files_item,
         share_files_project=share_files_project,
         share_files_icon=share_files_icon,
@@ -1095,115 +1088,55 @@ def delete_card(card_id):
     return jsonify({'ok': True})
 
 
-@kanban_bp.route('/kanban/cards/<int:card_id>/upload', methods=['POST'])
+@kanban_bp.route('/kanban/cards/<int:card_id>/files', methods=['POST'])
 @login_required
-def upload_card_attachment(card_id):
+def save_card_files(card_id):
+    """Apply the attachment removals and uploads chosen in the card dialog, sent when it is saved."""
     card = _card_uploadable_or_403(card_id)
-    files = request.files.getlist('files')
-
-    from flask import current_app
-    demo = current_app.config.get('DEMO_MODE', False)
-    max_size_mb    = 1 if demo else int(Setting.get('kanban_upload_max_size', '10'))
-    max_size_bytes = max_size_mb * 1024 * 1024
-    ext_str        = 'png,jpg,jpeg' if demo else Setting.get('kanban_upload_extensions', 'png,jpg,jpeg,txt,pdf')
-    allowed_exts   = {e.strip().lower() for e in ext_str.split(',') if e.strip()}
-    max_files      = 5 if demo else int(Setting.get('kanban_upload_max_files', '5'))
-
-    valid_files = [f for f in files if f and f.filename]
-
-    if max_files == 0:
-        return jsonify({'success': False, 'uploaded': 0,
-                        'errors': ['File uploads are currently disabled.']}), 400
-    if max_files > 0:
-        existing_count = KanbanAttachment.query.filter_by(card_id=card.id).count()
-        if existing_count >= max_files:
-            return jsonify({'success': False, 'uploaded': 0,
-                            'errors': [f'Upload limit reached. This card already has {existing_count} file(s) (max {max_files}).']}), 400
-        if existing_count + len(valid_files) > max_files:
-            remaining = max_files - existing_count
-            return jsonify({'success': False, 'uploaded': 0,
-                            'errors': [f'Too many files. Selecting {len(valid_files)} would exceed the limit (max {max_files}, already {existing_count}, room for {remaining} more).']}), 400
-
     upload_folder = current_app.config['UPLOAD_FOLDER']
-    card_folder   = os.path.join(upload_folder, 'kanban', card.uuid)
-    os.makedirs(card_folder, exist_ok=True)
 
-    uploaded = 0
-    errors   = []
+    remove_ids = {int(i) for i in request.form.getlist('remove_attachment_ids[]') if i.isdigit()}
+    removed = 0
+    for att in KanbanAttachment.query.filter(KanbanAttachment.card_id == card.id,
+                                             KanbanAttachment.id.in_(remove_ids)).all() if remove_ids else []:
+        remove_stored_file(att.filename, upload_folder)
+        log_audit(current_user.id, 'delete', 'kanban_attachment', card.id, f'Deleted attachment: {att.original_filename}')
+        db.session.delete(att)
+        removed += 1
+    db.session.flush()
 
-    for file in valid_files:
-        fname = file.filename
-        ext   = fname.rsplit('.', 1)[1].lower() if '.' in fname else ''
-
-        if ext not in allowed_exts:
-            errors.append(f'"{fname}" — type .{ext} not allowed. Allowed: {ext_str}')
-            continue
-
-        file.seek(0, 2)
-        file_size = file.tell()
-        file.seek(0)
-
-        if file_size > max_size_bytes:
-            errors.append(f'"{fname}" — too large ({format_file_size(file_size)}). Max: {max_size_mb} MB')
-            continue
-
-        mime_ok, mime_reason = validate_mime_type(file, ext)
-        if not mime_ok:
-            errors.append(f'"{fname}" — {mime_reason}')
-            continue
-
-        safe_name = secure_filename(fname)
-        if not safe_name:
-            safe_name = f'file_{uploaded + 1}.{ext}'
-        file_path = os.path.join(card_folder, safe_name)
-        base  = safe_name.rsplit('.', 1)[0] if '.' in safe_name else safe_name
-        ctr   = 1
-        while os.path.exists(file_path):
-            safe_name = f'{base}_{ctr}.{ext}'
-            file_path = os.path.join(card_folder, safe_name)
-            ctr += 1
-
-        file.save(file_path)
-
-        att = KanbanAttachment(
-            card_id=card.id,
-            filename=f'kanban/{card.uuid}/{safe_name}',
-            original_filename=secure_filename(fname) or safe_name,
-            file_path=file_path,
-            file_type=ext,
-            file_size=os.path.getsize(file_path),
-            uploaded_by=current_user.id,
-        )
-        db.session.add(att)
-        uploaded += 1
-
-    if uploaded:
-        db.session.commit()
+    existing = KanbanAttachment.query.filter_by(card_id=card.id).count()
+    accepted, rejected = select_uploads(request.files.getlist('files'), kanban_rules(existing))
+    card_folder = os.path.join(upload_folder, 'kanban', card.uuid)
+    if accepted:
+        os.makedirs(card_folder, exist_ok=True)
+    for storage in accepted:
+        safe_name = secure_filename(storage.filename)
+        base, ext = safe_name.rsplit('.', 1)
+        stored, counter = safe_name, 1
+        while os.path.exists(os.path.join(card_folder, stored)):
+            stored, counter = f'{base}_{counter}.{ext}', counter + 1
+        file_path = os.path.join(card_folder, stored)
+        storage.save(file_path)
+        db.session.add(KanbanAttachment(card_id=card.id, filename=f'kanban/{card.uuid}/{stored}',
+                                        original_filename=safe_name, file_path=file_path, file_type=ext.lower(),
+                                        file_size=os.path.getsize(file_path), uploaded_by=current_user.id))
+    if accepted:
         log_audit(current_user.id, 'upload', 'kanban_attachment', card.id,
-                  f'Uploaded {uploaded} file(s) to card: {card.title}')
-
-    return jsonify({
-        'success': uploaded > 0,
-        'uploaded': uploaded,
-        'errors': errors,
-    }), 200 if uploaded > 0 or not errors else 400
-
-
-@kanban_bp.route('/kanban/cards/attachments/<int:attachment_id>', methods=['DELETE'])
-@login_required
-def delete_card_attachment(attachment_id):
-    att  = KanbanAttachment.query.get_or_404(attachment_id)
-    card = _card_uploadable_or_403(att.card_id)
-    try:
-        if os.path.exists(att.file_path):
-            os.remove(att.file_path)
-    except OSError:
-        pass
-    db.session.delete(att)
+                  f'Uploaded {len(accepted)} file(s) to card: {card.title}')
     db.session.commit()
-    log_audit(current_user.id, 'delete', 'kanban_attachment', card.id,
-              f'Deleted attachment: {att.original_filename}')
-    return jsonify({'ok': True})
+
+    messages = describe_rejections(rejected)
+    if accepted or removed:
+        parts = []
+        if accepted:
+            parts.append(f'{len(accepted)} file{"s" if len(accepted) != 1 else ""} uploaded')
+        if removed:
+            parts.append(f'{removed} file{"s" if removed != 1 else ""} removed')
+        flash(f'Card "{card.title}": ' + ' and '.join(parts) + '.', 'success')
+    for message in messages:
+        flash(message, 'warning')
+    return jsonify({'uploaded': len(accepted), 'removed': removed, 'messages': messages})
 
 
 @kanban_bp.route('/kanban/cards/reorder', methods=['POST'])
